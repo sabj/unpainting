@@ -24,7 +24,7 @@ function fixture() {
 test('fused faces bind exactly ten storage buffers',()=>{
   const info=analyse(SRC+FINISH_WET_SCAN);
   assert.equal(info.uses('faces_pflux').filter(b=>info.decl.find(d=>d.binding===b).kind.startsWith('storage')).length,10);
-  for(const name of ['p5c_wetfrontier','p5c_wetscan','p5ab','slide_apply_cap_sp']) {
+  for(const name of ['cap_commit','cap_sp','p5c_wetfrontier','p5c_wetscan','p5ab']) {
     assert(info.uses(name).filter(b=>b!==0).length<=10,`${name} uses ${info.uses(name).filter(b=>b!==0).length} storage bindings`);
   }
 });
@@ -44,9 +44,10 @@ test('GPU fusion and tight frontier retain fields across boundaries, drying and 
         process.env.GPU_FUSE_FACES=optimized?'1':'0';process.env.GPU_FUSE_WETSCAN=optimized?'1':'0';process.env.GPU_SPARSE_TIGHT=optimized?'1':'0';
         const s=fixture(),g=await GpuSheet.create(device,s,o);
         try {
-          for(const name of ['p5c_wetfrontier','p5c_wetscan','p5ab','slide_apply_cap_sp']) {
+          for(const name of ['p5c_wetfrontier','p5c_wetscan','p5ab']) {
             assert.equal(!!g.p[name],optimized && device.limits.maxStorageBuffersPerShaderStage>=10,name+' compiled for the selected arm');
           }
+          assert.ok(g.p.cap_commit, 'intermediate pore publication is available in both arms');
           g.step(60,25,true);await g.download(s);
           // A host stamp into a previously culled tile must re-open its halo.
           const i=8*s.w+8;s.M[i]=s.ever[i]=1;s.W[i]=.2;s.G[0][i]=.01;g.upload(s);

@@ -9,6 +9,7 @@ import {fastDryChunk, adaptiveFastDryChunk} from './fast-dry-chunk.mjs';
 import {strokePlanBudget,strokePlanShader,planMiB} from './stroke-plan-budget.mjs';
 import { runStrokePrefixDiagnostic } from './stroke-prefix-diagnostic.mjs';
 import { GpuTimestamps } from './gpu-timestamps.mjs';
+import { flowTime, poreTime } from '../flow-time.mjs';
 import { SIZING } from '../sizing.mjs';
 import { settleSpeed, settleDiffusion } from '../settling.mjs';
 import { BrushReadbacks } from './brush-readbacks.mjs';
@@ -46,7 +47,7 @@ const UF = [['w', 'u'], ['h', 'u'], ['n', 'u'], ['tw', 'u'], ['th', 'u'], ['ntil
   // follows on a 16-byte boundary
   'enclose', 'slideCap', 'holeFill', 'padB', 'filmDiff', 'filmDepth', 'holeSpan', 'mar', 'slope', 'padC', 'mmPerCell', 'edgeFlowDepth',
   // the paper's tooth range and the unit its hollows are measured in (paper.mjs toothHollow), for settling
-  'toothLo', 'toothSpan', 'hollowUnit', 'groundPhys'].map(k => [k, 'f'])];
+  'toothLo', 'toothSpan', 'hollowUnit', 'groundPhys', 'poreHalo', 'poreReach', 'padTime2', 'padTime3'].map(k => [k, 'f'])];
 export { UF, UBYTES_EXPORT as UBYTES, SRC_EXPORT as SRC, analyse, HASH };
 // settling needs the paper's hollow unit (paper.mjs toothHollow): a paper made without it cannot settle on the GPU
 const hollowUnitOf = paper => { if (!(paper?.hollowUnit > 0)) throw new Error('GPU sheet: the paper has no hollowUnit (make it with makePaper or scanPaper)'); return paper.hollowUnit; };
@@ -182,17 +183,23 @@ export class GpuSheet {
     const set = (k, v) => { const i = UOFF[k] / 4; if (UF.find(x => x[0] === k)[1] === 'u') U32[i] = v; else F32[i] = v; };
     set('w', this.w); set('h', this.h); set('n', this.n); set('tw', this.tw); set('th', this.th); set('ntiles', this.ntiles); set('K', this.K);
     set('p3', this.resident ? (this.persistent ? 2 : 1) : 0); set('cap', this.cap); set('hasTop', this.hasTop ? 1 : 0); set('holdOn', Number.isFinite(o.hold ?? Infinity) ? 1 : 0);
-    const dt = o.dt ?? 1;
+    const requestedDt = o.dt ?? 1;
+    if (!Number.isFinite(requestedDt) || requestedDt < 0) throw new RangeError('dt must be finite and nonnegative');
+    this.timeChunks = Math.max(1, Math.ceil(requestedDt / 2));
+    const dt = requestedDt / this.timeChunks, sub = { ...o, dt };
+    this.flowTime = flowTime(sheet, sub); this.poreTime = poreTime(sheet, sub);
+    const fraction = this.flowTime.fraction;
     Object.entries({
-      dt, evap: o.evap, edgeEvap: o.edgeEvap, edgeWidth: o.edgeWidth, capE: o.edgeWidth + 1, absorb: o.absorb, film: o.film, flow: o.flow, ff: o.fibreFlow ?? 0.6,
-      flowDepth: o.flowDepth ?? 0.12, diffuse: Math.min(0.25, Math.max(0, o.diffuse)), cd: o.carryDepth ?? 0.08, settle: o.settle, liftDepth: o.liftDepth ?? 0.15,
+      dt, evap: o.evap, edgeEvap: o.edgeEvap, edgeWidth: o.edgeWidth, capE: o.edgeWidth + 1, absorb: o.absorb, film: o.film, flow: o.flow * fraction, ff: o.fibreFlow ?? 0.6,
+      flowDepth: o.flowDepth ?? 0.12, diffuse: Math.min(0.25, Math.max(0, o.diffuse * fraction)), cd: o.carryDepth ?? 0.08, settle: o.settle, liftDepth: o.liftDepth ?? 0.15,
       rewetLift: o.rewetLift, granFill: o.granFill ?? 0, holdCap: Number.isFinite(o.hold ?? Infinity) ? o.hold : 0, slide: o.slide ?? 0, slideFill: o.slideFill ?? 1,
-      capStep: Math.min(2 / 3, Math.max(0, o.capRate * dt * 10)), capEps: o.capEps, capDelta: o.capDelta, sizing: o.sizing ?? SIZING, wickFilter: o.wickFilter ?? 0.2,
+      capStep: this.poreTime.fraction, capEps: o.capEps, capDelta: o.capDelta, sizing: o.sizing ?? SIZING, wickFilter: o.wickFilter ?? 0.2,
       wetEps: o.wetEps, paperDry: o.paperDry, capSigma: o.capSigma, spill: o.spill, spillHeight: o.spillHeight, dampEase: o.dampEase, pinning: o.pinning ?? 0, pinFibre: o.pinFibre ?? 0,
-      enclose: o.encloseEase ?? 0, slideCap: o.slideCap ?? 0, holeFill: o.holeFill ?? 0, padB: this.workers, filmDiff: Math.max(0, o.filmDiffuse ?? 0), filmDepth: o.filmDepth ?? 0.03,
-      padC: process.env.GPU_SPARSE_TIGHT === '0' || process.env.GPU_STEP === 'old' || o.edgeWidth + 1 > 7 ? 0 : 1, holeSpan: o.holeSpan ?? 0, mar: o.marangoni ?? 0, slope: o.slope ?? 0,
+      enclose: o.encloseEase ?? 0, slideCap: o.slideCap ?? 0, holeFill: o.holeFill ?? 0, padB: this.workers, filmDiff: Math.max(0, (o.filmDiffuse ?? 0) * fraction), filmDepth: o.filmDepth ?? 0.03,
+      padC: process.env.GPU_SPARSE_TIGHT === '0' || process.env.GPU_STEP === 'old' || o.edgeWidth + 1 > 7 || this.poreTime.iters > 2 ? 0 : 1, holeSpan: o.holeSpan ?? 0, mar: (o.marangoni ?? 0) * fraction, slope: o.slope ?? 0,
       mmPerCell: o.mmPerCell > 0 ? o.mmPerCell : (this.mmPerCell > 0 ? this.mmPerCell : (this.paper?.mmPerCell > 0 ? this.paper.mmPerCell : 0.3)),
       edgeFlowDepth: o.edgeFlowDepth ?? 0.06,
+      poreHalo: Math.max(1, Math.ceil(this.poreTime.iters / TILE)), poreReach: Math.max(2, this.poreTime.iters),
       toothLo: this.paper?.toothLo ?? 0, toothSpan: this.paper?.toothSpan ?? 0, hollowUnit: hollowUnitOf(this.paper), groundPhys: this.paper?.zUm ? 1 : 0,
     }).forEach(([k, v]) => set(k, v));
     const base = UF.length;
@@ -252,8 +259,17 @@ export class GpuSheet {
   encodeSteps(enc, steps, measure = false) { const pass = this.timestamps.begin(enc, 'encodeSteps'); this.stepsInPass(pass, steps, measure); pass.end(); }
   stepsInPass(pass, steps, measure = false) {
     const o = this.o, K = this.K, B = this.b;
+    if (o.dt === 0) return;
+    steps *= this.timeChunks;
+    const flowIters = this.flowTime.iters, poreIters = this.poreTime.iters;
     const nD = this.cap;
     const go = (name, indirectOffset = 0, dispatch = null) => { if (indirectOffset === 12 && !this.act.length) return; pass.setPipeline(this.p[name]); pass.setBindGroup(0, this.bg[name]); if (dispatch) pass.dispatchWorkgroups(...dispatch); else if (this.persistent && indirectOffset < 24) pass.dispatchWorkgroups(this.workers, indirectOffset === 12 ? this.act.length : 1); else if (this.resident) pass.dispatchWorkgroupsIndirect(B.ARGS, indirectOffset); else pass.dispatchWorkgroups(nD, indirectOffset ? this.act.length : 1); };
+    const pores = fused => {
+      for (let p = 0; p < poreIters; p++) {
+        if (fused) go('cap_sp'); else { go('cap_s'); go('cap_p', 12); }
+        if (p + 1 < poreIters) go('cap_commit');
+      }
+    };
     const nT = Math.ceil(this.ntiles / 64);
     // The next step consumes the frontier, but only observations need wet counts/max W.
     const fuseStep = !!this.b.W && process.env.GPU_FUSE_FACES !== '0' && process.env.GPU_FUSE_WETSCAN !== '0';
@@ -269,7 +285,7 @@ export class GpuSheet {
     if (this.resident && this.dryS?.dampOnly) {
       for(let s=0;s<steps;s++) {
         if (SPARSE_ALL) go('sparse_all',0,[1]); else { go('sparse_start',0,[1]); go('sparse_build',24); go('tiles_args',0,[1]); }
-        if (process.env.GPU_STEP !== 'old' && o.edgeWidth + 1 <= 7) go('cap_sp'); else { go('cap_s'); go('cap_p', 12); }
+        pores(process.env.GPU_STEP !== 'old' && o.edgeWidth + 1 <= 7);
         go('p5a'); finish(s === steps - 1);
       }
       return;
@@ -279,17 +295,18 @@ export class GpuSheet {
       for (let s = 0; s < steps; s++) {
         if (this.resident && SPARSE_ALL) go('sparse_all', 0, [1]); else { if (this.resident) { go('sparse_start', 0, [1]); go('sparse_build', 24); } else { go('tiles_prep', 0, [nT]); go('tiles_build', 0, [nT]); } go('tiles_args', 0, [1]); }
         go('edge_phase1');
-        for (let it = 0; it < o.flowIters; it++) {
+        for (let it = 0; it < flowIters; it++) {
           if (process.env.GPU_FUSE_FACES !== '0') go('faces_pflux'); else { go('faces_wsc'); go('pflux_sc'); }
-          if (it > 0 && it === o.flowIters - 1 && fuseStep && this.p.apply_f1_p3a_dep) go('apply_f1_p3a_dep');
+          if (it > 0 && it === flowIters - 1 && fuseStep && this.p.apply_f1_p3a_dep) go('apply_f1_p3a_dep');
           else go(it === 0 ? 'apply_f0' : 'apply_f1');
         }
-        if (!(o.flowIters > 1 && fuseStep && this.p.apply_f1_p3a_dep)) go('p3a_dep');
+        if (!(flowIters > 1 && fuseStep && this.p.apply_f1_p3a_dep)) go('p3a_dep');
         if ((o.slide ?? 0) > 0) {
           go('slide_out_all');
-          if (fuseStep && this.p.slide_apply_cap_sp) go('slide_apply_cap_sp');
-          else { go('slide_apply_all'); go('cap_sp'); }
-        } else go('cap_sp');
+          // Pore catch reads EVER; fusing with slide application would exceed Metal's ten storage buffers.
+          go('slide_apply_all');
+        }
+        pores(true);
         if (fuseStep && this.p.p5ab) go('p5ab'); else { go('p5a'); go('p5b'); }
         finish(s === steps - 1);
       }
@@ -299,13 +316,13 @@ export class GpuSheet {
       if (this.resident) { go('sparse_start', 0, [1]); go('sparse_build', 24); } else { go('tiles_prep', 0, [nT]); go('tiles_build', 0, [nT]); } go('tiles_args', 0, [1]);
       go('edge_first'); for (let r = 1; r < o.edgeWidth + 1; r++) go(r % 2 ? 'edge_b2a' : 'edge_a2b');
       go('phase1');
-      for (let it = 0; it < o.flowIters; it++) {
+      for (let it = 0; it < flowIters; it++) {
         go('faces'); go('wsc'); if (K) { go('pflux_k', 12); go('ppout', 12); }
         go(it === 0 ? 'apply_w0' : 'apply_w1'); if (K) go('apply_g', 12);
       }
       go('p3a');
       if ((o.slide ?? 0) > 0) { go('dep_k'); go('slide_out', 12); go('slide_apply', 12); }
-      go('cap_s'); go('cap_p', 12); go('p5a'); go('p5b'); finish(s === steps - 1);
+      pores(false); go('p5a'); go('p5b'); finish(s === steps - 1);
     }
   }
 
