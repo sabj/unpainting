@@ -29,7 +29,8 @@ const PLAN_MM = 0.5;
 const CLUSTERS = 14, CLUSTER_JOIN = 12;
 /** A part smaller than this share of the sheet is a sliver and joins a neighbour. */
 const SLIVER_SHARE = 0.004;
-/** Bare paper: a shape at least this light (L*, against the paper) and no more chromatic than this. */
+/** Bare paper: a shape at least this light (L*, against the SHEET's colour: on a toned sheet, buff is paper, and a study's
+ * white, lighter than the sheet, is paper too) and no more chromatic than this. */
 const PAPER_L = 91, PAPER_CHROMA = 7;
 /** Outlines are rounded by a brush this wide (mm) and simplified to this tolerance (mm). */
 const ROUND_MM = 2, TOL_MM = 0.8;

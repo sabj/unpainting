@@ -62,3 +62,14 @@ test('lanes: a wide band is laid in a few lanes along its length, landing and li
   assert.ok(f.uncovered < 0.03, `${f.uncovered}`);
   for (const s of big) { assert.ok(s.points[0][2] < 0.5 && s.points[s.points.length - 1][2] < 0.5, 'tapered ends'); const dx = s.points.at(-1)[0] - s.points[0][0], dy = s.points.at(-1)[1] - s.points[0][1]; assert.ok(Math.abs(dy / dx) < 0.25, 'along the band'); }
 });
+
+test('a toned sheet: the study\'s buff paper and its white are both bare paper, measured against the sheet\'s colour', () => {
+  const BUFF = [232, 218, 190], w = 200, h = 150, rgb = new Uint8ClampedArray(w * h * 3);
+  for (let i = 0; i < w * h; i++) { const x = (i % w) / 2, y = ((i / w) | 0) / 2; rgb.set(x >= 20 && x < 60 && y >= 20 && y < 50 ? [150, 120, 90] : x > 80 ? [255, 255, 255] : BUFF, i * 3); }
+  const log = console.log; console.log = () => {};
+  try {
+    const p = planStudyWashes({ k: pigments.length, w, h, studies: [{ rgb, file: 'buff' }], paperRGB: BUFF, pigments, sheetWidthMm: 100, washBrushMm: 5, washKitMm: [25.4, 7, 5] });
+    assert.ok(p.summary.reservedShare > 0.8, `${p.summary.reservedShare}`);
+    assert.equal(p.instructions.filter(q => q.stage !== 2).length, 1);
+  } finally { console.log = log; }
+});
