@@ -215,10 +215,12 @@ export function exchangeCell(sheet, i, lane, capL, freeAt, a, share, hb, g, buf)
 }
 
 /** How far a lane's liquid reaches into the tooth below the hills, as a share of the paper's relief, from its head hb
- *  (of a full head Hb): past the deepest pit for a loaded tuft (or the brush's own `bridge` share when it has one), less
- *  as the free film thins, and only the highest hills once it holds no free liquid and the fibres it touches must draw
- *  the paint out of it. */
+ *  (of a full head Hb): past the deepest pit for a loaded tuft (or the brush's own `bridge` share when it has one),
+ *  less as the free film thins, to the paper's median at no free film, and only the crests once it holds none and the
+ *  fibres it touches must draw the paint out of it. A nearly dry tuft so leaves its paint on the crests with white
+ *  hollows between (dry brush; looks/drybrush-real.jpg), where it once reached a third of the way into every pit and
+ *  laid an even, pale film. */
 export function toothReach(hb, Hb, p, bridge, wander = 1) {
   const x = Math.max(-1, Math.min(1, hb / Math.max(1e-6, Hb))), full = (bridge > 0 ? bridge : 3) * (0.55 + 0.45 * Math.min(1, p)) * wander;
-  return x >= 0 ? full * (0.35 + 0.65 * Math.sqrt(x)) : 0.35 * full + 2.5 * x;
+  return x >= 0 ? full * Math.sqrt(x) : 1.5 * x;
 }
