@@ -2,6 +2,7 @@ import { flowTime, poreTime } from './flow-time.mjs';
 // Threads for the sheet's step (sheet.mjs): a persistent worker pool on SharedArrayBuffers runs each large box in row
 // bands through the phases in sheet-kernel.mjs, bit-identical to the serial step. Whole-sheet jobs use the same pool
 // (jobs-kernel.mjs). Node only: sheet.mjs loads this on setThreads(n > 1).
+import { settleSpeed, settleDiffusion } from './settling.mjs';
 import { Worker, MessageChannel } from 'node:worker_threads';
 import os from 'node:os';
 import { useRenderThreads, useRenderCellsThreads } from './km.mjs';
@@ -108,7 +109,7 @@ const PAPERS = new WeakMap(), PERMS = new WeakMap();
 function paperShared(paper) {
   if (PAPERS.has(paper)) return PAPERS.get(paper);
   const h = paper.valley || paper.height;
-  const out = { capacity: sharedCopy(paper.capacity), fdx: sharedCopy(paper.fdx), fdy: sharedCopy(paper.fdy), grain: sharedCopy(paper.grain), height: sharedCopy(h), fibreH: sharedCopy(paper.height), tooth: paper.tooth ? sharedCopy(paper.tooth) : null };
+  const out = { capacity: sharedCopy(paper.capacity), fdx: sharedCopy(paper.fdx), fdy: sharedCopy(paper.fdy), grain: sharedCopy(paper.grain), height: sharedCopy(h), fibreH: sharedCopy(paper.height), tooth: paper.tooth ? sharedCopy(paper.tooth) : null, hollow: sharedCopy(paper.hollow) };
   PAPERS.set(paper, out); return out;
 }
 const set = (C, key, value) => { C[key] = value; post({ t: 'set', id: C.id, key, value }); };
@@ -272,7 +273,7 @@ function params(C, sheet, o) {
     f32[0] = pg.wick ?? Math.max(0.05, Math.min(0.9, 1 - pg.gamma)); f32[1] = pg.floc ?? 0;
     const rho = +pg.rho, omega = +pg.omega, gamma = +pg.gamma, gg = gamma * v.gran;
     prm[b] = f32[0]; prm[b + 1] = rho; prm[b + 2] = omega; prm[b + 3] = gamma; prm[b + 4] = gg;
-    prm[b + 5] = (rho / omega) * v.lift * v.looseLift; prm[b + 6] = v.scour / omega; prm[b + 7] = v.repose / gg; prm[b + 8] = f32[1];
+    prm[b + 5] = (rho / omega) * v.lift * v.looseLift; prm[b + 6] = v.scour / omega; prm[b + 7] = v.repose / gg; prm[b + 8] = f32[1]; prm[b + 9] = settleSpeed(pg); prm[b + 10] = settleDiffusion(pg);
   }
   return v;
 }

@@ -39,7 +39,9 @@ import zlib from 'node:zlib';
 import path from 'node:path';
 import {execFileSync} from 'node:child_process';
 import sharp from 'sharp';
-import {makePaper, coldPressField} from '../../src/media/paper.mjs';
+import {makePaper} from '../../src/media/paper.mjs';
+import {paperRelief} from '../../src/media/paper-relief.mjs';
+import {subcellLayers} from '../../src/media/subcell-grain.mjs';
 import {createSheet, step, dry as physicalDry, layersOf, thickness, thicknessTotals, DEFAULTS, coherent} from '../../src/media/sheet.mjs';
 import {attachGpu} from '../../src/media/gpu/link.mjs';
 import {CpuDemandWindow} from '../../src/media/gpu/cpu-demand-window.mjs';
@@ -336,15 +338,13 @@ const GCHUNK = GFLOOR ? Math.max(num('gradedchunk', 6), num('floorchunk', 24) * 
 // --paperfibres, --papertooth: shares of the relief that are fibre and tooth; --toothscale: tooth coarseness.
 // --papershade: how much the bare sheet's relief shows in its own tone. Default 0.04.
 // --paperscan file: paper height from a grey height map, tiled, one scan pixel to --paperscanscale cells (src/media/paper-scan.mjs).
-// --paper coldpress (default): cold-press tooth at physical size in mm (coldPressField); any other value keeps the value-noise tooth.
-// --cpbump min,max: bump diameters in mm; --cpcover: how crowded; --cpswell: broad swells.
+// --paper coldpress (default): the cold-press relief in micrometres at physical size (src/media/paper-relief.mjs); any other value keeps the value-noise tooth.
 const CP_MM = opt('paper', 'coldpress') === 'coldpress' ? (PB ? PB.mmPerCell : num('sheetmm', DEFAULT_SHEET_MM) / W2) : 0;
 // --paperphysical 0|1: fibre lengths, density and brush relief in millimetres. Default 1.
 const PAPER_PHYSICAL_MM = num('paperphysical', 1) > 0 ? (PB ? PB.mmPerCell : num('sheetmm', DEFAULT_SHEET_MM) / W2) : 0;
 const PAPER_OPTS = { ...(PAPER_PHYSICAL_MM > 0 ? { mmPerCell: PAPER_PHYSICAL_MM } : {}), seed: 9, scale: SC, toothScale: num('toothscale', 0.2), fibres: num('paperfibres', 0.5), tooth: num('papertooth', 0.5), proudBlur: num('proudblur', 1),
-  ...(CP_MM ? { coldPress: { mmPerCell: CP_MM, bumpMm: (opt('cpbump', '0.5,2')).split(',').map(Number), cover: num('cpcover', 2.2), swell: num('cpswell', 0.3), ...(num('cppits', 0) > 0 ? { pits: num('cppits', 0) } : {}) } } : {}) }; ctx.PAPER_OPTS = PAPER_OPTS;
-// --cppits p: share of cold-press bumps that are pits, so settled paint gathers in them as dark grains. Default 0.
-if (CP_MM) console.log(`paper: cold press at ${CP_MM.toFixed(3)} mm a cell, bumps ${opt('cpbump', '0.5,2')} mm, tooth ${num('papertooth', 0.5)} of the height`);
+  ...(CP_MM ? { coldPress: { mmPerCell: CP_MM } } : {}) }; ctx.PAPER_OPTS = PAPER_OPTS;
+if (CP_MM) console.log(`paper: cold press relief in micrometres at ${CP_MM.toFixed(3)} mm a cell (src/media/paper-relief.mjs)`);
 const paper = opt('paperscan', '') ? await (async () => {
   const { scanPaper } = await import('../../src/media/paper-scan.mjs');
   const file = path.resolve(root, opt('paperscan', ''));
@@ -576,14 +576,17 @@ const view = () => {
 };
 const renderFine = () => {
   const N = LOOK_RES, FW = W2 * N, FH = H2 * N, FN = FW * FH, mm = LOOK_MM / N;
-  const hgt = CP_MM ? coldPressField(FW, FH, CP_MM / N, PAPER_OPTS.seed, { ...PAPER_OPTS.coldPress, mmPerCell: CP_MM / N }) : lookUp(paper.height, W2, H2, N);
+  const hgt = CP_MM ? paperRelief(FW, FH, CP_MM / N, { seed: PAPER_OPTS.seed, relief: PAPER_OPTS.relief ?? 'cold' }).height : lookUp(paper.height, W2, H2, N);
   const fbase = lookBase(hgt, FW, FH, mm), micro = LOOK_MICRO > 0 ? lookMicro(hgt, FW, FH, N * LOOK_MC) : null;
   const Kp = SHEET_PIGS.map(p => p.K), Sp = SHEET_PIGS.map(p => p.S), R = new Float64Array(FN * 3), outF = new Uint8ClampedArray(FN * 3);
   for (let i = 0; i < FN * 3; i++) R[i] = fbase[i] / 255;
   const layers = layersOf(ctx.sheet);
+  // on a physical sheet each layer's pigment is spread over the same paper evaluated N times finer (subcell-grain.mjs),
+  // not enlarged cells: granulating paint in the fine pits, every cell keeping its own pigment
+  const fineLayers = CP_MM && N > 1 ? subcellLayers(layers, SHEET_PIGS, ctx.sheet.paper, N) : null;
   let mIn = 0, mOut = 0;
   layers.forEach((L, q) => {
-    const fine = L.map(a => lookUp(a, W2, H2, N));
+    const fine = fineLayers ? fineLayers[q] : L.map(a => lookUp(a, W2, H2, N));
     if (micro) for (let k = 0; k < fine.length; k++) { const a = fine[k], g = micro.amp[k]; for (let i = 0; i < FN; i++) { mIn += a[i]; mOut += a[i] * (1 + g * micro.t[i]); } }
     renderCells([fine], Kp, Sp, fbase, 0, FN, 1, null, q === layers.length - 1 ? outF : null, R, R, micro);
   });

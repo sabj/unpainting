@@ -145,8 +145,9 @@ test('the towed tuft trails the hand and swings round a turn late', () => {
 });
 
 test('a 45 degree line has no roughness at the cell pitch', () => {
-  // the brush's own geometry: paper without its fine grain, whose pores differ cell by cell and step every edge at the pitch
-  const mm = 0.25, sheet = createSheet(paperAt(40, 40, mm, { grainAmp: 0 }), pigments), b = round(mm, 1.5);
+  // the brush's own geometry on the painter's cold press: a cell is touched by the share of its area the liquid reaches
+  // (brush.mjs soft, paper.mjs subRelief), so the paper's grain does not step every edge at the pitch
+  const mm = 0.25, sheet = createSheet(paperAt(40, 40, mm), pigments), b = round(mm, 1.5);
   dip(b, { water: 1, conc: [0.5, 0] });
   stroke(b, sheet, [{ x: 20, y: 20, p: 0.8 }, { x: 140, y: 140, p: 0.8 }]);
   const f = Float64Array.from(sheet.W, (v, i) => v + sheet.s[i]);

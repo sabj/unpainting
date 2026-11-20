@@ -327,7 +327,7 @@ test('a damp round carrying paint, drawn through a wet wash, lays its paint into
 test('a dry brush touches the coarse hills of cold-press tooth more than the ground between them', () => {
   const mmc = 280 / 480, W = 160, H = 60, by = { hill: [0, 0], low: [0, 0] };
   for (const seed of [9, 10, 11]) {
-    const paper = makePaper(W, H, { mmPerCell: mmc, seed, toothScale: 0.2, fibres: 0.5, tooth: 0.5, coldPress: { mmPerCell: mmc, bumpMm: [0.5, 2], cover: 2.2, swell: 0.3 } });
+    const paper = makePaper(W, H, { mmPerCell: mmc, seed, toothScale: 0.2, fibres: 0.5, tooth: 0.5, coldPress: { mmPerCell: mmc } });
     const sheet = createSheet(paper, [{ K: [0.35, 0.49, 0.66], S: [0.06, 0.025, 0.014], rho: 0.05, omega: 1.4, gamma: 0.15 }]), r = 2 / mmc, y = H / 2;
     const b = createBrush({ flat: true, radius: r, bristles: Math.max(12, Math.ceil(2 * r)), capacity: 100, belly: 12, feed: 0.4, give: 0.9, free: 0.4, film: 0.25, splay: 0.03, stiffness: 8, seed: 31, wetMix: 0, bridge: 0.38, bridgeSoft: 1.0 });
     dip(b, { water: 0.22, conc: [0.5] }); stroke(b, sheet, [{ x: 15, y, p: 0.9 }, { x: W - 15, y, p: 0.9 }], { upright: 'sweep' });

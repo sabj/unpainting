@@ -10,6 +10,7 @@ import {strokePlanBudget,strokePlanShader,planMiB} from './stroke-plan-budget.mj
 import { runStrokePrefixDiagnostic } from './stroke-prefix-diagnostic.mjs';
 import { GpuTimestamps } from './gpu-timestamps.mjs';
 import { SIZING } from '../sizing.mjs';
+import { settleSpeed, settleDiffusion } from '../settling.mjs';
 import { BrushReadbacks } from './brush-readbacks.mjs';
 import { permeability } from './permeability.mjs';
 import { workerCount } from './workers.mjs';
@@ -43,11 +44,15 @@ const UF = [['w', 'u'], ['h', 'u'], ['n', 'u'], ['tw', 'u'], ['th', 'u'], ['ntil
   ...['dt', 'evap', 'edgeEvap', 'edgeWidth', 'capE', 'absorb', 'film', 'flow', 'ff', 'flowDepth', 'diffuse', 'cd', 'settle', 'liftDepth', 'rewetLift', 'granFill', 'holdCap', 'slide', 'slideFill', 'capStep', 'capEps', 'capDelta', 'sizing', 'wickFilter', 'wetEps', 'paperDry', 'capSigma', 'spill', 'spillHeight', 'dampEase', 'pinning', 'pinFibre',
   // encloseEase and slideCap, holeFill and holeSpan in cells, marangoni and slope; pads keep the pigment table that
   // follows on a 16-byte boundary
-  'enclose', 'slideCap', 'holeFill', 'padB', 'filmDiff', 'filmDepth', 'holeSpan', 'mar', 'slope', 'padC', 'mmPerCell', 'edgeFlowDepth'].map(k => [k, 'f'])];
+  'enclose', 'slideCap', 'holeFill', 'padB', 'filmDiff', 'filmDepth', 'holeSpan', 'mar', 'slope', 'padC', 'mmPerCell', 'edgeFlowDepth',
+  // the paper's tooth range and the unit its hollows are measured in (paper.mjs toothHollow), for settling
+  'toothLo', 'toothSpan', 'hollowUnit', 'groundPhys'].map(k => [k, 'f'])];
 export { UF, UBYTES_EXPORT as UBYTES, SRC_EXPORT as SRC, analyse, HASH };
+// settling needs the paper's hollow unit (paper.mjs toothHollow): a paper made without it cannot settle on the GPU
+const hollowUnitOf = paper => { if (!(paper?.hollowUnit > 0)) throw new Error('GPU sheet: the paper has no hollowUnit (make it with makePaper or scanPaper)'); return paper.hollowUnit; };
 const UOFF = Object.fromEntries(UF.map(([k], i) => [k, i * 4]));
-const UBYTES = UF.length * 4 + 512 + 64; const UBYTES_EXPORT = UBYTES;
-const PRELUDE = `struct U {\n${UF.map(([k, t]) => `  ${k}: ${t === 'u' ? 'u32' : 'f32'},`).join('\n')}\n  pa: array<vec4<f32>, 16>,\n  pb: array<vec4<f32>, 16>,\n  kl: array<vec4<u32>, 4>,\n}\n@group(0) @binding(0) var<uniform> u: U;\nfn pigA(k: u32) -> vec4<f32> { return u.pa[k]; }\nfn pigB(k: u32) -> vec4<f32> { return u.pb[k]; }\n`;
+const UBYTES = UF.length * 4 + 512 + 64 + 256; const UBYTES_EXPORT = UBYTES;
+const PRELUDE = `struct U {\n${UF.map(([k, t]) => `  ${k}: ${t === 'u' ? 'u32' : 'f32'},`).join('\n')}\n  pa: array<vec4<f32>, 16>,\n  pb: array<vec4<f32>, 16>,\n  kl: array<vec4<u32>, 4>,\n  pc: array<vec4<f32>, 16>,\n}\n@group(0) @binding(0) var<uniform> u: U;\nfn pigA(k: u32) -> vec4<f32> { return u.pa[k]; }\nfn pigB(k: u32) -> vec4<f32> { return u.pb[k]; }\nfn pigC(k: u32) -> vec4<f32> { return u.pc[k]; }\n`;
 const SRC = PRELUDE + (process.env.GPU_EDGE_PINGPONG === '1' ? edgePingPong(WGSL) : WGSL); const SRC_EXPORT = SRC;
 
 // which bindings each entry point touches, found from the source: its own body plus the helpers it calls
@@ -188,13 +193,15 @@ export class GpuSheet {
       padC: process.env.GPU_SPARSE_TIGHT === '0' || process.env.GPU_STEP === 'old' || o.edgeWidth + 1 > 7 ? 0 : 1, holeSpan: o.holeSpan ?? 0, mar: o.marangoni ?? 0, slope: o.slope ?? 0,
       mmPerCell: o.mmPerCell > 0 ? o.mmPerCell : (this.mmPerCell > 0 ? this.mmPerCell : (this.paper?.mmPerCell > 0 ? this.paper.mmPerCell : 0.3)),
       edgeFlowDepth: o.edgeFlowDepth ?? 0.06,
+      toothLo: this.paper?.toothLo ?? 0, toothSpan: this.paper?.toothSpan ?? 0, hollowUnit: hollowUnitOf(this.paper), groundPhys: this.paper?.zUm ? 1 : 0,
     }).forEach(([k, v]) => set(k, v));
     const base = UF.length;
     const gran = o.gran ?? 1, scour = o.scour ?? 0;
     (this.pigments ?? []).forEach((p, k) => {
       const gg = p.gamma * gran, mob = p.wick ?? Math.max(0.05, Math.min(0.9, 1 - p.gamma));
       F32.set([gg, (p.rho / p.omega) * o.lift * o.looseLift, scour / p.omega, gg > 0 ? (o.repose ?? 0) / gg : 0], base + k * 4);
-      F32.set([p.rho, p.omega, p.floc ?? 0, mob], base + 64 + k * 4);
+      F32.set([settleSpeed(p) * (o.settle ?? 1), p.omega, p.floc ?? 0, mob], base + 64 + k * 4);
+      F32.set([settleDiffusion(p) * (o.settle ?? 1), 0, 0, 0], base + 144 + k * 4);   // pc: after kl (16 u32)
     });
     set('nAct', this.act.length); this.act.forEach((k, a) => { U32[UF.length + 128 + a] = k; });
     d.queue.writeBuffer(this.b.U, 0, u);

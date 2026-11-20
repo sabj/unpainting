@@ -37,11 +37,11 @@ const PAPER_RGB = [246, 245, 239];
 const CAPTION_FILL = '#768390';
 
 // The painter's default paper, as tools/paint-plate.mjs builds it with --paper coldpress --paperphysical 1 and no
-// other paper flags: seed 9, fibres 0.5, tooth 0.5, toothscale 0.2, proudblur 1, cold-press domes 0.5 to 2 mm,
-// cover 2.2, swell 0.3, no pits.
+// other paper flags: seed 9, fibres 0.5, tooth 0.5, toothscale 0.2, proudblur 1, the cold-press relief in micrometres
+// (src/media/paper-relief.mjs).
 const paperOptions = mm => ({
   seed: 9, scale: 1, toothScale: 0.2, fibres: 0.5, tooth: 0.5, proudBlur: 1, mmPerCell: mm,
-  coldPress: { mmPerCell: mm, bumpMm: [0.5, 2], cover: 2.2, swell: 0.3 },
+  coldPress: { mmPerCell: mm },
 });
 // The painter's default sheet constants (tools/plate/sheet.mjs O): fixed bed, edge drying 0.0012, grains stop rolling
 // when the slope is gone (slide cap 1); each pigment granulates by its own rating, with no scale.

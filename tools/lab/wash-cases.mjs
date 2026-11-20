@@ -3,7 +3,8 @@
 // the painter's exact (full) and default fast modes at two cell sizes. Imports only the media API that every version
 // since v0.1.1 has, so the same cases run on an old tag's checkout for comparison.
 //   node tools/lab/wash-cases.mjs <repo root> <out dir> [--cells 0.25,0.1] [--modes full,fast] [--cases puddleU,...] [--physics k=v,...] [--brush row|section]
-// Writes <case>-<mode>-<mm>.rgb (raw RGB of the dried sheet), paper-<mm>.f32 (the paper's height) and cases.json.
+// Writes <case>-<mode>-<mm>.rgb (raw RGB of the dried sheet), .mass.f32 (each pigment's dried mass a cell, one after
+// the other), paper-<mm>.f32 (the paper's height) and cases.json.
 import fs from 'node:fs';
 import path from 'node:path';
 import { waitForDamp } from './wash-state.mjs';
@@ -49,7 +50,12 @@ const CASES = {
   sweeps: (sheet, mm) => {
     for (let k = 0; k < 5; k++) { const y = 9 + k * 8, b = flat(mm, 60 + k); B.dip(b, { water: 1, conc: [0.6, 0] }); const [a, z] = k % 2 ? [45, 5] : [5, 45]; lay(sheet, mm, b, [{ x: a, y, p: 0.9 }, { x: z, y, p: 0.9 }], { upright: 'sweep' }); }
   },
-  // (c) a bloom: a 40 mm wash left until damp (its shine gone), then a 12 mm drop of clean water into it
+  // a graded wash: a 40 mm square poured with ultramarine falling evenly from strong at the top to nearly clear at the bottom
+  graded: (sheet, mm) => {
+    const { w } = sheet;
+    for (let y = Math.round(5 / mm); y < Math.round(45 / mm); y++) { const c = 1.5 * (1 - ((y + 0.5) * mm - 5) / 40) + 0.05; for (let x = Math.round(5 / mm); x < Math.round(45 / mm); x++) S.deposit(sheet, y * w + x, 0.3, [0.3 * c, 0]); }
+  },
+  // (c) a bloom: a 40 mm wash left until damp (its shine gone), then a 12 mm drop of nearly clean water into it
   bloom: (sheet, mm) => {
     const { w } = sheet;
     for (let y = Math.round(5 / mm); y < Math.round(45 / mm); y++) for (let x = Math.round(5 / mm); x < Math.round(45 / mm); x++) S.deposit(sheet, y * w + x, 0.2, [0.25, 0]);
@@ -58,7 +64,7 @@ const CASES = {
       const indices = []; for (let y = 0; y < sheet.h; y++) for (let x = 0; x < sheet.w; x++) if (Math.hypot((x + .5) * mm - 25, (y + .5) * mm - 25) < 6) indices.push(y * w + x);
       preparation = waitForDamp(sheet, indices, O, S.step);
     } else flowFor(sheet, Number(arg('bloomwait', 60)));
-    disc(sheet, mm, 25, 25, 6, 0.25, [0, 0]);
+    disc(sheet, mm, 25, 25, 6, 0.25, [0.05, 0]);
     return preparation;
   },
   // a nearly dry flat dragged once, light and fast, over dry paper (dry brush: paint caught on the grain's peaks)
@@ -67,7 +73,7 @@ const CASES = {
   },
 };
 const cells = arg('cells', '0.25,0.1').split(',').map(Number), modes = arg('modes', 'full,fast').split(','), only = arg('cases', Object.keys(CASES).join(',')).split(',');
-const info = { root: path.resolve(root), O, size: SIZE, runs: [] };
+const info = { root: path.resolve(root), O, size: SIZE, pigments: PIGMENTS, runs: [] };
 for (const mm of cells) {
   const w = Math.round(SIZE / mm), h = w;
   const paper = paperOf(w, h, mm);
@@ -82,6 +88,9 @@ for (const mm of cells) {
     const rgb = renderLayers(S.layersOf(sheet), PIGMENTS, base, n);
     const file = `${name}-${mode}-${mm}.rgb`;
     fs.writeFileSync(path.join(outDir, file), Buffer.from(rgb));
+    // each pigment's dried mass a cell (a single wash dries into one layer), for renders finer than the sheet
+    const mass = PIGMENTS.map(() => new Float32Array(n)); for (const L of S.layersOf(sheet)) L.forEach((a, k) => { for (let i = 0; i < n; i++) mass[k][i] += a[i]; });
+    fs.writeFileSync(path.join(outDir, file.replace(/\.rgb$/, '.mass.f32')), Buffer.concat(mass.map(a => Buffer.from(a.buffer))));
     const run = { name, mode, mm, w, h, file, steps, seconds: +((performance.now() - t0) / 1000).toFixed(2), initialTotals: tot0, preparation: preparation ?? null, evaporated: sheet.evaporated == null ? null : sheet.evaporated - evaporated0, outwardPigmentFlux: sheet.outwardPigmentFlux ?? null, totals: tot0 && S.totals(sheet) };
     info.runs.push(run); sheet._gpu?.close?.();
     console.log(`${name} ${mode} ${mm} mm: ${steps} steps, ${run.seconds} s`);

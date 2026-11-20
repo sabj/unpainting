@@ -1,6 +1,7 @@
 // Generated from src/media/pigment-physical.mjs by tools/lab/sync-site-media.mjs. Edit the source.
 // The physical properties of the paints, in one table the painter (src/crop/box.mjs) and Paint Lab (pigments.js) both read.
 // DOM free.
+import { stokesMmPerS } from './settling.js';
 //
 // Each paint is described by what pigment makers and painters publish, as categories: granulation, staining,
 // flocculation, opacity, and the pigment's specific gravity. One rule turns each category into the number the sheet
@@ -56,6 +57,34 @@ const DATA = {
   indigo: row('PB66', 'none', 'staining', 'none', 'transparent', 1.35, 'HP: non-granulating, staining, transparent; the specific gravity is estimated', ['sg']),
 };
 
+// Effective particle diameter in micrometres, for the sheet's Stokes settling (settling.mjs; with the density sg x 1000
+// kg/m^3). Typical figures for artists' grades, the middle of the published range:
+//   PC  Eastaugh, Walsh, Chaplin and Siddall, Pigment Compendium (2004): particle sizes of the inorganic pigments
+//   HP  Handprint pigment pages (handprint.com/HP/WCL/): particle sizes for ultramarine, cerulean, the cobalts and earths
+//   HH  Herbst and Hunger, Industrial Organic Pigments (3rd ed. 2004): primary particles of the phthalocyanines,
+//       quinacridones and arylides, 0.05 to 0.3 um
+// The granulating paints (ultramarine, cerulean, the earths) are a micrometre or more and heavy; the staining organics
+// a tenth of one, so they barely settle in the time a wash takes to dry. Dyes and carbon are smaller still.
+const PARTICLE_UM = Object.freeze({
+  ultramarine: [2.0, 'HP, PC: synthetic ultramarine 0.5 to 5 um, coarse watercolour grades 1 to 3'],
+  phthaloblue: [0.08, 'HH: copper phthalocyanine primary particles 0.05 to 0.1 um'],
+  cerulean: [1.5, 'HP, PC: cobalt blues 0.5 to 3 um'],
+  phthalogreen: [0.08, 'HH: chlorinated copper phthalocyanine 0.05 to 0.1 um'],
+  hansa: [0.2, 'HH: arylide yellows 0.1 to 0.4 um'],
+  cadyellow: [0.5, 'PC: cadmium sulphides 0.2 to 1 um'],
+  ochre: [2.0, 'HP, PC: natural iron oxides 1 to 5 um'],
+  rawsienna: [2.0, 'HP, PC: natural iron oxides 1 to 5 um (estimated as ochre)'],
+  sienna: [1.0, 'PC: calcined iron oxides, finer than the raw earth, 0.5 to 2 um'],
+  umber: [1.5, 'PC: iron and manganese oxides 0.5 to 3 um'],
+  rose: [0.1, 'HH: quinacridones 0.05 to 0.2 um'],
+  cadred: [0.5, 'PC: cadmium sulphoselenides 0.2 to 1 um'],
+  lampblack: [0.05, 'PC: carbon blacks 0.02 to 0.1 um primary'],
+  lemon: [0.2, 'HH: arylide yellows 0.1 to 0.4 um'],
+  walnut: [0.01, 'estimated: a dye in solution, settling only where it dries'],
+  alizarin: [0.2, 'HH, PC: alizarin lakes on alumina, about 0.1 to 0.3 um'],
+  indigo: [0.1, 'HH: synthetic indigo, about 0.05 to 0.2 um'],
+});
+
 /** Mixed paints as shares of parent density, the same shares box.mjs mixes their colour with. */
 export const MIXED_OF = Object.freeze({
   sapgreen: Object.freeze({ phthalogreen: 0.48, hansa: 0.52 }),
@@ -66,23 +95,27 @@ export const MIXED_OF = Object.freeze({
 const round = (v, n) => Math.round(v * 10 ** n) / 10 ** n;
 const numbers = d => {
   const C = CLASS_VALUES, s = C.opacity[d.opacity];
-  return { rho: round(d.sg * C.densityPerGravity, 5), omega: C.staining[d.staining], gamma: C.granulation[d.granulation], floc: C.flocculation[d.flocculation], scatter: [s, s, s] };
+  return { rho: round(d.sg * C.densityPerGravity, 5), omega: C.staining[d.staining], gamma: C.granulation[d.granulation], floc: C.flocculation[d.flocculation], scatter: [s, s, s], rhoP: Math.round(d.sg * 1000) };
 };
 
 const build = key => {
   const d = DATA[key];
-  if (d) return Object.freeze({ key, ci: d.ci, ...numbers(d), source: d.source, estimated: Object.freeze([...d.estimated]), categories: Object.freeze({ granulation: d.granulation, staining: d.staining, flocculation: d.flocculation, opacity: d.opacity, sg: d.sg }) });
+  if (d) return Object.freeze({ key, ci: d.ci, ...numbers(d), dUm: PARTICLE_UM[key][0], particleSource: PARTICLE_UM[key][1], source: d.source, estimated: Object.freeze([...d.estimated]), categories: Object.freeze({ granulation: d.granulation, staining: d.staining, flocculation: d.flocculation, opacity: d.opacity, sg: d.sg }) });
   const of = MIXED_OF[key];
   if (!of) return null;
-  const sum = { rho: 0, omega: 0, gamma: 0, floc: 0, scatter: [0, 0, 0] };
+  const sum = { rho: 0, omega: 0, gamma: 0, floc: 0, scatter: [0, 0, 0], rhoP: 0, v: 0 };
   for (const [parent, share] of Object.entries(of)) {
     const p = physicalOf(parent);
-    for (const f of ['rho', 'omega', 'gamma', 'floc']) sum[f] += share * p[f];
+    for (const f of ['rho', 'omega', 'gamma', 'floc', 'rhoP']) sum[f] += share * p[f];
+    sum.v += share * stokesMmPerS(p.dUm, p.rhoP);   // a mix settles as its parts do, so its speed is their mean
     for (let c = 0; c < 3; c++) sum.scatter[c] += share * p.scatter[c];
   }
   const parts = Object.entries(of).map(([k, s]) => `${k} ${s}`).join(', ');
-  return Object.freeze({ key, ci: null, rho: round(sum.rho, 5), omega: round(sum.omega, 4), gamma: round(sum.gamma, 4), floc: round(sum.floc, 4), scatter: sum.scatter.map(v => round(v, 5)), source: `mixed in density from ${parts}; each parent's row applies`, estimated: Object.freeze(['mixed']) });
+  return Object.freeze({ key, ci: null, rho: round(sum.rho, 5), omega: round(sum.omega, 4), gamma: round(sum.gamma, 4), floc: round(sum.floc, 4), scatter: sum.scatter.map(v => round(v, 5)), rhoP: Math.round(sum.rhoP), dUm: round(diameterFor(sum.v, sum.rhoP), 4), particleSource: 'the diameter that settles at the share-weighted speed of the parents', source: `mixed in density from ${parts}; each parent's row applies`, estimated: Object.freeze(['mixed']) });
 };
+
+// the diameter (um) that settles at v mm/s at density rhoP (Stokes' law inverted)
+const diameterFor = (v, rhoP) => Math.sqrt(v / stokesMmPerS(1, rhoP));
 
 const cache = new Map();
 /** The physical row of a paint: { key, ci, rho, omega, gamma, floc, scatter, source, estimated } or null. */
@@ -98,4 +131,4 @@ const LAB_ALIAS = Object.freeze({ phthalo: 'phthaloblue' });
 export const labKeyOf = key => LAB_ALIAS[key] ?? key;
 
 /** The physics fields as a pigment carries them; `floc` only when above zero, as before. */
-export const physicsFields = row => ({ rho: row.rho, omega: row.omega, gamma: row.gamma, ...(row.floc > 0 ? { floc: row.floc } : {}) });
+export const physicsFields = row => ({ rho: row.rho, omega: row.omega, gamma: row.gamma, dUm: row.dUm, rhoP: row.rhoP, ...(row.floc > 0 ? { floc: row.floc } : {}) });

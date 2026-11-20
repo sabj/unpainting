@@ -83,11 +83,15 @@ const feedHair = (brush, pig, hr, water) => {
 const smooth = x => (x <= 0 ? 0 : x >= 1 ? 1 : x * x * (3 - 2 * x));
 
 // The paper under a hair: the tooth averaged over the contact length L (cells) behind the tip, plus fine fibre relief.
+// The tooth is read in the height's own units (toothRange): a paper whose height is its relief in micrometres
+// (paper-relief.mjs) has a height range far narrower than the tooth stretched to 0..1, and against the stretched tooth
+// its coarse hills read as hollows and a dry brush touched the ground between them instead. A paper without units
+// (value noise, both stretched to 0..1) keeps the stretched tooth its brushes were tuned on.
 function groundAt(paper, xx, yy, tx, ty, L, fine, coarse = 0.3) {
-  const { w, h, tooth, height, valley } = paper; let sum = 0, n = 0;
+  const { w, h, tooth, height, valley } = paper, [tlo, tspan] = paper.zUm ? toothRange(paper) : [0, 1]; let sum = 0, n = 0;
   for (let m = 0; m <= L; m++) {
     const bx = Math.round(xx - tx * m), by = Math.round(yy - ty * m); if (bx < 0 || by < 0 || bx >= w || by >= h) break;
-    const j = by * w + bx; sum += height[j] - (1 - coarse) * tooth[j]; n++;
+    const j = by * w + bx; sum += height[j] - (1 - coarse) * (tlo + tspan * tooth[j]); n++;
   }
   const i = yy * w + xx; return sum / (n || 1) + fine * (height[i] - valley[i]);
 }
@@ -525,7 +529,9 @@ function sectionStroke(brush, sheet, path, { spacing = 0.7, between, lift = true
   // the share of a hair's load it keeps when it has nothing left to give (retention): half the legacy free threshold,
   // below which the row brush still smeared paint
   const keep = TUFT.keep * brush.free;
-  const [tlo, tspan] = paper.toothSpan > 0 ? [paper.toothLo, paper.toothSpan] : [0, 0], relief = paper.relief ?? 0.2, soft = Math.max(0.05, brush.bridgeSoft) * relief;
+  // soft: the bridge's own softness, widened by the relief finer than a cell (paper.mjs subRelief), so a cell is touched
+  // by the share of its area above the liquid's reach on any grid
+  const [tlo, tspan] = paper.toothSpan > 0 ? [paper.toothLo, paper.toothSpan] : [0, 0], relief = paper.relief ?? 0.2, soft = Math.hypot(Math.max(0.05, brush.bridgeSoft) * relief, 2.5 * (paper.subRelief ?? 0));
   const ET = edgeTooth(brush, paper), vr = varietyOf(brush), clip = sheet.clip ?? null;
   const capB = brush._capB ?? brush.capacity * lanes * brush.belly, buf = new Float64Array(K);
   const sat = new Float64Array(lanes), hb = new Float64Array(lanes), reach = new Float64Array(lanes), capL = new Float64Array(lanes);

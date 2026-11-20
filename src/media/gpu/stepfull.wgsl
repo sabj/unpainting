@@ -433,10 +433,20 @@ fn apply_g_tile(wid: vec3<u32>, lid: vec3<u32>) {
 }
 
 // 3. pigment exchange
+// settling (settling.mjs): the share of the suspension that falls through a film Wi mm deep in one step at speed v mm/s,
+// and Brownian diffusion D mm^2/s to the fibres, 1 - exp(-(v B / h + D / l^2) dt) with B = 1 + gamma hollow and
+// l = min(h, 0.02 mm) (FIBRE_GAP_MM); a series where the exponent is small keeps f32's digits
+// how deep a cell lies below the tooth level under it, in the paper's hollow unit (paper.mjs toothHollow)
+fn hollowAt(i: u32) -> f32 { let p = PAPER3[i]; return max(0.0, (u.toothLo + u.toothSpan * p.x - p.w) / u.hollowUnit); }
+fn settleShareG(v: f32, df: f32, gg: f32, hol: f32, Wi: f32) -> f32 {
+  let h = max(0.001, Wi); let l = min(h, 0.02);
+  let x = (v * (1.0 + gg * hol) / h + df / (l * l)) * u.dt;
+  if (x < 0.01) { return x * (1.0 - x * (0.5 - x / 6.0)); }
+  return 1.0 - exp(-x);
+}
 fn p3a_tile(wid: vec3<u32>, lid: vec3<u32>) {
   let c = cx(wid, lid); if (!c.ok || M[c.i] != 1u || (RESIST[c.i] & 1u) != 0u) { return; }
-  let i = c.i; let Wi = W[i]; let hh = PAPER3[i].z;
-  let thin = min(3.0, 0.12 / max(0.04, Wi));
+  let i = c.i; let Wi = W[i]; let hh = PAPER3[i].z; let hol = hollowAt(i);
   let ld = Wi / u.liftDepth; let wetting = select(ld * ld, 1.0, ld >= 1.0);
   let rewet = u.hasTop != 0u && Wi > u.film;
   let turnover = select(0.0, min(1.0, WENT[i] / Wi), Wi > 1e-6);
@@ -447,10 +457,9 @@ fn p3a_tile(wid: vec3<u32>, lid: vec3<u32>) {
     var Gk = G[q]; var Dk = D[q]; var top = 0.0;
     if (rewet) { top = TOP[q]; }
     if (Gk == 0.0 && Dk == 0.0 && !(rewet && top != 0.0)) { continue; }
-    let pa = pigA(k); let pb = pigB(k);   // pa: gg, liftOf, scourOf, rep;  pb: rho, omega, floc, mobility
-    let filled = select(hh, min(1.0, hh + settled * u.granFill), u.granFill > 0.0);
+    let pa = pigA(k); let pb = pigB(k);   // pa: gg, liftOf, scourOf, rep;  pb: Stokes speed (mm/s, times settle), omega, floc, mobility
     let gg = pa.x;
-    let down = Gk * max(0.0, 1.0 - filled * gg) * pb.x * u.settle * thin * u.dt;
+    let down = Gk * settleShareG(pb.x, pigC(k).x, gg, select(hol, hol * max(0.0, 1.0 - settled * u.granFill), u.granFill > 0.0), Wi);
     let shape = max(0.0, 1.0 + (hh - 1.0) * gg);
     let up = Dk * shape * (pa.y * wetting * u.dt + pa.z * turnover * wetting);
     let dn = min(Gk, max(0.0, down)); let uu = min(Dk, max(0.0, up));
@@ -918,8 +927,7 @@ fn p3a_dep_tile(wid: vec3<u32>, lid: vec3<u32>) {
   let c = cx(wid, lid); if (!c.ok || M[c.i] != 1u) { return; }
   let i = c.i;
   if ((RESIST[i] & 1u) == 0u) {
-    let Wi = W[i]; let hh = PAPER3[i].z;
-    let thin = min(3.0, 0.12 / max(0.04, Wi));
+    let Wi = W[i]; let hh = PAPER3[i].z; let hol = hollowAt(i);
     let ld = Wi / u.liftDepth; let wetting = select(ld * ld, 1.0, ld >= 1.0);
     let rewet = u.hasTop != 0u && Wi > u.film;
     let turnover = select(0.0, min(1.0, WENT[i] / Wi), Wi > 1e-6);
@@ -931,9 +939,8 @@ fn p3a_dep_tile(wid: vec3<u32>, lid: vec3<u32>) {
       if (rewet) { top = TOP[q]; }
       if (Gk == 0.0 && Dk == 0.0 && !(rewet && top != 0.0)) { continue; }
       let pa = pigA(k); let pb = pigB(k);
-      let filled = select(hh, min(1.0, hh + settled * u.granFill), u.granFill > 0.0);
       let gg = pa.x;
-      let down = Gk * max(0.0, 1.0 - filled * gg) * pb.x * u.settle * thin * u.dt;
+      let down = Gk * settleShareG(pb.x, pigC(k).x, gg, select(hol, hol * max(0.0, 1.0 - settled * u.granFill), u.granFill > 0.0), Wi);
       let shape = max(0.0, 1.0 + (hh - 1.0) * gg);
       let up = Dk * shape * (pa.y * wetting * u.dt + pa.z * turnover * wetting);
       let dn = min(Gk, max(0.0, down)); let uu = min(Dk, max(0.0, up));
@@ -1366,7 +1373,7 @@ fn ground_at(xx: i32, yy: i32, tx: f32, ty: f32, L: i32, fine: f32, coarse: f32)
   for (var m = 0; m <= L; m++) {
     let bx = i32(jround(f32(xx) - tx * f32(m))); let by = i32(jround(f32(yy) - ty * f32(m)));
     if (bx < 0 || by < 0 || bx >= w || by >= h) { break; }
-    let p = BPAP[u32(by * w + bx)]; sum += p.x - (1.0 - coarse) * p.y; cnt += 1.0;
+    let p = BPAP[u32(by * w + bx)]; sum += p.x - (1.0 - coarse) * select(p.y, u.toothLo + u.toothSpan * p.y, u.groundPhys > 0.5); cnt += 1.0;   // the tooth in the height's units on a physical sheet
   }
   let i = u32(yy * w + xx); let p0 = BPAP[i];
   return sum / select(cnt, 1.0, cnt == 0.0) + fine * (p0.x - p0.z);

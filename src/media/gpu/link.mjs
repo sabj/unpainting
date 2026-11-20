@@ -974,7 +974,7 @@ export function attachGpu(sheet, O, { mode = 'auto', log = m => console.error(m)
       w: sheet.w, h: sheet.h, n, K, pigments: sheet.pigments, W: clone(sheet.W), s: clone(sheet.s), M: clone(sheet.M), ever: clone(sheet.ever), resist: clone(sheet.resist),
       G: sheet.G.map(clone), P: sheet.P.map(clone), D: sheet.D.map(clone), edge: new Float32Array(0), layers: [],
       paperPlanes: batchPort ? paperPlanes(paper, n) : undefined,
-      paper: { w: sheet.w, h: sheet.h, n, capacity: paper.capacity, grain: paper.grain, fdx: paper.fdx, fdy: paper.fdy, height: paper.height, valley: paper.valley, tooth: paper.tooth, proud: paper.proud, mmPerCell: paper.mmPerCell ?? 0 },
+      paper: { w: sheet.w, h: sheet.h, n, capacity: paper.capacity, grain: paper.grain, fdx: paper.fdx, fdy: paper.fdy, height: paper.height, valley: paper.valley, tooth: paper.tooth, proud: paper.proud, toothLo: paper.toothLo, toothSpan: paper.toothSpan, hollowUnit: paper.hollowUnit, zUm: paper.zUm ? true : undefined, mmPerCell: paper.mmPerCell ?? 0 },
     },
     top: top ? top.map(clone) : null,
   });

@@ -65,7 +65,7 @@ test('the pinned edge evaporates the same water and carries the same pigment in 
 
 test('granulation settles into hollows and lifts from peaks', () => {
   const s = sheet(5); s.pigments = [{...pigment,gamma:.9}];
-  s.paper.valley[11] = 0; s.paper.valley[13] = 1;
+  s.paper.valley[11] = 0; s.paper.valley[13] = 1; s.paper.hollow[11] = 1.5; s.paper.hollow[13] = 0;   // 11 a hollow, 13 a crest
   deposit(s,11,1,[1]); deposit(s,13,1,[1]);
   step(s,{...still,settle:1}); assert.ok(s.D[0][11] > s.D[0][13]);
   s.D[0].fill(0); s.G[0].fill(0); s.D[0][11] = s.D[0][13] = 1;

@@ -17,7 +17,8 @@ import path from 'node:path';
 import {ignoredSettings, badNumbers} from '../../src/paint/option-check.mjs';
 import {execFile} from 'node:child_process';
 import sharp from 'sharp';
-import {coldPressField} from '../../src/media/paper.mjs';
+import {paperRelief} from '../../src/media/paper-relief.mjs';
+import {subcellLayers, SUBCELL_GAIN} from '../../src/media/subcell-grain.mjs';
 import {step, layersOf, thickness, layersChanged, coherent} from '../../src/media/sheet.mjs';
 import {gpuStats} from '../../src/media/gpu/link.mjs';
 import {assertDeviceHealthy} from '../../src/media/gpu/device-health.mjs';
@@ -171,47 +172,17 @@ const SUBGRID = Math.round(num('subgrid', 0));
 const renderSub = () => {
   const coarse = view();
   if (SUBGRID < 2 || !CP_MM || INKRES) return { coarse, fine: null };
-  const N = SUBGRID, FW = W2 * N, FH = H2 * N, cp = PAPER_OPTS.coldPress;
-  const hF = coldPressField(FW, FH, CP_MM / N, PAPER_OPTS.seed, { ...cp, mmPerCell: CP_MM / N });
-  const T = thickness(ctx.sheet), KP = SHEET_PIGS.length;
-  const shareOf = p => (p.gamma == null ? 0 : 1 - (p.wick ?? Math.max(0.05, Math.min(0.9, 1 - p.gamma))));
-  const share = SHEET_PIGS.map(shareOf), gg = SHEET_PIGS.map(p => Math.min(0.97, (p.gamma ?? 0) * (O.gran ?? 1) * num('subgridgain', 1)));
-  const Kc = SHEET_PIGS.map(p => Array.from(p.K));
-  const fine = Buffer.alloc(FW * FH * 3), avg = Buffer.alloc(N2 * 3);
-  const w = new Float64Array(N * N * KP), mw = new Float64Array(KP), od = new Float64Array(3), den = new Float64Array(3);
-  for (let cy = 0; cy < H2; cy++) for (let cx = 0; cx < W2; cx++) {
-    const c = cy * W2 + cx;
-    let any = false;
-    for (let ch = 0; ch < 3; ch++) {
-      const b = Math.max(1, base[c * 3 + ch]), r = Math.max(1, coarse[c * 3 + ch]);
-      od[ch] = Math.max(0, Math.log(b / r)); den[ch] = 0;
-      for (let k = 0; k < KP; k++) den[ch] += T[k][c] * Kc[k][ch];
-      if (od[ch] > 1e-4 && den[ch] > 1e-9) any = true;
-    }
-    // the sub-cells' settling weights per pigment, and their mean over the cell (so the cell keeps its pigment)
-    mw.fill(0);
-    for (let sy = 0; sy < N; sy++) for (let sx = 0; sx < N; sx++) {
-      const h = hF[(cy * N + sy) * FW + cx * N + sx], s = sy * N + sx;
-      for (let k = 0; k < KP; k++) { const v = Math.max(0.02, 1 - h * gg[k]); w[s * KP + k] = v; mw[k] += v; }
-    }
-    for (let k = 0; k < KP; k++) mw[k] /= N * N;
-    const acc = [0, 0, 0];
-    for (let sy = 0; sy < N; sy++) for (let sx = 0; sx < N; sx++) {
-      const s = sy * N + sx, fi = (cy * N + sy) * FW + cx * N + sx, h = hF[fi], shade = 1 - SHADE + SHADE * h;
-      for (let ch = 0; ch < 3; ch++) {
-        let m = 1;
-        if (any && den[ch] > 1e-9) {
-          let nm = 0;
-          for (let k = 0; k < KP; k++) { const t = T[k][c]; if (t > 0) nm += t * Kc[k][ch] * ((1 - share[k]) + share[k] * w[s * KP + k] / mw[k]); }
-          m = nm / den[ch];
-        }
-        const v = Math.min(255, paperRGB[ch] * shade * Math.exp(-od[ch] * m) * (coarse[c * 3 + ch] > base[c * 3 + ch] ? coarse[c * 3 + ch] / Math.max(1, base[c * 3 + ch]) : 1));
-        fine[fi * 3 + ch] = Math.round(v); acc[ch] += v;
-      }
-    }
-    for (let ch = 0; ch < 3; ch++) avg[c * 3 + ch] = Math.round(acc[ch] / (N * N));
-  }
-  console.log(`subgrid: settled pigment over ${N}x${N} sub-cells of cold press at ${(CP_MM / N).toFixed(3)} mm, painting-fine.jpg ${FW}x${FH}`);
+  // the sheet's settled pigment spread over the same paper evaluated N times finer (src/media/subcell-grain.mjs): each
+  // cell keeps its pigment, granulating paint gathers in the fine pits, staining paint only interpolates
+  const N = SUBGRID, FW = W2 * N, FH = H2 * N, FN = FW * FH;
+  const hF = paperRelief(FW, FH, CP_MM / N, { seed: PAPER_OPTS.seed, relief: PAPER_OPTS.relief ?? 'cold' }).height;
+  const fineLayers = subcellLayers(layersOf(ctx.sheet), SHEET_PIGS, ctx.sheet.paper, N, { gain: SUBCELL_GAIN * num('subgridgain', 1) });
+  const fbase = new Uint8Array(FN * 3);
+  for (let i = 0; i < FN; i++) { const shade = 1 - SHADE + SHADE * hF[i]; for (let ch = 0; ch < 3; ch++) fbase[i * 3 + ch] = Math.round(Math.min(255, paperRGB[ch] * shade)); }
+  const fine = Buffer.from(renderLayers(fineLayers, SHEET_PIGS, fbase, FN)), avg = Buffer.alloc(N2 * 3), acc = new Float64Array(N2 * 3);
+  for (let y = 0; y < FH; y++) for (let x = 0; x < FW; x++) { const c = ((y / N) | 0) * W2 + ((x / N) | 0); for (let ch = 0; ch < 3; ch++) acc[c * 3 + ch] += fine[(y * FW + x) * 3 + ch]; }
+  for (let i = 0; i < N2 * 3; i++) avg[i] = Math.round(acc[i] / (N * N));
+  console.log(`subgrid: settled pigment over ${N}x${N} sub-cells of the paper's relief at ${(CP_MM / N).toFixed(3)} mm, painting-fine.jpg ${FW}x${FH}`);
   return { coarse: avg, fine };
 };
 const FINAL = renderSub();
