@@ -1,14 +1,14 @@
 # Example sources
 
-The example targets are in `targets/` and their saved outputs are in `output/`. The table lists commands for painting them. The paintings in `output/` came from an earlier version of the painter (2026-10-06). They are not the expected output of today's commands, which paint differently. Every target except the architecture photo is public domain.
+The example targets are in `targets/`, the prepared drawings in `drawings/`, the block-in studies in `studies/` and saved outputs in `output/`. The table lists commands for painting them. The paintings in `output/` came from an earlier version of the painter (2026-10-06). They are not the expected output of today's commands, which paint differently. Every target except the architecture photo is public domain.
+
+Since 0.4 a painting takes a drawing file and a block-in study (`--drawingfile`, `--washplan`). Only two targets have them here. The other targets have no study, so the painter refuses them until one is made.
 
 | use case | target | run | saved output (earlier painter, 2026-10-06) |
 |---|---|---|---|
 | landscape | `targets/white-ships.jpg` | `node tools/paint-plate.mjs --image examples/targets/white-ships.jpg --width 540 --mode full --out work/white-ships` | `output/white-ships-540-painting.jpg`, `output/white-ships-540.mp4` |
-| portrait or figure | `targets/sargent-a-tramp.jpg` | `npm run example:portrait` | `output/sargent-a-tramp-360.jpg` |
-| drawing, figures | `targets/tiepolo-punchinello-sweets.jpg` | `npm run example:drawing` | `output/tiepolo-punchinello-sweets-360.jpg` |
-| drawing, animals | `targets/tiepolo-punchinello-camel.jpg` | `npm run example:animal` | `output/tiepolo-punchinello-camel-360.jpg` |
-| architecture | `targets/trumbull.jpg` | `npm run example:architecture` | `output/trumbull-360.jpg` |
+| portrait or figure, study only | `targets/sargent-a-tramp.jpg`, `studies/sargent-a-tramp-study.png` | `npm run example:portrait` | `output/sargent-a-tramp-360.jpg` |
+| pen and wash, drawing and study | `targets/tiepolo-punchinello-camel.jpg`, `drawings/tiepolo-punchinello-camel.png` (traced and ordered into `drawings/tiepolo-punchinello-camel-lines.json.gz`), `studies/tiepolo-punchinello-camel-study.png` | `npm run example:animal` | `output/tiepolo-punchinello-camel-360.jpg` |
 | stroke plan (a JSON list of painting commands) | `plans/graded-wash.json` | `npm run example`, `npm run example:plan` | `output/graded-wash-result.png` |
 
 ## Targets
@@ -32,6 +32,17 @@ Credit lines:
 - Trumbull College photo: posted by @trumbullcollegeyale on 24 August 2020, credited there to Google; photographer unknown. Third-party photo, used with credit for noncommercial research. See NOTICE section 1a.
 
 Benchmark targets: `bench/v2/targets/hills.png` and `bench/v2/targets/south-france.png` are crops of original photographs, photo by Sam Jackson. They are covered by section 1 of [NOTICE](../NOTICE).
+
+## Drawings and studies
+
+Made from the public-domain targets above by an image model, 2026-11-19 (records in the project's working notes): Qwen-Image-Edit 2511 (`Qwen/Qwen-Image-Edit-2511`, Apache-2.0) with the Lightning 8-step LoRA (`lightx2v/Qwen-Image-Edit-2511-Lightning`), seed 42. They are © 2026 Sam Jackson under CC BY 4.0, like the painter's outputs.
+
+| file | made from | how |
+|---|---|---|
+| `drawings/tiepolo-punchinello-camel.png` | `targets/tiepolo-punchinello-camel.jpg` | the ink-prep drawing prompt (e6, 8 steps), 889 x 640 |
+| `drawings/tiepolo-punchinello-camel-lines.json.gz` | the drawing above | `tools/seg/trace-drawing.py --medium ink --sheetmm 152.4`, then `tools/seg/order-strokes.mjs --sheetmm 152.4` |
+| `studies/tiepolo-punchinello-camel-study.png` | `targets/tiepolo-punchinello-camel.jpg` | the block-in study prompt (s3, 8 steps), 889 x 640 |
+| `studies/sargent-a-tramp-study.png` | `targets/sargent-a-tramp.jpg` | the block-in study prompt (s3, 8 steps), 960 x 1359 |
 
 ## Outputs
 
