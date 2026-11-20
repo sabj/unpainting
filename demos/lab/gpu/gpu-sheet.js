@@ -155,8 +155,8 @@ export class GpuSheet {
     if (st[3] > 0.75 * ef.rounds && ef.rounds < EF_RMAX) { ef.rounds = Math.min(EF_RMAX, 2 * ef.rounds); this.device.queue.writeBuffer(this.b.EFB, 4, new Uint32Array([ef.rounds])); }
     if (!ef.stale) return;
     const { n, w, h, o } = this, cap = this.capacity;
-    const [Mw, Ew, Sw] = await Promise.all([this.readWords('M', n * 4), this.readWords('EVER', n * 4), this.readWords('S', n * 4)]);
-    const M = new Uint32Array(Mw), ever = new Uint32Array(Ew), s = new Float32Array(Sw), mm = o.mmPerCell ?? 0.3;
+    const [Mw, Ew, Sw, Ww] = await Promise.all([this.readWords('M', n * 4), this.readWords('EVER', n * 4), this.readWords('S', n * 4), this.readWords('W', n * 4)]);
+    const M = new Uint32Array(Mw), ever = new Uint32Array(Ew), s = new Float32Array(Sw), W = new Float32Array(Ww), mm = o.mmPerCell ?? 0.3;
     const boxes = wetBoxes({ w, h, M, s, capacity: cap }, Math.max(2, this.poreTime.iters));
     if (boxes.length > EF_BMAX) throw new Error(`GPU edge feed: ${boxes.length} wet boxes, more than ${EF_BMAX}`);
     let foot = 0, bx0 = 0xffffffff, by0 = 0xffffffff, bx1 = 0, by1 = 0;
@@ -167,8 +167,16 @@ export class GpuSheet {
     const q = this.device.queue;
     q.writeBuffer(this.b.EFB, 16, new Uint32Array([0, 0, 0xffffffff, 0xffffffff, 0, 0, foot, bx0, by0, bx1, by1]));
     ef.stale = false;
+    // a box with no surface water has no feed (edgeFeed returns before its geometry); the rest keep their geometry while
+    // the footprint in them is the same (edgeFeed's cache)
+    const feeding = boxes.filter(([x0, y0, x1, y1]) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) if (W[y * w + x] > 0) return true; return false; });
+    const res = this.resist; let hash = 0x811c9dc5; const mix = v => { hash = Math.imul(hash ^ v, 16777619) >>> 0; };
+    for (const [x0, y0, x1, y1] of feeding) { mix(0xb0c5); for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) { const i = y * w + x; if (M[i] || ever[i]) mix(res?.[i] ? ~i : i); } }
+    const key = `${[mm, o.edgeMm, o.edgeEvap, o.reachMm, o.holeSpan].join(',')}:${feeding.length}:${hash}`;
+    if (key === ef.key) return;
+    ef.key = key;
     const list = [], G = new Float32Array(4 * n); let b = 0;
-    for (const box of boxes) {
+    for (const box of feeding) {
       const geo = edgeGeometry({ w, h, M, ever, resist: this.resist }, o, box, mm, ef.scratch);
       if (!geo) continue;
       const { order, ex, fx, fy } = geo;

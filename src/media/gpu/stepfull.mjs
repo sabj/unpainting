@@ -203,8 +203,8 @@ export class GpuSheet {
     const { n, w, h } = this, ef = this.ef;
     // the mask, footprint and damp pores packed four bits a cell on the GPU (ef_pack): an eighth of one field to read
     { const e = this.device.createCommandEncoder(), pass = e.beginComputePass(); pass.setPipeline(this.p.ef_pack); pass.setBindGroup(0, this.bg.ef_pack); pass.dispatchWorkgroups(Math.ceil(n / 2048)); pass.end(); this.device.queue.submit([e.finish()]); }
-    const bits = new Uint32Array(await this.readWords('EFP', Math.ceil(n / 8) * 4)), M = new Uint8Array(n), ever = new Uint8Array(n), damp = new Uint8Array(n);
-    for (let i = 0; i < n; i++) { const b = (bits[i >>> 3] >>> (4 * (i & 7))) & 15; M[i] = b & 1; ever[i] = (b >> 1) & 1; damp[i] = (b >> 2) & 1; }
+    const bits = new Uint32Array(await this.readWords('EFP', Math.ceil(n / 8) * 4)), M = new Uint8Array(n), ever = new Uint8Array(n), damp = new Uint8Array(n), water = new Uint8Array(n);
+    for (let i = 0; i < n; i++) { const b = (bits[i >>> 3] >>> (4 * (i & 7))) & 15; M[i] = b & 1; ever[i] = (b >> 1) & 1; damp[i] = (b >> 2) & 1; water[i] = b >> 3; }
     // wetBoxes asks M[i] || s[i] > 0.02 capacity[i]: the packed bit answers it with a capacity of 1 and s of 1 or 0
     const boxes = wetBoxes({ w, h, M: damp, s: damp, capacity: ONES(n) }, Math.max(2, this.poreTime.iters));
     if (boxes.length > EF_BMAX) throw new Error(`GPU edge feed: ${boxes.length} wet boxes, more than ${EF_BMAX}`);
@@ -214,7 +214,10 @@ export class GpuSheet {
     const mix = v => { hash = Math.imul(hash ^ v, 16777619) >>> 0; };
     mix(Math.round(mm * 1e6)); mix(Math.round((o.edgeMm ?? 1) * 1e6)); mix(Math.round(o.edgeEvap * 1e9)); mix(Math.round((o.reachMm ?? 1.5) * 1e6)); mix(o.holeSpan ?? 0);
     // (edge-feed.mjs keeps its geometry while the mask is the same, however its box moved: the box only bounds the mask)
-    for (const [x0, y0, x1, y1] of boxes) { mix(0xb0c5); for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) { const i = y * w + x; if (M[i] || ever[i]) mix(resist?.[i] ? ~i : i); } }
+    // A box with no surface water has no feed (edgeFeed returns before its geometry), so its footprint does not count.
+    const wetBox = ([x0, y0, x1, y1]) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) if (water[y * w + x]) return true; return false; };
+    const feeding = boxes.filter(wetBox);
+    for (const [x0, y0, x1, y1] of feeding) { mix(0xb0c5); for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) { const i = y * w + x; if (M[i] || ever[i]) mix(resist?.[i] ? ~i : i); } }
     // what ef_watch will compare each step against: the footprint's size and the box round the wet and damp cells
     let foot = 0, bx0 = 0xffffffff, by0 = 0xffffffff, bx1 = 0, by1 = 0;
     for (let i = 0; i < n; i++) {
@@ -223,12 +226,12 @@ export class GpuSheet {
     }
     this.device.queue.writeBuffer(this.b.EFB, 16, new Uint32Array([0, 0, 0xffffffff, 0xffffffff, 0, 0, foot, bx0, by0, bx1, by1]));
     ef.stale = false;
-    const key = `${boxes.length}:${hash}`;
+    const key = `${feeding.length}:${hash}`;
     if (key === ef.key) return;
-    ef.key = key; ef.solves = (ef.solves ?? 0) + 1;
+    ef.key = key;
     const list = [], G = new Float32Array(4 * n);
     let b = 0;
-    for (const box of boxes) {
+    for (const box of feeding) {
       const geo = edgeGeometry({ w, h, M, ever, resist }, o, box, mm, ef.scratch);
       if (!geo) continue;
       const { order, ex, fx, fy } = geo;

@@ -126,7 +126,8 @@ fn ef_watch(@builtin(global_invocation_id) gid: vec3<u32>) {
     atomicMin(&EFB[6], x); atomicMin(&EFB[7], y); atomicMax(&EFB[8], x); atomicMax(&EFB[9], y);
   }
 }
-// the wet mask, the footprint and the damp pores (sheet.mjs wetBoxes) of eight cells a word: bit 1 M, 2 ever, 4 M or damp
+// the wet mask, the footprint, the damp pores (sheet.mjs wetBoxes) and surface water of eight cells a word: bit 1 M,
+// 2 ever, 4 M or damp, 8 water standing
 @compute @workgroup_size(256)
 fn ef_pack(@builtin(global_invocation_id) gid: vec3<u32>) {
   let q = gid.x; if (q * 8u >= u.n) { return; }
@@ -137,6 +138,7 @@ fn ef_pack(@builtin(global_invocation_id) gid: vec3<u32>) {
     if (M[i] == 1u) { b = 5u; }
     if (EVER[i] == 1u) { b = b | 2u; }
     if (S[i] > 0.02 * PAPER[i].x) { b = b | 4u; }
+    if (W[i] > 0.0) { b = b | 8u; }
     v = v | (b << (4u * k));
   }
   EFP[q] = v;
