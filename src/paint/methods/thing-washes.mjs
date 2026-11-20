@@ -5,7 +5,7 @@
 // most specific named thing whose box holds most of the region.
 // 1. Reserved lights: the few brightest regions of named things, kept as bare paper. Each is a smooth outline no narrower than
 //    the wash brush; every wash goes round them.
-// 2. Big bands first: the sky, the ground, the water, the path and the main mass (a named thing over a quarter of the
+// 2. Big bands first: the sky, the ground, the water, the path and the main mass (the thing over a quarter of the
 //    sheet), each one low-vertex polygon spanning the sheet, its holes filled: the things in it go on over it.
 // 3. One polygon a named thing: its regions closed, filled and opened by the brush, simplified to a low-vertex smooth
 //    outline (within DRAWN_TOL_MM of the drawn edge under a drawing). Nothing inside it is cut by value.
@@ -298,7 +298,7 @@ export function planThingWashes({ demand, k, density, w, h, rgb = null, paperRGB
   };
 
   // 2. the big bands, light to dark
-  const mass = things.filter(t => !t.light && t.box && !BAND_KINDS.has(t.kind)).sort((a, b) => b.area - a.area)[0];
+  const mass = things.filter(t => !t.light && !BAND_KINDS.has(t.kind)).sort((a, b) => b.area - a.area)[0];
   const bands = things.filter(t => !t.light && (BAND_KINDS.has(t.kind) || (t === mass && t.area >= MASS_SHARE * pn))).sort((a, b) => b.L - a.L);
   // A band goes round the things in it that it cannot lie under: one lighter than the band, or of another hue.
   for (const t of bands) t.band = true;
