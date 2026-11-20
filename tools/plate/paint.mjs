@@ -45,7 +45,7 @@ import {dropMask} from '../../src/crop/blockin.mjs';
 import {shapeDeficit, shapeCharge, shapeOwedColour} from '../../src/paint/methods/shape-deficit.mjs';
 import {touchLack, touchGap, touchDue, touchFilmUnits} from '../../src/paint/methods/touch-up.mjs';
 import {tipMarks, darkClip} from '../../src/paint/methods/final-dark-marks.mjs';
-import {washPaths, brushedWashPaths, invalidateFlowField, sweepCover, sweepCount, containPaths, openEdgeShare, softArcs, soften} from '../../src/media/wash.mjs';
+import {washPaths, brushedWashPaths, invalidateFlowField, sweepCover, footprintSpread, sweepCount, containPaths, openEdgeShare, softArcs, soften} from '../../src/media/wash.mjs';
 import {wetsLaneByLane} from '../../src/paint/methods/prewet-order.mjs';
 import {softenFirstWash} from '../../src/paint/methods/first-wash.mjs';
 import {distanceToZero} from '../../src/raster.js';
@@ -663,6 +663,11 @@ for (let L = L_START; L < (PENWASH ? 0 : ctx.layers.length); L++) {
     if (sh._cover == null) sh._cover = detail || opt('cover', vectorPaths ? '1' : '0') === '0' ? 1 : Math.pow(Math.max(1, passageCover()), num('coverpow', 1));
     // --undercover 0|1: raise the charge by area over brush footprint, floored at --underfloor (default 0.4), so the planned mass arrives. Default 1.
     if (sh._under == null) sh._under = detail || opt('undercover', '1') === '0' ? 1 : 1 / Math.max(num('underfloor', 0.4), Math.min(1, passageCover()));
+    // The section brush lays a film as deep wherever its sweeps reach, and a wash plan's sweeps reach past the outline
+    // (it is laid a little past it so neighbours meet, and its rounds ring it): the charge is spread over all the paper
+    // they brush, so the sheet holds the passage's booked mass. Charged for its outline alone, a passage put 1.4 to 2.6
+    // times its mass on the sheet. The swatch that calibrates it is charged the same way (sheet.mjs scrapSwatches).
+    if (sh._spread == null) sh._spread = detail || brush.model !== 'section' ? 1 : Math.max(1, footprintSpread(paths, up(MASK), W2, H2));
     sh.laidShare = opening;
     // see GRADED_CAL: the whole scrap's delivery, less what runs past this passage's own open edge (in sheet cells)
     if (useGradedCal && sh._gcal == null) {
@@ -713,7 +718,7 @@ for (let L = L_START; L < (PENWASH ? 0 : ctx.layers.length); L++) {
       CHARGE_CAL=NUMERIC_TUFT_CAL.get(key).gain;JSONL.append(path.join(out,'numeric-tuft-consumed.jsonl'),JSON.stringify({shapeId:ctx.MAJOR_TECHNIQUE.shapeId,radius:r,calibration:CHARGE_CAL,water:WET(T),passes:T.passes,originalGeometry:true,profile:semanticBrushObservation(brush)})+'\n');
     }
 
-    const initialLoad={ water: detail ? Math.min(T.water, num('detailwater', 0.3)) : WET(T), conc: sh.mix.map((v, j) => v * DCAL(sh, j) * TCAL(sh, T, detail, layer.value) * num('strength', 2.2) * CHARGE_CAL * opening * PF / sh._cover * sh._under * (sh._fb ?? 1) * (detail ? num('detailstrength', 2.0) : 1)) };
+    const initialLoad={ water: detail ? Math.min(T.water, num('detailwater', 0.3)) : WET(T), conc: sh.mix.map((v, j) => v * DCAL(sh, j) * TCAL(sh, T, detail, layer.value) * num('strength', 2.2) * CHARGE_CAL * opening * PF / sh._cover / sh._spread * sh._under * (sh._fb ?? 1) * (detail ? num('detailstrength', 2.0) : 1)) };
     if(!reserveFeasibility)productionDip(brush,initialLoad);
     const cadence=nativeBodyCadence({mode:NATIVE_PAINT_MODE.mode,enabled:Boolean(FAST_BODY_ENABLED),detail,instructionBound:!!sh._semantic,technique:T.name,radiusCells:r,mmPerCell:num('sheetmm', DEFAULT_SHEET_MM)/W2,every:flowEvery(paths.length),spacing:FAST_BODY_SPACING});
     if(cadence.approximated)BODY_CADENCE_RECORD.sourceSweepsSelected++;
@@ -775,7 +780,7 @@ for (let L = L_START; L < (PENWASH ? 0 : ctx.layers.length); L++) {
       // along one load the hand presses toward the plane's darker end, so load factor times pressure follows the plane
       const GRADED = PLANE ? LOADS.map((ch, k) => gradeLoadPressure(ch, PLANE, f[k], SC)) : LOADS;
       if (PLANE) used['graded load'] = (used['graded load'] || 0) + LOADS.length;
-      const loadScale = (v, j) => v * DCAL(sh, j) * TCAL(sh, T, detail, layer.value) * num('strength', 2.2) * (useGradedCal ? sh._gcal : CHARGE_CAL) * opening * PF / sh._cover * sh._under * (sh._fb ?? 1);
+      const loadScale = (v, j) => v * DCAL(sh, j) * TCAL(sh, T, detail, layer.value) * num('strength', 2.2) * (useGradedCal ? sh._gcal : CHARGE_CAL) * opening * PF / sh._cover / sh._spread * sh._under * (sh._fb ?? 1);
       const base = sh.mix.map(loadScale);
       // an area plan's variegated wash (area-washes.mjs): each load is dipped at the mix where it lies along the wash
       const second = sh._variegate ? sh._variegate.mix.map(loadScale) : null, loadBase = k => second ? variegatedCharge(base, second, sh._variegate.span, LOADS[k], SC) : base;
@@ -788,7 +793,7 @@ for (let L = L_START; L < (PENWASH ? 0 : ctx.layers.length); L++) {
       for (let k = 0; k < shaped.length; k += Math.max(2, Math.round(gradedLen))) chunks.push(shaped.slice(Math.max(0, k - 1), k + Math.round(gradedLen) + 1));
       // One amount per shape: the chunks carry the passage's amount, not a per-cell field.
       const f = chunks.map(() => 1), mean = 1;
-      const base = sh.mix.map((v, j) => v * DCAL(sh, j) * TCAL(sh, T, detail, layer.value) * num('strength', 2.2) * (useGradedCal ? sh._gcal : CHARGE_CAL) * opening * PF / sh._cover * sh._under * (sh._fb ?? 1));
+      const base = sh.mix.map((v, j) => v * DCAL(sh, j) * TCAL(sh, T, detail, layer.value) * num('strength', 2.2) * (useGradedCal ? sh._gcal : CHARGE_CAL) * opening * PF / sh._cover / sh._spread * sh._under * (sh._fb ?? 1));
       // The water moves on the sweep's clock, counted across its chunks, so the sheet flows while a chunked sweep is laid.
       let st = 0;
       clock('strokes', () => { for (let pass = 0; pass < T.passes; pass++) chunks.forEach((ch, k) => { runCharge(ch, { water: WET(T), conc: base.map(v => v * f[k] / mean) }, { upright: UPRIGHT, flowEvery: every, gpuBetween: true, lift: !GFLOOR || k === chunks.length - 1, between: () => { if (++st % every === 0) clock('flow', () => step(ctx.sheet, O)); } },o=>numericalStroke(brush, ctx.sheet, ch, o)); }); });
