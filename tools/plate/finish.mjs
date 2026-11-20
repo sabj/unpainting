@@ -136,10 +136,14 @@ console.log(`${ctx.laid} brush sweeps, ${ctx.frame} frames, ${((Date.now() - t0)
 if(COLOUR_TRACE) await sharp(INKRES ? INKRES.compose(render()) : render(), {raw:{width:OUT_W,height:OUT_H,channels:3}}).png().toFile(path.join(out,'colour-final.png'));
 // --subgrid N: spread settled pigment over N x N sub-cells by the cold-press relief, each cell keeping its pigment. Default 0.
 // Water stays at the sheet's grid. Written as painting-fine.jpg and averaged back as reflectance. Cold-press paper only.
-const SUBGRID = Math.round(num('subgrid', 0));
+// With the pens on a sheet N times finer (--inkres N) the painting is already N times the sheet: the sub-cell render is
+// the painting itself, at the pen's N, with the pen composed over it at its own grid (ink-res.mjs composeFine).
+const SUBGRID = Math.round(num('subgrid', 0)) >= 2 && INKRES ? INKRES.N : Math.round(num('subgrid', 0));
+if (INKRES && SUBGRID >= 2 && SUBGRID !== Math.round(num('subgrid', 0))) console.log(`subgrid: ${SUBGRID}, the pen sheet's (--inkres ${INKRES.N}), not ${num('subgrid', 0)}: the painting is written at the pen's grid`);
+if (SUBGRID >= 2 && !CP_MM) throw new Error('--subgrid: the sub-cell grain needs the cold-press relief in micrometres (--paper coldpress)');
 const renderSub = () => {
   const coarse = view();
-  if (SUBGRID < 2 || !CP_MM || INKRES) return { coarse, fine: null };
+  if (SUBGRID < 2) return { coarse, fine: null };
   // the sheet's settled pigment spread over the same paper evaluated N times finer (src/media/subcell-grain.mjs): each
   // cell keeps its pigment, granulating paint gathers in the fine pits, staining paint only interpolates
   const N = SUBGRID, FW = W2 * N, FH = H2 * N, FN = FW * FH;
@@ -150,13 +154,13 @@ const renderSub = () => {
   const fine = Buffer.from(renderLayers(fineLayers, SHEET_PIGS, fbase, FN)), avg = Buffer.alloc(N2 * 3), acc = new Float64Array(N2 * 3);
   for (let y = 0; y < FH; y++) for (let x = 0; x < FW; x++) { const c = ((y / N) | 0) * W2 + ((x / N) | 0); for (let ch = 0; ch < 3; ch++) acc[c * 3 + ch] += fine[(y * FW + x) * 3 + ch]; }
   for (let i = 0; i < N2 * 3; i++) avg[i] = Math.round(acc[i] / (N * N));
-  console.log(`subgrid: settled pigment over ${N}x${N} sub-cells of the paper's relief at ${(CP_MM / N).toFixed(3)} mm, painting-fine.jpg ${FW}x${FH}`);
+  console.log(`subgrid: settled pigment over ${N}x${N} sub-cells of the paper's relief at ${(CP_MM / N).toFixed(3)} mm, ${INKRES ? 'the painting with the pen over it' : 'painting-fine.jpg'} ${FW}x${FH}`);
   return { coarse: avg, fine };
 };
 const FINAL = renderSub();
-if (FINAL.fine) await sharp(FINAL.fine, { raw: { width: W2 * SUBGRID, height: H2 * SUBGRID, channels: 3 } }).jpeg({ quality: 92 }).toFile(path.join(out, 'painting-fine.jpg'));
+if (FINAL.fine && !INKRES) await sharp(FINAL.fine, { raw: { width: W2 * SUBGRID, height: H2 * SUBGRID, channels: 3 } }).jpeg({ quality: 92 }).toFile(path.join(out, 'painting-fine.jpg'));
 if (LOOK_RES > 1 && !INKRES) { const F = renderFine(); await sharp(F.buf, { raw: { width: F.FW, height: F.FH, channels: 3 } }).jpeg({ quality: 92 }).toFile(path.join(out, 'painting-fine.jpg')); }
-const FINAL_PIXELS=INKRES ? INKRES.compose(view()) : FINAL.coarse;
+const FINAL_PIXELS=INKRES ? (FINAL.fine ? INKRES.composeFine(FINAL.fine) : INKRES.compose(view())) : FINAL.coarse;
 assertDeviceHealthy(ctx.sheet); // a broken GPU device never writes a painting (src/media/gpu/device-health.mjs)
 await sharp(FINAL_PIXELS,{raw:{width:OUT_W,height:OUT_H,channels:3}}).png().toFile(path.join(out,'painting.png'));
 if(ctx.NATIVE_RECORDER){

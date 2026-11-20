@@ -163,3 +163,12 @@ test('graphite or pure watercolor channel produces an empty proof with zero ink 
   assert.equal(proof.height, 2);
   assert.ok(proof.pixels.every(v => v === 255), 'proof must be completely blank white for non-ink channels');
 });
+
+test('composeFine lays the pen over a paint render already at the fine grid as compose does over the coarse one', () => {
+  const { main, R } = setup();
+  R.draw([line], new Float32Array(W * H).fill(1), W, H, { ink: [10], peak: 1 });
+  const lo = Buffer.alloc(W * H * 3, 230), a = R.compose(lo), b = R.composeFine(Buffer.alloc(W * H * 27, 230));
+  let worst = 0; for (let i = 0; i < a.length; i++) worst = Math.max(worst, Math.abs(a[i] - b[i]));
+  assert.ok(worst <= 1, `worst ${worst}`);
+  assert.throws(() => R.composeFine(lo), /composeFine/);
+});

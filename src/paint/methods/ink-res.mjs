@@ -218,7 +218,9 @@ export function makeInkRes({ N, W2, H2, paperOpts, pigments, main, inkAt = 0, ga
       dst[o + 2] = src[a + 2] * tx0 + src[b + 2] * tx;
     }
   }
-  function composeImpl(lo) {
+  // The fine pen's transmittance over the coarse ink's, per fine pixel: what the paint's own render of the ink is
+  // multiplied by to show the pen at its own grid.
+  function ensureInkRatio() {
     ensureComposeTables();
     const rowLen = WH * 3;
     if (renderVersion !== materialVersion) {
@@ -244,6 +246,10 @@ export function makeInkRes({ N, W2, H2, paperOpts, pigments, main, inkAt = 0, ga
       }
       renderVersion = materialVersion;
     }
+  }
+  function composeImpl(lo) {
+    ensureInkRatio();
+    const rowLen = WH * 3;
     const out = Buffer.allocUnsafe(nH * 3);
     let r0 = hBuf0, r1 = hBuf1, cy0 = -1, cy1 = -1;
     for (let y = 0; y < HH; y++) {
@@ -266,6 +272,16 @@ export function makeInkRes({ N, W2, H2, paperOpts, pigments, main, inkAt = 0, ga
     return out;
   }
 
+  /** The pen over a paint render already at the fine grid (WH x HH RGB, such as the sub-cell grain render, which
+   *  carries the coarse ink as the sheet holds it): the coarse ink is swapped for the pen's own, pixel by pixel. */
+  function composeFine(hi) {
+    if (!hi || hi.length !== nH * 3) throw new Error(`inkres composeFine: a ${WH} x ${HH} RGB render is needed, got ${hi ? hi.length / 3 : 0} pixels`);
+    ensureInkRatio();
+    const out = Buffer.allocUnsafe(nH * 3);
+    for (let i = 0; i < nH * 3; i++) { const v = Math.round(hi[i] * invInkL[i]); out[i] = v < 0 ? 0 : v > 255 ? 255 : v; }
+    return out;
+  }
+
   // Actual deposited ink on the pen's own grid, on white. No upsampling or geometry replay.
   function nativeInk() {
     const isGraphite = /graphite|pencil/i.test(pigments[inkAt]?.kind ?? pigments[inkAt]?.name ?? '');
@@ -285,7 +301,7 @@ export function makeInkRes({ N, W2, H2, paperOpts, pigments, main, inkAt = 0, ga
     wetOn=st.wetOn;Object.assign(stats,st.stats);
     changed();totalVersion=-1;renderVersion=-1;
   }
-  return { N, width: WH, height: HH, draw, settle, compose, nativeInk, carry, wet, stats, fine, remapInk, changed, exportState, importState };
+  return { N, width: WH, height: HH, draw, settle, compose, composeFine, nativeInk, carry, wet, stats, fine, remapInk, changed, exportState, importState };
 }
 
 
