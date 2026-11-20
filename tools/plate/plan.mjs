@@ -473,7 +473,6 @@ const FINE = await (async () => {
 // What the source's fine structure adds above its local tone: grain a glaze cannot carry but a later dry brush can.
 // --edgeclear e: share of width and height at each edge read as structureless, so a scan's mount is not grain. Default 0.
 const EDGE = (() => { const e = num('edgeclear', 0), ex = Math.round(e * w), ey = Math.round(e * h); return i => { const x = i % w, y = (i / w) | 0; return x < ex || y < ey || x >= w - ex || y >= h - ey; }; })();
-const HP = (() => { const b = gaussian(ctx.SRC, w, h, num('texsigma', 1.6)); return Float32Array.from(ctx.SRC, (v, i) => (EDGE(i) ? 0 : Math.max(0, v - b[i]))); })();
 // The part of the fine grid a passage's cells can map to (with a margin): everything outside it is empty, so what walks the
 // passage's mask there can stay inside, in the same order, and give the same numbers.
 const maskWindow = (mask, F, box = null) => {
@@ -669,8 +668,6 @@ const FINISH_FIELD = (!MASK_FINISH || VIGFINISH) && num('finish', 0) > 0
   : null;
 const FINISH = VIGFINISH && FINISH_FIELD ? Float32Array.from(MASK_FINISH, (v, i) => (v < 0 ? v : Math.min(v, FINISH_FIELD[i]))) : (MASK_FINISH ?? FINISH_FIELD);
 if (VIGFINISH && FINISH_FIELD) console.log(`vignette finish: cut by the finish field (background ${num('finish', 0)})`);
-let FUR_CACHE = null;
-const FUR_FIELD = () => (FUR_CACHE ??= orientationField(ctx.SRC, w, h, gaussian, { sigma: num('fursigma', 2) }));
 
 // The separator's reading of the source: which cells are pen line, which are wash. Read once; the ink's colour, the
 // line budget and the gate on the pen all use it.
@@ -831,8 +828,8 @@ const EARLY_DRY_VALUE=num('earlydryvalue',0);earlyDryBoundary({minValue:EARLY_DR
 if(EARLY_DRY_VALUE)fs.writeFileSync(path.join(out,'early-dry-before.json'),JSON.stringify({minValue:EARLY_DRY_VALUE,scope:'completed original full numeric pan/value dry boundaries; firstwash and intentional connected wet passages unchanged',order:'ordinary physical dry before baseline idle settle, not perstroke dry',water:'original unchanged',pigment:'original requested load and planned demand unchanged'},null,2));ctx.EARLY_DRY_CAPTURED=false;
 Object.assign(ctx, { PALETTE, PIGS, COLOUR_BUDGET, STYLE, D_AIM, FIG_MASK, LIGHT_CELLS, GOUACHE_LIGHTS, LIGHT_SHARE, 
   SMALL, WHITE_HOLD, MIXES, setClip, MOD, MASS_BUDGET, DRAW_STYLE, COLOUR_TRACE, PUDDLES, 
-  FIRST_FLOOR, AUTHORED_INPUT, EDGE, HP, maskBox, FULLBOX, TECHNIQUE, techniqueOf, reportTechniques, CURLS, 
-  FINISH, FUR_FIELD, SEP, OUTLINE, PREP_ERASE, STAGE_PLAN, FACE_INK, REQUESTED_DRAW_MEDIUM, STYLE_ON, 
+  FIRST_FLOOR, AUTHORED_INPUT, EDGE, maskBox, FULLBOX, TECHNIQUE, techniqueOf, reportTechniques, CURLS, 
+  FINISH, SEP, OUTLINE, PREP_ERASE, STAGE_PLAN, FACE_INK, REQUESTED_DRAW_MEDIUM, STYLE_ON, 
   INKLOAD, INK_WIDTH_FLOOR_MM, INK_DAMP, STYLE_INK_DEFAULT, INK_PROFILE, GRAPHITE_PROFILE, OUTLINE_MEDIUM, INK, 
   PENCIL, PENCIL_STAGE, GRAPHITE, GRAPHITE_AT, FINISH_FILE, AREA_FILE, AREA_LOADS, AREA_COMPLETED, AREA_EXEC, 
   EARLY_DRY_VALUE });

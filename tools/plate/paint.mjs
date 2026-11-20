@@ -53,7 +53,6 @@ import {cellRGB} from '../../src/eval/plan-optics.mjs';
 import {gaussian} from '../../src/keyframes/density.mjs';
 import {applyResist} from '../../src/media/sheet.mjs';
 import {makeCrisp} from '../../src/paint/methods/crisp-edges.mjs';
-import {orientationField, furMarks} from '../../src/crop/fur.mjs';
 import {traceOutlines} from '../../src/crop/outline.mjs';
 import {clipToFinish} from '../../src/crop/finish.mjs';
 import {sameWash} from '../../src/paint/methods/wash-session.mjs';
@@ -70,8 +69,8 @@ const { WASH_FLAT_SPLAY, JSONL, argv, OPTS_READ, opt, num, STROKE_BUDGET, optTra
   FAST_BODY_SPACING, BODY_CADENCE_RECORD, VALUE_COUNTS, SOFT_WET_MM, WASH_SESSION, MAJOR_INTENT, NUMERIC_TUFT_SHAPES, 
   NUMERIC_TUFT_CAL, TARGET_GUARD, paintingLook, STEP_BACKS, w, h, n, createBrush, candidateContact, paperRGB, 
   planContentHashes, CODE_HASH, PIGS, COLOUR_BUDGET, GOUACHE_LIGHTS, setClip, MOD, MASS_BUDGET, 
-  COLOUR_TRACE, PUDDLES, FIRST_FLOOR, AUTHORED_INPUT, HP, maskBox, FULLBOX, TECHNIQUE, techniqueOf, CURLS, 
-  FINISH, FUR_FIELD, SHEET_PIGS, FINISH_FILE, AREA_FILE, AREA_COMPLETED, AREA_EXEC, EARLY_DRY_VALUE, 
+  COLOUR_TRACE, PUDDLES, FIRST_FLOOR, AUTHORED_INPUT, maskBox, FULLBOX, TECHNIQUE, techniqueOf, CURLS, 
+  FINISH, SHEET_PIGS, FINISH_FILE, AREA_FILE, AREA_COMPLETED, AREA_EXEC, EARLY_DRY_VALUE, 
   dry, dip, dipLoad, productionDip, stroke, SC, W2, H2, N2, PB, GFLOOR, GCHUNK, PAPER_OPTS, PROBE, INKRES, OUT_W, OUT_H, O,
   GPU_INFO, render, view, colourTrace, traceCells, colourMass, BRUSH, UPRIGHT, highlights, 
   expected, DELIVERY, DCAL, TECH_CAL, TCAL, marks, PENDING_IO, drainFrames, mark, 
@@ -776,39 +775,6 @@ for (let L = L_START; L < (PENWASH ? 0 : ctx.layers.length); L++) {
     const now = thicknessTotals(ctx.sheet).reduce((a, v, j) => a + v - TRACE_MASS[j], 0), mixed = sh.mix.reduce((a, v) => a + v, 0);
     let booked = 0; for (let i = 0; i < n; i++) if (MASK[i] && !(sh._skip && sh._skip[i])) booked += mixed * (sh.laidShare ?? 1);
     console.log(`trace pass ${L + 1} laid ${(now / Math.max(1e-6, booked * SC * SC)).toFixed(2)} of its booked mass${sh.graded ? ' (graded)' : ''}`);
-  }
-  // --texture 1: a pass of short dry-brush texture marks. Default 0; --washgrain alone does not enable it.
-  // Off by default: many tiny random marks do not read as dry brush; texture comes from paper, settling and chosen passages.
-  const WASHGRAIN = num('washgrain', 0);
-  if (opt('texture', '0') !== '0' && !detail && paths.length && (through >= num('texfrom', 0.35) || WASHGRAIN > 0)) {
-    const tex = new Float32Array(n), vals = []; let sum = 0, cnt = 0;
-    // --washgrain g: a grain floor that does not thin with the wash; below --washgrainmin (default 0.3) it grains at that depth.
-    const floor = WASHGRAIN * Math.max(sh.amount, num('washgrainmin', 0.3));
-    for (let i = 0; i < n; i++) if (MASK[i]) { tex[i] = (through >= num('texfrom', 0.35) ? HP[i] : 0) + floor; sum += tex[i]; cnt++; if (tex[i] > 0) vals.push(tex[i]); }
-    const meanHP = cnt ? sum / cnt : 0;
-    if (meanHP > num('texmin', 0.03)) {
-      const side = Math.min(w, h);
-      // --fur: flicks along the way the hair lies, root to tip, thinning as the brush lifts (src/crop/fur.mjs), in place
-      // of marks centred on a cell at an even pressure
-      const FUR = opt('fur', '0') !== '0';
-      const marks = FUR
-        ? furMarks(tex, FUR_FIELD(), w, h, { length: Math.max(5, Math.round(num('furlen', 0.035) * side)), spacing: Math.max(2, Math.round(num('furgap', 0.006) * side)), seed: 400 + ctx.laid + SEED, coverage: num('furcover', 0.35), minWant: meanHP * 0.8 })
-        : detailMarks(tex, w, h, { length: Math.max(4, Math.round(num('texlen', 0.02) * side)), spacing: Math.max(2, Math.round(num('texgap', 0.008) * side)), seed: 400 + ctx.laid + SEED, coverage: num('texcover', 0.45), minWant: meanHP * 0.8 });
-      vals.sort((a, b) => b - a); const peak = Math.max(1e-4, vals[Math.min(vals.length - 1, Math.max(0, cnt / 20 | 0))] ?? 1e-4);
-      const colour = sh.mix.map(v => v / Math.max(1e-4, sh.amount));
-      for (const m of marks) {
-        const pts = m.map(q => ({ x: (q.x + 0.5) * SC, y: (q.y + 0.5) * SC, r: num('texr', 1.1) * SC, p: q.p != null ? q.p * Math.min(1, 0.5 + q.want / peak) : Math.min(1, 0.3 + q.want / peak) }));
-        const dryb = createBrush({ radius: num('texr', 1.1) * SC, bristles: 10, capacity: 20, belly: 2, feed: 0.06, give: 0.6, free: 0.3, film: 0.2, splay: 0.08, stiffness: 5, wetMix: 0, bridge: 0.38, bridgeSoft: 1.0, streak: 0.6, seed: 700 + ctx.laid + SEED });
-        const tone = m.reduce((a, q) => a + q.want, 0) / m.length;
-        dip(dryb, { water: 0.22, conc: colour.map(c => c * tone * num('strength', 2.2) * (CAL['dry brush'] ?? 1) * num('texstrength', 1.3)) });
-        // the dry brush faces along its mark too (--texheading sheet keeps it facing down the sheet)
-        clock('strokes', () => stroke(dryb, ctx.sheet, pts, { upright: opt('texheading', 'sweep') === 'sheet' ? true : UPRIGHT }));
-        // --texbook 1: book the texture into the plan, so later glazes lay less. Default 0.
-        if (opt('texbook', '0') !== '0') for (const q of m) { const i = Math.round(q.y) * w + Math.round(q.x); for (let j = 0; j < PIGS.length; j++) expected[i * PIGS.length + j] += colour[j] * q.want; }
-      }
-      // Diagnostic count only: physical deposition alone does not validate the gesture or its appearance.
-      used['dry brush marks (texture)'] = (used['dry brush marks (texture)'] || 0) + marks.length;
-    }
   }
   if (opt('bookfollow', '0') !== '0') throw new Error('--bookfollow was removed with the per-cell follow pressure (anti-cheat rules)');
   }

@@ -30,6 +30,8 @@ const REMOVED_IN_04 = Object.freeze({
     'the touch-up rounds glazed each planning family toward the subject\'s colour after a look, a correction loop', 'src/paint/methods/touch-up.mjs, tools/plate/paint.mjs'),
   ...in04(['finaldarks', 'fdquantile', 'fdmin', 'fdcontrast', 'fdsurroundmm', 'fdminmm2', 'fdtilemm', 'fddmin', 'fdgain'],
     'the final darks cut accent cells from the subject and darkened them after a look', 'src/paint/methods/final-darks.mjs, final-dark-marks.mjs'),
+  ...in04(['texture', 'texfrom', 'texmin', 'texlen', 'texgap', 'texcover', 'texr', 'texstrength', 'texheading', 'texbook', 'texsigma', 'washgrain', 'washgrainmin', 'fur', 'furcover', 'furgap', 'furlen', 'fursigma'],
+    'the texture pass placed dry-brush marks from a per-cell high-pass of the subject', 'tools/plate/paint.mjs'),
 });
 
 /** Throws, naming every removed option in argv with its reason. */
