@@ -399,7 +399,7 @@ export function laneFill(loops, { kitMm, growMm = 0, keepOut = null, spine = tru
   const at = (x, y) => { const gx = Math.floor((x - ox) / pitch), gy = Math.floor((y - oy) / pitch); return gx >= 0 && gy >= 0 && gx < gw && gy < gh ? gy * gw + gx : -1; };
   // a turn from one lane's end to the next lane's start stays on the part (no more than a brush's tip off it): it is
   // short (no longer than three lane steps) and its points every half cell lie on the part or its grown margin
-  // (`off`: each cell's distance to the part, in grid cells; `reach`: mm a lane's end may overrun the outline)
+  // (`off`: each cell's distance to the part, in grid cells; `reach`: mm the turn may run off the part)
   const turnOnPart = (A, B, off, reach) => {
     const len = Math.hypot(B[0] - A[0], B[1] - A[1]), steps = Math.ceil(len / (pitch / 2));
     for (let s = 1; s < steps; s++) { const i = at(A[0] + (B[0] - A[0]) * s / steps, A[1] + (B[1] - A[1]) * s / steps); if (i < 0 || off[i] * pitch > reach + pitch) return false; }
@@ -496,10 +496,15 @@ export function laneFill(loops, { kitMm, growMm = 0, keepOut = null, spine = tru
         // the lane ends that meet in a turn are not carried past the outline as an end that lifts is (the brush going
         // round would push the wash out past it).
         off ??= distance(Uint8Array.from(part, vv => 1 - vv), gw, gh);
+        // the turn is judged between the ends as they will be laid (an end carried past the outline is not kept in a
+        // turn) and must stay on the part to within a grid cell: a turn across a gap (a window's glazing bar, the paper
+        // between two panes) would paint it
         let join = null;
         for (const st of open) for (const rev of [false, true]) {
-          const end = st.points[st.points.length - 1], first = rev ? fwd[fwd.length - 1] : fwd[0], d = Math.hypot(first[0] - end[0], first[1] - end[1]);
-          if (d <= 3 * step && (!join || d < join.d) && turnOnPart(end, first, off, END_REACH * halfAt(r, TIP))) join = { st, rev, d };
+          const pe = st.points, end = st._endExt && pe.length > 2 ? pe[pe.length - 2] : pe[pe.length - 1];
+          const ext0 = (rev ? run[run.length - 1] : run[0]).ext && fwd.length > 2, first = rev ? fwd[fwd.length - 1 - (ext0 ? 1 : 0)] : fwd[ext0 ? 1 : 0];
+          const d = Math.hypot(first[0] - end[0], first[1] - end[1]);
+          if (d <= 3 * step && (!join || d < join.d) && turnOnPart(end, first, off, 0)) join = { st, rev, d };
         }
         const rev = join ? join.rev : k % 2 === 1, pts = rev ? [...fwd].reverse() : fwd;
         const startExt = (rev ? run[run.length - 1] : run[0]).ext && pts.length > 2, endExt = (rev ? run[0] : run[run.length - 1]).ext;
