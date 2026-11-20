@@ -24,7 +24,7 @@ function fixture() {
 test('fused faces bind exactly ten storage buffers',()=>{
   const info=analyse(SRC+FINISH_WET_SCAN);
   assert.equal(info.uses('faces_pflux').filter(b=>info.decl.find(d=>d.binding===b).kind.startsWith('storage')).length,10);
-  for(const name of ['p5c_wetfrontier','p5c_wetscan','p5ab','slide_apply_cap_sp']) {
+  for(const name of ['cap_commit','cap_sp','p5c_wetfrontier','p5c_wetscan','p5ab']) {
     assert(info.uses(name).filter(b=>b!==0).length<=10,`${name} uses ${info.uses(name).filter(b=>b!==0).length} storage bindings`);
   }
 });
@@ -36,17 +36,21 @@ test('GPU fusion and tight frontier retain fields across boundaries, drying and 
     let gpu;
     try {const w=await import('webgpu');Object.assign(globalThis,w.globals);gpu=w.create([]);({device}=await openGpu(gpu));}
     catch(e){t.skip(`GPU unavailable: ${e.message}`);return;}
-    for(const persistent of ['0','1'])for(const special of [false,true]) {
+    // The old step mode is the reference schedule: it never had the tight frontier (padC is 0 there).
+    const tight=process.env.GPU_STEP!=='old';
+    // 0.1 mm cells take ten pore passes a step: the tight halo must still cull and match.
+    for(const persistent of ['0','1'])for(const [special,mm] of [[false,0],[true,0],[false,.1]]) {
       process.env.GPU_RESIDENT='1';process.env.GPU_PERSISTENT=persistent;process.env.GPU_WORKERS='2';
-      const o={...DEFAULTS,dt:2,...(special?{slope:.2,marangoni:.03,capEps:.01}: {})};
+      const o={...DEFAULTS,dt:2,...(mm?{mmPerCell:mm}:{}),...(special?{slope:.2,marangoni:.03,capEps:.01}: {})};
       const sheets=[];const counts=[];
       for(const optimized of [false,true]) {
         process.env.GPU_FUSE_FACES=optimized?'1':'0';process.env.GPU_FUSE_WETSCAN=optimized?'1':'0';process.env.GPU_SPARSE_TIGHT=optimized?'1':'0';
         const s=fixture(),g=await GpuSheet.create(device,s,o);
         try {
-          for(const name of ['p5c_wetfrontier','p5c_wetscan','p5ab','slide_apply_cap_sp']) {
+          for(const name of ['p5c_wetfrontier','p5c_wetscan','p5ab']) {
             assert.equal(!!g.p[name],optimized && device.limits.maxStorageBuffersPerShaderStage>=10,name+' compiled for the selected arm');
           }
+          assert.ok(g.p.cap_commit, 'intermediate pore publication is available in both arms');
           g.step(60,25,true);await g.download(s);
           // A host stamp into a previously culled tile must re-open its halo.
           const i=8*s.w+8;s.M[i]=s.ever[i]=1;s.W[i]=.2;s.G[0][i]=.01;g.upload(s);
@@ -65,9 +69,9 @@ test('GPU fusion and tight frontier retain fields across boundaries, drying and 
       let peak=0;
       for(let p=0;p<sheets[0].length;p++)for(let i=0;i<sheets[0][p].length;i++)peak=Math.max(peak,Math.abs(sheets[0][p][i]-sheets[1][p][i]));
       assert(peak<2e-6,`persistent=${persistent} special=${special} max field error ${peak}`);
-      if(!special)assert(counts[1]<counts[0],`tight frontier must cull tile work: ${counts}`);
-      else assert.equal(counts[0],counts[1],'low capillary threshold must retain conservative halo');
-      t.diagnostic(JSON.stringify({persistent,special,peak,tileSteps:counts}));
+      if(!special&&tight)assert(counts[1]<counts[0],`tight frontier must cull tile work: ${counts}`);
+      else assert.equal(counts[0],counts[1],special?'low capillary threshold must retain conservative halo':'the old step mode keeps the full halo');
+      t.diagnostic(JSON.stringify({persistent,special,mm,peak,tileSteps:counts}));
     }
   } finally {device?.destroy();keys.forEach((k,i)=>{if(saved[i]===undefined)delete process.env[k];else process.env[k]=saved[i];});}
 });

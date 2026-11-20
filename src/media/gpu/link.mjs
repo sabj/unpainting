@@ -46,7 +46,7 @@ const TIMEOUT_MS = 30 * 60 * 1000;
 const DEFERRED_ARCHIVE_BUDGET_BYTES = 128 * 1024 * 1024;
 // the worker ops that only read the sheet: every other op counts as a change (GpuLink.version)
 const READ_OPS = new Set(['down', 'paperDown', 'paperGate', 'sums', 'topDown', 'topSums', 'topDownRect', 'counters', 'idle', 'prof', 'dryStats', 'snap', 'framePort', 'brushState', 'lowerDown', 'lowerBatch', 'opticalInit', 'opticalFrame', 'drainDrys','demandCheckState']);
-const OPT_KEYS = ['flow', 'flowIters', 'diffuse', 'evap', 'edgeEvap', 'edgeWidth', 'absorb', 'film', 'capRate', 'capEps', 'capDelta', 'settle', 'lift', 'looseLift', 'scour', 'liftDepth', 'rewetLift', 'wetEps', 'spill', 'spillHeight', 'dampEase', 'pinning', 'pinFibre', 'encloseEase', 'slideCap', 'holeFill', 'holeSpan', 'fibreFlow', 'carryDepth', 'flowDepth', 'gran', 'granFill', 'slide', 'slideFill', 'repose', 'hold', 'sizing', 'wickFilter', 'dt', 'capSigma', 'paperDry', 'marangoni', 'slope', 'filmDiffuse', 'filmDepth', 'mmPerCell', 'edgeFlowDepth'];
+const OPT_KEYS = ['flow', 'flowIters', 'diffuse', 'evap', 'edgeEvap', 'edgeWidth', 'absorb', 'film', 'capRate', 'capEps', 'capDelta', 'settle', 'lift', 'looseLift', 'scour', 'liftDepth', 'rewetLift', 'wetEps', 'spill', 'spillHeight', 'dampEase', 'pinning', 'pinFibre', 'encloseEase', 'slideCap', 'holeFill', 'holeSpan', 'fibreFlow', 'carryDepth', 'flowDepth', 'gran', 'granFill', 'slide', 'slideFill', 'repose', 'hold', 'sizing', 'wickFilter', 'dt', 'capSigma', 'paperDry', 'marangoni', 'slope', 'filmDiffuse', 'filmDepth', 'mmPerCell', 'edgeFlowDepth', 'edgeMm', 'reachMm'];
 
 export class GpuLink {
   constructor(worker, shared, sheet) {
@@ -94,7 +94,6 @@ export class GpuLink {
 
   applyOptions(o) {
     if (o === this.lastO) return;
-    if (o.edgeEvap > 0) throw new Error(gpuEdgeRefusal(o));
     const pick = {}; let key = ''; for (const k of OPT_KEYS) if (o[k] !== undefined) { pick[k] = o[k]; key += `${k}=${o[k]};`; }
     this.lastO = o; if (key === this.lastKey) return;
     const prevVer = this.version;
@@ -909,18 +908,9 @@ export class GpuLink {
  * Put `sheet` on the GPU if the mode allows and a GPU is there. mode: 'off' | 'auto' | 'on'. Returns
  * { backend: 'gpu' | 'cpu', mode, adapter?, reason? }; with 'on' and no GPU it throws. Blocks while the worker starts.
  */
-const gpuEdgeRefusal = o => `the GPU sheet has no pinned-edge feed (src/media/edge-feed.mjs); edgeEvap ${o.edgeEvap} needs the CPU sheet (--gpu off), or edgeEvap 0`;
 export function attachGpu(sheet, O, { mode = 'auto', log = m => console.error(m) } = {}) {
   const note = { mode };
   if (mode === 'off') return sheet._gpuInfo = { ...note, backend: 'cpu', fallback: false, reason: '--gpu off' };
-  // The pinned-edge feed (edge-feed.mjs) has no GPU step yet: a GPU sheet would dry its edges by the old local rule and
-  // come out different from the CPU. Until it is ported the GPU refuses sheets that use it.
-  if (O.edgeEvap > 0) {
-    const reason = gpuEdgeRefusal(O);
-    if (mode === 'on') throw new Error(`--gpu on but ${reason}`);
-    log(cpuFallbackWarning(reason));
-    return sheet._gpuInfo = { ...note, backend: 'cpu', fallback: true, reason };
-  }
   const K = sheet.K, n = sheet.n, ctrlSab = new SharedArrayBuffer(64), errSab = new SharedArrayBuffer(512);
   const adapterMetadata = new SharedArrayBuffer(4096),strokePlanMetadata=new SharedArrayBuffer(32);
   const rectSab = new SharedArrayBuffer(4 * PLANES(K) * n), layerSab = new SharedArrayBuffer(4 * K * n);
