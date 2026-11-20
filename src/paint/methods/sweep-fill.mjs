@@ -338,6 +338,8 @@ const TIP = 0.35;
 const LANE_OVERLAP = 0.25;
 /** A shape is laid along its long axis when it is at least this many times as long as it is wide; else level. */
 const LONG = 2.2;
+/** A part the lanes left bare (a wedge along a slanting side, a corner) is laid along its own length when it is this long. */
+const LEFT_LONG = 1.3;
 /** The brush is the smallest of the kit that lays the shape in at most this many lanes... */
 const MOST_LANES = 4;
 /** ... and is never wider than this many times the shape's widest inscribed width. */
@@ -400,7 +402,7 @@ export function laneFill(loops, { kitMm, growMm = 0, keepOut = null, spine = tru
     let mx = 0, my = 0; for (const [x, y] of P) { mx += x; my += y; } mx /= P.length; my /= P.length;
     let a = 0, b = 0, c = 0; for (const [x, y] of P) { const dx = x - mx, dy = y - my; a += dx * dx; b += dx * dy; c += dy * dy; }
     const mean = (a + c) / 2, d = Math.sqrt(((a - c) / 2) ** 2 + b * b), long = Math.sqrt((mean + d) / Math.max(1e-9, mean - d));
-    let th = long >= LONG ? 0.5 * Math.atan2(2 * b, a - c) : 0;
+    let th = long >= (depth ? LEFT_LONG : LONG) ? 0.5 * Math.atan2(2 * b, a - c) : 0;
     const tx = Math.cos(th), ty = Math.sin(th);
     // the lanes' normal points down the sheet (or right, for an upright shape), so the lanes go top down
     let nx = -ty, ny = tx; if (ny < -1e-6 || (Math.abs(ny) <= 1e-6 && nx < 0)) { nx = -nx; ny = -ny; }
@@ -445,7 +447,7 @@ export function laneFill(loops, { kitMm, growMm = 0, keepOut = null, spine = tru
         stamp(pts, r); strokes.push({ kind: 'sweep', radiusMm: +r.toFixed(3), points: pts }); k++;
       }
     }
-    if (depth >= 2) return;
+    if (depth >= 3) return;
     // what the lanes left bare, less the slivers the wet wash closes by itself, laid with a smaller brush
     const raw = Uint8Array.from(part, (vv, i) => (vv && !covered[i] ? 1 : 0)), o = BARE_WIDE_MM / 2 / pitch;
     const shrunk = Uint8Array.from(distance(raw, gw, gh), dd => (dd > o ? 1 : 0)), back = distance(Uint8Array.from(shrunk, vv => 1 - vv), gw, gh);
