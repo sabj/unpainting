@@ -39,11 +39,28 @@ function scriptMix(paint, pigments) {
   const k = pigments.length, keys = pigments.map(p => p.key), white = [255, 255, 255], base = new Array(k).fill(0);
   for (const [key, parts] of Object.entries(paint.pigments)) { const j = keys.indexOf(key); if (j < 0) throw Error(`painting script: pigment ${key} is not in the box`); base[j] += Math.max(0, Number(parts) || 0); }
   const t = base.reduce((a, v) => a + v, 0); if (!(t > 0)) throw Error('painting script: pigment parts must be positive');
-  const unit = base.map(v => v / t), sw = hexRgb(paint.swatch), want = sw ? labOf(sw, 0, white)[0] : DILUTION_L[paint.dilution] ?? DILUTION_L.medium;
-  const Lat = s => filmLab(unit.map(v => v * s), pigments, white)[0];
-  let lo = 0.01, hi = 32; if (Lat(hi) > want) return unit.map(v => v * hi); if (Lat(lo) < want) return unit.map(v => v * lo);
-  for (let it = 0; it < 14; it++) { const mid = Math.sqrt(lo * hi); if (Lat(mid) > want) lo = mid; else hi = mid; }
-  return unit.map(v => v * Math.sqrt(lo * hi));
+  const sw = hexRgb(paint.swatch), target = sw ? labOf(sw, 0, white) : null, want = target ? target[0] : DILUTION_L[paint.dilution] ?? DILUTION_L.medium;
+  // the strength whose film on white reaches the lightness wanted, for proportions `unit`
+  const atL = unit => {
+    const Lat = s => filmLab(unit.map(v => v * s), pigments, white)[0];
+    let lo = 0.01, hi = 32; if (Lat(hi) > want) return unit.map(v => v * hi); if (Lat(lo) < want) return unit.map(v => v * lo);
+    for (let it = 0; it < 14; it++) { const mid = Math.sqrt(lo * hi); if (Lat(mid) > want) lo = mid; else hi = mid; }
+    return unit.map(v => v * Math.sqrt(lo * hi));
+  };
+  let unit = base.map(v => v / t);
+  // with a swatch, the script's own pigments are re-proportioned (never others added) so the film's hue meets the swatch's:
+  // a painter mixes to the colour on the scrap, not to the parts written down. Parts the script gave are a start, and each
+  // named pigment keeps at least a tenth of its written share.
+  const named = base.map(v => v > 0);
+  if (target && named.filter(Boolean).length > 1) {
+    const err = u => { const m = atL(u), c = filmLab(m, pigments, white); return Math.hypot(c[1] - target[1], c[2] - target[2]) + 0.5 * Math.abs(c[0] - target[0]); };
+    let best = err(unit), step = 0.5;
+    for (let round = 0; round < 6; round++, step /= 2) for (let j = 0; j < k; j++) if (named[j]) for (const dir of [1, -1]) {
+      const u = unit.map((v, q) => (q === j ? Math.max(0.1 * base[q] / t, v * (1 + dir * step)) : v)), su = u.reduce((a, v) => a + v, 0), un = u.map(v => v / su), e = err(un);
+      if (e < best - 1e-3) { best = e; unit = un; }
+    }
+  }
+  return atL(unit);
 }
 
 /** The colour a passage's mix makes as one film on white paper (sRGB): what the painter will lay, for the preview. */
