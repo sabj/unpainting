@@ -16,6 +16,8 @@ export const SWEEP_OVERLAP = 0.3;
 const BRUSH_FIT = 1.1;
 /** A part left bare is filled when it is at least this share of a touch of the brush that fills it. */
 const LEAST_BARE = 0.5;
+/** The brush is recharged (a new stroke, from where the last one ended) every this many lanes. */
+const LANES_PER_LOAD = 2;
 /** A lane's square end may reach this far (mm, or this share of the brush's radius) past where the brush fits, at a slanting outline. */
 const OVERSHOOT_MM = 2, OVERSHOOT_SHARE = 0.3;
 /** A bare sliver narrower than this (mm) is closed by the wet wash itself and gets no stroke. */
@@ -144,25 +146,55 @@ export function sweepFill(loops, { kitMm, angle = null, growMm = 0, keepOut = nu
     let top = -1, bottom = -1; for (let i = 0; i < gn; i++) if (band[i]) { const y = (i / gw) | 0; if (top < 0) top = y; bottom = y; }
     if (top < 0) return 0;
     const span = bottom - top, step = 2 * rc * (1 - overlap), lanes = Math.max(1, Math.ceil(span / step - 1e-9) + 1), gap = lanes > 1 ? span / (lanes - 1) : 0;
-    let made = 0;
+    // the runs of each lane where the brush's width fits across
+    const rows = [];
     for (let q = 0; q < lanes; q++) {
-      const gy = Math.round(top + q * gap); let from = -1;
+      const gy = Math.round(top + q * gap), runs = []; let from = -1;
       for (let gx = 0; gx <= gw; gx++) {
         const ok = gx < gw && band[gy * gw + gx];
         if (ok && from < 0) from = gx;
         else if (!ok && from >= 0) {
           let a = from, b = gx - 1; from = -1;
           // where the outline slants the square end reaches on past the band's fit, up to OVERSHOOT_MM, half of it outside
-          // the outline and half filling the corner the slant leaves: no tooth of bare paper for a small brush to go round
+          // the outline and half filling the corner the slant leaves
           let a0 = a, b0 = b; while (a0 > 0 && inside[gy * gw + a0 - 1]) a0--; while (b0 < gw - 1 && inside[gy * gw + b0 + 1]) b0++;
           const over = Math.max(OVERSHOOT_MM, OVERSHOOT_SHARE * radius) / pitch; a -= Math.min((a - a0) / 2, over); b += Math.min((b0 - b) / 2, over);
-          if ((b - a) * pitch < radius) continue;   // a stroke, not a dab
-          const line = [[a + .5, gy + .5], [(a + b) / 2 + .5, gy + .5], [b + .5, gy + .5]];
-          stamp(line, radius);
-          strokes.push({ kind: 'sweep', radiusMm: +radius.toFixed(3), points: line.map(([gx2, gy2]) => toXY([ou + gx2 * pitch, ov + gy2 * pitch])) });
-          made++;
+          if ((b - a) * pitch >= radius) runs.push([a, b]);   // a stroke, not a dab
         }
       }
+      rows.push({ gy, runs });
+    }
+    // The lanes of one part of the shape are one stroke, back and forth, top down, the bead carried from each lane to
+    // the next: at a lane's end the brush steps in by its radius, runs down beside the outline (so its band, held across
+    // its heading, reaches the outline and lays the side), and steps out to the next lane's end.
+    const chains = []; let open = [];
+    for (const { gy, runs } of rows) {
+      const next = [], taken = new Set();
+      for (const run of runs) {
+        let best = null, bo = 0;
+        for (const ch of open) { if (taken.has(ch)) continue; const [a, b] = ch.runs[ch.runs.length - 1].run, o = Math.min(b, run[1]) - Math.max(a, run[0]); if (o > bo) { bo = o; best = ch; } }
+        if (best) { taken.add(best); best.runs.push({ gy, run }); next.push(best); } else { const ch = { runs: [{ gy, run }] }; chains.push(ch); next.push(ch); }
+      }
+      open = next;
+    }
+    let made = 0;
+    const emit = line => { stamp(line, radius); strokes.push({ kind: 'sweep', radiusMm: +radius.toFixed(3), points: line.map(([gx2, gy2]) => toXY([ou + gx2 * pitch, ov + gy2 * pitch])) }); made++; };
+    const insideLine = (A, B) => { for (let t = 0; t <= 8; t++) { const x = Math.round(A[0] + (B[0] - A[0]) * t / 8 - .5), y = Math.round(A[1] + (B[1] - A[1]) * t / 8 - .5); if (!(D[y * gw + x] >= .9 * rc)) return false; } return true; };
+    for (const ch of chains) {
+      let line = [];
+      ch.runs.forEach(({ gy, run: [a, b] }, k) => {
+        const rightward = k % 2 === 0, start = rightward ? a : b, end = rightward ? b : a, y = gy + .5;
+        if (line.length) {
+          // the turn: in from the last lane's end, down beside the outline, out to this lane's end
+          const last = line[line.length - 1], inA = [last[0] + (rightward ? rc : -rc), last[1]], inB = [start + .5 + (rightward ? rc : -rc), y];
+          if (insideLine(inA, inB)) line.push(inA, inB);
+          else { if (line.length >= 2) emit(line); line = []; }
+        }
+        line.push([start + .5, y], [(a + b) / 2 + .5, y], [end + .5, y]);
+        // the brush is recharged every LANES_PER_LOAD lanes: the next load starts where this one ended, on the bead
+        if ((k + 1) % LANES_PER_LOAD === 0 && k + 1 < ch.runs.length) { const at = line[line.length - 1]; emit(line); line = [at]; }
+      });
+      if (line.length >= 2) emit(line);
     }
     return made;
   };

@@ -43,7 +43,9 @@ const AROUND_LIGHTER = 4;
 /** ... and runs behind a hole in it no bigger than this share of it. */
 const HOLE_MOST = 0.3;
 /** The light side of an area: the cells between these quantiles of its L*. */
-const LIGHT_SIDE = [0.6, 0.92];
+const LIGHT_SIDE = [0.7, 0.95];
+/** The squint (mm) the light side's colour is read at. */
+const COLOUR_SIGMA_MM = 2;
 /** Charges: tiles this wide (mm) read for the local light side; a charge where it is this far (CIEDE2000) from the wash; at most this many a wash, one per this much area (mm2). */
 const CHARGE_TILE_MM = 24, CHARGE_DIFFERS = 5, CHARGE_MOST = 4, CHARGE_PER_MM2 = 1600;
 /** Shadow steps: this much darker (L*) than the area's light side, and the deeper step. */
@@ -233,8 +235,8 @@ export function planLayeredWashes({ demand, k, density, w, h, rgb = null, paperR
   const layer = (stage, shapes) => { if (!shapes.length) return; const area = shapes.reduce((a, s) => a + s.area, 0), mix = new Array(k).fill(0); for (const s of shapes) s.mix.forEach((v, j) => { mix[j] += v * s.area / area; }); const t = mix.reduce((a, v) => a + v, 0) || 1; layers.push({ value: stage, pigment: mix.indexOf(Math.max(...mix)), mixId: shapes[0]._valuePlan.mixId, shapes, mix: mix.map(v => v / t), amount: shapes.reduce((a, s) => a + s.amount * s.area, 0) / area, area, _order: { phase: stage <= 2 ? 'ground' : stage <= 4 ? 'mid' : 'dark', region: 0, shoot: true }, _valuePhase: shapes[0]._valuePlan.phase }); };
 
   // --- 2. the first wash: areas of one local colour, light side, charged while wet ---
-  // the light side is read off the subject squinted at the shadow's scale, so no fine mark of the subject sets it
-  const S3 = squint(SHADOW_SIGMA_MM), sqAt = q => toRGB(S3.planes, q), sqL = q => S3.L[q];
+  // the light side is read off the subject a little squinted (one colour for a whole area or tile: no shape comes of it)
+  const S3 = squint(SHADOW_SIGMA_MM), SC = squint(COLOUR_SIGMA_MM), sqAt = q => toRGB(SC.planes, q), sqL = q => SC.L[q];
   // an area is one local colour in light and in shadow: its chromaticity, (a*, b*) over L* (a shadow is darker and less
   // chromatic in proportion), and a little of its light
   const zoneFeature = q => { const l = Math.max(20, S6.L[q]); return [60 * S6.A[q] / l, 60 * S6.B[q] / l, ZONE_L_WEIGHT * S6.L[q]]; };

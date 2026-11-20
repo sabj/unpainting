@@ -4,22 +4,23 @@ import { sweepFill, sweepAngle } from './sweep-fill.mjs';
 
 const KIT = [38, 25.4, 7, 5];
 
-test('a rectangle is filled with level, parallel sweeps of one brush, top down, with nothing left bare', () => {
+test('a rectangle is laid back and forth in one run of loads, top down, its lanes level and overlapping, nothing left bare', () => {
   const r = sweepFill([{ points: [[0, 0], [200, 0], [200, 120], [0, 120]] }], { kitMm: KIT });
   assert.equal(r.brushMm, 38);
   assert.ok(r.uncovered < 0.01);
-  assert.ok(r.strokes.every(s => s.radiusMm === 19 && s.points.every(p => Math.abs(p[1] - s.points[0][1]) < 1e-6)), 'every sweep is level');
-  const ys = r.strokes.map(s => s.points[0][1]);
-  assert.deepEqual(ys, [...ys].sort((a, b) => a - b), 'top down');
-  // neighbouring sweeps overlap: closer than the brush is wide
-  for (let q = 1; q < ys.length; q++) assert.ok(ys[q] - ys[q - 1] < 38);
+  // one zigzag, recharged every two lanes: each load starts where the last ended
+  for (let q = 1; q < r.strokes.length; q++) assert.deepEqual(r.strokes[q].points[0], r.strokes[q - 1].points.at(-1));
+  const ys = r.strokes.flatMap(s => s.points.map(p => p[1]));
+  for (let q = 1; q < ys.length; q++) assert.ok(ys[q] >= ys[q - 1] - 1e-6, 'never goes back up');
+  const levels = [...new Set(ys.map(y => y.toFixed(2)))].map(Number);
+  for (let q = 1; q < levels.length; q++) assert.ok(levels[q] - levels[q - 1] < 38, 'lanes overlap');
 });
 
 test('no stroke of a fill is a ring: sweeps run one way, an edge stroke runs along the outline once', () => {
   const r = sweepFill([{ points: [[10, 0], [50, 5], [60, 40], [30, 55], [0, 35]] }], { kitMm: KIT });
   assert.ok(r.uncovered < 0.05);
-  const lanes = r.strokes.filter(s => s.points.length === 3), edges = r.strokes.filter(s => s.points.length > 3);
-  assert.ok(lanes.length >= edges.length * 3, `${lanes.length} sweeps, ${edges.length} edge strokes`);
+  const edges = r.strokes.filter(s => s.radiusMm < r.brushMm / 2);
+  assert.ok(r.strokes.filter(s => s.radiusMm < r.brushMm / 2).length <= 4, `${r.strokes.length} strokes`);
   for (const e of edges) { const a = e.points[0], b = e.points[e.points.length - 1]; assert.ok(Math.hypot(a[0] - b[0], a[1] - b[1]) > 5, 'an edge stroke is not a closed ring'); }
 });
 
