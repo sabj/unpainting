@@ -47,25 +47,12 @@ export function inkForDarkness(darkOf, tMax = 64, n = 400) {
   };
 }
 
-const ringArea = r => { let a = 0; for (let k = 0, n = r.length; k < n; k++) { const p = r[k], q = r[(k + 1) % n]; a += p[0] * q[1] - q[0] * p[1]; } return a / 2; };
-const ringLength = r => { let L = 0; for (let k = 0, n = r.length; k < n; k++) { const p = r[k], q = r[(k + 1) % n]; L += Math.hypot(q[0] - p[0], q[1] - p[1]); } return L; };
-
 /**
- * A FILL (a leaf mass, a dark pane, a blot), not a LINE: its ink (outer rings less holes) is wider than `widthMm` (twice its
- * area over its perimeter, the width of a strip) or covers over `areaMm2` and is over 0.8 of that wide, and is COMPACT:
- * under four widths long (half its perimeter under five widths). Anything longer is a line at any width (a thick branch is laid whole). Same rule as tools/seg/ink-vectors.py is_fill.
+ * A FILL (a leaf mass, a dark pane, a blot, grey glass), not a LINE: a stroke the fitter made from a compact blob of ink and
+ * marked `fill` (tools/seg/ink-vectors.py find_fills: ink wider than half a millimetre and no longer than about four of its
+ * widths; anything longer is a line at any width, so a thick branch is laid whole).
  */
-export function isFill(stroke, widthMm = 0.5, areaMm2 = 1.5) {
-  const a = Math.abs(stroke.outline.reduce((t, r) => t + ringArea(r), 0)), per = stroke.outline.reduce((t, r) => t + ringLength(r), 0);
-  const w = 2 * a / Math.max(per, 1e-9), L = per / 2;
-  return L < 5 * w && (w > widthMm || (a > areaMm2 && w > 0.8 * widthMm));
-}
-
-const pathLength = P => P.reduce((t, q, k) => (k ? t + Math.hypot(q[0] - P[k - 1][0], q[1] - P[k - 1][1]) : 0), 0);
-/** A fill's width: twice its area over its perimeter. */
-function fillWidth(stroke) { const a = Math.abs(stroke.outline.reduce((t, r) => t + ringArea(r), 0)), per = stroke.outline.reduce((t, r) => t + ringLength(r), 0); return 2 * a / Math.max(per, 1e-9); }
-/** Distance from (x, y) to a polyline. */
-function polylineDistance(P, x, y) { return edgeDistance([P.slice(0, -1).concat([P[P.length - 1]])].map(r => r), x, y, false); }
+export const isFill = stroke => stroke.fill === true;
 
 /** Distance from (x, y) to the nearest edge of the rings (same unit). */
 function edgeDistance(R, x, y, closed = true) {
@@ -87,6 +74,7 @@ function edgeDistance(R, x, y, closed = true) {
  */
 export function layVectors(doc, field, w, h, mm, inkOf, { ss = 4, each = null, fill = 1, softMm = 0.2 } = {}) {
   const S = [...doc.strokes].sort((a, b) => a.seq - b.seq), dark = new Float32Array(w * h);
+  if (fill < 1 && doc.fills !== 'marked') throw new Error('ink vectors: this file does not mark its fills (made before the fitter found them): refit it with tools/seg/ink-vectors.py before laying it under paint');
   let cells = 0, fills = 0;
   for (const s of S) {
     const r = rasterizeRings(s.outline, w, h, mm, ss); let n = 0;

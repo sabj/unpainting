@@ -97,11 +97,14 @@ test('below full: diagonal hatching is left to the paint; joints across flat wal
   assert.ok(forms.has(18), 'a joint by an opening stays');
 });
 
-test('growth order: a few light lay-in lines, outlines before their divisions, detail after growth, emphasis last and heaviest', () => {
+test('growth order: a few light lay-in lines, outlines before their divisions, area by area, emphasis last and heaviest', () => {
   const S = [...box(10, 10, 90, 60), ...box(20, 20, 35, 40), seg(27.5, 20, 27.5, 40), ...box(60, 20, 75, 40), seg(62, 30, 64, 30), zig(40, 50, 12)];
   const r = orderStrokes(S, 100, 70, { mode: 'growth', layIn: 3, emphasisShare: 0.1 });
   const ph = r.map(x => x.phase), order = ['layin', 'growth', 'detail', 'texture', 'emphasis'];
-  assert.ok(ph.every((p, k) => !k || order.indexOf(p) >= order.indexOf(ph[k - 1])), 'phases in order');
+  // the lay-in first and the accents last; between them the drawing is worked area by area (area-order.mjs), each area's
+  // structure before its detail before its texture
+  const first = ph.findIndex(p => p !== 'layin'), last = ph.length - 1 - [...ph].reverse().findIndex(p => p !== 'emphasis');
+  assert.ok(ph.slice(0, first).every(p => p === 'layin') && ph.slice(last + 1).every(p => p === 'emphasis') && ph.slice(first, last + 1).every(p => order.indexOf(p) >= 1 && order.indexOf(p) <= 3), 'lay-in first, accents last');
   assert.equal(ph.filter(p => p === 'layin').length, 3);
   assert.ok(ph.at(-1) === 'emphasis');
   assert.ok(growthWeight({ phase: 'layin' }).weight < growthWeight({ phase: 'growth' }).weight && growthWeight({ phase: 'growth' }).weight <= growthWeight({ phase: 'emphasis' }).weight);

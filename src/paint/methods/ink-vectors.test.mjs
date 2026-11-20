@@ -34,10 +34,10 @@ test('lay over ink already there: the darker holds, nothing is taken away', () =
   assert.ok(Math.abs(f[0] - 0.5) < 1e-6 && Math.abs(f[5] - 0.9) < 1e-6 && f[50] === 0.5);
 });
 
-test('fills: a compact blot is a fill, a line or a thick branch is not; under paint a fill is one pale shape, no rim', () => {
-  const blot = { seq: 0, dark: 1, outline: [square(1, 1, 3)], path: [[2.5, 2.5], [2.6, 2.6]] }, line = { seq: 1, dark: 1, outline: [[[1, 6], [9, 6], [9, 6.3], [1, 6.3]]] };
+test('fills: a stroke the fitter marked as a fill is one; under paint it is one pale shape, no rim; lines and a thick branch stay whole', () => {
+  const blot = { seq: 0, dark: 1, fill: true, outline: [square(1, 1, 3)], path: [[2.5, 2.5], [2.6, 2.6]] }, line = { seq: 1, dark: 1, outline: [[[1, 6], [9, 6], [9, 6.3], [1, 6.3]]] };
   assert.ok(isFill(blot) && !isFill(line));
-  const f = new Float32Array(400), r = layVectors({ strokes: [blot, line] }, f, 20, 20, 0.5, d => d, { fill: 0.25 });
+  const f = new Float32Array(400), r = layVectors({ fills: 'marked', strokes: [blot, line] }, f, 20, 20, 0.5, d => d, { fill: 0.25 });
   assert.equal(r.fills, 1);
   const at = (x, y) => f[Math.floor(y / 0.5) * 20 + Math.floor(x / 0.5)];
   assert.ok(at(1.1, 2.5) <= 0.25 && at(1.1, 2.5) > 0, 'no dark rim: the edge no darker than the inside');
@@ -46,6 +46,9 @@ test('fills: a compact blot is a fill, a line or a thick branch is not; under pa
   // a thick branch (long against its width) is a line at any width: laid whole at full strength
   const branch = { seq: 0, dark: 1, outline: [[[1, 1], [9, 1], [9, 2.2], [1, 2.2]]], path: [[1, 1.6], [9, 1.6]] }, g = new Float32Array(400);
   assert.ok(!isFill(branch));
-  layVectors({ strokes: [branch] }, g, 20, 20, 0.5, d => d, { fill: 0.25 });
+  layVectors({ fills: 'marked', strokes: [branch] }, g, 20, 20, 0.5, d => d, { fill: 0.25 });
   assert.ok(g[2 * 20 + 8] >= 0.99, 'the branch at full strength');
+  // a file from before the fitter marked fills cannot be laid under paint: it stops, it does not guess
+  assert.throws(() => layVectors({ strokes: [branch] }, new Float32Array(400), 20, 20, 0.5, d => d, { fill: 0.25 }), /does not mark its fills/);
+  layVectors({ strokes: [branch] }, new Float32Array(400), 20, 20, 0.5, d => d);
 });
