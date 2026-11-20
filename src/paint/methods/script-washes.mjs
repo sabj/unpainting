@@ -87,11 +87,32 @@ function washBrush(p, brushes) {
   return kit.filter(v => v <= want).at(-1) ?? kit[0];
 }
 
+/**
+ * The named marks (the vocabulary of src/paint/methods/marks.mjs on the paint branch, until the shared library lands):
+ * each a handling a script may name with `handling.mark`; anything the script also says overrides it. `len` is in
+ * brush widths.
+ */
+export const MARK_HANDLING = Object.freeze({
+  sweep: { pressure: [0.75, 0.85, 0.8, 0.6], hold: 'side', start: 'belly', speed: 'slow', path: 'straight', len: 6, look: 'broad wash sweep: belly down, even pressure, slow, the bead carried' },
+  taper: { pressure: [0.15, 1, 0.7, 0.08], hold: 'upright', start: 'point', speed: 'medium', path: 'curved', len: 5, look: 'tapered stroke: lands on the point, swells, lifts' },
+  leaf: { pressure: [0.1, 1, 0.9, 0.05], hold: 'upright', start: 'point', speed: 'fast', path: 'curved', len: 2.2, look: 'leaf or petal: pressed and lifted' },
+  comma: { pressure: [0.3, 1, 0.5, 0.05], hold: 'upright', start: 'belly', speed: 'fast', path: 'flick', len: 2.2, look: 'comma: pressed and flicked off round a curve' },
+  line: { pressure: [0.25, 0.4, 0.35, 0.15], hold: 'upright', start: 'point', speed: 'fast', path: 'straight', len: 8, look: 'long thin line: the point, light and quick' },
+  edge: { pressure: [0.15, 0.2, 0.2, 0.1], hold: 'upright', start: 'point', speed: 'medium', path: 'straight', len: 8, look: 'a hairline drawn along the blade' },
+  wedge: { pressure: [0.2, 0.6, 1, 0.85], hold: 'upright', start: 'point', speed: 'medium', path: 'straight', len: 2.5, look: 'wedge: pulled sideways, lifting off one corner' },
+  push: { pressure: [0.8, 1, 1, 0.7], hold: 'side', start: 'belly', speed: 'slow', path: 'wobble', len: 2.5, look: 'pushed stroke: the hairs splay, slow and heavy' },
+  twist: { pressure: [0.15, 1, 0.15], hold: 'upright', start: 'point', speed: 'medium', path: 's-curve', len: 3, look: 'twist: thin to thick to thin' },
+  drag: { pressure: [0.6, 0.8, 0.7, 0.5], hold: 'side', start: 'belly', speed: 'fast', path: 'straight', len: 5, load: 'dry', look: 'side drag: a nearly dry brush on its side, broken on the tooth' },
+  dot: { pressure: [0.5, 1, 0.3], hold: 'upright', start: 'point', speed: 'fast', path: 'straight', len: 0.8, look: 'dot: a touch of the point' },
+  contour: { pressure: [0.3, 0.8, 0.8, 0.3], hold: 'upright', start: 'point', speed: 'slow', path: 'straight', len: 8, look: 'contour: follows an edge, crisp on its outer side' },
+  scumble: { pressure: [0.5, 0.8, 0.6], hold: 'side', start: 'belly', speed: 'fast', path: 'zigzag', len: 2, look: 'scumble: short overlapping strokes in turning directions' },
+});
+
 /** The strokes of one passage (mm), from its kind, brush and handling; no picture read. */
 export function passageStrokes(p, brushes, seed = 0, sheetLights = []) {
   // the paper this passage keeps: the sheet's lights and its own reserves (shapes it is laid round, painted later)
   const lights = [...sheetLights, ...(p.reserveRegions ?? []).filter(P => P?.length >= 3)];
-  const rng = handOf(`${seed}/${p.id}`), h = p.handling ?? {}, ch = p.character ?? {}, polys = regionsOf(p);
+  const named = MARK_HANDLING[p.handling?.mark] ?? {}, rng = handOf(`${seed}/${p.id}`), h = { ...named, ...(p.handling ?? {}) }, ch = p.character ?? {}, polys = regionsOf(p);
   const deg = Number(h.direction ?? 0) || 0, pressure = Array.isArray(h.pressure) ? h.pressure.map(Number) : PRESSURES[h.pressure] ?? PRESSURES.medium;
   const widthMm = p.kind === 'wash' ? washBrush(p, brushes) : brushes[p.brush].widthMm;
   const style = { pressure, path: h.path, hold: h.hold, speed: h.speed, start: h.start };
@@ -102,7 +123,7 @@ export function passageStrokes(p, brushes, seed = 0, sheetLights = []) {
     const [x, y] = s.at ?? s.from ?? [0, 0];
     return handled(x, y, { ...style, deg: Number(s.direction ?? deg), len: Number(s.lengthMm ?? h.lengthMm ?? 3 * w), r: w / 2, pressure: Array.isArray(s.pressure) ? s.pressure.map(Number) : pressure, path: s.path ?? h.path, from: !!s.from, rng });
   });
-  const n = Math.max(1, Math.round(p.count ?? 1)), lengthMm = Number(h.lengthMm) || (p.kind === 'touches' ? 2.6 * widthMm : 4 * widthMm);
+  const n = Math.max(1, Math.round(p.count ?? 1)), lengthMm = Number(h.lengthMm) || (named.len ? named.len * widthMm : p.kind === 'touches' ? 2.6 * widthMm : 4 * widthMm);
   switch (p.kind) {
     case 'wash': return sweeps(polys, { widthMm, deg, pressure: Math.max(0.6, Math.max(...pressure)), lights, rng });
     case 'strokes': return scattered(polys, { ...style, n, widthMm, deg, lengthMm, size: ch.size, spread: ch.spread ?? 'scattered', denser: ch.denser, lights, rng });
@@ -114,7 +135,7 @@ export function passageStrokes(p, brushes, seed = 0, sheetLights = []) {
 
 /** The painter's move, water and phase for a passage: from its paper, load, stage and what it goes into. */
 function moveOf(p, joins) {
-  const load = p.handling?.load, water = LOAD[load];
+  const load = p.handling?.load ?? MARK_HANDLING[p.handling?.mark]?.load, water = LOAD[load];
   if (load === 'dry') return { move: 'dry on dry', water: LOAD.dry, phase: null };
   if (p.paper === 'wet') return { move: 'wet on wet', water: water ?? 0.88, phase: null, ownBed: !joins };
   if (p.paper === 'damp' && joins) return { move: 'beside damp', water: water ?? 0.62, phase: null };

@@ -109,3 +109,9 @@ test('shapes of a study named by number become the passage\'s regions, its reser
   const st = passageStrokes({ ...r.passages[0], brush: 'r8' }, brushes).flatMap(q => q.points);
   assert.ok(!st.some(([x, y]) => x > 32 && x < 38 && y > 27 && y < 33));
 });
+
+test('a named mark sets the handling the script leaves out', () => {
+  const st = passageStrokes({ id: 'm', kind: 'touches', brush: 'r8', region: square, count: 6, handling: { mark: 'leaf' } }, brushes);
+  assert.equal(st.length, 6); assert.ok(st.every(q => q.points[0][2] < 0.3 && Math.max(...q.points.map(v => v[2])) > 0.8));
+  assert.equal(plan(script([{ ...wall, handling: { mark: 'drag' } }])).layers[0].shapes[0]._valuePlan.move, 'dry on dry');
+});
