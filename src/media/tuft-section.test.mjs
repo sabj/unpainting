@@ -202,3 +202,15 @@ test('two overlapping wet sweeps dry with no density step at their seam', async 
   assert.ok(s.above > 0.05 && s.below > 0.05, `both sweeps laid paint (${s.above}, ${s.below} OD)`);
   assert.ok(s.step < 0.02, `seam step ${s.step} OD`);
 });
+
+test('on a GPU sheet the section brush lays exactly what it lays on a CPU sheet (its contact runs on the CPU)', async t => {
+  const { attachGpu } = await import('./gpu/link.mjs');
+  const make = () => createSheet(paperAt(40, 20, 0.25), pigments);
+  const gpu = make(); let info;
+  try { info = attachGpu(gpu, DEFAULTS, { mode: 'on', log: () => {} }); } catch (e) { if (process.env.GPU_REQUIRED === '1') throw e; t.skip(`no WebGPU adapter: ${e.message}`); return; }
+  if (info.backend !== 'gpu') { if (process.env.GPU_REQUIRED === '1') assert.fail('no GPU'); t.skip('no WebGPU adapter'); return; }
+  const cpu = make();
+  for (const sheet of [cpu, gpu]) { const b = round(0.25, 2); dip(b, { water: 1, conc: [0.5, 0] }); stroke(b, sheet, inMm([{ x: 5, y: 10, p: 1 }, { x: 20, y: 6, p: 0.8 }, { x: 35, y: 12, p: 1 }], 0.25)); }
+  const a = totals(cpu), b = totals(gpu);
+  assert.ok(Math.abs(a.water - b.water) < 1e-3 * a.water && Math.abs(a.pig[0] - b.pig[0]) < 1e-3 * a.pig[0], `cpu ${JSON.stringify(a)} gpu ${JSON.stringify(b)}`);
+});

@@ -17,6 +17,9 @@ import { pigmentPerMm, runOut, meanBetween, opticalDensity, rowProfile, seamStep
 const args = process.argv.slice(2), arg = (k, d) => { const i = args.indexOf(`--${k}`); return i >= 0 ? args[i + 1] : d; };
 const STAGE = arg('stage', 's1'), OUT = path.resolve(arg('out', `brush-${STAGE}.jpg`)), JSON_OUT = arg('json', null);
 const MODELS = arg('models', STAGE === 's2' ? 'row,tuft,section' : 'row,section').split(',');
+// --real <file>: a grid of real watercolour crops (5 across, 2 down, each labelled underneath, about 0.14 mm a pixel)
+// shown in a last column at the same 40 px a mm, for comparison
+const REAL = arg('real', null), REAL_MM = Number(arg('realmm', '0.14'));
 const PX = 40; // pixels a millimetre
 
 const paperOptions = mm => ({ seed: 9, scale: 1, toothScale: 0.2, fibres: 0.5, tooth: 0.5, proudBlur: 1, mmPerCell: mm, coldPress: { mmPerCell: mm, bumpMm: [0.5, 2], cover: 2.2, swell: 0.3 } });
@@ -134,7 +137,8 @@ const panels = STAGE === 's2' ? S2 : S1, results = {};
 const label = (t, x, y, size = 30) => `<text x="${x}" y="${y}" font-family="Helvetica, Arial, sans-serif" font-size="${size}" fill="#333">${t.replace(/&/g, '&amp;').replace(/</g, '&lt;')}</text>`;
 const GAP = 40, HEAD = 50, colW = Math.max(...panels.map(p => p.wmm)) * PX;
 const rowsH = panels.map(p => p.hmm * PX + HEAD);
-const W = MODELS.length * colW + (MODELS.length + 1) * GAP, H = rowsH.reduce((a, b) => a + b + GAP, 0) + 80;
+const realTiles = REAL ? await realCrops(REAL, REAL_MM) : [], realW = realTiles.length ? Math.max(...realTiles.map(t => t.w)) + GAP : 0;
+const W = MODELS.length * colW + (MODELS.length + 1) * GAP + realW, H = Math.max(rowsH.reduce((a, b) => a + b + GAP, 0), realTiles.reduce((a, t) => a + t.h + GAP, 0)) + 80;
 const comps = [], svg = [label(`brush ${STAGE}: ${MODELS.join(' | ')} (40 px a mm)`, GAP, 50, 40)];
 let y = 80;
 for (const [pi, p] of panels.entries()) {
@@ -149,6 +153,7 @@ for (const [pi, p] of panels.entries()) {
   }
   y += rowsH[pi] + GAP;
 }
+{ let ry = 80; const rx = GAP + MODELS.length * (colW + GAP); svg.push(label('real watercolour, same scale', rx, 50, 30)); for (const t of realTiles) { comps.push({ input: t.img, left: rx, top: ry }); ry += t.h + GAP; } }
 fs.mkdirSync(path.dirname(OUT), { recursive: true });
 await sharp({ create: { width: W, height: H, channels: 3, background: { r: 255, g: 255, b: 255 } } })
   .composite([...comps, { input: Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}">${svg.join('')}</svg>`), left: 0, top: 0 }])
@@ -166,4 +171,14 @@ function measurePanel(stage, pi, r) {
     return { values: { peakWidthMm: peak, midWidthMm: mid, widthAt83Mm: end }, text: `width ${mid.toFixed(1)} mm at p 1, ${end.toFixed(2)} mm 2 mm from the end` };
   }
   return { values: {}, text: '' };
+}
+
+// The crops of a 5 x 2 grid image, each scaled from mmPx millimetres a pixel to PX a millimetre (a label strip under each cut off).
+async function realCrops(file, mmPx) {
+  const meta = await sharp(file).metadata(), cw = Math.floor(meta.width / 5), ch = Math.floor(meta.height / 2), strip = Math.round(ch * 0.06), out = [];
+  for (let r = 0; r < 2; r++) for (let c = 0; c < 5; c++) {
+    const w = Math.round((cw - 6) * mmPx * PX), h = Math.round((ch - strip - 6) * mmPx * PX);
+    out.push({ w, h, img: await sharp(file).extract({ left: c * cw + 3, top: r * ch + 3, width: cw - 6, height: ch - strip - 6 }).resize(w, h, { kernel: 'lanczos3' }).png().toBuffer() });
+  }
+  return out;
 }

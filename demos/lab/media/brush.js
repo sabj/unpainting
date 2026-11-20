@@ -523,6 +523,9 @@ function sectionStroke(brush, sheet, path, { spacing = 0.7, between, lift = true
   const { w, h, paper } = sheet, K = sheet.K, mmc = paper.mmPerCell > 0 ? paper.mmPerCell : REF_MM, S = TUFT.sections;
   const shape = tuftShape(brush.flat), lanes = brush.hairs.length, hairs = brush.hairs, v0 = speed ?? brush.speed ?? TUFT.speed;
   const g = mmc * mmc / kappaOf(brush, mmc), kF = feedRate(brush.feed), Hb = brush.depositDepth || brush.wetness;
+  // the share of a hair's load it keeps when it has nothing left to give (retention): half the legacy free threshold,
+  // below which the row brush still smeared paint
+  const keep = TUFT.keep * brush.free;
   const [tlo, tspan] = paper.toothSpan > 0 ? [paper.toothLo, paper.toothSpan] : [0, 0], relief = paper.relief ?? 0.2, soft = Math.max(0.05, brush.bridgeSoft) * relief;
   const ET = edgeTooth(brush, paper), vr = varietyOf(brush), clip = sheet.clip ?? null;
   const capB = brush._capB ?? brush.capacity * lanes * brush.belly, buf = new Float64Array(K);
@@ -553,7 +556,7 @@ function sectionStroke(brush, sheet, path, { spacing = 0.7, between, lift = true
       brush._chain = moveChain(brush._chain, S, qx, qy, segLen, brush._seg ?? 0, -tx, -ty); brush._seg = segLen;
       geom.pts = brush._chain;
       if (brush.flat) {
-        const a0 = R * (0.9 + 0.1 * p) * Math.sqrt(Math.min(1, p / 0.15)); // the corners leave the paper only at the last
+        const a0 = R * (0.9 + 0.1 * p) * Math.sqrt(Math.min(1, p / 0.05)); // a flat lands and lifts on its whole edge; the corners leave only at the last
         rad.fill(a0); geom.thick = Math.max(0.5, shape.thick * R);
         // the blade, held at bladeAngle to the heading (the path's, or the fixed one upright), turns after the path
         const [fx, fy] = upright ? [hx, hy] : [tx, ty], ang = brush.bladeAngle * Math.PI / 180;
@@ -572,7 +575,7 @@ function sectionStroke(brush, sheet, path, { spacing = 0.7, between, lift = true
           const q = ef * (sB - sL) * capL[j] * capB / (capL[j] + capB || 1);
           if (q > 0) feedHair(brush, brush.resP, hr, Math.min(q, brush.resW));
           else if (q < 0 && hr.water > 0) { const f = Math.min(1, -q / hr.water); for (let kk = 0; kk < K; kk++) { const m = hr.pig[kk] * f; hr.pig[kk] -= m; brush.resP[kk] += m; } brush.resW += hr.water * f; hr.water -= hr.water * f; }
-          sat[j] = hr.water / (capL[j] || 1); hb[j] = headOf(sat[j], brush.free, Hb);
+          sat[j] = hr.water / (capL[j] || 1); hb[j] = headOf(sat[j], keep, Hb);
           const cl = brush.clumps[hr.clump], wander = cl && brush.streak ? 1 + brush.streak * (2 * along1(hr.clump + cl.lift * 7, brush.travel * mmc / (brush.streakLength * REF_MM)) - 1) : 1;
           reach[j] = toothReach(hb[j], Hb, p, brush.bridge, wander) * relief;
         }
@@ -595,9 +598,9 @@ function sectionStroke(brush, sheet, path, { spacing = 0.7, between, lift = true
         // a round presses hardest along its spine, a flat evenly along its blade
         const pl = brush.flat ? p : p * (0.6 + 0.4 * (1 - across * across)), aa = 1 - Math.exp(-ka * (0.35 + 0.65 * Math.min(1, pl)) * dt);
         countContact(i); markCpuStrokeCell(sheet, i);
-        exchangeCell(sheet, i, hr, capL[j], brush.free * capL[j], aa, contact, hb[j], g, buf);
+        exchangeCell(sheet, i, hr, capL[j], keep * capL[j], aa, contact, hb[j], g, buf);
         // the lane's head follows what it gave or took
-        sat[j] = hr.water / (capL[j] || 1); hb[j] = headOf(sat[j], brush.free, Hb);
+        sat[j] = hr.water / (capL[j] || 1); hb[j] = headOf(sat[j], keep, Hb);
       });
     }
     steps++; if (between) between(steps);
