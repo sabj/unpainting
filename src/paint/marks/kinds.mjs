@@ -28,7 +28,7 @@ function one(o, name, moves, width, opts, step) {
   return hand(name, path, width, { seed: o.seed ?? 0, step, ...(o.load != null && opts.water == null ? { water: o.load } : {}), ...opts });
 }
 
-export const KINDS = {
+const KINDS = {
   sweep: {
     label: 'wash sweep: a loaded flat held square, even pressure, slow, carrying a bead along its lower edge',
     make: o => [one(o, 'sweep', [{ len: 1, turn: 0.06 * sideOf(o) * bendOf(o, 1) }], o.width,

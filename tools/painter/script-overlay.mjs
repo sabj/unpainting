@@ -35,10 +35,10 @@ export function paintColour(paint) {
 function ribbon(st, px) {
   const P = st.points, L = [], R = [];
   for (let k = 0; k < P.length; k++) {
-    const a = P[Math.max(0, k - 1)], b = P[Math.min(P.length - 1, k + 1)], dx = b[0] - a[0], dy = b[1] - a[1], d = Math.hypot(dx, dy) || 1, hw = st.radiusMm * (0.25 + 0.75 * (P[k][2] ?? 1));
+    const a = P[Math.max(0, k - 1)], b = P[Math.min(P.length - 1, k + 1)], dx = b[0] - a[0], dy = b[1] - a[1], d = Math.hypot(dx, dy) || 1, hw = st.radiusMm * (P[k][4] ?? 1) * (0.25 + 0.75 * Math.min(1, P[k][2] ?? 1));
     L.push([(P[k][0] - dy / d * hw) * px, (P[k][1] + dx / d * hw) * px]); R.push([(P[k][0] + dy / d * hw) * px, (P[k][1] - dx / d * hw) * px]);
   }
-  const caps = [P[0], P.at(-1)].map(q => `<circle cx="${(q[0] * px).toFixed(1)}" cy="${(q[1] * px).toFixed(1)}" r="${(st.radiusMm * (0.25 + 0.75 * (q[2] ?? 1)) * px).toFixed(1)}"/>`).join('');
+  const caps = [P[0], P.at(-1)].map(q => `<circle cx="${(q[0] * px).toFixed(1)}" cy="${(q[1] * px).toFixed(1)}" r="${(st.radiusMm * (q[4] ?? 1) * (0.25 + 0.75 * Math.min(1, q[2] ?? 1)) * px).toFixed(1)}"/>`).join('');
   return `<path d="M${[...L, ...R.reverse()].map(q => q.map(v => v.toFixed(1)).join(',')).join(' L')} Z"/>${caps}`;
 }
 

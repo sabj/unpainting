@@ -13,6 +13,7 @@ import { passage } from '../../crop/blockin.mjs';
 import { labOf } from '../../eval/colour.mjs';
 import { filmLab } from './puddles.mjs';
 import { handOf, PRESSURES, sweeps, scattered, lines, written, handled, chargeDab } from './script-marks.mjs';
+import { makeMark, MARK_KINDS } from '../marks/index.mjs';
 
 /** Swatch lightness (L* on white paper) for each dilution word. */
 export const DILUTION_L = Object.freeze({ 'very pale': 88, pale: 79, medium: 66, strong: 52, rich: 40, dark: 30 });
@@ -87,32 +88,38 @@ function washBrush(p, brushes) {
   return kit.filter(v => v <= want).at(-1) ?? kit[0];
 }
 
+/** A named mark's usual length in brush widths, when the script gives none (the shared library's kinds, src/paint/marks). */
+const MARK_LEN = Object.freeze({ sweep: 6, taper: 5, reverse: 4, leaf: 2.4, comma: 2.2, teardrop: 2, dot: 0.8, touch: 1.6, line: 10, edge: 8, wedge: 2, swell: 8, ribbon: 6, contour: 8, hook: 4, bar: 6,
+  hatch: 2.5, scumble: 3, drag: 6, 'flying-white': 6, grass: 5, 'leaf-stem': 4, branch: 10, 's-stroke': 6, ring: 4, 'leaf-group': 4 });
+/** Marks laid with a nearly dry brush. */
+const DRY_MARKS = new Set(['drag', 'flying-white', 'scumble', 'ring']);
+const LOAD_SHARE = Object.freeze({ flooded: 1, loaded: 0.75, damp: 0.45, dry: 0.2 });
+
 /**
- * The named marks (the vocabulary of src/paint/methods/marks.mjs on the paint branch, until the shared library lands):
- * each a handling a script may name with `handling.mark`; anything the script also says overrides it. `len` is in
- * brush widths.
+ * A stroke the executor placed (where it lands, its direction and length, the way its path bends) laid as a named mark
+ * of the shared mark library (src/paint/marks): the library sets the pressure rising and falling along it, the hand's
+ * speed, a flat's blade and the stroke's water. Returns a list (a hatch, a branch or a leaf group is several strokes).
  */
-const MARK_HANDLING = Object.freeze({
-  sweep: { pressure: [0.75, 0.85, 0.8, 0.6], hold: 'side', start: 'belly', speed: 'slow', path: 'straight', len: 6, look: 'broad wash sweep: belly down, even pressure, slow, the bead carried' },
-  taper: { pressure: [0.15, 1, 0.7, 0.08], hold: 'upright', start: 'point', speed: 'medium', path: 'curved', len: 5, look: 'tapered stroke: lands on the point, swells, lifts' },
-  leaf: { pressure: [0.1, 1, 0.9, 0.05], hold: 'upright', start: 'point', speed: 'fast', path: 'curved', len: 2.2, look: 'leaf or petal: pressed and lifted' },
-  comma: { pressure: [0.3, 1, 0.5, 0.05], hold: 'upright', start: 'belly', speed: 'fast', path: 'flick', len: 2.2, look: 'comma: pressed and flicked off round a curve' },
-  line: { pressure: [0.25, 0.4, 0.35, 0.15], hold: 'upright', start: 'point', speed: 'fast', path: 'straight', len: 8, look: 'long thin line: the point, light and quick' },
-  edge: { pressure: [0.15, 0.2, 0.2, 0.1], hold: 'upright', start: 'point', speed: 'medium', path: 'straight', len: 8, look: 'a hairline drawn along the blade' },
-  wedge: { pressure: [0.2, 0.6, 1, 0.85], hold: 'upright', start: 'point', speed: 'medium', path: 'straight', len: 2.5, look: 'wedge: pulled sideways, lifting off one corner' },
-  push: { pressure: [0.8, 1, 1, 0.7], hold: 'side', start: 'belly', speed: 'slow', path: 'wobble', len: 2.5, look: 'pushed stroke: the hairs splay, slow and heavy' },
-  twist: { pressure: [0.15, 1, 0.15], hold: 'upright', start: 'point', speed: 'medium', path: 's-curve', len: 3, look: 'twist: thin to thick to thin' },
-  drag: { pressure: [0.6, 0.8, 0.7, 0.5], hold: 'side', start: 'belly', speed: 'fast', path: 'straight', len: 5, load: 'dry', look: 'side drag: a nearly dry brush on its side, broken on the tooth' },
-  dot: { pressure: [0.5, 1, 0.3], hold: 'upright', start: 'point', speed: 'fast', path: 'straight', len: 0.8, look: 'dot: a touch of the point' },
-  contour: { pressure: [0.3, 0.8, 0.8, 0.3], hold: 'upright', start: 'point', speed: 'slow', path: 'straight', len: 8, look: 'contour: follows an edge, crisp on its outer side' },
-  scumble: { pressure: [0.5, 0.8, 0.6], hold: 'side', start: 'belly', speed: 'fast', path: 'zigzag', len: 2, look: 'scumble: short overlapping strokes in turning directions' },
-});
+function asLibraryMark(kind, st, widthMm, { seed, bend = 0, load = 0.75 }) {
+  const P = st.points, a = P[0], b = P.at(-1), len = Math.max(0.5, Math.hypot(b[0] - a[0], b[1] - a[1])), c = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+  return makeMark(kind, { x: c[0], y: c[1], length: len, width: widthMm, angle: Math.atan2(b[1] - a[1], b[0] - a[0]), seed, bend, load });
+}
 
 /** The strokes of one passage (mm), from its kind, brush and handling; no picture read. */
 export function passageStrokes(p, brushes, seed = 0, sheetLights = []) {
+  const st = placedStrokes(p, brushes, seed, sheetLights), kind = p.handling?.mark;
+  // a named mark from the shared library, unless the author wrote the pressure out (then the author's handling is laid)
+  if (!kind || !MARK_KINDS[kind] || p.kind === 'wash' || Array.isArray(p.handling?.pressure)) return st;
+  if (p.kind === 'lines' && p.paths?.some(P => P.length > 2)) return st;
+  const rng = handOf(`${seed}/${p.id}/marks`), path = p.handling?.path, load = LOAD_SHARE[p.handling?.load] ?? (DRY_MARKS.has(kind) ? 0.3 : 0.75);
+  return st.flatMap((q, k) => asLibraryMark(kind, q, 2 * q.radiusMm, { seed: (seed * 7919 + k * 31 + [...p.id].reduce((h, c) => h * 31 + c.charCodeAt(0), 7)) | 0,
+    bend: path === 'straight' ? 0.05 * (rng.next() < 0.5 ? -1 : 1) : path === 'curved' || path === 'flick' ? rng.range(0.4, 0.8) * (rng.next() < 0.5 ? -1 : 1) : 0, load }));
+}
+
+function placedStrokes(p, brushes, seed = 0, sheetLights = []) {
   // the paper this passage keeps: the sheet's lights and its own reserves (shapes it is laid round, painted later)
   const lights = [...sheetLights, ...(p.reserveRegions ?? []).filter(P => P?.length >= 3)];
-  const named = MARK_HANDLING[p.handling?.mark] ?? {}, rng = handOf(`${seed}/${p.id}`), h = { ...named, ...(p.handling ?? {}) }, ch = p.character ?? {}, polys = regionsOf(p);
+  const named = {}, rng = handOf(`${seed}/${p.id}`), h = { ...named, ...(p.handling ?? {}) }, ch = p.character ?? {}, polys = regionsOf(p);
   const deg = Number(h.direction ?? 0) || 0, pressure = Array.isArray(h.pressure) ? h.pressure.map(Number) : PRESSURES[h.pressure] ?? PRESSURES.medium;
   const widthMm = p.kind === 'wash' ? washBrush(p, brushes) : brushes[p.brush].widthMm;
   const style = { pressure, path: h.path, hold: h.hold, speed: h.speed, start: h.start };
@@ -123,7 +130,7 @@ export function passageStrokes(p, brushes, seed = 0, sheetLights = []) {
     const [x, y] = s.at ?? s.from ?? [0, 0];
     return handled(x, y, { ...style, deg: Number(s.direction ?? deg), len: Number(s.lengthMm ?? h.lengthMm ?? 3 * w), r: w / 2, pressure: Array.isArray(s.pressure) ? s.pressure.map(Number) : pressure, path: s.path ?? h.path, from: !!s.from, rng });
   });
-  const n = Math.max(1, Math.round(p.count ?? 1)), lengthMm = Number(h.lengthMm) || (named.len ? named.len * widthMm : p.kind === 'touches' ? 2.6 * widthMm : 4 * widthMm);
+  const n = Math.max(1, Math.round(p.count ?? 1)), lengthMm = Number(h.lengthMm) || (MARK_LEN[h.mark] ? MARK_LEN[h.mark] * widthMm : p.kind === 'touches' ? 2.6 * widthMm : 4 * widthMm);
   switch (p.kind) {
     case 'wash': return sweeps(polys, { widthMm, deg, pressure: Math.max(0.6, Math.max(...pressure)), lights, rng });
     case 'strokes': return scattered(polys, { ...style, n, widthMm, deg, lengthMm, size: ch.size, spread: ch.spread ?? 'scattered', denser: ch.denser, lights, rng });
@@ -135,7 +142,7 @@ export function passageStrokes(p, brushes, seed = 0, sheetLights = []) {
 
 /** The painter's move, water and phase for a passage: from its paper, load, stage and what it goes into. */
 function moveOf(p, joins) {
-  const load = p.handling?.load ?? MARK_HANDLING[p.handling?.mark]?.load, water = LOAD[load];
+  const load = p.handling?.load ?? (['drag', 'flying-white'].includes(p.handling?.mark) ? 'dry' : undefined), water = LOAD[load];
   if (load === 'dry') return { move: 'dry on dry', water: LOAD.dry, phase: null };
   if (p.paper === 'wet') return { move: 'wet on wet', water: water ?? 0.88, phase: null, ownBed: !joins };
   if (p.paper === 'damp' && joins) return { move: 'beside damp', water: water ?? 0.62, phase: null };
@@ -153,7 +160,7 @@ export function footprint(strokes, w, h, cellMm) {
     const P = st.points;
     for (let k = 0; k < P.length; k++) {
       const a = P[k], b = P[Math.min(P.length - 1, k + 1)], steps = Math.max(1, Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) / (cellMm * 1.5)));
-      for (let s = 0; s < steps; s++) { const t = s / steps, p = (a[2] ?? 1) + ((b[2] ?? 1) - (a[2] ?? 1)) * t; disc(a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, st.radiusMm * (0.25 + 0.75 * p)); }
+      for (let s = 0; s < steps; s++) { const t = s / steps, p = (a[2] ?? 1) + ((b[2] ?? 1) - (a[2] ?? 1)) * t; disc(a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, st.radiusMm * (a[4] ?? 1) * (0.25 + 0.75 * Math.min(1, p))); }
     }
   }
   return m;
