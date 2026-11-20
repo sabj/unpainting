@@ -237,7 +237,7 @@
       "designed": "docs/how-it-paints.md:19,72,77",
       "applies": {
         "routes": [
-          "bench --planform area"
+          "none: the area plan was removed in 0.4 (last at commit ad4a1e3e)"
         ],
         "subjects": "all"
       },

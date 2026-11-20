@@ -95,9 +95,6 @@ test('required paper-state proof rejects diagnostic continuation, missing and ma
     assert.equal(get().status, 'DID NOT RUN', JSON.stringify(summary));
     assert.equal(checkDesignedPaths(dir).ok, false);
   }
-  fs.writeFileSync(path.join(dir, 'run-card.json'), JSON.stringify({...card,args:['--areaplan','area.json']}));
-  assert.equal(get().applicable, true);
-  assert.equal(get().status, 'RAN');
 });
 
 test('malformed paper-check switches fail before painting, including the legacy alias beside strict mode', t => {

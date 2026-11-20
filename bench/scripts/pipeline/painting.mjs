@@ -10,7 +10,6 @@ import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { reportDesignedPaths } from '../../../tools/designed-paths-check.mjs';
 import { resolvePlan, renderVerdict } from './plan-args.mjs';
-import { resolveAreaPlan } from './area-args.mjs';
 
 const readJson = f => { try { return JSON.parse(fs.readFileSync(f, 'utf8')); } catch { return null; } };
 const writeJson = (f, v) => { fs.writeFileSync(f + '.tmp', JSON.stringify(v, null, 1)); fs.renameSync(f + '.tmp', f); };
@@ -23,8 +22,8 @@ export const bkey = b => (String(b) === 'closing' ? 1e9 : Number(b));
 
 export class Painting {
   /** spec: {width, sheetmm}; dir: this painting's folder; initialStop: 0 (stop before the first wash) or 'end'. */
-  constructor({ repo, spec, target, dir, gpu = 'auto', initialStop = 0, env = {}, planForm = 'token' }) {
-    Object.assign(this, { repo, spec, target, dir, gpu, env, planForm });
+  constructor({ repo, spec, target, dir, gpu = 'auto', initialStop = 0, env = {} }) {
+    Object.assign(this, { repo, spec, target, dir, gpu, env });
     this.aware = path.join(dir, 'aware');
     this.out = path.join(dir, 'out');
     fs.mkdirSync(this.aware, { recursive: true });
@@ -41,9 +40,7 @@ export class Painting {
   /** Start segment k from a plan folder (a copy the harness owns). resume: the saved state folder, or null. */
   run(planDir, variant, resume = null) {
     const k = this.segments.length + 1;
-    const plan = this.planForm === 'area'
-      ? resolveAreaPlan({ spec: this.spec, planDir, target: this.target, out: this.out, work: planDir, gpu: this.gpu, pausedir: this.aware, resumestate: resume })
-      : resolvePlan({ spec: this.spec, planDir, variant, target: this.target, out: this.out, gpu: this.gpu, pausedir: this.aware, resumestate: resume });
+    const plan = resolvePlan({ spec: this.spec, planDir, variant, target: this.target, out: this.out, gpu: this.gpu, pausedir: this.aware, resumestate: resume });
     if (resume) {
       // Session.reviseChecked admitted this suffix; keep the saved prefix identity explicit.
       const prefix=path.join(this.dir, `prefix-${k}.json`);
