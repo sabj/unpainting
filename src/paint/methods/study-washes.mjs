@@ -33,6 +33,8 @@ const CLUSTERS = 8, CLUSTER_JOIN = 18;
 const SLIVER_SHARE = 0.004;
 /** A small shape this much darker (L*) than the neighbour it would be merged into is kept. */
 const KEEP_DARK = 25;
+/** ... or this far from it in hue and chroma (a*b*, at least this chromatic itself): a warm accent in a pale wall. */
+const KEEP_HUE = 15;
 /** Bare paper: a shape at least this light (L*, against the SHEET's colour: on a toned sheet, buff is paper, and a study's
  * white, lighter than the sheet, is paper too) and no more chromatic than this. */
 const PAPER_L = 91, PAPER_CHROMA = 7;
@@ -88,7 +90,7 @@ function parts(lab, w, h) {
  * The study's flat shapes on a pw x ph grid: {label (0-based shape per cell), shapes: [{cells, colour (sRGB), lab, paper, border: Map(shape -> shared edges), rim}]}.
  * `rgb` is the study on that grid.
  */
-function studyShapes(rgb, pw, ph, paperRGB, { sliverCells, most = 0, clusters: K = CLUSTERS, join: J = CLUSTER_JOIN, keep: KD = KEEP_DARK }) {
+function studyShapes(rgb, pw, ph, paperRGB, { sliverCells, most = 0, clusters: K = CLUSTERS, join: J = CLUSTER_JOIN, keep: KD = KEEP_DARK, hue: HK = KEEP_HUE }) {
   const pn = pw * ph, L = new Float32Array(pn), A = new Float32Array(pn), B = new Float32Array(pn);
   for (let q = 0; q < pn; q++) { const [l, a, b] = labOf(rgb, q, paperRGB); L[q] = l; A[q] = a; B[q] = b; }
   // the colours, read off a fixed grid of about 8000 cells
@@ -100,15 +102,25 @@ function studyShapes(rgb, pw, ph, paperRGB, { sliverCells, most = 0, clusters: K
   for (let merged = true; merged;) { merged = false; for (let a = 0; a < centres.length && !merged; a++) for (let b = a + 1; b < centres.length && !merged; b++) if (paperish(centres[a]) === paperish(centres[b]) && Math.hypot(...centres[a].map((v, j) => v - centres[b][j])) < J) { centres[a] = centres[a].map((v, j) => (v + centres[b][j]) / 2); centres.splice(b, 1); merged = true; } }
   let lab = new Int32Array(pn);
   for (let q = 0; q < pn; q++) { let best = 0, bd = Infinity; centres.forEach((c, f) => { const d = (L[q] - c[0]) ** 2 + (A[q] - c[1]) ** 2 + (B[q] - c[2]) ** 2; if (d < bd) { bd = d; best = f; } }); lab[q] = best; }
+  // a small region whose HUE differs strongly from its cluster's (a warm niche in a pale wall) gets a cluster of its own,
+  // though its value is close: the coarse clusters would swallow it. Hue, not lightness: a faint neutral pattern changes
+  // lightness only and cannot open one.
+  if (HK > 0) {
+    const off = Uint8Array.from({ length: pn }, (_, q) => { const c = centres[lab[q]]; return Math.hypot(A[q] - c[1], B[q] - c[2]) >= HK && Math.hypot(A[q], B[q]) >= HK ? 1 : 0; });
+    const oc = components(off, pw, ph, 4), cnt = new Int32Array(oc.count + 1); for (const id of oc.labels) if (id) cnt[id]++;
+    const newId = new Int32Array(oc.count + 1).fill(-1);
+    for (let id = 1; id <= oc.count; id++) if (cnt[id] >= sliverCells / 6) { let l = 0, a = 0, b = 0; for (let q = 0; q < pn; q++) if (oc.labels[q] === id) { l += L[q]; a += A[q]; b += B[q]; } newId[id] = centres.length; centres.push([l / cnt[id], a / cnt[id], b / cnt[id]]); }
+    for (let q = 0; q < pn; q++) { const id = oc.labels[q]; if (id && newId[id] >= 0) lab[q] = newId[id]; }
+  }
   lab = majority(majority(lab, pw, ph), pw, ph);
   // connected parts, each with its cluster, size and borders
   const pc = parts(lab, pw, ph), n = pc.count, root = Int32Array.from({ length: n + 1 }, (_, i) => i), size = new Float64Array(n + 1), cluster = new Int32Array(n + 1);
   const border = Array.from({ length: n + 1 }, () => new Map());
   for (let q = 0; q < pn; q++) { const id = pc.labels[q]; size[id]++; cluster[id] = lab[q]; const x = q % pw;
     for (const j of [x < pw - 1 ? q + 1 : -1, q + pw < pn ? q + pw : -1]) { if (j < 0) continue; const o = pc.labels[j]; if (o !== id) { border[id].set(o, (border[id].get(o) ?? 0) + 1); border[o].set(id, (border[o].get(id) ?? 0) + 1); } } }
-  // a small shape much darker than the one it would join is kept (darks carry the drawing: windows, a doorway), if it is
+  // a small shape much darker than the one it would join, or of a strongly different hue, is kept (darks carry the drawing: windows, a doorway), if it is
   // at least a sixth of the least size
-  const keepDark = (i, into) => size[i] >= sliverCells / 6 && centres[cluster[into]][0] - centres[cluster[i]][0] >= KD;
+  const keepDark = (i, into) => size[i] >= sliverCells / 6 && (centres[cluster[into]][0] - centres[cluster[i]][0] >= KD || (HK > 0 && Math.hypot(centres[cluster[into]][1] - centres[cluster[i]][1], centres[cluster[into]][2] - centres[cluster[i]][2]) >= HK));
   const find = i => { while (root[i] !== i) { root[i] = root[root[i]]; i = root[i]; } return i; };
   const join = (small, big) => {
     root[small] = big; size[big] += size[small];
