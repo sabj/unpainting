@@ -129,12 +129,40 @@ def plan(bgr, zoom=4, ink=.2, fit=.6, min_px=3.0):
     return lines, mask, skeleton, {'inkPixels': int(mask.sum()), 'tracedPaths': len(paths), 'selectedPaths': len(lines), 'joins': joins, 'zoom': zoom, 'fit': fit}
 
 
+def merge_parallels(lines, sep, share=.7):
+    """A line drawn as two or three close parallel strokes (a thick edge, or a sketchy double) is one stroke: a line whose
+    samples lie within `sep` source pixels of one longer line along `share` of its length is folded into it, which takes
+    the span of both as its width and the darker weight. Returns the kept lines and how many were folded."""
+    from scipy.spatial import cKDTree
+    order = sorted(range(len(lines)), key=lambda i: -lines[i]['length'])
+    S = [resample(np.asarray(lines[i]['points'], float), .5) for i in range(len(lines))]
+    owner = np.concatenate([np.full(len(S[i]), i) for i in range(len(lines))]); tree = cKDTree(np.vstack(S))
+    gone = set()
+    for i in reversed(order):           # shortest first
+        hits = {}
+        for k, nb in enumerate(tree.query_ball_point(S[i], sep)):
+            for j in {owner[n] for n in nb}:
+                if j != i and j not in gone and lines[j]['length'] >= lines[i]['length']: hits[j] = hits.get(j, 0) + 1
+        best = max(hits, key=hits.get) if hits else None
+        if best is not None and hits[best] >= share*len(S[i]):
+            a, b = lines[best], lines[i]
+            d = float(np.median(cKDTree(S[best]).query(S[i])[0]))
+            # the span of both, at most 1.6 times the wider (folds of several strokes do not pile up into a bar)
+            a['width'] = round(min(max(a['width'], d + (a['width']+b['width'])/2), 1.6*max(a['width'], b['width'], a.get('width0', a['width']))), 3)
+            a.setdefault('width0', a['width']); a['weight'] = max(a['weight'], b['weight'])
+            gone.add(i)
+    for l in lines: l.pop('width0', None)
+    return [l for k, l in enumerate(lines) if k not in gone], len(gone)
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument('image'); ap.add_argument('--out', required=True)
     ap.add_argument('--target', help='the picture the drawing is registered to (same size): the line file is bound to it')
     ap.add_argument('--sheetmm', type=float, help='sheet width in mm: adds widthMm to each line')
     ap.add_argument('--zoom', type=int, default=4, help='enlargement before thinning')
+    ap.add_argument('--mergemm', type=float, default=.45, help='close parallel strokes within this (mm, with --sheetmm) are one stroke; 0 keeps them')
+    ap.add_argument('--maxwidthmm', type=float, default=1.2, help='wider marks are filled darks, left to the paint (mm, with --sheetmm); 0 keeps them')
     ap.add_argument('--fit', type=float, default=.6, help='how far a straight run or arc may lie from the traced line, source pixels')
     args = ap.parse_args()
     bgr = cv2.imread(args.image)
@@ -142,6 +170,14 @@ def main():
         ap.error('cannot read '+args.image)
     h, w = bgr.shape[:2]
     lines, mask, skeleton, stats = plan(bgr, args.zoom, fit=args.fit)
+    if args.sheetmm:
+        px = w/args.sheetmm   # source pixels a millimetre
+        if args.mergemm > 0:
+            lines, stats['foldedParallels'] = merge_parallels(lines, args.mergemm*px)
+        if args.maxwidthmm > 0:
+            # a filled dark (traced as a fat scribble) is left to the paint
+            n = len(lines); lines = [l for l in lines if l['width'] <= args.maxwidthmm*px]; stats['filledDarksLeft'] = n-len(lines)
+        stats['selectedPaths'] = len(lines)
     if args.sheetmm:
         for l in lines:
             l['widthMm'] = round(l['width']*args.sheetmm/w, 3)
