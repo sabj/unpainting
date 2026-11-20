@@ -122,3 +122,26 @@ test('unmet evaporation remains a demand for the next subcycle, rather than disa
   assert.ok(Math.abs(ev + s.edgeDemandPending - s.edgeDemandRequested) < 1e-5 * s.edgeDemandRequested);
   assert.ok(s.W.every(v => v >= 0));
 });
+
+test('the faster edge feed moves the same water and pigment as the first version, to the bit', async () => {
+  const { edgeFeedReference } = await import('./edge-feed-reference.mjs');
+  const mm = 0.5, n = 40;
+  // two identical sheets; marks laid, boxes moved and masking fluid put on and off between the calls, as a painting does
+  const make = () => { const s = createSheet(paperAt(n, mm), [ultramarine, phthalo]); return s; };
+  const A = make(), B = make(), o = { ...O, edgeEvap: 0.004, dt: 0.1 };
+  let seed = 3; const rnd = () => ((seed = (seed * 1103515245 + 12345) >>> 0) / 4294967296);
+  const same = (label) => {
+    for (const k of ['W', 'M', 'edgePending']) for (let i = 0; i < A.n; i++) assert.ok(Object.is(A[k][i], B[k][i]), `${label}: ${k}[${i}] ${A[k][i]} vs ${B[k][i]}`);
+    for (let k = 0; k < A.K; k++) for (let i = 0; i < A.n; i++) assert.ok(Object.is(A.G[k][i], B.G[k][i]), `${label}: G${k}[${i}]`);
+    for (const k of ['outwardPigmentFlux', 'edgeDemandPending', 'edgeDemandRequested']) assert.ok(Object.is(A[k], B[k]), `${label}: ${k} ${A[k]} vs ${B[k]}`);
+  };
+  for (let call = 0; call < 60; call++) {
+    // a dab of paint somewhere every few calls: the footprint grows, or stays and the cached solve is reused
+    if (call % 4 === 0) { const cx = 4 + rnd() * 32, cy = 4 + rnd() * 32, r = 1 + rnd() * 4, g = [rnd() * 0.3, rnd() * 0.1]; for (const s of [A, B]) for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) if (Math.hypot(x - cx, y - cy) < r) deposit(s, y * n + x, 0.15, g); }
+    if (call === 30) for (const s of [A, B]) { s.resist = new Uint8Array(s.n); for (let i = 0; i < 40; i++) s.resist[300 + i] = 1; }
+    if (call === 40) for (const s of [A, B]) s.resist = null;
+    const half = call % 3 === 2, boxes = half ? [[0, 0, n - 1, 19], [0, 20, n - 1, n - 1]] : [[0, 0, n - 1, n - 1]];
+    for (const box of boxes) { const a = edgeFeed(A, o, box, mm), b = edgeFeedReference(B, o, box, mm); assert.ok(Object.is(a, b), `call ${call}: evaporated ${a} vs ${b}`); }
+    same(`call ${call}`);
+  }
+});

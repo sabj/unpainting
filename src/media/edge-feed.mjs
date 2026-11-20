@@ -41,7 +41,11 @@ export function edgeFeed(sheet, o, box, mm) {
   const b = bufs(sheet), { lev, order, dem, inner, rho, ex, geo, cout, W0 } = b;
   const reach = Math.max(1, Math.round((o.reachMm ?? 1.5) / mm));
   const mask = b.footprint;
-  mask.fill(0); let surfaceWater = 0;
+  // the footprint is only ever set inside a box, so clearing the last box clears it (the first version cleared the
+  // whole sheet every call)
+  if (b.maskBox) { const [a0, b0, a1, b1] = b.maskBox; for (let y = b0; y <= b1; y++) mask.fill(0, y * w + a0, y * w + a1 + 1); }
+  b.maskBox = box;
+  let surfaceWater = 0;
   for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) { const i = y * w + x; mask[i] = M[i] || ever[i]; surfaceWater += W[i]; }
   if (!(surfaceWater > 0)) return 0;
   const { fx, fy, pressure, cachedSink, cachedMask, cachedFootprint, cachedResist } = b;
@@ -53,7 +57,10 @@ export function edgeFeed(sheet, o, box, mm) {
   // footprint. That must not invalidate an identical pressure problem.
   const key = `${mm}:${E}:${edgeEvap}:${reach}:${o.holeSpan ?? 0}`;
   let reuse = b.key === key;
-  if (reuse) for (let i = 0; i < mask.length; i++) if (mask[i] !== cachedFootprint[i] || (resist?.[i] ?? 0) !== cachedResist[i]) { reuse = false; break; }
+  // the footprint and the cached one are zero outside their own boxes, so without masking fluid (either now or when
+  // cached) comparing the two boxes compares the whole sheet
+  if (reuse && (resist || b.cacheResist)) { for (let i = 0; i < mask.length; i++) if (mask[i] !== cachedFootprint[i] || (resist?.[i] ?? 0) !== cachedResist[i]) { reuse = false; break; } }
+  else if (reuse) for (const [a0, b0, a1, b1] of [box, b.cacheBox]) { for (let y = b0; y <= b1 && reuse; y++) for (let i = y * w + a0, e = y * w + a1; i <= e; i++) if (mask[i] !== cachedFootprint[i]) { reuse = false; break; } if (!reuse) break; }
   let n = b.count;
   if (reuse) { lev.set(cachedMask); ex.set(cachedSink); }
   else {
@@ -125,7 +132,8 @@ export function edgeFeed(sheet, o, box, mm) {
     }
     if (!(Etot > 0)) { for (let q = 0; q < n; q++) lev[order[q]] = 0; return 0; }
     cachedMask.set(lev); cachedSink.set(ex); cachedFootprint.set(mask);
-    if (resist) cachedResist.set(resist); else cachedResist.fill(0);
+    if (resist) cachedResist.set(resist); else if (b.cacheResist) cachedResist.fill(0);
+    b.cacheBox = box; b.cacheResist = !!resist;
     // a cold start: a solve warm-started from the last one converges to a different last bit, so a painting taken over
     // by a fresh process (whose scratch starts at zero) would not end as the one painted without a break
     for (let q = 0; q < n; q++) pressure[order[q]] = 0;
@@ -136,38 +144,43 @@ export function edgeFeed(sheet, o, box, mm) {
   const active = [];
   for (let k = 0; k < K; k++) { for (let q = 0; q < n; q++) if (G[k][order[q]] !== 0) { active.push(k); break; } }
   let outward = sheet.outwardPigmentFlux ?? 0;
-  const eachFace = f => {
-    for (let q = 0; q < n; q++) {
-      const i = order[q];
-      if (fx[i]) f(i, i + 1, fx[i]);
-      if (fy[i]) f(i, i + w, fy[i]);
-    }
-  };
+  // (the faces are walked inline, in the order the cells are listed, x face then y face, as the first version's
+  // per-face callback walked them: the same sums in the same order)
   // The outgoing rate is independent of dt. A donor cannot be spent twice by
   // two faces; both faces use the same pre-substep concentration and budget.
   for (let q = 0; q < n; q++) dem[order[q]] = 0;
-  eachFace((i, j, f) => { dem[f > 0 ? i : j] += Math.abs(f); });
+  for (let q = 0; q < n; q++) {
+    const i = order[q], a = fx[i], c = fy[i];
+    if (a) dem[a > 0 ? i : i + 1] += Math.abs(a);
+    if (c) dem[c > 0 ? i : i + w] += Math.abs(c);
+  }
+  const nAct = active.length, wetFloor = 2 * (o.wetEps ?? 0.004);
   let remaining = dt, evaporated = 0;
   while (remaining > 1e-12) {
     let sub = remaining;
-    for (let q = 0; q < n; q++) { const i = order[q], rate = dem[i] + ex[i]; if (rate > 0 && W[i] > 2 * (o.wetEps ?? 0.004)) sub = Math.min(sub, 0.5 * W[i] / rate); }
+    for (let q = 0; q < n; q++) { const i = order[q], rate = dem[i] + ex[i]; if (rate > 0 && W[i] > wetFloor) sub = Math.min(sub, 0.5 * W[i] / rate); }
     // The last microlayer is no longer a source; faces are limited together
     // rather than letting a vanishing cell force infinitely many substeps.
     for (let q = 0; q < n; q++) {
       const i = order[q]; W0[i] = W[i]; inner[i] = 0;
       rho[i] = dem[i] > 0 ? Math.min(1, 0.5 * W[i] / (sub * dem[i])) : 1;
-      for (const k of active) cout[k][i] = 0;
+      for (let a = 0; a < nAct; a++) cout[active[a]][i] = 0;
     }
-    eachFace((i, j, f) => {
-      const donor = f > 0 ? i : j, receiver = f > 0 ? j : i, v = sub * Math.abs(f) * rho[donor];
-      if (!(v > 0)) return;
-      inner[donor] -= v; inner[receiver] += v;
-      for (const k of active) {
-        const g = W0[donor] > 1e-12 ? v * G[k][donor] / W0[donor] : 0;
-        cout[k][donor] -= g; cout[k][receiver] += g;
-        outward += g * (lev[donor] - lev[receiver]) * mm / 3;
+    for (let q = 0; q < n; q++) {
+      const i = order[q];
+      for (let dir = 0; dir < 2; dir++) {
+        const f = dir ? fy[i] : fx[i]; if (!f) continue;
+        const j = dir ? i + w : i + 1, donor = f > 0 ? i : j, receiver = f > 0 ? j : i, v = sub * Math.abs(f) * rho[donor];
+        if (!(v > 0)) continue;
+        inner[donor] -= v; inner[receiver] += v;
+        const w0 = W0[donor], dl = lev[donor] - lev[receiver];
+        for (let a = 0; a < nAct; a++) {
+          const k = active[a], ck = cout[k], g = w0 > 1e-12 ? v * G[k][donor] / w0 : 0;
+          ck[donor] -= g; ck[receiver] += g;
+          outward += g * dl * mm / 3;
+        }
       }
-    });
+    }
     for (let q = 0; q < n; q++) {
       const i = order[q], water = Math.max(0, W0[i] + inner[i]);
       const demand = sub * ex[i]; pending[i] += demand;
@@ -178,12 +191,13 @@ export function edgeFeed(sheet, o, box, mm) {
       // Otherwise a spatially uniform sub-ULP bias accumulates over a dry.
       evaporated += water - W[i];
       if (W[i] > 0) M[i] = 1;
-      for (const k of active) G[k][i] = Math.max(0, G[k][i] + cout[k][i]);
+      for (let a = 0; a < nAct; a++) { const k = active[a]; G[k][i] = Math.max(0, G[k][i] + cout[k][i]); }
     }
     remaining -= sub;
   }
   for (let q = 0; q < n; q++) lev[order[q]] = 0;
   sheet.outwardPigmentFlux = outward;
-  sheet.edgeDemandPending = pending.reduce((sum, v) => sum + v, 0);
+  let pend = 0; for (let i = 0; i < pending.length; i++) pend += pending[i];   // as reduce summed it, from 0 in index order
+  sheet.edgeDemandPending = pend;
   return evaporated;
 }
