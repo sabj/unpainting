@@ -62,8 +62,11 @@ test('physics changes the sheet and not the amount of paint laid', () => {
   }
 });
 
-/** Where a dried wash sits against the paper: the correlation of dried mass with paper height inside the block
- *  (negative: in the hollows). The same paint and water, dried at `evap` times the sheet's drying rate. */
+/** Where a dried wash sits against the paper: the dried mass's change per standard deviation of paper height, as a
+ *  share of its mean, inside the block (negative: in the hollows). The same paint and water, dried at `evap` times the
+ *  sheet's drying rate. It was the correlation, which is blind to how much: a level film stands deeper over a hollow
+ *  (the slope term in the flow), so even a staining paint's faint variation follows the height (-0.90 for phthalo
+ *  against -0.86 for ultramarine), while its amount is a fifth of ultramarine's (-0.07 against -0.37). */
 function hollowShare(pigment, evap, water = 0.1) {
   const paper = makePaper(W, H, { seed: 7, mmPerCell: 0.259 }), sheet = createSheet(paper, [pigment]);
   const o = { ...O, evap: O.evap * evap, edgeEvap: O.edgeEvap * evap };
@@ -73,14 +76,14 @@ function hollowShare(pigment, evap, water = 0.1) {
   const m = layersOf(sheet).reduce((a, l) => { for (const i of ids) a[i] = (a[i] ?? 0) + l[0][i]; return a; }, {});
   const mx = ids.reduce((s, i) => s + m[i], 0) / ids.length, my = ids.reduce((s, i) => s + paper.height[i], 0) / ids.length;
   let sxy = 0, sxx = 0, syy = 0; for (const i of ids) { sxy += (m[i] - mx) * (paper.height[i] - my); sxx += (m[i] - mx) ** 2; syy += (paper.height[i] - my) ** 2; }
-  return sxy / Math.sqrt(sxx * syy);
+  return sxy / syy / mx * Math.sqrt(syy / ids.length);
 }
 
 test('a granulating paint settles into the hollows more as the wash dries more slowly, and a staining one does not', () => {
   const um = physicalPigment(paint('ultramarine')), ph = physicalPigment(paint('phthaloblue'));
-  const slow = hollowShare(um, 0.4), fast = hollowShare(um, 3);
+  const slow = hollowShare(um, 0.4), fast = hollowShare(um, 3), stain = hollowShare(ph, 0.4);
   assert.ok(slow < 0 && slow < fast, `ultramarine against paper height: slow ${slow.toFixed(3)}, fast ${fast.toFixed(3)}`);
-  assert.ok(hollowShare(ph, 0.4) > slow + 0.2, 'phthalo blue does not gather in the hollows as ultramarine does');
+  assert.ok(Math.abs(stain) < Math.abs(slow) / 3, `phthalo blue gathers in the hollows ${stain.toFixed(3)} against ultramarine's ${slow.toFixed(3)}`);
 });
 
 /** Share of a brushed ultramarine wash's cell-to-cell variation that is a one-cell checkerboard: three flat lanes of
@@ -104,7 +107,11 @@ function checkerShare(slideCap) {
   return Math.sqrt(c2 / d2);
 }
 
-test('granulation follows the tooth, not a grid: grains stop rolling when the slope is gone (the painter sheet, slideCap 1)', () => {
-  const free = checkerShare(0), capped = checkerShare(1);
-  assert.ok(capped < 0.8 * free, `checkerboard share capped ${capped.toFixed(3)} vs uncapped ${free.toFixed(3)}`);
+// Uncorrelated cell noise has a checkerboard share of sqrt(1/8) = 0.354; a grid artefact sits above it. The test used to
+// require the cap to cut the uncapped sheet's share by a fifth, but since the drying flow (69ad01f1 and on) and the
+// cell-averaged relief neither sheet makes a grid: both read 0.30 (capped 0.297, uncapped 0.296). What is held now is
+// the property itself, on both: no checkerboard beyond noise.
+test('granulation follows the tooth, not a grid: no one-cell checkerboard beyond uncorrelated noise, with or without the slide cap', () => {
+  const free = checkerShare(0), capped = checkerShare(1), noise = Math.sqrt(1 / 8);
+  assert.ok(capped < 0.9 * noise && free < 0.9 * noise, `checkerboard share capped ${capped.toFixed(3)}, uncapped ${free.toFixed(3)}, noise ${noise.toFixed(3)}`);
 });
