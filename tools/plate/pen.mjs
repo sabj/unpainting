@@ -26,7 +26,7 @@ import {fillSheetBase} from '../../src/paint/methods/sheet-tone.mjs';
 
 export async function penPlan(ctx) {
 const { opt, num, optTrack, NATIVE_PAINT_MODE, FRAME_POLICY, root, out, RUN_CACHE, VALUE_CONFIG, 
-  phaseMark, srcMeta, PX_RAW, TARGET_GUARD, w, h, n, paperRGB, PIGS, COLOUR_BUDGET, MASS_BUDGET, 
+  phaseMark, srcMeta, PX_RAW, TARGET_GUARD, w, h, n, paperRGB, PIGS, COLOUR_BUDGET, 
   DRAW_STYLE, EDGE, FINISH, SEP, STAGE_PLAN, FACE_INK, REQUESTED_DRAW_MEDIUM, STYLE_ON, STYLE_INK_DEFAULT, 
   GRAPHITE_PROFILE, OUTLINE_MEDIUM, INK, PENCIL, GRAPHITE, GRAPHITE_AT, SC, W2, H2, N2, PB, paper, INKRES, 
   TARGET_DRAW_EDGE, sourceInkDrawing, drawingCapsFor, OUT_W, OUT_H, base, SHADE, TONE_STAGE, view, framer, 
@@ -106,10 +106,9 @@ if (TONE_STAGE) {
 phaseMark('sheet');
 // Wrap the target and its per-cell maps (--targetguard): planning may read them until TARGET_GUARD.beginPaint()
 // closes them before the first mark. The look gets shape-level means only.
-TARGET_GUARD.provide('px', PX_RAW, { stride: 3 }); TARGET_GUARD.provide('A', ctx.A, { stride: PIGS.length }); if (ctx.AL !== ctx.A) TARGET_GUARD.provide('AL', ctx.AL, { stride: PIGS.length });
-const LOOK_AL = ctx.AL !== ctx.A ? 'AL' : 'A', LOOK_PLAN = COLOUR_BUDGET ? LOOK_AL : 'A';
+TARGET_GUARD.provide('px', PX_RAW, { stride: 3 });
 if (TARGET_GUARD.mode !== 'off') {
-  TARGET_GUARD.register('A', ctx.A); ctx.px = TARGET_GUARD.seal('px', ctx.px); ctx.D_SOURCE = TARGET_GUARD.seal('D_SOURCE', ctx.D_SOURCE); ctx.A = TARGET_GUARD.seal('A', ctx.A); ctx.AL = TARGET_GUARD.seal('AL', ctx.AL); ctx.SRC = TARGET_GUARD.seal('SRC', ctx.SRC);
+  ctx.px = TARGET_GUARD.seal('px', ctx.px); ctx.D_SOURCE = TARGET_GUARD.seal('D_SOURCE', ctx.D_SOURCE); ctx.SRC = TARGET_GUARD.seal('SRC', ctx.SRC);
   // the value plan's per-cell amounts (sh.graded): one amount per shape while painting, so they are closed too
   const sealedG = new Map();
   for (const L2 of ctx.layers) for (const sh of L2.shapes) if (sh.graded && typeof sh.graded === 'object') { if (!sealedG.has(sh.graded)) sealedG.set(sh.graded, TARGET_GUARD.seal('G', sh.graded)); sh.graded = sealedG.get(sh.graded); }
@@ -207,7 +206,7 @@ async function planPenInner(planD0, { first = false, fine = false } = {}) {
   // --drawingfile <base>: the first pen draws a selected drawing whole, in strokes of a person's length, and nothing
   // the walker found (src/paint/methods/drawing-file.mjs)
   // --massbudget cuts the closing pen inside the masses; the opening drawing keeps them unless --masscutfirst 1
-  const cutPen = MASS_BUDGET && (!first || num('masscutfirst', 0) > 0) ? MASS_BUDGET.cutPen : g => g;
+  const cutPen = g => g;
   const SELECTED = cutPen(selectedDrawing({ first, fine, w, h, opt, num, log: console.log, walked: drawn.length, D: DRAW_SOURCE, want: inkWant, cells: CELLS, K, style: DRAW_STYLE, families: VALUE_CONFIG?.families ?? null }));
   let kept = SELECTED ? SELECTED : cutPen(penKeep ? drawn.filter(penKeep) : drawn);
   // --inkskin x0,y0,x1,y1 (sheet fractions): the closing pen keeps off warm skin interiors of the figure in the box. Default off.
@@ -356,6 +355,5 @@ async function planPenInner(planD0, { first = false, fine = false } = {}) {
   return { preparing, PEN, K, graphiteFirst, inkPig, scaled, wantT1, big, peak, inkVerdict, frozenPeak, per, SELECTED, outlines, gestures };
 }
 Object.assign(ctx, { FRAMES, snap, FULL_TAPE, MARKTAPE, AWARE_DIR, RESUME_DIR, RESUME_AT, shoot, WETFRAMES, 
-  PASSFRAMES, WET_STEPS, FILM_BY_PAINT, PEN_FRAMES, LOOK_AL, 
-  LOOK_PLAN, SOURCE_INK });
+  PASSFRAMES, WET_STEPS, FILM_BY_PAINT, PEN_FRAMES, SOURCE_INK });
 }

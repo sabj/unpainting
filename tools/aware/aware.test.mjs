@@ -32,7 +32,7 @@ test('saved state round-trips typed arrays, shared references, Sets, Maps and sp
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
-const ARGS = ['tools/paint-plate.mjs', '--recipe', 'none', '--image', 'bench/v2/targets/hills.png', '--washplan', 'flat:bench/v2/targets/hills.png', '--width', '64', '--scale', '1', '--sheetmm', '80', '--palettewide', '1',
+const ARGS = ['tools/paint-plate.mjs', '--recipe', 'none', '--image', 'bench/v2/targets/hills.png', '--washplan', 'bench/v2/targets/hills.png', '--width', '64', '--scale', '1', '--sheetmm', '80', '--palettewide', '1',
   '--physical', '1', '--shapedmarks', '1', '--drawing', 'both', '--outlinemedium', 'ink',
   '--mode', 'fast', '--marks', '1', '--video', '0', '--targetguard', 'gentle', '--seed', '0', '--gpu', 'off', '--allowdirty', '1',
   // segmentation is not under test: off keeps the run free of the SAM python and checkpoint (src/crop/segment-prep.mjs)
@@ -43,7 +43,7 @@ const run = (args, log) => new Promise(resolve => {
 });
 const writeJson = (f, v) => fs.writeFileSync(f, JSON.stringify(v));
 
-for (const extra of [[], ['--inkres','2','--prepfade','0.5'], ['--inkrecipe','wash','--image','bench/ink-heavy/targets/h34-a.jpg','--washplan','flat:bench/ink-heavy/targets/h34-a.jpg','--inkres','2']]) test(`a painting saved at a passage boundary and taken over by a fresh process ends identical (${extra.join(' ')})`, {
+for (const extra of [[], ['--inkres','2','--prepfade','0.5'], ['--inkrecipe','wash','--image','bench/ink-heavy/targets/h34-a.jpg','--washplan','bench/ink-heavy/targets/h34-a.jpg','--inkres','2']]) test(`a painting saved at a passage boundary and taken over by a fresh process ends identical (${extra.join(' ')})`, {
   // Open fault since the pressure-fed drying flow (claude/033-brush f5f96086): with the edge flow on the taken-over
   // painting's pigment (G, D) differs from the first step after the boundary while its water does not; with
   // --physics edgeEvap=0 the test passes. The edge feed's own unmet demand, solve and pending sums match across the

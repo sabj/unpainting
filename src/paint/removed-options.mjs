@@ -27,6 +27,8 @@ export const REMOVED_OPTIONS = Object.freeze({
 const LAST = 'last at commit 49447027';
 const in04 = (names, why, where, last = LAST) => Object.fromEntries(names.map(k => [k, `removed in 0.4: ${why} (${last}, ${where})`]));
 const REMOVED_IN_04 = Object.freeze({
+  ...in04(['refit', 'planmasses', 'planmassrange', 'figurelayers', 'fwmask', 'figuremassr', 'figuremassrange', 'shaperefit', 'refitfamilies', 'refitmin', 'paperkeep', 'paperchroma', 'shorten', 'shortencurve', 'whitefloor', 'glaze', 'groundpapertone', 'masscutfirst', 'massbudget', 'masscutin', 'massink', 'masspenpad', 'smoothmasschroma', 'smoothmassdensity', 'smoothmassmin', 'smoothmassradius'],
+    'the per-cell pigment fit of the subject (ctx.A) and what only it fed (plan masses, figure layers, the shape refit, paper keep, range shortening, the white floor, the ground-paper tone, the mass budget) are gone: a wash\'s mix is chosen for its shape as a whole from one colour', 'tools/plate/plan.mjs', 'last at commit 3d606fa2'),
   ...in04(['touchpoints', 'touchbroad', 'touchthrough', 'touchdmin', 'touchfamilies', 'touchmincells', 'touchsmoothmm', 'touchlinepad', 'finishsnaps'],
     'the touch-up rounds glazed each planning family toward the subject\'s colour after a look, a correction loop', 'src/paint/methods/touch-up.mjs, tools/plate/paint.mjs'),
   ...in04(['finaldarks', 'fdquantile', 'fdmin', 'fdcontrast', 'fdsurroundmm', 'fdminmm2', 'fdtilemm', 'fddmin', 'fdgain'],

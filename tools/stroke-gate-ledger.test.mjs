@@ -56,7 +56,7 @@ test('soft planned edges no longer hide every broad wash from the gate; hard edg
   assert.equal(summarize(normalize(tape), { plan, commands }).composition.broadAreasMeasured, false);
 });
 
-const ARGS = ['tools/paint-plate.mjs', '--recipe', 'none', '--image', 'bench/v2/targets/hills.png', '--washplan', 'flat:bench/v2/targets/hills.png', '--width', '64', '--scale', '1', '--sheetmm', '80', '--palettewide', '1',
+const ARGS = ['tools/paint-plate.mjs', '--recipe', 'none', '--image', 'bench/v2/targets/hills.png', '--washplan', 'bench/v2/targets/hills.png', '--width', '64', '--scale', '1', '--sheetmm', '80', '--palettewide', '1',
   '--physical', '1', '--drawing', 'both', '--outlinemedium', 'ink',
   '--mode', 'fast', '--video', '0', '--targetguard', 'gentle', '--seed', '0', '--gpu', 'off', '--allowdirty', '1',
   // segmentation is not under test: off keeps the run free of the SAM python and checkpoint (src/crop/segment-prep.mjs)

@@ -11,7 +11,7 @@
     "test": "node --test --test-timeout=300000 \"src/**/*.test.mjs\" \"tools/**/*.test.mjs\"",
     "example": "node tools/run-plan.mjs examples/plans/graded-wash.json",
     "example:portrait": "node tools/paint-plate.mjs --image examples/targets/sargent-a-tramp.jpg --washplan examples/studies/sargent-a-tramp-study.png --drawing none --width 360 --mode fast --out work/sargent-a-tramp",
-    "example:animal": "node tools/paint-plate.mjs --image examples/targets/tiepolo-punchinello-camel.jpg --drawingfile examples/drawings/tiepolo-punchinello-camel --washplan examples/studies/tiepolo-punchinello-camel-study.png --inkrecipe wash --width 360 --sheetmm 152.4 --mode fast --strict 0 --out work/tiepolo-punchinello-camel",
+    "example:animal": "node tools/paint-plate.mjs --image examples/targets/tiepolo-punchinello-camel.jpg --drawingfile examples/drawings/tiepolo-punchinello-camel --washplan examples/studies/tiepolo-punchinello-camel-study.png --inkrecipe wash --width 360 --sheetmm 152.4 --mode fast --out work/tiepolo-punchinello-camel",
     "example:plan": "node tools/run-plan.mjs examples/plans/graded-wash.json",
     "bench:score": "node bench/scripts/score.mjs",
     "bench:build": "node bench/scripts/build-results.mjs && node bench/scripts/build-leaderboard.mjs && node bench/scripts/build-findings.mjs && node bench/scripts/build-chart.mjs && node bench/scripts/build-overview.mjs && node bench/scripts/build-rounds-table.mjs",

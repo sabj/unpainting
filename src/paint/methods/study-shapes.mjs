@@ -1,6 +1,7 @@
 // Shape helpers of the study wash plan (study-washes.mjs): a brush-rounded mask and a stable k-means. Planning only.
 
-function dilate(m, w, h, r) {
+/** The mask grown by a disc of radius r cells. */
+export function dilate(m, w, h, r) {
   if (r <= 0) return Uint8Array.from(m);
   const a = new Float32Array(m.length), b = new Uint8Array(m.length), r2 = r * r;
   // a disc: rows by run, then the disc's half-chords

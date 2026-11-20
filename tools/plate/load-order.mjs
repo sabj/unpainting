@@ -114,7 +114,6 @@ import '../../src/paint/drawing-plan.mjs';
 import '../../src/paint/methods/ink-res.mjs';
 import '../../src/paint/methods/mop-lanes.mjs';
 import '../../src/crop/segment-prep.mjs';
-import '../../src/paint/methods/mass-budget.mjs';
 import '../../src/paint/methods/stroke-budget.mjs';
 import '../../src/paint/methods/practice-style.mjs';
 import '../guard/no-target.mjs';
