@@ -32,6 +32,7 @@ LVL, LVL_FAINT = .5, .45
 # the edges between solid black and paper in the drawings the image model returns: 0.79 to 0.86. Most of it is
 # taken out: with all of it out a soft grey line (chalk, pencil) turns into a hard black hairline
 PSF = .7
+PSF_SOFT = .4   # for a pencil drawing
 
 def smooth_ring(r, sigma):
     n = len(r)
@@ -106,10 +107,12 @@ def build(drawing, lines_doc, sheet_mm, zoom=4, ink=.06, orphan_mm=.6, sigma=.6,
     if (lines_doc['image']['w'], lines_doc['image']['h']) != (w0, h0): raise SystemExit('ink-vectors: the line file is not on the drawing\'s grid')
     W, H = w0 * zoom, h0 * zoom; px = sheet_mm / W   # mm per grid pixel
     Z = zoom / 2   # lengths below are in pixels of a twice-enlarged grid
-    a = deblur(cv2.resize(darkness(bgr), (W, H), interpolation=cv2.INTER_CUBIC).clip(0, 1), psf * zoom)
+    a = cv2.resize(darkness(bgr), (W, H), interpolation=cv2.INTER_CUBIC).clip(0, 1)
     # a light drawing (pencil, whose firmest line is grey) is fitted on its own scale: the shapes are found as if its
-    # firmest line were black, and each stroke keeps its real darkness
+    # firmest line were black, and each stroke keeps its real darkness. Its line is soft of itself (graphite): less of the
+    # softness is taken out (PSF_SOFT), or its shading comes out as hard rims
     firm = float(np.percentile(a[a > .02], 99)) if (a > .02).any() else 1.0
+    a = deblur(a, (psf if firm >= .6 else min(psf, PSF_SOFT)) * zoom)
     gain = 1 / firm if firm < .6 else 1.0
     a = np.clip(a * gain, 0, 1)
     inkm = a > ink
@@ -293,6 +296,19 @@ def build(drawing, lines_doc, sheet_mm, zoom=4, ink=.06, orphan_mm=.6, sigma=.6,
                         wid = np.where(on, wid, 0)
                         path = np.round((C + [x0 - 1, y0 - 1] + .5) * px, 3); widths = np.round(wid * px, 3).tolist(); drawn = 'path'
             if drawn: rec = {**rec, 'drawn': drawn}
+            # SHADING: the stroke's own ink paler than its edge level (soft tone beside a pencil line, a pale wash by a dark
+            # one) is a piece of its own at its own grey, laid just before the stroke: shading stays shading and is not lost
+            if len(parts) == 1 and not fill:
+                inner = f[1:-1, 1:-1]; pale = own & (inner >= 2 * ink) & (inner < lvl)
+                if drawn: pale &= ~(cv2.dilate(S[1:-1, 1:-1], np.ones((int(2 * Z) + 1,) * 2, np.uint8)) > 0)
+                kz = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (int(Z) * 2 + 1,) * 2); pale = (cv2.dilate(cv2.erode(pale.astype(np.uint8), kz), kz) > 0) & pale
+                if pale.sum() >= 12 * Z * Z:
+                    g_ = float(np.median(inner[pale])); fs = np.pad(np.where(cv2.dilate(pale.astype(np.uint8), np.ones((3, 3), np.uint8)) > 0, cv2.GaussianBlur(np.minimum(inner, lvl), (0, 0), .4 * Z), 0), 1); shade = []
+                    for c in find_contours(fs, .5 * g_):
+                        if len(c) < 4 or not np.allclose(c[0], c[-1]): continue
+                        c = simplify_ring(smooth_ring(c[:-1] - 1 + [y0, x0], .6 * Z), .1 * Z)
+                        if len(c) >= 3 and abs(ring_area(c)) >= 2 * Z * Z: shade.append(np.round(edge_ring(c), 3).tolist())
+                    if shade: strokes.append({**{k_: v_ for k_, v_ in rec.items() if k_ not in ('drawn', 'rest')}, 'seq': rec['seq'] - .005, 'dark': round(g_ / gain, 3), 'path': np.round(path, 3).tolist(), 'widths': [], 'outline': shade, 'piece': 'shade'})
             if not rings: continue
             strokes.append({**rec, 'seq': rec['seq'] + .01 * n_, 'dark': round(tone, 3), 'path': np.round(path, 3).tolist(), 'widths': widths, 'outline': rings, **({'piece': ['grey', 'black'][n_]} if len(parts) > 1 else {})})
     strokes.sort(key=lambda s: s['seq'])
