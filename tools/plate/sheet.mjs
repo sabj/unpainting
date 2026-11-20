@@ -11,7 +11,8 @@ import {drawFineMaterial, drawOnFineSheet, fineGestures} from '../../src/paint/m
 import {createDeliveryCal} from '../../src/paint/methods/delivery-cal.mjs';
 import {drawMaterial, sourceDrawingCaps} from '../../src/paint/methods/material-profiles.mjs';
 import {planLightToDark, valueTechnique} from '../../src/paint/methods/light-to-dark.mjs';
-import {planFairWashes} from '../../src/paint/methods/fair-wash.mjs';
+import {planThingWashes} from '../../src/paint/methods/thing-washes.mjs';
+import {loadThings} from '../../src/paint/methods/thing-labels.mjs';
 import {washStrokeHold} from '../../src/paint/methods/wash-strokes.mjs';
 import {smallestBrushMm} from '../../src/paint/methods/light-reserves.mjs';
 import {roleBrushMm,roleBrushPointMm,washKitMm} from '../../src/paint/methods/brush-footprint.mjs';
@@ -267,14 +268,16 @@ if(VALUE_ENABLED){
  const DETAIL_SEG = num('detailseg',0)>0 && opt('image','') ? await (async () => { const { hasSegments, loadSegments } = await import('../../src/crop/segments.mjs'); const b = path.basename(opt('image',''), path.extname(opt('image',''))); return hasSegments(b) ? loadSegments(b, w, h) : null; })() : null;
   const valueOptions={paperRule:PAPER_RULE,calibratedPlan:CALIBRATED_PLAN,ownSwatch:true,smallLightMax:num('smallmarklights',120),detailScale:num('detailscale',0),detailSegments:DETAIL_SEG,layerLocal:num('layerlocal',0)>0,smallMarks:num('smallmarks',0)>0,smallIsolationMm:num('smallisolation',0),washJoin:num('washjoin',0)>0,bandRound:num('bandround',0)>0,valueFloor:opt('valuefloor','')||null,strokePlan:num('strokeplan',0)>0,laneMm:opt('lanemm','')==='auto'?0:num('lanemm',6),laneAdapt:num('laneadapt',0)>0,strokeMm:num('strokemm',30),washReachMm:num('washreach',0),edgeWobbleMm:num('edgewobble',0),shadowThresh:num('shadowthresh',.38),shadowWater:num('shadowwater',0),skyOneLayer:num('skyonelayer',0)>0,minShapeCells:num('minshapecells',0),cellFamilies:num('cellfamilies',VALUE_CONFIG?.view?.wholeOf?1:0)>0,paperRel:num('paperrel',0)>0,paperLights:num('paperlights',0)>0,paperDelta:opt('paperdelta','')?num('paperdelta',10):null,accentShare:num('accentshare',0),accentMin:num('accentmin',.55),layerSmoothMm:num('layersmooth',0),floorBrushMm:roleBrushMm(root,'floor',{brushes:opt('brushes','src/paint/brushes.json'),name:opt('floorbrush','')}),detailPointMm:roleBrushPointMm(root,'detail',{brushes:opt('brushes','src/paint/brushes.json')}),styleGain:num('stylegain',1),skySplit:num('skysplit',0)>0,layerTexture:num('layertexture',0)>0,edgeFadeMm:num('edgefade',0),layerHue:num('layerhue',0)>0,layers:num('midlayers',0),layerIncrement:num('layerincrement',0)>0,pigShare:num('pigshare',0),hueChroma:num('huechroma',0),hueChromaLab:num('huechromalab',0)>0,shadowFamilies:num('shadowfamilies',0)>0,passCap:num('passcap',0),carryMm:num('carrymm',0),holeFill:num('holefill',0),keepMask:num('carrykeep',0)>0,maskMm:num('maskmm',0),paleLights:num('palelights',0),lightFamilies:num('lightfamilies',0)>0,laneMax:num('lanemax',0),nestedBands:num('nestedbands',CALIBRATED_PLAN?1:0)>0,cellLight:num('celllight',CALIBRATED_PLAN?1:0)>0,massTone:num('masstone',CALIBRATED_PLAN?1:0)>0,nested:num('nestedmid',0)>0,midDomains:num('middomain',1)>0,brushChoice:num('brushchoice',0)>0,shaped,pigments:PIGS,subject:VALUE_CONFIG?.subject,styleSelection:VALUE_CONFIG?.styleSelection,demand:ctx.AL,k:PIGS.length,density:ctx.SRC,w,h,rgb:ctx.px,paperRGB,hold:ctx.FUR_HOLD,paleHold:WHITE_HOLD,families:VALUE_CONFIG?.families??MAJOR_INTENT?.families??[],reserves:VALUE_CONFIG?.reserves??[],smallestBrushMm:smallestBrushMm(JSON.parse(fs.readFileSync(path.join(root,opt('brushes','src/paint/brushes.json')),'utf8'))),sheetWidthMm:num('sheetmm', DEFAULT_SHEET_MM)};
 
- // The wash plan (fair-wash.mjs): puddles and whole shapes. A plan that names a style (ink and wash, the wet styles) still
+ // The wash plan (thing-washes.mjs): puddles and whole shapes. A plan that names a style (ink and wash, the wet styles) still
  // takes the older value plan, whose style profiles the wash plan does not read yet; that path goes when they are ported.
  valueOptions.washBrushMm=roleBrushMm(root,'shape',{brushes:opt('brushes','src/paint/brushes.json')});valueOptions.washKitMm=washKitMm(root,{brushes:opt('brushes','src/paint/brushes.json')});valueOptions.pointBrushMm=roleBrushMm(root,'detail',{brushes:opt('brushes','src/paint/brushes.json')});
  // the things of the picture, for the wash plan's first shapes: the run's segment map on the sheet's cells
  if(ctx.SEGMENTS_RECORD?.stem&&opt('image','')){const {registerSegments,loadSegments}=await import('../../src/crop/segments.mjs');const base=path.basename(opt('image'),path.extname(opt('image')));registerSegments(base,ctx.SEGMENTS_RECORD.stem);valueOptions.segments=(await loadSegments(base,w,h)).labels;}
  // under an ink drawing (the ink-and-wash recipe) the washes stay broad: the line carries the structure
  valueOptions.drawn=opt('inkrecipe','none')==='wash'&&opt('drawing','first')!=='none';
- const planValues=valueOptions.styleSelection?planLightToDark:planFairWashes;
+ // the things a local vision model named in the subject, with rough boxes (thing-labels.mjs)
+ {const t=loadThings(opt('image',''));valueOptions.things=t.things;console.log(t.file?`named things: ${t.things.length} from ${path.basename(t.file)} (${t.model})`:'named things: none for this subject; each SAM region is a thing');}
+ const planValues=valueOptions.styleSelection?planLightToDark:planThingWashes;
  const valueStarted=performance.now();
  if(SPEED_VALUE_CACHE){
   const saved=await cachedStep({...RUN_CACHE,name:'value-plan',code:CODE_HASH,track:optTrack,inputs:valueOptions},async()=>({plan:planValues(valueOptions),demand:valueOptions.demand}));

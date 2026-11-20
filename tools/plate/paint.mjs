@@ -508,7 +508,7 @@ for (let L = L_START; L < (PENWASH ? 0 : ctx.layers.length); L++) {
     if (!paths.length) { used['touch-up too small, left'] = (used['touch-up too small, left'] || 0) + 1; continue; }
     touchSmall = true; used['touch-up small brush'] = (used['touch-up small brush'] || 0) + 1;
   }
-  // A wash of the wash plan (fair-wash.mjs) is a whole shape laid in sweeps. One no sweep fits is left and counted: it gets
+  // A wash of the wash plan (thing-washes.mjs) is a whole shape laid in sweeps. One no sweep fits is left and counted: it gets
   // no touch placed at its centroid.
   if (vectorPaths) { used['unclipped wash strokes'] = (used['unclipped wash strokes'] || 0) + paths.length; }
   if (!paths.length && sh._valuePlan?.mixId != null) { used['wash no sweep fits, left'] = (used['wash no sweep fits, left'] || 0) + 1; ctx.dropped++; ctx.droppedMass += sh.amount * sh.area; continue; }
@@ -833,7 +833,7 @@ for (let L = L_START; L < (PENWASH ? 0 : ctx.layers.length); L++) {
   // round of the kit that fits inside the shape and is no wider than the passage's own brush (--softmm caps its width), so a
   // shape narrower than the finest round keeps its dry edge. A soft cell within one brush of a hard cell of the passage or
   // of a reserved light is left as cut. --softsplit 0 and a plan's soften:false turn it off.
-  // A wash plan's soft boundary (fair-wash.mjs: decided once for the boundary between two shapes) is made with the brush: a
+  // A wash plan's soft boundary (thing-washes.mjs: where a graded polygon's halves meet) is made with the brush: a
   // clean damp round, the smallest wash brush, run along that part of the outline while the wash is wet.
   if (vectorPaths && paths.length && sh._valuePlan.softEdges?.length) {
     const rS = Math.max(SC, sh._valuePlan.strokes.reduce((a, st) => Math.min(a, st.radiusMm), Infinity) * CELLS_PER_MM);

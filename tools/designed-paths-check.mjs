@@ -23,7 +23,7 @@ export function checkDesignedPaths(folder, { registry = read(registryFile), logF
   const ranMedium = opts.get('subjectmedium');
   const checks = {
     'subject-medium': () => jsonEvidence('run-card.json', c => ['none', 'pencil'].includes(ranMedium) && (!expectedMedium || ranMedium === expectedMedium) && c.drawing?.medium !== 'ink', c => ({ expectedMedium, subjectMedium: ranMedium, drawingMedium: c.drawing?.medium })),
-    // the wash plan (fair-wash.mjs) states its own join rule: a shape under the least wash joins a neighbour
+    // the wash plan (thing-washes.mjs) states its own join rule: a shape under the least wash joins a neighbour
     'small-marks': () => opts.get('washjoin') === '1' && (line(/^small marks: \d+ small lights reserved, \d+ small darks laid once, last/) || line(/^washes: \d+ over \d+ stages; least wash [\d.]+ mm2/)),
     'wash-rules': () => jsonEvidence('pipeline-plan.json', d => d.plan?.washes?.colour && opts.get('huechroma') === '30' && opts.get('lightfamilies') === '1', d => ({ washes: d.plan.washes, huechroma: opts.get('huechroma'), lightfamilies: opts.get('lightfamilies') })),
     'brush-lanes': () => jsonEvidence('designed-execution.json', d => d.laneStrokes > 0 || d.brushChoiceStrokes > 0),
