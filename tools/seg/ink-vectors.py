@@ -225,7 +225,7 @@ def is_fill(stroke, width_mm=.5, area_mm2=1.5):
     rings = stroke['outline']; a = abs(sum(ring_area(r) for r in rings))
     per = sum(float(np.hypot(*np.diff(np.vstack([r, r[:1]]), axis=0).T).sum()) for r in map(np.asarray, rings))
     w = 2 * a / max(per, 1e-9); L = per / 2
-    return L < 4 * w and (w > width_mm or (a > area_mm2 and w > .8 * width_mm))
+    return L < 5 * w and (w > width_mm or (a > area_mm2 and w > .8 * width_mm))
 
 
 def render_vectors(doc, width, upto=None, ss=4, fill=1.0, band_mm=.2):

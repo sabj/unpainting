@@ -53,12 +53,12 @@ const ringLength = r => { let L = 0; for (let k = 0, n = r.length; k < n; k++) {
 /**
  * A FILL (a leaf mass, a dark pane, a blot), not a LINE: its ink (outer rings less holes) is wider than `widthMm` (twice its
  * area over its perimeter, the width of a strip) or covers over `areaMm2` and is over 0.8 of that wide, and is COMPACT:
- * under four widths long. Anything longer than four widths is a line at any width (a thick branch is laid whole). Same rule as tools/seg/ink-vectors.py is_fill.
+ * under four widths long (half its perimeter under five widths). Anything longer is a line at any width (a thick branch is laid whole). Same rule as tools/seg/ink-vectors.py is_fill.
  */
 export function isFill(stroke, widthMm = 0.5, areaMm2 = 1.5) {
   const a = Math.abs(stroke.outline.reduce((t, r) => t + ringArea(r), 0)), per = stroke.outline.reduce((t, r) => t + ringLength(r), 0);
   const w = 2 * a / Math.max(per, 1e-9), L = per / 2;
-  return L < 4 * w && (w > widthMm || (a > areaMm2 && w > 0.8 * widthMm));
+  return L < 5 * w && (w > widthMm || (a > areaMm2 && w > 0.8 * widthMm));
 }
 
 const pathLength = P => P.reduce((t, q, k) => (k ? t + Math.hypot(q[0] - P[k - 1][0], q[1] - P[k - 1][1]) : 0), 0);
