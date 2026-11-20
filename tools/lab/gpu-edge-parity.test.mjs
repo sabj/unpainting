@@ -31,14 +31,17 @@ async function runGpu(dev, opts) {
   return sheet;
 }
 
-test('the lab WebGPU sheet and its CPU sheet dry a blob rim to the same water, and the edge rule matters', async t => {
+// The CPU sheet's pinned edge is now the pressure-fed drying flow (src/media/edge-feed.mjs), which the lab's WGSL does
+// not have: its kernels still dry the rim by the 0.3.1 local dry-fraction rule. So the two are compared with the edge
+// flow off (edgeEvap 0) and on level paper (slope 0, which the lab's kernels refuse), until the port.
+const LEVEL = { edgeEvap: 0, slope: 0 };
+test('the lab WebGPU sheet and its CPU sheet dry a blob to the same water with the edge flow off', async t => {
   const dev = await device();
   if (!dev) return t.skip('no WebGPU adapter');
-  const cpu = blob(); for (let i = 0; i < STEPS; i++) step(cpu, { ...DEFAULTS, mmPerCell: 0.3 });
-  const gpu = await runGpu(dev, {}), off = await runGpu(dev, { edgeFlowDepth: 0 });
-  const match = worst(cpu.W, gpu.W), withoutRule = worst(cpu.W, off.W);
-  t.diagnostic(`max water difference CPU vs GPU ${match}; CPU vs GPU with edgeFlowDepth 0: ${withoutRule}`);
+  const cpu = blob(); for (let i = 0; i < STEPS; i++) step(cpu, { ...DEFAULTS, ...LEVEL, mmPerCell: 0.3 });
+  const gpu = await runGpu(dev, LEVEL);
+  const match = worst(cpu.W, gpu.W);
+  t.diagnostic(`max water difference CPU vs GPU ${match}`);
   assert.ok(match < 2e-3, `GPU and CPU water differ by ${match}`);
-  assert.ok(withoutRule > match * 3, `the edge-depth term must change the result (${withoutRule} vs ${match})`);
   dev.destroy();
 });
