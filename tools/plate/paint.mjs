@@ -3,6 +3,8 @@
 import {invalidatePaperCertificate} from '../../src/media/paper-certificate.mjs';
 import {EpochCells} from '../../src/paint/epoch-cells.mjs';
 import {check} from '../../src/media/checks.mjs';
+import {createScriptColourCheck} from '../painter/script-colour-check.mjs';
+import {inkMoved, INK_MOVED_MOST} from '../../src/paint/methods/ink-held.mjs';
 import {splitLoadsFeathered} from '../../src/paint/methods/brushes.mjs';
 import {passageBrushPaths, attachPlaneRamp as attachRampToPaths, planeRampApplies} from '../../src/paint/methods/passage-brush.mjs';
 import {shapeMix} from '../../src/paint/methods/wash-weights.mjs';
@@ -197,6 +199,25 @@ if (TECH_CAL && L_START === 0) {
   if (ONSHEET) for (let k = 0; k < ONSHEET.length; k++) initialHeld += ONSHEET[k];
   TECH_CAL.observe(initialHeld);
 }
+// a painting script's passages: planned colour against what the plate lays, measured on the next dry sheet (script-colour-check.mjs)
+const SCRIPT_CHECK = ctx.VALUE_PLAN?.summary?.source === 'painting script' ? createScriptColourCheck({ out, w, SC, W2 }) : null;
+// the pen is set before any wash: the ink's whole thickness (every dried layer and what is wet, never the top layer
+// alone, which empties at each dry) is held as it was before the first wash, and once the sheet is next dry the first
+// wash must have moved none of it out of its cells (ink-held.mjs); more than INK_MOVED_MOST stops the run
+let INK_HOLD = null;
+if (ctx.VALUE_PLAN && L_START === 0) {
+  const before = Float32Array.from(thickness(ctx.sheet)[PIGS.length] ?? []); let t = 0; for (let i = 0; i < before.length; i++) t += before[i];
+  if (t > 0) INK_HOLD = { before, checked: false };
+  else if (INKRES) console.log(`INK HELD NOT CHECKED: the pen is on its own fine sheet (--inkres ${INKRES.N}), which no wash touches; nothing on the painting sheet to hold`);
+  else console.log('ink held: no pen on the sheet before the first wash; nothing to check');
+}
+const checkInkHeld = when => {
+  if (!INK_HOLD || INK_HOLD.checked) return;
+  const r = inkMoved(INK_HOLD.before, thickness(ctx.sheet)[PIGS.length]); INK_HOLD.checked = true;
+  console.log(`ink held: the first wash moved ${(100 * r.moved).toFixed(2)}% of the pen's ink out of its cells, ${(100 * r.lost).toFixed(2)}% off the sheet (${when})`);
+  fs.writeFileSync(path.join(out, 'ink-held.json'), JSON.stringify({ moved: r.moved, lost: r.lost, most: INK_MOVED_MOST, when }));
+  if (r.moved > INK_MOVED_MOST) throw Error(`the first wash moved ${(100 * r.moved).toFixed(1)}% of the pen's ink (most ${100 * INK_MOVED_MOST}%): the pen was not set before the washes (--inkfast) or was still wet`);
+};
 for (let L = L_START; L < ctx.layers.length; L++) {
   const layer = ctx.layers[L];
   colourMass('before-pass', {pass:L+1,value:layer.value,pigment:layer.pigment});
@@ -239,7 +260,7 @@ for (let L = L_START; L < ctx.layers.length; L++) {
   const TRACE_MASS = opt('trace', '0') !== '0' ? thicknessTotals(ctx.sheet) : null;
   // The plan's move is final: every passage comes from the wash plan (valueTechnique). No switch replaces a planned move.
   let T = valueTechnique(sh._valuePlan);
-  if(sh._valuePlan){ctx.VALUE_ACTIVE=sh._valuePlan;const inSession=WASH_SESSION>0&&ctx.WASH_LAST&&(ctx.WASH_LAST.L===L||(WASH_SESSION>1&&sameWash(ctx.WASH_LAST.layer,layer)));ctx.WASH_LAST={L,layer};if(!inSession)ctx.VALUE_OWN_CONTACT.clear();if(!T.intoWet&&!inSession){clock('dry',()=>dry(ctx.sheet,30000,O,{levelMax:140,dt:2}));const base=measurePaperDry(ctx.sheet);JSONL.append(path.join(out,'value-commands.jsonl'),JSON.stringify({kind:'dry-base',intent:ctx.VALUE_ACTIVE.id,paper:base})+'\n');check('target-value pass needs fully dry base',base.dry,{intent:ctx.VALUE_ACTIVE.id,waterMax:base.waterMax,saturationMax:base.saturationMax});}}
+  if(sh._valuePlan){ctx.VALUE_ACTIVE=sh._valuePlan;const inSession=WASH_SESSION>0&&ctx.WASH_LAST&&(ctx.WASH_LAST.L===L||(WASH_SESSION>1&&sameWash(ctx.WASH_LAST.layer,layer)));ctx.WASH_LAST={L,layer};if(!inSession)ctx.VALUE_OWN_CONTACT.clear();if(!T.intoWet&&!inSession){clock('dry',()=>dry(ctx.sheet,30000,O,{levelMax:140,dt:2}));const base=measurePaperDry(ctx.sheet);if(L>L_START&&base.dry)checkInkHeld('the next dry sheet');if(SCRIPT_CHECK?.pending&&base.dry)SCRIPT_CHECK.measure(render(),'next dry sheet');JSONL.append(path.join(out,'value-commands.jsonl'),JSON.stringify({kind:'dry-base',intent:ctx.VALUE_ACTIVE.id,paper:base})+'\n');check('target-value pass needs fully dry base',base.dry,{intent:ctx.VALUE_ACTIVE.id,waterMax:base.waterMax,saturationMax:base.saturationMax});}}
   // one passage for the dry-paper gate: its reach is looked over once, before its first lane (passage-dry-gate.mjs)
   ctx.VALUE_PASSAGE = sh._valuePlan ? {} : null;
   // what this passage's own instrument delivers on scrap (instrument-cal.mjs); the charge below is divided by it
@@ -293,8 +314,6 @@ for (let L = L_START; L < ctx.layers.length; L++) {
   // A lane is swept with a flat; every other stroke of a wash is a round's (its footprint a disc, as the plan counts it).
   // a wash plan's strokes are a list of laid strokes (layered-washes.mjs), each charged at its own share of the mix (a
   // graded wash: water added at each recharge); a light-to-dark plan's are a count and lane widths for its stroke plan
-  // a wash plan's first washes are divided by at most this much for the paper their lanes reach past the outline
-  const FIRST_SPREAD_MOST = 1.5;
   const vectorPaths = Array.isArray(sh._valuePlan?.strokes) ? sh._valuePlan.strokes.map(st => { const round = st.kind !== 'lane' && !st.flat, r = round || st.flat ? Math.max(SC, st.radiusMm * CELLS_PER_MM) : brushFor(st.radiusMm * CELLS_PER_MM); const path = st.points.map(q => ({ x: q[0] * CELLS_PER_MM, y: q[1] * CELLS_PER_MM, r: q[4] != null ? Math.max(0.5, r * q[4]) : r, p: q[2] ?? 1, round, ...(q[3] > 0 ? { v: q[3] } : {}), ...(st.angle != null ? { blade: st.held === 'fixed' ? st.angle - 90 : st.angle } : {}) })); if (st.charge) PATH_FACTOR.set(path, st.charge); if (st.held === 'fixed' || st.water != null) PATH_HAND.set(path, { fixed: st.held === 'fixed', water: st.water ?? 1 }); return path; }) : null;
   const shapedPaths = vectorPaths ? vectorPaths : sh._valuePlan?.shaped ? (sh._strokePlan ? strokePlanPaths(sh) : attachPlaneRamp(rawShapedPaths())) : null;
   let detail = !sh._valuePlan && through > num('detailfrom', 2);
@@ -517,9 +536,7 @@ for (let L = L_START; L < ctx.layers.length; L++) {
     // the film the plan asks for over every place the brush goes, and a glaze run a little past its outline is a little
     // larger, not thinner. Spread over the paper past the study's cells, marks dried 30 to 45 L* pale and four glazes
     // planned to L* 31 left a window at L* 63 to 79.
-    // (a first wash's lanes, run a little past the outline to meet its neighbours, keep a share of the divisor: at full
-    // strength over a wide overrun they laid more than the plan's forms on a coarse sheet; glazes and marks keep none)
-    if (sh._spread == null) sh._spread = detail || brush.model !== 'section' ? 1 : vectorPaths ? (sh._valuePlan?.stage <= 2 ? Math.min(FIRST_SPREAD_MOST, Math.max(1, footprintSpread(paths, up(MASK), W2, H2))) : 1) : Math.max(1, footprintSpread(paths, up(MASK), W2, H2));
+    if (sh._spread == null) sh._spread = detail || brush.model !== 'section' || vectorPaths ? 1 : Math.max(1, footprintSpread(paths, up(MASK), W2, H2));
     sh.laidShare = opening;
     // see GRADED_CAL: the whole scrap's delivery, less what runs past this passage's own open edge (in sheet cells)
     if (useGradedCal && sh._gcal == null) {
@@ -745,6 +762,7 @@ for (let L = L_START; L < ctx.layers.length; L++) {
   }
   if(ctx.VALUE_PLAN){const next=ctx.layers[L+1];if(!next||next.value!==layer.value){ctx.VALUE_ACTIVE=null;fs.writeFileSync(path.join(out,'value-executed-counts.json'),JSON.stringify({scope:'all actual value-pass stroke calls and summed observed footprint contact cells; includes clean water and finite reloads',bands:VALUE_COUNTS,total:VALUE_COUNTS.reduce((a,b)=>({strokes:a.strokes+b.strokes,contacts:a.contacts+b.contacts}),{strokes:0,contacts:0})},null,2));const bandRgb=Buffer.from(render());PENDING_IO.push(sharp(bandRgb,{raw:{width:W2,height:H2,channels:3}}).png().toFile(path.join(out,'value-band-'+layer.value+'-dried.png')));}}
   // Nothing after a pass reads its passages again (the ledger holds what it laid), so its sheet-sized fields are freed.
+  SCRIPT_CHECK?.queue(layer);
   for (const sh of layer.shapes) { sh.mask = null; sh.graded = null; sh._prewet = null; sh._brushMask = null; sh.ids = null; }
   layer.mask = null; layer.ids = null;
   // Playback gets a frame at every value-band boundary (the band complete and dried) and at the end of each touch-up
@@ -778,6 +796,7 @@ for (let L = L_START; L < ctx.layers.length; L++) {
 if (TECH_CAL) { console.log(`technique calibration: ${TECH_CAL.history().length} reads; charge factors ${JSON.stringify(Object.fromEntries(Object.entries(TECH_CAL.factors()).map(([k, v]) => [k, +v.toFixed(2)])))}`); fs.writeFileSync(path.join(out, 'technique-cal.json'), JSON.stringify({ kind: 'sheet gain against ledger charge, per technique; no target reads', history: TECH_CAL.history() }, null, 1)); }
 if (DELIVERY) { const hst = DELIVERY.history(); console.log(`delivery calibration: ${hst.length} reads; kept of charge ${JSON.stringify(hst.at(-1)?.kept ?? [])}; charge factors ${DELIVERY.factors().map(v => v.toFixed(2)).join(', ')}`); fs.writeFileSync(path.join(out, 'delivery-cal.json'), JSON.stringify({ kind: 'sheet against ledger, per pigment; no target reads', history: hst }, null, 1)); }
 if (FEEDBACK_LAG) console.log(`feedback: ${feedbackStats.read} passes read the sheet, ${feedbackStats.predicted} predicted it from the last read and the ledger`);
+if (SCRIPT_CHECK) { if (SCRIPT_CHECK.pending) { clock('dry', () => dry(ctx.sheet, 30000, O, { levelMax: 140, dt: 2 })); SCRIPT_CHECK.measure(render(), 'end, dried'); } SCRIPT_CHECK.finish(); }
 colourMass('ladder-finished');
 if (COLOUR_TRACE) await sharp(render(), {raw:{width:W2,height:H2,channels:3}}).png().toFile(path.join(out,'colour-before-dry.png'));
 Object.assign(ctx, { awareProvenance, awareBoundary });

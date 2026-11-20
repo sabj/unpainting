@@ -149,6 +149,11 @@ The painter maps the image box onto the target (`src/paint/methods/drawing-regis
 
 The painter does not read this file yet. `bench/v6/plan-args.mjs` turns it into painter options. The model chooses the medium, the ink level it asks the drawing model for, the studies for each layer with their least size and glaze, the paints, and when to stop.
 
+## Painting script
+
+`--washplan script:FILE.json` takes the washes from a painting script, a list of passages written by a planning model
+(what, where, paint, brush, move, mark, charges, what it goes into). See [painting-script.md](painting-script.md).
+
 ## Value plan file
 
 `--valueplan FILE` reads a JSON object. It does not supply washes; the washes come from the studies. `src/paint/plan-keys.mjs` lists every key the painter reads, and a key nothing reads makes the run log `UNUSED PLAN KEYS`, write `unused-plan-keys.txt` and exit 3 after its outputs (`--allowunusedplan 1` keeps exit 0).
