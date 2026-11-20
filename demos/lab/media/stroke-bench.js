@@ -14,9 +14,11 @@ import { MATERIAL_PROFILES } from './drawing-materials.js';
 
 export const CELL_SIZES_MM = Object.freeze([0.25, 0.1, 0.05]);
 const INK = MATERIAL_PROFILES['sepia-ink'], GRAPHITE = MATERIAL_PROFILES['graphite-HB'];
-// The sheet's channels: the wash pigment (the caller's), the sepia ink and HB graphite.
+// The sheet's channels: the wash pigment, the sepia ink, HB graphite, then the four glaze colours (yellow, green, cyan,
+// rose), all the caller's but the ink and graphite.
 export const WASH = 0, INK_AT = 1, GRAPHITE_AT = 2;
-export const benchPigments = wash => [wash, INK.pigment, GRAPHITE.pigment];
+const GLAZE_AT = { yellow: 3, green: 4, cyan: 5, rose: 6 };
+export const benchPigments = (wash, glaze) => [wash, INK.pigment, GRAPHITE.pigment, glaze.yellow, glaze.green, glaze.cyan, glaze.rose];
 
 // Papers as the painter's paper model draws them. Lengths in the model are cells; `scale` keeps fibres and tooth the same
 // size in millimetres at a finer cell, as Paint Lab's papers do above 120 dpi.
@@ -25,7 +27,7 @@ export const BENCH_PAPERS = Object.freeze({
   cold: Object.freeze({ name: 'cold press', model: {} }),
   rough: Object.freeze({ name: 'rough', model: { fibres: 0.45, tooth: 0.85, toothScale: 1.6, patternScale: 1.4 } }),
 });
-export function benchPaper(kind, w, h, mmPerCell, seed = 7) {
+function benchPaper(kind, w, h, mmPerCell, seed = 7) {
   const scale = Math.max(1, PAPER_MM / mmPerCell);
   return { ...makePaper(w, h, { seed, ...BENCH_PAPERS[kind].model, scale, proudBlur: scale, coldPress: { mmPerCell }, mmPerCell }), mmPerCell };
 }
@@ -37,6 +39,12 @@ const BOX = { w: 64, h: 20 };
 const line = (x0, y0, x1, y1, n = 24) => Array.from({ length: n + 1 }, (_, i) => ({ x: x0 + (x1 - x0) * i / n, y: y0 + (y1 - y0) * i / n }));
 const swell = (pts, f) => pts.map((q, i) => ({ ...q, p: f(i / (pts.length - 1)) }));
 const ease = u => Math.min(1, u / 0.08, (1 - u) / 0.1);
+
+const bars = wet => async c => {
+  for (const [k, x] of [['yellow', 20], ['green', 32], ['cyan', 44]]) await c.drag(c.brush('flat', 6, 'wet on dry', 0.9, 1, x, k), [{ x, y: 4 }, { x: x - 1, y: 21 }, { x: x - 2, y: 38 }].map(q => ({ ...q, p: 0.8 })), { upright: false });
+  if (!wet) await c.dryAll();
+  await c.drag(c.brush('flat', 6, wet ? 'wet on wet' : 'glazed', 0.9, 1, 9, 'rose'), swell(line(6, 20, 58, 22), u => 0.8 * ease(u)));
+};
 
 /**
  * The strokes. Each has its label fields (tool, load, pressure, speed, paper) and `lay(ctx)`, which paints it through
@@ -65,6 +73,8 @@ export const BENCH_STROKES = Object.freeze([
     lay: async c => { await c.drag(c.brush('flat', 10, 'first wash', 0.8), swell(line(6, 8, 58, 8), u => 0.8 * ease(u))); await c.untilDamp(); await c.drag(c.brush('flat', 10, 'wet on wet', 1, 0.25), swell(line(6, 17, 58, 17), u => 0.8 * ease(u)), { seed: 2 }); } },
   { id: 'graded', title: 'Graded wash, five sweeps', tool: 'flat 10 mm', technique: 'wet on wet', load: 1, pressure: 0.8, speed: 'medium', paper: 'cold', h: 44,
     lay: async c => { for (let k = 0; k < 5; k++) await c.drag(c.brush('flat', 10, 'wet on wet', 1, 1 - k * 0.22, k), swell(k % 2 ? line(58, 8 + 7 * k, 6, 8 + 7 * k) : line(6, 8 + 7 * k, 58, 8 + 7 * k), u => 0.8 * ease(u)), { seed: k }); } },
+  { id: 'glaze-dry', title: 'Rose bar over dry yellow, green, cyan', tool: 'flat 6 mm', technique: 'glazed', load: 0.9, pressure: 0.8, speed: 'medium', paper: 'cold', h: 42, lay: bars(false) },
+  { id: 'glaze-wet', title: 'Rose bar into wet yellow, green, cyan', tool: 'flat 6 mm', technique: 'wet on wet', load: 0.9, pressure: 0.8, speed: 'medium', paper: 'cold', h: 42, lay: bars(true) },
   { id: 'pen', title: 'Pen line, pressure change', tool: 'sepia pen', technique: 'ink', load: 1, pressure: '0.1-1-0.1', speed: 'medium', paper: 'cold',
     lay: c => c.pen(line(6, 10, 58, 10, 48).map((q, i) => ({ ...q, s: Math.sin(Math.PI * i / 48) ** 2 }))) },
   { id: 'pencil', title: 'Pencil, light then firm', tool: 'HB pencil', technique: 'graphite', load: '-', pressure: '0.3 / 1', speed: 'medium', paper: 'rough',
@@ -85,17 +95,25 @@ const DRY = { settle: 60, dt: 2 };
  *   fix()                  dry the wet layer into a layer
  * Returns { sheet, pigments, steps }.
  */
-export async function layBenchStroke(s, { mmPerCell, wash, ops = cpuOps(), O = DEFAULTS, maxSteps = 4000 }) {
-  const { w, h } = strokeSize(s, mmPerCell), cells = mm => mm / mmPerCell, pigments = benchPigments(wash);
+export async function layBenchStroke(s, { mmPerCell, wash, glaze, ops = cpuOps(), O = DEFAULTS, maxSteps = 4000 }) {
+  const { w, h } = strokeSize(s, mmPerCell), cells = mm => mm / mmPerCell, pigments = benchPigments(wash, glaze);
   const sheet = createSheet(benchPaper(s.paper, w, h, mmPerCell), pigments);
   await ops.attach?.(sheet, O);
   let steps = 0;
   const flow = async n => { if (n <= 0) return true; steps += n; return ops.step(sheet, n, O); };
+  // Dry as the painter does (sheet.mjs dry): a settle at the working time step, then long steps until no water is left.
+  const dryOut = async () => {
+    await flow(DRY.settle);
+    const D = { ...O, dt: DRY.dt };
+    for (let k = 0; k * 32 < maxSteps; k++) { steps += 32; if (!(await ops.step(sheet, 32, D))) break; }
+    await ops.fix(sheet);
+  };
   const c = {
-    brush(kind, widthMm, technique, load, concShare = 1, seed = 0) {
-      const T = TECHNIQUES[technique], r = cells(widthMm) / 2;
+    brush(kind, widthMm, technique, load, concShare = 1, seed = 0, colour = null) {
+      const T = TECHNIQUES[technique], r = cells(widthMm) / 2, conc = pigments.map(() => 0);
+      conc[colour ? GLAZE_AT[colour] : WASH] = CONC * concShare;
       const b = createBrush(washBrushOptions(r, T, 11 + seed, { round: kind === 'round' }));
-      dip(b, { water: load, conc: [CONC * concShare, 0, 0] });
+      dip(b, { water: load, conc });
       return b;
     },
     // A drag in segments of SEGMENT_MM; the sheet flows between them as fast as the hand is slow.
@@ -113,9 +131,11 @@ export async function layBenchStroke(s, { mmPerCell, wash, ops = cpuOps(), O = D
     async untilDamp() {
       for (let k = 0; k < 400; k++) { await flow(4); await ops.read(sheet); let standing = 0; for (let i = 0; i < sheet.n; i++) if (sheet.W[i] > 1e-3) standing++; if (standing < sheet.n * 0.002) return; }
     },
+    // The sheet dried as at the end of a stroke, so the next is laid on a dry layer.
+    async dryAll() { await dryOut(); },
     async pen(ptsMm) {
       const pen = createPen({ nib: INK.widthMm[0] / mmPerCell, flex: (INK.widthMm[1] - INK.widthMm[0]) / mmPerCell });
-      dipPen(pen, [0, INK.concentration, 0]);
+      dipPen(pen, pigments.map((_, k) => (k === INK_AT ? INK.concentration : 0)));
       const path = ptsMm.map(q => ({ x: cells(q.x), y: cells(q.y), ...penContact(q.s) }));
       await ops.instrument(sheet, path, cells(INK.widthMm[1]) * 4 + 12, () => penStroke(pen, sheet, path));
     },
@@ -126,11 +146,7 @@ export async function layBenchStroke(s, { mmPerCell, wash, ops = cpuOps(), O = D
     },
   };
   await s.lay(c);
-  // Dry as the painter does (sheet.mjs dry): a settle at the working time step, then long steps until no water is left.
-  await flow(DRY.settle);
-  const D = { ...O, dt: DRY.dt };
-  for (let k = 0; k * 32 < maxSteps; k++) { steps += 32; if (!(await ops.step(sheet, 32, D))) break; }
-  await ops.fix(sheet);
+  await dryOut();
   await ops.read(sheet);
   return { sheet, pigments, steps };
 }

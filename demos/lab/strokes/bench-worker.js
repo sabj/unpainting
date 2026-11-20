@@ -8,14 +8,14 @@ import { BY_KEY } from '../media/pigments.js';
 import { paperReflectance } from '../media/papers.js';
 import { GpuPhysics } from '../gpu/gpu-physics.js';
 
-const WASH = BY_KEY.ultramarine;
+const WASH = BY_KEY.ultramarine, GLAZE = { yellow: BY_KEY.hansa, green: BY_KEY.sapgreen, cyan: BY_KEY.cerulean, rose: BY_KEY.rose };
 let phys = null, physError = '';
 
 async function gpu() {
   if (phys || physError) return phys;
   try {
     if (!globalThis.navigator?.gpu) throw new Error('no WebGPU in this browser');
-    phys = await GpuPhysics.create(benchPigments(WASH), { ...DEFAULTS }, navigator.gpu);
+    phys = await GpuPhysics.create(benchPigments(WASH, GLAZE), { ...DEFAULTS }, navigator.gpu);
   } catch (e) { physError = String(e?.message ?? e).slice(0, 200); }
   return phys;
 }
@@ -51,7 +51,7 @@ onmessage = async ({ data }) => {
     if (backend === 'gpu' && !g) continue;
     const t = performance.now();
     try {
-      const { sheet, pigments, steps } = await layBenchStroke(s, { mmPerCell, wash: WASH, ops: backend === 'gpu' ? gpuOps(g) : cpuOps() });
+      const { sheet, pigments, steps } = await layBenchStroke(s, { mmPerCell, wash: WASH, glaze: GLAZE, ops: backend === 'gpu' ? gpuOps(g) : cpuOps() });
       const rgba = colour(sheet, pigments, s.paper);
       postMessage({ type: 'stroke', id: s.id, backend, w: sheet.w, h: sheet.h, rgba, steps, ms: performance.now() - t }, [rgba.buffer]);
     } catch (e) { postMessage({ type: 'stroke', id: s.id, backend, error: String(e?.message ?? e) }); }
