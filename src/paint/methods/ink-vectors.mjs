@@ -48,9 +48,9 @@ export function inkForDarkness(darkOf, tMax = 64, n = 400) {
 }
 
 /**
- * A FILL (a leaf mass, a dark pane, a blot, grey glass), not a LINE: a stroke the fitter made from a compact blob of ink and
- * marked `fill` (tools/seg/ink-vectors.py find_fills: ink wider than half a millimetre and no longer than about four of its
- * widths; anything longer is a line at any width, so a thick branch is laid whole).
+ * A FILL (a leaf mass, a dark pane, a blot, grey glass), not a LINE: a stroke the fitter made from a mass of ink and marked
+ * `fill` (tools/seg/ink-vectors.py find_fills: ink wider than 0.8 mm that is not a strip; a thick branch, a post or a frame is
+ * long and of even width, a line at any width, and is laid whole).
  */
 export const isFill = stroke => stroke.fill === true;
 

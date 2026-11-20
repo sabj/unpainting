@@ -17,7 +17,7 @@ one where they cross (one bar passes through a junction, the other meets it), an
 claim. Ink farther than --orphanmm from every stroke (a speck the tracer left) becomes a stroke of its own, laid just after
 the nearest stroke. Nothing is added and nothing is re-estimated: the outline follows the ink.
 A LINE is drawn as its path with a width at every point (`drawn: 'path'`), read across it at its own local darkness, in
-runs where the tracer joined it across a gap. A compact blob of ink (a leaf mass, a blot, a pane, grey glass) is a FILL, one
+runs where the tracer joined it across a gap. A mass of ink (a leaf mass, a blot, a pane, grey glass) is a FILL, one
 stroke of its own marked `fill` (find_fills); under paint the painter lays fills pale (--inkfill), lines never.
 
 usage: ink-vectors.py DRAWING.png ORDERED-lines.json --sheetmm MM --out FILE.json [--zoom 4] [--psf 0.7] [--window X Y W H]
@@ -146,7 +146,7 @@ def build(drawing, lines_doc, sheet_mm, zoom=4, ink=.06, orphan_mm=.6, sigma=.6,
             nearest = int(owner[int(m[1]), int(m[0])]) or int(lab.ravel()[of[near[int(m[1]), int(m[0])]]])
             kid = len(L) + len(extra) + 1; owner[ys, xs] = kid; param[ys, xs] = (u - u.min()) / max(1e-9, u.max() - u.min())
             extra.append({'after': nearest - 1, 'path': np.vstack([m + u.min() * d, m + u.max() * d]), 'part': 'small'})
-    # FILLS: a compact blob of ink (a leaf mass, a blot, a pane) is one stroke of its own, whole, whatever lines the tracer ran
+    # FILLS: a mass of ink (a leaf mass, a blot, a pane) is one stroke of its own, whole, whatever lines the tracer ran
     # through it; a window's grey glass is one grey fill laid under its black bars, which stay lines
     under = np.zeros((H, W), np.int32)
     for fl in find_fills(a, px):
@@ -294,25 +294,22 @@ def ring_area(r):
     r = np.asarray(r, float); return .5 * float(np.dot(r[:, 0], np.roll(r[:, 1], 1)) - np.dot(r[:, 1], np.roll(r[:, 0], 1)))
 
 
-def compact(m, long=4.0, solid=.35):
-    """A blob (mask), not a line: under `long` times as long as it is wide (the box that fits it tightest) and filling over
-    `solid` of that box (a curved branch or a frame fills little of its box)."""
-    cs, _ = cv2.findContours(m.astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    if not cs: return False
-    (_, _), (w, h), _ = cv2.minAreaRect(np.vstack(cs)); w, h = max(w, 1.0) + 1, max(h, 1.0) + 1
-    return max(w, h) < long * min(w, h) and m.sum() >= solid * w * h
+def is_strip(m, dt, long=4.0, even=1.6):
+    """A line at any width (a thick branch, a post, a frame, a moulding), not a mass: long (half its outer perimeter over
+    `long` of its own widths, the width twice its area over its perimeter) and of even width (nowhere over `even` times that
+    width across). A mass of leaves is lumpy: much wider in places than its strip width. `dt`: the distance inside the ink."""
+    cs, _ = cv2.findContours(m.astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+    per = sum(cv2.arcLength(q, True) for q in cs); w = 2 * float(m.sum()) / max(per, 1e-9)
+    return per / 2 >= long * w and 2 * float(dt[m].max()) < even * w
 
 
-def find_fills(a, px, width_mm=.5, neck=.4):
-    """The FILLS in the drawing's ink `a` (0..1 on a grid of `px` mm): ink wider than `width_mm` (what is left of it when
-    half that is taken off all round, grown back), divided where it necks in (under `neck` of the thinner of the two
-    widths it joins, so a mass of leaves is its leaves and a branch of even width stays one piece), each piece a fill if
-    it is COMPACT (compact(): under about four widths long). Anything long is a line at any width (a thick branch, a
-    frame) and stays with the pen's strokes. Two kinds: a black fill (ink over 0.85: a leaf mass, a blot), and a grey
-    fill (ink over 0.3 of which a quarter or more is grey: glass, a shaded pane; not divided), which lies under whatever
-    black is drawn across it. Returns [{x0, y0, mask, grey, tone, level}], the black ones first."""
-    from skimage.morphology import h_maxima
-    from skimage.segmentation import watershed
+def find_fills(a, px, width_mm=.8):
+    """The FILLS in the drawing's ink `a` (0..1 on a grid of `px` mm): each connected mass of ink wider than `width_mm` (what
+    is left of the ink when half that is taken off all round, grown back: bars, twigs and the knots of a lattice are
+    thinner and stay lines), unless it is a strip (is_strip: long and of even width: a thick branch, a post, a frame),
+    which is a line at any width and stays with the pen's strokes. Two kinds: a black fill (ink over 0.85: a leaf mass, a
+    blot, dark glass), and a grey fill (ink over 0.3 of which a quarter or more is grey: glass, a shaded pane), which lies
+    under whatever black is drawn across it. Returns [{x0, y0, mask, grey, tone, level}], the black ones first."""
     out = []; black_taken = np.zeros(a.shape, bool); r = .5 * width_mm / px; g = 2; kg = np.ones((2 * g + 1,) * 2, np.uint8)
     for grey in (False, True):
         ink = (a >= (.3 if grey else .85)).astype(np.uint8); dt = cv2.distanceTransform(ink, cv2.DIST_L2, 5)
@@ -322,26 +319,19 @@ def find_fills(a, px, width_mm=.5, neck=.4):
         n, cl, st, _ = cv2.connectedComponentsWithStats(wide, connectivity=8)
         for c in range(1, n):
             x, y, w, h = st[c, :4]; q = 2 * g + 3; x0, y0, x1, y1 = max(0, x - q), max(0, y - q), min(a.shape[1], x + w + q), min(a.shape[0], y + h + q)
-            comp = cl[y0:y1, x0:x1] == c; A = a[y0:y1, x0:x1]
-            if grey: parts = [comp]
+            m = cl[y0:y1, x0:x1] == c; A = a[y0:y1, x0:x1]
+            if is_strip(m, dt[y0:y1, x0:x1]): continue
+            near_ = cv2.dilate(m.astype(np.uint8), kg) > 0
+            if grey:
+                gp = m & (A < .85) & ~black_taken[y0:y1, x0:x1]
+                if gp.sum() < .25 * m.sum(): continue
+                tone, level = float(np.median(A[gp])), None
             else:
-                d = dt[y0:y1, x0:x1] * comp; lg = np.log(np.maximum(d, .5)); pk = h_maxima(lg, -math.log(neck)) > 0
-                nm, mk = cv2.connectedComponents((pk & comp).astype(np.uint8))
-                lab_ = watershed(-lg, mk, mask=comp) if nm > 2 else comp.astype(np.int32)
-                parts = [lab_ == k for k in range(1, max(2, nm))]
-            for m in parts:
-                if not m.any() or not compact(m): continue
-                near_ = cv2.dilate(m.astype(np.uint8), kg) > 0
-                if grey:
-                    gp = m & (A < .85) & ~black_taken[y0:y1, x0:x1]
-                    if gp.sum() < .25 * m.sum(): continue
-                    tone, level = float(np.median(A[gp])), None
-                else:
-                    # its edge at half its darkness over what lies round it (paper: 0.5; grey glass: nearer black)
-                    ring = (cv2.dilate(m.astype(np.uint8), np.ones((4 * g + 5,) * 2, np.uint8)) > 0) & ~near_ & (A < .85)
-                    level = min(.85, max(.5, .5 * (1 + float(np.median(A[ring]))))) if ring.any() else .85
-                    m = (m | (near_ & (A >= level) & ~comp)); tone = 1.0; black_taken[y0:y1, x0:x1] |= m
-                out.append({'x0': x0, 'y0': y0, 'mask': m, 'grey': grey, 'tone': tone, 'level': level})
+                # its edge at half its darkness over what lies round it (paper: 0.5; grey glass: nearer black)
+                ring = (cv2.dilate(m.astype(np.uint8), np.ones((4 * g + 5,) * 2, np.uint8)) > 0) & ~near_ & (A < .85)
+                level = min(.85, max(.5, .5 * (1 + float(np.median(A[ring]))))) if ring.any() else .85
+                m = (m | (near_ & (A >= level) & ~(cl[y0:y1, x0:x1] > 0))); tone = 1.0; black_taken[y0:y1, x0:x1] |= m
+            out.append({'x0': x0, 'y0': y0, 'mask': m, 'grey': grey, 'tone': tone, 'level': level})
     return out
 
 
