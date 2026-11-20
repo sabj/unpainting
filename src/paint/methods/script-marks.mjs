@@ -213,7 +213,9 @@ export function sweeps(polys, { widthMm, deg = 0, pressure = 0.8, perLoad = 3, l
   while (v < v1) {
     const tilt = rng.normal() * 2.5, um = (u0 + u1) / 2, cx = um * ux + v * vx, cy = um * uy + v * vy;
     for (const [t0, t1] of runsOn(polys, lights, cx, cy, deg + tilt)) if (t1 - t0 >= Math.min(2, 0.6 * widthMm)) runs.push({ i, cx, cy, d: deg + tilt, t0: t0 - r * rng.range(-0.25, 0.6), t1: t1 + r * rng.range(-0.25, 0.6) });
-    v += widthMm * rng.range(0.45, 0.7); i++;
+    // the last lane is carried down to the region's far edge (the bead is taken to the bottom)
+    const was = v; v += widthMm * rng.range(0.45, 0.7); i++;
+    if (v >= v1 && was < v1 - 0.45 * widthMm) v = v1 - 0.35 * widthMm;
   }
   const centre = q => { const t = (q.t0 + q.t1) / 2, d = q.d * Math.PI / 180; return [q.cx + Math.cos(d) * t, q.cy + Math.sin(d) * t]; };
   runs.sort((p, q) => p.i - q.i || p.t0 - q.t0);
