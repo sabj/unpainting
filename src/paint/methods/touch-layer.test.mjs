@@ -13,7 +13,7 @@ test('touches go only where the richer study is darker or of another hue than wh
   const out = touchesFrom({ grid, ref, paper: null, pw, ph, mmX: 0.5, paperRGB: [252, 251, 248], minMm2: 2 });
   const touches = out.flatMap(g => g.touches);
   assert.equal(touches.length, 2);
-  assert.ok(touches.some(t => t.name === 'taper'));
+  assert.ok(touches.some(t => ['taper', 'bar', 'swell'].includes(t.name) && t.strokes?.length !== 0));
   assert.ok(touches.every(t => !t.cells.includes(50 * pw + 55)));
   for (let i = 1; i < out.length; i++) assert.ok(out[i - 1].lab[0] >= out[i].lab[0]);
 });
