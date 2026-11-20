@@ -61,10 +61,16 @@ export function isFill(stroke, widthMm = 0.5, areaMm2 = 1.5) {
   return (w > widthMm && L < 4 * w) || (a > areaMm2 && w > 0.8 * widthMm);
 }
 
+const pathLength = P => P.reduce((t, q, k) => (k ? t + Math.hypot(q[0] - P[k - 1][0], q[1] - P[k - 1][1]) : 0), 0);
+/** A fill's width: twice its area over its perimeter. */
+function fillWidth(stroke) { const a = Math.abs(stroke.outline.reduce((t, r) => t + ringArea(r), 0)), per = stroke.outline.reduce((t, r) => t + ringLength(r), 0); return 2 * a / Math.max(per, 1e-9); }
+/** Distance from (x, y) to a polyline. */
+function polylineDistance(P, x, y) { return edgeDistance([P.slice(0, -1).concat([P[P.length - 1]])].map(r => r), x, y, false); }
+
 /** Distance from (x, y) to the nearest edge of the rings (same unit). */
-function edgeDistance(R, x, y) {
+function edgeDistance(R, x, y, closed = true) {
   let best = Infinity;
-  for (const r of R) for (let k = 0, n = r.length; k < n; k++) {
+  for (const r of R) for (let k = 0, n = r.length; k < (closed ? n : n - 1); k++) {
     const a = r[k], b = r[(k + 1) % n], dx = b[0] - a[0], dy = b[1] - a[1], L2 = dx * dx + dy * dy;
     const t = L2 ? Math.max(0, Math.min(1, ((x - a[0]) * dx + (y - a[1]) * dy) / L2)) : 0, ex = a[0] + t * dx - x, ey = a[1] + t * dy - y, d = ex * ex + ey * ey;
     if (d < best) best = d;
@@ -75,20 +81,27 @@ function edgeDistance(R, x, y) {
 /**
  * Lays the strokes on `field` (an ink amount per cell, w x h cells of `mm` mm) in seq order; the darker holds where two meet.
  * `inkOf` maps darkness to ink amount (inkForDarkness). `each(stroke, cells)` is told each stroke's area as it is laid.
- * `fill` (0..1): a FILL stroke (isFill) is laid as its edge, a band of `bandMm` at the stroke's darkness, and its inside at
- * `fill` of that darkness, so a mass the paint will darken stays drawn without its ink overcoming the paint (1: exact).
- * Returns { strokes, cells, fills }.
+ * `fill` (0..1): a FILL stroke (isFill) is laid as one pale shape of diluted ink at `fill` of its darkness, its edge soft
+ * over `softMm` (like ink laid with a brush), no rim; where the fill is a thickened part of a line (its path at least
+ * three times as long as the fill is wide: a branch swelling, a leaf on a twig) the line through it, `coreMm` wide, stays at
+ * full darkness. Lines are exact (1: everything exact). Returns { strokes, cells, fills }.
  */
-export function layVectors(doc, field, w, h, mm, inkOf, { ss = 4, each = null, fill = 1, bandMm = 0.25 } = {}) {
+export function layVectors(doc, field, w, h, mm, inkOf, { ss = 4, each = null, fill = 1, softMm = 0.2, coreMm = 0.3 } = {}) {
   const S = [...doc.strokes].sort((a, b) => a.seq - b.seq), dark = new Float32Array(w * h);
   let cells = 0, fills = 0;
   for (const s of S) {
     const r = rasterizeRings(s.outline, w, h, mm, ss); let n = 0;
     const thin = fill < 1 && isFill(s); if (thin) fills++;
+    const P = s.path ?? [], core = thin && P.length > 1 && pathLength(P) >= 3 * fillWidth(s);
     for (let j = 0; j < r.h; j++) for (let i = 0; i < r.w; i++) {
       const c = r.cov[j * r.w + i]; if (!(c > 0)) continue;
-      const inside = thin && edgeDistance(s.outline, (r.x0 + i + 0.5) * mm, (r.y0 + j + 0.5) * mm) > bandMm;
-      const k = (r.y0 + j) * w + r.x0 + i, d = Math.min(1, c * s.dark * (inside ? fill : 1));
+      let f = 1;
+      if (thin) {
+        const x = (r.x0 + i + 0.5) * mm, y = (r.y0 + j + 0.5) * mm;
+        f = fill * Math.min(1, edgeDistance(s.outline, x, y) / softMm + 0.35);
+        if (core && polylineDistance(P, x, y) <= coreMm / 2) f = 1;
+      }
+      const k = (r.y0 + j) * w + r.x0 + i, d = Math.min(1, c * s.dark * f);
       // the darker holds, against ink already on the sheet too (a closing pen over the opening's ink adds none twice)
       if (d > dark[k]) { dark[k] = d; const t = inkOf(d); if (t > field[k]) field[k] = t; n++; }
     }

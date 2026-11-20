@@ -34,13 +34,17 @@ test('lay over ink already there: the darker holds, nothing is taken away', () =
   assert.ok(Math.abs(f[0] - 0.5) < 1e-6 && Math.abs(f[5] - 0.9) < 1e-6 && f[50] === 0.5);
 });
 
-test('fills: a blot is a fill, a line is not; a fill at a quarter keeps its edge at full weight and lightens its inside', () => {
-  const blot = { seq: 0, dark: 1, outline: [square(1, 1, 3)] }, line = { seq: 1, dark: 1, outline: [[[1, 6], [9, 6], [9, 6.3], [1, 6.3]]] };
+test('fills: a blot is a fill, a line is not; under paint a fill is one pale shape, no rim, and a line through it stays full', () => {
+  const blot = { seq: 0, dark: 1, outline: [square(1, 1, 3)], path: [[2.5, 2.5], [2.6, 2.6]] }, line = { seq: 1, dark: 1, outline: [[[1, 6], [9, 6], [9, 6.3], [1, 6.3]]] };
   assert.ok(isFill(blot) && !isFill(line));
   const f = new Float32Array(400), r = layVectors({ strokes: [blot, line] }, f, 20, 20, 0.5, d => d, { fill: 0.25 });
   assert.equal(r.fills, 1);
   const at = (x, y) => f[Math.floor(y / 0.5) * 20 + Math.floor(x / 0.5)];
-  assert.ok(Math.abs(at(1.1, 2.5) - 1) < 1e-6, 'the fill\'s edge at full weight');
+  assert.ok(at(1.1, 2.5) <= 0.25 && at(1.1, 2.5) > 0, 'no dark rim: the edge no darker than the inside');
   assert.ok(Math.abs(at(2.6, 2.6) - 0.25) < 1e-6, 'its inside at a quarter');
-  assert.ok(at(5, 6.1) >= 0.45, 'the line at its full darkness (its coverage of the cell), not lightened');
+  assert.ok(at(5, 6.1) >= 0.45, 'the line at its full darkness, not lightened');
+  // a swelling on a branch: a fill whose path runs well past its width keeps the line through it at full strength
+  const branch = { seq: 0, dark: 1, outline: [[[1, 1], [9, 1], [9, 2.2], [1, 2.2]]], path: [[1, 1.6], [9, 1.6]] }, g = new Float32Array(400);
+  layVectors({ strokes: [branch] }, g, 20, 20, 0.5, d => d, { fill: 0.25 });
+  assert.ok(g[3 * 20 + 8] >= 0.99 && g[2 * 20 + 8] <= 0.26, 'the line through the swelling full, the rest of it pale');
 });
