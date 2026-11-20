@@ -95,7 +95,7 @@ test('--subjectmedium given on the command line is an explicit override and says
 
 test('the decision lists its evidence for the run card', () => {
   const d = decideMedium({ argv: ['--inkrecipe', 'wash'], plan: null, penSharePct: 0.3, penFirstPct: PEN_FIRST });
-  assert.deepEqual(Object.keys(d.evidence).sort(), ['inkRequestedBy', 'penFirstPct', 'penSharePct', 'planDeclared', 'planStyles']);
+  assert.deepEqual(Object.keys(d.evidence).sort(), ['inkRequestedBy', 'penFirstPct', 'penSharePct', 'planDeclared', 'planStyles', 'preparedDrawing']);
   assert.deepEqual(d.evidence.inkRequestedBy, ['--inkrecipe wash']);
   assert.equal(d.evidence.penSharePct, 0.3);
   assert.match(d.note, /pen share 0\.30% is under 0\.5%/);
@@ -111,4 +111,22 @@ test('which flags ask for ink', () => {
 
 test('a missing pen share with an ink request and no declaration fails loudly', () => {
   assert.throws(() => decideMedium({ argv: ['--inkrecipe', 'wash'], plan: null, penSharePct: null, penFirstPct: PEN_FIRST }), /pen share/);
+});
+
+test('a prepared drawing declares the medium: the pen share is not consulted, and a plan or flag naming another medium stops', () => {
+  const argv = ['--inkrecipe', 'wash', '--drawingfile', 'x'];
+  const ink = decideMedium({ argv, plan: null, penSharePct: 0.11, penFirstPct: 0.5, drawing: { file: 'x-lines.json', medium: 'ink', from: 'the drawing file' } });
+  assert.equal(ink.medium, 'pen'); assert.equal(ink.basis, 'drawing'); assert.equal(ink.vetoed, false); assert.match(ink.note, /pen share is not consulted/);
+  const pencil = decideMedium({ argv: ['--drawingfile', 'x'], plan: null, penFirstPct: 0.5, drawing: { file: 'x-lines.json', medium: 'graphite', from: '--outlinemedium' } });
+  assert.equal(pencil.medium, 'pencil'); assert.equal(pencil.subjectMedium, 'pencil');
+  assert.throws(() => decideMedium({ argv, plan: { drawing: { medium: 'graphite' } }, penFirstPct: 0.5, drawing: { file: 'x-lines.json', medium: 'ink', from: 'the drawing file' } }), /plan declares graphite/);
+  assert.throws(() => decideMedium({ argv: [...argv, '--subjectmedium', 'pencil'], plan: null, penFirstPct: 0.5, drawing: { file: 'x-lines.json', medium: 'ink', from: 'the drawing file' } }), /--subjectmedium is pencil/);
+  assert.throws(() => decideMedium({ argv, plan: null, penFirstPct: 0.5, drawing: { file: 'x-lines.json', medium: null, from: 'nothing' } }), /declares no medium/);
+});
+
+test('without a prepared drawing the pen-share decision stands and says which medium and why', () => {
+  const low = decideMedium({ argv: ['--inkrecipe', 'wash'], plan: null, penSharePct: 0.2, penFirstPct: 0.5 });
+  assert.equal(low.medium, 'pencil'); assert.match(low.note, /^medium pencil: .*pen share 0\.20% is under 0\.5%/);
+  const high = decideMedium({ argv: ['--inkrecipe', 'wash'], plan: null, penSharePct: 0.8, penFirstPct: 0.5 });
+  assert.equal(high.medium, 'pen'); assert.match(high.note, /^medium pen: .*at least 0\.5%/);
 });
