@@ -8444,8 +8444,9 @@ export const NATIVE_FLAT_GROUND=/^background-/;
 export const NATIVE_FLAT_SETTLE=Object.freeze({steps:8,dt:.6});
 // Dry a flat pass where it lies: water goes, suspended pigment settles.
 function dryInPlace(sheet){
+  sheet._gpu?.syncAll(sheet);
   for(let i=0;i<sheet.n;i++){sheet.W[i]=0;sheet.s[i]=0;sheet.M[i]=0;for(let k=0;k<sheet.K;k++){sheet.D[k][i]+=sheet.G[k][i]+sheet.P[k][i];sheet.G[k][i]=0;sheet.P[k][i]=0;}}
-  sheet.wetDirty=1;
+  sheet.wetDirty=1;sheet._gpu?.cpuWroteAll();
 }
 export function planNativePassages(study){
   // The habitat setting's ground and litter washes (background on) go down
@@ -8785,14 +8786,14 @@ export function nativePatchRect({x0,y0,x1,y1},sw,sh,W,H){
   const px0=Math.max(0,Math.floor(x0*W/sw)),py0=Math.max(0,Math.floor(y0*H/sh)),px1=Math.min(W,Math.ceil((x1+1)*W/sw)),py1=Math.min(H,Math.ceil((y1+1)*H/sh));
   return {x:px0,y:py0,w:Math.max(0,px1-px0),h:Math.max(0,py1-py0)};
 }
-export async function simulateNativePassages(study,{width=NATIVE_PAINT_LIMITS.width,seed=301,maskFor,onCheckpoint=async()=>{},isCancelled=()=>false,yieldWork=nativeYield,depositDurationMs=0,checkpointIntervalMs=0,paperTemplate=null,onPaper=()=>{},onBrush=null,travelMs=0,skipPacing=()=>false,limits=NATIVE_PAINT_LIMITS}={}){
+export async function simulateNativePassages(study,{width=NATIVE_PAINT_LIMITS.width,seed=301,maskFor,onCheckpoint=async()=>{},isCancelled=()=>false,yieldWork=nativeYield,depositDurationMs=0,checkpointIntervalMs=0,paperTemplate=null,onPaper=()=>{},onBrush=null,travelMs=0,skipPacing=()=>false,limits=NATIVE_PAINT_LIMITS,onSheet=null}={}){
   const started=performance.now(),passages=planNativePassages(study),keys=nativePalette(passages);
   width=nativeSheetWidth(width,keys,limits);
   const height=Math.round(width/1.2),n=width*height,scale=width/1200,mmPerCell=.2/scale;
   const paperReused=paperTemplate?.materialVersion===NATIVE_PAPER_VERSION&&paperTemplate.w===width&&paperTemplate.h===height;
   const paper=paperReused?paperTemplate:makeNativePaper(width,height),pigments=keys.map(k=>BY_KEY[k]);
   if(!paperReused)onPaper(paper);
-  const sheet=createSheet(paper,pigments);let strokes=0,steps=0,checkpoints=0,strokeSegments=0,brushDips=0,brushLifts=0,clearWaterStrokes=0,lastCheckpoint=-Infinity;
+  const sheet=createSheet(paper,pigments);onSheet?.(sheet,{width,height,keys,paper});let strokes=0,steps=0,checkpoints=0,strokeSegments=0,brushDips=0,brushLifts=0,clearWaterStrokes=0,lastCheckpoint=-Infinity;
   const timings={paperMs:performance.now()-started,maskMs:0,depositMs:0,transportMs:0};
   const flow=options=>{const t=performance.now(),active=step(sheet,options);timings.transportMs+=performance.now()-t;steps++;return active;};
   const check=()=>{if(isCancelled())throw new DOMException('Cancelled','AbortError');};

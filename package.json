@@ -19,6 +19,7 @@
     "bench:score": "node bench/scripts/score.mjs",
     "bench:build": "node bench/scripts/build-results.mjs && node bench/scripts/build-leaderboard.mjs && node bench/scripts/build-findings.mjs && node bench/scripts/build-chart.mjs && node bench/scripts/build-overview.mjs && node bench/scripts/build-rounds-table.mjs",
     "bench:test": "node --test bench/scripts/*.test.mjs",
+    "bench:render": "node tools/render-bench/render-bench.mjs",
     "quick-start": "npm run example:plan",
     "doctor": "node tools/doctor.mjs",
     "bench:add-target": "node bench/scripts/add-target.mjs",
