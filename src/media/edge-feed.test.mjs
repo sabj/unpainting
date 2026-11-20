@@ -109,10 +109,10 @@ test('a cell reaching past the edge band counts only its part inside it', () => 
   assert.ok(Math.abs(s - 1) < 1e-9, `cells of 0.3 mm over a 1 mm band: ${s}`);
 });
 
-test('GPU on refuses edge flow explicitly until both WGSL drying paths implement the pressure solve', async () => {
+test('a GPU sheet takes the pinned-edge feed (its parity: gpu/gpu-edge-feed.test.mjs)', async t => {
   const { attachGpu } = await import('./gpu/link.mjs');
-  const s = puddle(.5, ultramarine);
-  assert.throws(() => attachGpu(s, O, { mode: 'on', log: () => {} }), /no pinned-edge feed/);
+  const s = puddle(.5, ultramarine), info = attachGpu(s, O, { mode: 'auto', log: () => {} });
+  try { if (info.backend !== 'gpu') return t.skip(`no GPU: ${info.reason}`); assert.ok(O.edgeEvap > 0); } finally { s._gpu?.close?.(); }
 });
 
 test('unmet evaporation remains a demand for the next subcycle, rather than disappearing at the donor cap', () => {

@@ -41,19 +41,7 @@ fn p5ab(@builtin(workgroup_id) wid: vec3<u32>, @builtin(local_invocation_id) lid
     workgroupBarrier();
   }
 }
-@compute @workgroup_size(16, 16)
-fn slide_apply_cap_sp(@builtin(workgroup_id) wid: vec3<u32>, @builtin(local_invocation_id) lid: vec3<u32>) {
-  if (u.p3 != 2u) { slide_apply_all_tile(wid, lid); cap_sp_tile(wid, lid); return; }
-  if (lid.x == 0u && lid.y == 0u) { passTileCount = TL[u.ntiles]; }
-  workgroupBarrier();
-  let count = workgroupUniformLoad(&passTileCount);
-  for (var tile = wid.x; tile < count; tile += u32(u.padB)) {
-    let at = vec3<u32>(tile, wid.y, wid.z);
-    slide_apply_all_tile(at, lid);
-    cap_sp_tile(at, lid);
-    workgroupBarrier();
-  }
-}
+
 `;
 export const FINISH_WET_SCAN_14 = `
 @compute @workgroup_size(16, 16)
