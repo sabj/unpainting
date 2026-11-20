@@ -96,6 +96,21 @@ export function outlineLoops(ids, id, box, w, h, { cellMm, tolMm, soft = () => f
   return loops;
 }
 
+/**
+ * The cells of a w x h sheet (each `mm` wide) whose centres lie inside a set of outline loops (even-odd, so a loop inside
+ * another is a hole): an outline in millimetres put on a sheet at the sheet's own cell size, whatever grid it was traced on.
+ */
+export function loopsMask(loops, w, h, mm) {
+  const mask = new Uint8Array(w * h);
+  for (let y = 0; y < h; y++) {
+    const py = (y + .5) * mm, xs = [];
+    for (const { points: P } of loops) for (let q = 0, m = P.length; q < m; q++) { const a = P[q], b = P[(q + 1) % m]; if ((a[1] <= py) !== (b[1] <= py)) xs.push(a[0] + (py - a[1]) * (b[0] - a[0]) / (b[1] - a[1])); }
+    xs.sort((a, b) => a - b);
+    for (let q = 0; q + 1 < xs.length; q += 2) for (let x = Math.max(0, Math.ceil(xs[q] / mm - .5)), e = Math.min(w - 1, Math.ceil(xs[q + 1] / mm - .5) - 1); x <= e; x++) mask[y * w + x] = 1;
+  }
+  return mask;
+}
+
 /** The soft parts of an outline as lines a damp brush is run along: runs of soft segments, each a list of points in mm. */
 export function softLines(loops) {
   const lines = [];

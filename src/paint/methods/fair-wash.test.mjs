@@ -161,3 +161,32 @@ test('a thing that spans two hues is cut by hue before it gets a mix, a thing wi
   const many = plan(80, 60, [205, 170, 125], bands, { things: () => 1 });
   assert.ok(washesOf(many).filter(sh => sh._valuePlan.stage === 1).length <= 3);
 });
+
+test('a wash laid beside a reserved light has a smooth edge on a sheet finer than the plan: the painter\'s clip does not cut it in plan-cell steps', async () => {
+  const { makePaper } = await import('../../media/paper.mjs'), { createSheet, setClip, applyResist, dry, DEFAULTS } = await import('../../media/sheet.mjs'), { createBrush, dip, stroke } = await import('../../media/brush.mjs');
+  // a 60 mm sheet of 0.25 mm cells, planned on 1 mm: a band of bare paper runs across a tan ground at 45 degrees
+  const w = 240, h = 240, n = w * h, mm = 60 / w, light = (x, y) => x - y > -60 && x - y < 60;
+  const rgb = new Uint8ClampedArray(n * 3); for (let i = 0; i < n; i++) rgb.set(light(i % w, (i / w) | 0) ? PAPER : [150, 124, 92], i * 3);
+  const D = channelDensity(rgb, n, PAPER), demand = unmix(D, n, pigments.map(p => p.K.map(v => v / .55))), density = Float32Array.from({ length: n }, (_, i) => Math.max(0, (D[i * 3] + D[i * 3 + 1] + D[i * 3 + 2]) / 3));
+  const log = console.log; console.log = () => {}; let p;
+  try { p = planFairWashes({ demand, k: pigments.length, density, w, h, rgb, paperRGB: PAPER, pigments, sheetWidthMm: 60, washBrushMm: 3, washKitMm: [38, 25.4, 7, 5, 3], pointBrushMm: 1.2 }); } finally { console.log = log; }
+  assert.ok(Math.abs(p.summary.planCellMm - 1) < 1e-9 && p.protectedCells[120 * w + 120] === 1 && p.protectedCells[30 * w + 210] === 0, 'the band is reserved, on a plan of 1 mm cells');
+  // the painter's stroke path under a value plan: the reserved lights are the sheet's resist (tools/plate/drawing.mjs)
+  // and its clip is every other cell (tools/plate/plan.mjs setClip), on while a wash is laid and while it dries. One
+  // stroke of a 5 mm round along the band's edge, half on it.
+  const pig = [{ K: [.06, .26, .48], S: [.02, .02, .02], rho: .05, omega: 1.4, gamma: .25 }];
+  const sheet = createSheet(makePaper(w, h, { seed: 9, mmPerCell: mm, toothScale: .2 }), pig);
+  applyResist(sheet, Uint8Array.from(p.protectedCells)); setClip(sheet, Uint8Array.from(p.protectedCells, v => (v ? 0 : 1)));
+  const r = 2.5 / mm, b = createBrush({ flat: false, radius: r, bristles: Math.ceil(r * 2), capacity: 100, belly: 12, feed: .4, give: .9, free: .4, film: .25, splay: .03, stiffness: 8, seed: 31 });
+  dip(b, { water: .62, conc: [.05] });   // a wash's load in the plan (load.water): the bead stays where the brush lays it
+  stroke(b, sheet, Array.from({ length: 13 }, (_, q) => ({ x: 100 + q * 10, y: 40 + q * 10, r, p: 1 })), { lift: true, upright: 'sweep' });
+  dry(sheet, 40000, DEFAULTS);
+  const t = i => sheet.G[0][i] + sheet.D[0][i] + sheet.P[0][i] + sheet.layers.reduce((a, L) => a + (L[0]?.[i] ?? 0), 0);
+  // the wash's edge against the light, row by row: the first painted cell coming from the light's side
+  let top = 0; for (let i = 0; i < n; i++) top = Math.max(top, t(i));
+  const edge = []; for (let y = 70; y < 130; y++) { let x = 0; while (x < w && t(y * w + x) > top * .15) x++; while (x < w && t(y * w + x) <= top * .15) x++; edge.push(x); }
+  assert.ok(edge.every(x => x > 60 && x < w - 1), 'the stroke is cut along the light');
+  const steps = edge.slice(1).map((x, q) => Math.abs(x - edge[q])), worst = Math.max(...steps), flat = steps.filter(v => v === 0).length / steps.length;
+  assert.ok(worst <= 2, `the edge jumps ${worst} cells in one row: a step of the plan's 1 mm cells (4 sheet cells)`);
+  assert.ok(flat < .3, `${(flat * 100).toFixed(0)}% of the rows carry the edge straight down: straight-sided steps`);
+});

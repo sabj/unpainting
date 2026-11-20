@@ -30,7 +30,7 @@ import { components } from '../../raster.js';
 import { passage } from '../../crop/blockin.mjs';
 import { deltaE2000, labOf } from '../../eval/colour.mjs';
 import { washShapes, reservedLights, leastAreas } from './wash-shapes.mjs';
-import { outlineLoops, softLines, planWashStrokes } from './wash-strokes.mjs';
+import { outlineLoops, softLines, planWashStrokes, loopsMask } from './wash-strokes.mjs';
 import { mixFor, mixOver, filmLab } from './puddles.mjs';
 import { targetRegions } from './target-regions.mjs';
 import { targetValueMap, estimatePaper } from './light-to-dark.mjs';
@@ -240,7 +240,20 @@ export function planFairWashes({ demand, k, density, w, h, rgb = null, paperRGB 
       layWashes(stage, amounts, mask, cut, stage === 1 ? tolMm + washBrushMm / 2 : tolMm / 2);
     }
   });
-  const protectedCells = new Uint8Array(n); for (let i = 0; i < n; i++) if (planReserved[planOf[i]] || hold?.[i]) protectedCells[i] = 1;
+  // The reserved lights on the sheet's cells. The painter keeps every later stroke off them (its clip), so their edge is
+  // the edge of the washes beside them: it is the lights' outline in millimetres put on the sheet's cells, the same
+  // outline the first wash is laid up to, and not the plan's cells enlarged, which cut those washes in steps a plan cell
+  // long. A light too small for an outline keeps its plan cells.
+  const reservedOnSheet = (() => {
+    const blocks = Uint8Array.from({ length: n }, (_, i) => planReserved[planOf[i]]);
+    if (pw === w || !planReserved.some(v => v)) return blocks;
+    const smooth = loopsMask(outlineLoops(planReserved, 1, { x0: 0, y0: 0, x1: pw - 1, y1: ph - 1 }, pw, ph, { cellMm: planMm, tolMm }), w, h, sheetWidthMm / w);
+    const c = components(planReserved, pw, ph, 4), all = new Float64Array(c.count + 1), got = new Float64Array(c.count + 1);
+    for (let i = 0; i < n; i++) { const id = c.labels[planOf[i]]; if (id) { all[id]++; if (smooth[i]) got[id]++; } }
+    for (let i = 0; i < n; i++) { const id = c.labels[planOf[i]]; if (id && got[id] * 2 < all[id] && blocks[i]) smooth[i] = 1; }
+    return smooth;
+  })();
+  const protectedCells = new Uint8Array(n); for (let i = 0; i < n; i++) if (reservedOnSheet[i] || hold?.[i]) protectedCells[i] = 1;
   let open = 0, reserved = 0; for (let i = 0; i < pn; i++) { if (planReserved[i]) reserved++; else if (!(laid.some(f => f[i] > 0))) open++; }
   const areas = instructions.map(q => q.areaMm2).sort((a, b) => a - b), lc = components(protectedCells, w, h);
   const lightShapes = Array.from({ length: lc.count }, (_, j) => ({ id: j + 1, category: 'bare paper', reason: 'a light reserved whole', toneAt: 'retain paper', cells: 0 })); for (const id of lc.labels) if (id) lightShapes[id - 1].cells++;
