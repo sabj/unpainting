@@ -6,6 +6,7 @@ import {certifyZeroPaper} from '../../src/media/paper-certificate.mjs';
 import {check} from '../../src/media/checks.mjs';
 import {reservedContact, withReserveClip} from '../painter/reserve-clip.mjs';
 import {layIntoWetBed} from '../painter/wet-bed-wait.mjs';
+import {waitBesideDamp} from '../painter/beside-damp.mjs';
 import {prepareWetBed} from '../painter/wet-bed-prep.mjs';
 import {drawFineMaterial, drawOnFineSheet, fineGestures} from '../../src/paint/methods/fine-material.mjs';
 import {createDeliveryCal} from '../../src/paint/methods/delivery-cal.mjs';
@@ -127,9 +128,13 @@ const stroke=(b,target,points,options)=>{
   const freshCells=paint&&ownBed?cells.filter(i=>!ctx.VALUE_PIGMENT_CONTACT.has(i)):cells;
   const intoOwnWash=paint&&freshCells.length<cells.length*.3;
   const wetMove=['wet on wet','dry on wet'].includes(ctx.VALUE_ACTIVE.move);
+  // 'beside damp' (tools/painter/beside-damp.mjs): laid against a neighbour still damp; no dry gate, no wet bed of its
+  // own; at the passage's first stroke it waits until the neighbour has lost its shine
+  const beside=paint&&ctx.VALUE_ACTIVE.move==='beside damp';let besideWaits=0;
+  if(beside&&ctx.VALUE_PASSAGE&&!ctx.VALUE_PASSAGE.besideDone){ctx.VALUE_PASSAGE.besideDone=true;const nb=neighbors.filter(i=>!ctx.VALUE_OWN_CONTACT.has(i));if(nb.length)({waits:besideWaits}=waitBesideDamp({observe:()=>measurePaper(target,nb,SPEED_PAPER,{uniform:false}),step:o=>step(target,o),O}));JSONL.append(path.join(out,'value-commands.jsonl'),JSON.stringify({kind:'beside-damp',intent:ctx.VALUE_ACTIVE.id,neighbourCells:nb.length,waits:besideWaits})+'\n');}
   let paper=null,own=false;
   if(fastMode){
-    if(paint&&!wetMove){
+    if(paint&&!wetMove&&!beside){
       // the passage's reach is read once, at its first paint stroke, when its clip is set (tools/painter/passage-dry-gate.mjs)
       const VP=ctx.VALUE_PASSAGE;if(VP&&VP.reach===undefined)VP.reach=passageReach(target.clip,target.w,target.h);
       const gate=wetOnDryGate({cells,neighbors,own:{touches:ownCandidate,has:i=>ctx.VALUE_OWN_CONTACT.has(i)},texture:ctx.VALUE_ACTIVE.texture,observeCells:getObservationCells(),passage:VP?.reach?{start:!VP.checked,reach:VP.reach}:null,
@@ -142,7 +147,7 @@ const stroke=(b,target,points,options)=>{
   }else{
     const initial=measurePaperBatch(target,[{cells:getObservationCells()},...(ownCandidate?[{cells:[...cells,...neighbors].filter(i=>!ctx.VALUE_OWN_CONTACT.has(i)),stats:'gate'}]:[])],SPEED_PAPER,{uniform:SPEED_UNIFORM_PAPER});
     paper=initial[0];own=ownCandidate&&initial[1].dry;
-    if(paint&&!wetMove&&(!own||ctx.VALUE_ACTIVE.texture)&&!paper.dry){dry(target,30000,O,{levelMax:140,dt:2});paper=observe();check('value-plan dry-paper contact gate failed',paper.dry,{id:ctx.VALUE_ACTIVE.id,band:ctx.VALUE_ACTIVE.valueBand,waterMax:paper.waterMax,saturationMax:paper.saturationMax});}
+    if(paint&&!wetMove&&!beside&&(!own||ctx.VALUE_ACTIVE.texture)&&!paper.dry){dry(target,30000,O,{levelMax:140,dt:2});paper=observe();check('value-plan dry-paper contact gate failed',paper.dry,{id:ctx.VALUE_ACTIVE.id,band:ctx.VALUE_ACTIVE.valueBand,waterMax:paper.waterMax,saturationMax:paper.saturationMax});}
   }
   // a wet bed is judged by its typical cell (median standing water), so it is read cell by cell, never as uniform paper
   const observeBed=()=>measurePaper(target,getObservationCells(),SPEED_PAPER,{uniform:false});
