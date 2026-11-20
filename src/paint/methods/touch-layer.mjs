@@ -7,7 +7,7 @@
 // Plan time only. Reads the study, never the subject.
 import { labOf } from '../../eval/colour.mjs';
 import { kmeans } from './study-shapes.mjs';
-import { shapeGeometry, markFor } from '../marks/index.mjs';
+import { shapeGeometry, markFor, makeMark } from '../marks/index.mjs';
 
 /** A touch where the study is at least this much darker (L*) than what is laid, or this far off its hue (a*b*) and not lighter. */
 const DARKER = 3, HUE_OFF = 6, NOT_LIGHTER = 3;
@@ -16,7 +16,14 @@ const CLUSTERS = 14;
 /** A touch whose change (mean dE times its area, mm2) is under this is not painted (the noise tail). */
 const LEAST_GAIN = 40;
 /** Foliage: a green between these hues (degrees in Lab), at least this chromatic. */
-const GREEN = [95, 175], GREEN_C = 8;
+const GREEN = [95, 175], GREEN_C = 8, GREEN_L = 72;
+/** A change larger than this (mm2) is a glaze over a passage, not one mark. */
+const WASH_FROM_MM2 = 80;
+/** A dark (L* under DARK_L) bigger than DARK_LEAST_MM2 is laid as a dark only where the coarser studies are within
+ * DARK_JUSTIFIED (L*) of it; else it is a glaze at the coarser studies' value. */
+const DARK_L = 45, DARK_LEAST_MM2 = 6, DARK_JUSTIFIED = 20;
+/** A mark with more than this share of its points outside its shape (grown by 1 mm) is laid as a glaze instead. */
+const OUTSIDE_MOST = 0.2;
 
 /** 4-connected parts of the cells where label === id among `cells` (cells is a mask); returns arrays of cell indices. */
 function partsOf(label, pw, ph) {
@@ -48,7 +55,7 @@ function majority(lab, pw, ph) {
  * the least touch, `kit` the round widths (mm). Returns groups, lightest first: [{ colour (sRGB), lab, cells, touches:
  * [{ name, strokes, cells, gain }] }].
  */
-export function touchesFrom({ grid, ref, paper, pw, ph, mmX, paperRGB, minMm2 = 3, kit = [1, 2, 4, 8], salt = 0 }) {
+export function touchesFrom({ grid, ref, paper, pw, ph, mmX, paperRGB, minMm2 = 3, kit = [1, 2, 4, 8], salt = 0, coarseL = null }) {
   const pn = pw * ph, L = new Float32Array(pn), A = new Float32Array(pn), B = new Float32Array(pn), changed = new Uint8Array(pn);
   for (let q = 0; q < pn; q++) {
     const [l, a, b] = labOf(grid, q, paperRGB); L[q] = l; A[q] = a; B[q] = b;
@@ -71,10 +78,27 @@ export function touchesFrom({ grid, ref, paper, pw, ph, mmX, paperRGB, minMm2 = 
     if (gain < LEAST_GAIN * Math.min(1, area / 20)) continue;
     const c = centres[id], hue = (Math.atan2(c[2], c[1]) * 180 / Math.PI + 360) % 360, chroma = Math.hypot(c[1], c[2]);
     let dl = 0, db = 0; for (const q of cells) { dl += ref.L[q] - L[q]; db += ref.B[q] - B[q]; } dl /= cells.length; db /= cells.length;
-    const what = chroma >= GREEN_C && hue >= GREEN[0] && hue <= GREEN[1] ? 'foliage' : dl >= DARKER && db >= 3 ? 'shadow' : '';
-    const g = shapeGeometry(cells, pw, mmX), m = markFor(g, { what, kit, seed: (salt * 7919 + cells[0]) | 0 });
+    const what = chroma >= GREEN_C && hue >= GREEN[0] && hue <= GREEN[1] && c[0] <= GREEN_L ? 'foliage' : dl >= DARKER && db >= 3 ? 'shadow' : '';
+    // a large change is not a touch: it is a glaze over a passage, laid as a wash (the caller lays `wash` touches in lanes)
+    let big = area > WASH_FROM_MM2 && what !== 'foliage';
+    // a dark bigger than a few mm2 must be dark in the coarser studies there too, else it is a glaze at their value
+    let meanL = 0; for (const q of cells) meanL += L[q]; meanL /= cells.length;
+    let glazeL = null;
+    if (coarseL && meanL < DARK_L && area > DARK_LEAST_MM2) { let cl = 0; for (const q of cells) cl += coarseL[q]; cl /= cells.length; if (cl > meanL + DARK_JUSTIFIED) { big = true; glazeL = cl; } }
+    const g = shapeGeometry(cells, pw, mmX);
+    let m = big ? { name: 'wash', strokes: [] } : markFor(g, { what, kit, seed: (salt * 7919 + cells[0]) | 0 });
+    // a leaf is a mark for foliage only; elsewhere the same shape is a pressed touch
+    if (!big && /leaf/.test(m.name) && what !== 'foliage' && m.params) m = { name: 'touch', params: m.params, strokes: makeMark('touch', m.params) };
+    // a mark never reaches past its shape: if a fifth of its points lie outside the shape (grown by a millimetre), the
+    // shape is laid as a glaze over its own cells instead
+    if (!big && m.strokes.length) {
+      const inMask = new Uint8Array(pn); for (const q of cells) inMask[q] = 1;
+      const grow = Math.max(1, Math.round(1 / mmX)), near = (x, y) => { const gx = Math.floor(x / mmX), gy = Math.floor(y / mmX); for (let dy = -grow; dy <= grow; dy++) for (let dx = -grow; dx <= grow; dx++) { const xx = gx + dx, yy = gy + dy; if (xx >= 0 && yy >= 0 && xx < pw && yy < ph && inMask[yy * pw + xx]) return true; } return false; };
+      let all = 0, out = 0; for (const st of m.strokes) for (const p of st.points) { all++; if (!near(p[0], p[1])) out++; }
+      if (all && out / all > OUTSIDE_MOST) { big = true; m = { name: 'wash', strokes: [] }; }
+    }
     if (!groups.has(id)) groups.set(id, { id, cells: [], touches: [] });
-    const gr = groups.get(id); gr.cells.push(...cells); gr.touches.push({ name: m.name, strokes: m.strokes, cells, gain, what });
+    const gr = groups.get(id); gr.cells.push(...cells); gr.touches.push({ name: m.name, strokes: m.strokes, cells, gain, what, wash: big, glazeL, meanL, areaMm2: area, length: g.length, width: g.width });
   }
   const out = [...groups.values()].map(gr => {
     const colour = [0, 1, 2].map(ch => { const v = gr.cells.map(q => grid[q * 3 + ch]).sort((a, b) => a - b); return v[v.length >> 1]; });

@@ -411,7 +411,7 @@ export function planStudyWashes({ k, w, h, studies, flat = false, density = null
 
   const laid = Array.from({ length: k }, () => new Float32Array(pn));
   const mixes = [], layers = [], instructions = [], polygons = [], byStage = [0, 0, 0, 0], perLayer = []; let strokeCount = 0, charges = 0, dabbed = 0, softJoins = 0, glazes = 0;
-  const stagesAt = [];
+  const stagesAt = [], touchLog = [];
   const STAGE = ['', 'first wash', 'charge', 'wash over', 'accent'];
   const underMix = cells => { const u = new Array(k).fill(0); for (const q of cells) for (let j = 0; j < k; j++) u[j] += laid[j][q] / cells.length; return u; };
   const cellsIn = loops => { const m = loopsMask(loops, pw, ph, mmX), out = []; for (let q = 0; q < pn; q++) if (m[q]) out.push(q); return out; };
@@ -842,7 +842,9 @@ export function planStudyWashes({ k, w, h, studies, flat = false, density = null
     // share a session
     // (the darks of the block-in were laid from the finest study already)
     const keepFor = leftDark.size ? Uint8Array.from(paperMask, (v, q) => (v || leftDark.has(label[q]) ? 1 : 0)) : paperMask;
-    const groups = touchesFrom({ grid: grids[li], ref: { L: refL, A: refA, B: refB }, paper: keepFor, pw, ph, mmX, paperRGB: paperCol, minMm2, kit: TOUCH_KIT, salt: li });
+    const coarseL = Float32Array.from({ length: pn }, (_, q) => { let v = 0; for (let k = 0; k < li; k++) v = Math.max(v, labOf(grids[k], q, valueRef)[0]); return v; });
+    const groups = touchesFrom({ grid: grids[li], ref: { L: refL, A: refA, B: refB }, paper: keepFor, pw, ph, mmX, paperRGB: paperCol, minMm2, kit: TOUCH_KIT, salt: li, coarseL });
+    for (const gr of groups) for (const t of gr.touches) touchLog.push({ layer: li + 1, name: t.name, wash: t.wash, areaMm2: t.areaMm2, length: t.length, width: t.width, L: t.glazeL ?? gr.lab[0], strokes: t.strokes.length, cx: t.cells.length ? +(((t.cells[0] % pw) + 0.5) * mmX).toFixed(1) : 0, cy: t.cells.length ? +((Math.floor(t.cells[0] / pw) + 0.5) * mmX).toFixed(1) : 0 });
     const stage = 4; let sess = [], sessMask = new Uint8Array(pn), touches = 0;
     const flush = () => { if (sess.length) layer(stage, sess); sess = []; sessMask = new Uint8Array(pn); };
     for (const [j, gr] of groups.entries()) {
@@ -850,6 +852,14 @@ export function planStudyWashes({ k, w, h, studies, flat = false, density = null
       const near = dilate(m, pw, ph, rC(1.5)); if (sess.length >= SESSION_MOST || gr.cells.some(q => sessMask[q]) || near.some((v, q) => v && sessMask[q])) flush();
       // the passage is where its marks lay paint (their footprints), not the study's cells: charged for the cells, marks that
       // reach past them were spread thin over the extra paper and dried pale
+      // its large changes are glazes, laid in lanes over their own cells, before its marks
+      for (const t of gr.touches.filter(x => x.wash)) {
+        const tm = new Uint8Array(pn); for (const q of t.cells) tm[q] = 1;
+        const tp = partLoops(tm, 1, paperMask); if (!tp.length) continue;
+        const gs = wash(stage, `a glaze from ${st.file ?? `study ${li + 1}`}, colour ${j + 1}${t.glazeL != null ? ' (a dark the coarser studies do not hold, laid at their value)' : ''}`, tp.flat(), t.glazeL != null ? withL(gr.colour, t.glazeL) : gr.colour, { own: t.cells, parts: tp, grade: false });
+        if (gs) { sess.push(gs); for (const q of t.cells) sessMask[q] = 1; }
+      }
+      gr.touches = gr.touches.filter(x => !x.wash); if (!gr.touches.length) continue;
       const strokesOf = gr.touches.flatMap(t => t.strokes), foot = footprint(strokesOf);
       const loops = maskLoops(foot, 0.5); if (!loops.length) continue;
       const names = {}; for (const t of gr.touches) names[t.name] = (names[t.name] ?? 0) + 1;
@@ -875,11 +885,14 @@ export function planStudyWashes({ k, w, h, studies, flat = false, density = null
   const regions = { source: 'block-in study', labels: sheetLabels, regions: shapes.map((s, i) => ({ id: i + 1, colour: s.colour, paper: s.paper, parent: parent[i] >= 0 ? parent[i] + 1 : null, share: +(s.cells.length / pn).toFixed(4) })) };
   const washes = instructions.filter(q => q.stage !== 2).length;
   const summary = { source: 'study', flat, files: studies.map(st => st.file ?? null), layersOfStudy: perLayer, clusters, shapes: shapes.length, paperShapes: shapes.filter(s => s.paper).length, nested, softJoins, dabbed, stages: byStage.filter(Boolean).length, washesByStage: byStage, mixes: mixes.length, washes, charges, planCellMm: mmX, reservedShare,
-    paintedShare: covered.reduce((a, v) => a + v, 0) / pn, meanWashMm2: areas.reduce((a, v) => a + v, 0) / Math.max(1, areas.length), medianWashMm2: areas.length ? areas[areas.length >> 1] : 0, smallestWashMm2: areas[0] ?? 0, plannedStrokes: strokeCount, drawn, stagesAt };
+    paintedShare: covered.reduce((a, v) => a + v, 0) / pn, meanWashMm2: areas.reduce((a, v) => a + v, 0) / Math.max(1, areas.length), medianWashMm2: areas.length ? areas[areas.length >> 1] : 0, smallestWashMm2: areas[0] ?? 0, plannedStrokes: strokeCount, drawn, stagesAt, touchLog };
   console.log(`study washes: the wash plan is read from ${studies.length} block-in ${studies.length > 1 ? 'studies' : 'study'} (${studies.map(st => `${st.file ?? '?'}${st.minMm2 ? ` from ${st.minMm2} mm2` : ''}`).join(', ')}), not from the subject (the subject only registers the studies to the sheet${studies[0].registered ? `: ${studies[0].registered}` : ''} and scores the plate; the palette and the drawing are the painter's own as before)${flat ? '; FLAT: plain fills, for comparison' : ''}`);
   perLayer.forEach((pl, li) => console.log(`study washes, layer ${li + 1}${pl.accent ? ' (accents)' : pl.mode === 'glaze' ? ' (connected glazes)' : ''}: ${pl.study}, shapes from ${pl.minMm2 ?? '-'} mm2, registered by ${pl.shift.join(',')} cells: ${pl.washes} washes, ${pl.strokes} strokes`));
   console.log(`study washes: study maker by file name: ${studies.map(st => (/local|seed\d/.test(st.file ?? '') ? 'local image model (mflux)' : 'not named (the RunPod studies carry no tag)')).filter((v, i, a) => a.indexOf(v) === i).join(' and ')}`);
   console.log(`study washes: ${COPY_TEST}`);
+  const fmtT = t => `${t.wash ? 'glaze' : t.name} ${t.areaMm2.toFixed(0)} mm2 (${t.length.toFixed(0)} x ${t.width.toFixed(1)} mm) L* ${t.L.toFixed(0)} at ${t.cx},${t.cy} mm, layer ${t.layer}`;
+  console.log(`study washes, the ten largest touches: ${[...touchLog].sort((a, b) => b.areaMm2 - a.areaMm2).slice(0, 10).map(fmtT).join('; ')}`);
+  console.log(`study washes, the ten darkest marks: ${touchLog.filter(t => !t.wash).sort((a, b) => a.L - b.L).slice(0, 10).map(fmtT).join('; ')}`);
   console.log(`study washes: ${clusters} colours, ${shapes.length} block-in shapes (${summary.paperShapes} left as paper, ${(100 * reservedShare).toFixed(1)}% of the sheet); ${washes} washes (${byStage[0]} first, ${byStage[2]} over a lighter wash, ${byStage[3]} accents), ${nested} nested, ${softJoins} laid against a damp neighbour, ${dabbed} in dabs, ${charges} charges, ${glazes} glazes; ${strokeCount} strokes`);
   return { opticsReport: null, paper: null, style: null, layers, instructions, protectedCells: null, value: inkValue ?? { values: density ?? new Float32Array(n) }, regions, omittedDemand: 0, lightShapes, summary, mixes, polygons,
     geometry: 'Washes from a stack of block-in studies, coarse to fine: the block-in\'s flat shapes, each one mix, lightest and largest first, a darker shape of like hue laid over its lighter one (wash within wash), close values laid against each other damp, broken masses in dabs, the darkest small shapes last; each richer study adds only where it is darker or stronger than what is laid. Whites left as paper.' };
