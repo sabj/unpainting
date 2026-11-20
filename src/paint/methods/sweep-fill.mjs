@@ -343,8 +343,13 @@ const TIP = 0.35;
 const END_REACH = 0.5;
 /** Lanes overlap by this share of the brush's width. */
 const LANE_OVERLAP = 1 / 3;
-/** A shape is laid along its long axis when it is at least this many times as long as it is wide; else level. */
-const LONG = 2.2;
+/** A lane may lay its paint this far (mm, or this share of the brush's radius) past the outline beside it: held to the
+ * outline exactly, every lane near an edge or a notch was pressed so lightly it laid a thin line with bare paper between
+ * it and the next (a round lays r (0.25 + 0.75 p) to each side). The wash's edge is where the brush ends, a little loose. */
+const SPILL_MM = 1.5, SPILL_SHARE = 0.2;
+/** A shape is laid along its long axis when it is at least this many times as long as it is wide; else level (a tall window
+ * laid in level lanes is a stack of short strokes, each end a cap). */
+const LONG = 1.5;
 /** A part the lanes left bare (a wedge along a slanting side, a corner) is laid along its own length when it is this long. */
 const LEFT_LONG = 1.3;
 /** The brush is the smallest of the kit that lays the shape in at most this many lanes... */
@@ -422,7 +427,7 @@ export function laneFill(loops, { kitMm, growMm = 0, keepOut = null, spine = tru
     const fits = kit.filter(wd => wd <= widest && (wd <= fat || wd === kit[0]));
     if (!fits.length) return;
     let brush = fits.find(wd => Math.ceil(Math.max(0, across - wd) / (wd * (1 - LANE_OVERLAP))) + 1 <= MOST_LANES) ?? fits[fits.length - 1];
-    const r = brush / 2;
+    const r = brush / 2, spill = Math.min(SPILL_MM, SPILL_SHARE * r);
     if (!first) first = { brush, th, deep: deep * pitch };
     // lane centres: the outer ones nine tenths of the brush's radius in, so its edge lays the part's edge
     const inset = Math.min(across / 2, 0.9 * r), lanes = Math.max(1, Math.ceil(Math.max(0, across - 2 * inset) / (2 * r * (1 - LANE_OVERLAP))) + 1);
@@ -439,13 +444,18 @@ export function laneFill(loops, { kitMm, growMm = 0, keepOut = null, spine = tru
       const samples = [];
       for (let u = u0; u <= u1 + 1e-9; u += pitch / 2) {
         const x = u * tx + v * nx, y = u * ty + v * ny, i = at(x, y), dmm = i >= 0 && part[i] ? D[i] * pitch : 0;
-        samples.push({ u, dmm, in: dmm >= END_REACH * halfAt(r, TIP) });
+        samples.push({ u, dmm: dmm > 0 ? dmm + spill : 0, in: dmm >= END_REACH * halfAt(r, TIP) });
       }
       const runs = []; let cur = null;
       for (const sm of samples) { if (sm.in) (cur ??= []).push(sm); else if (cur) { runs.push(cur); cur = null; } }
       if (cur) runs.push(cur);
-      for (const run of runs) {
-        const len = run[run.length - 1].u - run[0].u; if (len < 0.6 * r) continue;
+      for (const run0 of runs) {
+        const len = run0[run0.length - 1].u - run0[0].u; if (len < 0.6 * r) continue;
+        // the engine lays a strip across the heading at each point and nothing past a stroke's last point, so the lane's
+        // ends are carried on to the outline, at the tip, where the outline
+        // is met; a lane's end that stops a cap's width short leaves a white seam against its neighbour
+        const ext = END_REACH * halfAt(r, TIP), a0 = run0[0], a1 = run0[run0.length - 1];
+        const run = [...(samples[0].u < a0.u ? [{ u: a0.u - ext, dmm: a0.dmm, in: true }] : []), ...run0, ...(a1.u < samples[samples.length - 1].u ? [{ u: a1.u + ext, dmm: a1.dmm, in: true }] : [])];
         const seq = k % 2 === 0 ? run : [...run].reverse(), every = Math.max(1, Math.round(r / 3 / (pitch / 2))), pts = [];
         seq.forEach((sm, q) => {
           if (q % every && q !== seq.length - 1) return;

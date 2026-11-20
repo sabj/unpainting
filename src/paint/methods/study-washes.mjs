@@ -266,6 +266,8 @@ const ABSORB_BORDER = 0.5;
 const LIGHT_LEAST_MM2 = 40;
 /** A lighter wash runs this far (mm) under a darker neighbour. */
 const UNDER_MM = 2;
+/** Any wash runs this far (mm) over a painted neighbour's edge. */
+const OVER_MM = 1;
 /** Shapes of one cluster this near (mm) are one wash. */
 const JOIN_MM = 2;
 /** Near-monochrome value steps: a wash whose study lightness spans at least this (L*, 10th to 90th percentile) is laid in
@@ -523,12 +525,16 @@ export function planStudyWashes({ k, w, h, studies, flat = false, density = null
     });
   }
   // a shape's outline: it and the darker shapes nested on it (its wash carried under them), rounded, off the true lights
-  // With `runUnder` (the wash's L*), it runs UNDER_MM on under the darker shapes beside it that are laid later, so a lighter
-  // wash and a darker one overlap instead of meeting at a hairline.
+  // With `runUnder` (the wash's L*), it runs UNDER_MM on under the darker shapes beside it that are laid later, and OVER_MM
+  // over any other painted neighbour (a thin rim of the study between two shapes is covered from both sides), so
+  // neighbouring washes overlap instead of meeting at a hairline.
   const outlineOf = (list, roundMm = roundFirst, runUnder = null) => {
     const m = new Uint8Array(pn); for (const i of list) for (const s of under(i)) for (const q of shapes[s].cells) m[q] = 1;
     const own = Uint8Array.from(m);
-    if (runUnder != null && !flat) { const g = dilate(own, pw, ph, rC(UNDER_MM)); for (let q = 0; q < pn; q++) if (g[q] && !own[q] && !paperMask[q] && !shapes[label[q]].paper && !done.has(label[q]) && shapes[label[q]].lab[0] < runUnder - NEST_LIGHTER) m[q] = 1; }
+    if (runUnder != null && !flat) {
+      const g = dilate(own, pw, ph, rC(UNDER_MM)), o = dilate(own, pw, ph, Math.max(1, rC(OVER_MM)));
+      for (let q = 0; q < pn; q++) if (g[q] && !own[q] && !paperMask[q] && !shapes[label[q]].paper && (o[q] || (!done.has(label[q]) && shapes[label[q]].lab[0] < runUnder - NEST_LIGHTER))) m[q] = 1;
+    }
     return { m: own, parts: partLoops(m, roundMm, paperMask) };
   };
   const phaseOf = i => { const s = shapes[i]; if (s.lab[0] < DARK_L && share(i) < DARK_SMALL) return 3; return parent[i] < 0 && fam[i] < 0 && s.lab[0] >= FIRST_L ? 1 : 2; };
