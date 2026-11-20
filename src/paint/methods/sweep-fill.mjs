@@ -11,7 +11,7 @@
 import { traceOutlines } from '../../crop/outline.mjs';
 
 /** Neighbouring sweeps overlap by this share of the brush's width, so the bead is carried. */
-export const SWEEP_OVERLAP = 0.3;
+const SWEEP_OVERLAP = 0.3;
 /** A brush fits a shape whose widest part is at least this many brush widths across. */
 const BRUSH_FIT = 1.1;
 /** A part left bare is filled when it is at least this share of a touch of the brush that fills it. */

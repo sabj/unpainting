@@ -25,7 +25,7 @@ import { targetValueMap, estimatePaper } from './light-to-dark.mjs';
 /** The plan's grid cell (mm): fine enough for a smooth outline, never finer than the sheet's cells. */
 const PLAN_MM = 0.5;
 /** Squint (Gaussian sigma, mm) for the reserved lights, the shadow shapes, the darks and the first wash's areas. */
-export const RESERVE_SIGMA_MM = 5, SHADOW_SIGMA_MM = 5, DARK_SIGMA_MM = 3.5, ZONE_SIGMA_MM = 5;
+const RESERVE_SIGMA_MM = 5, SHADOW_SIGMA_MM = 5, DARK_SIGMA_MM = 3.5, ZONE_SIGMA_MM = 5;
 /** Bare paper: squinted within this L* of the lighter of the paper and the picture's lightest tone, and no more chromatic than this. */
 const RESERVE_WITHIN = 7, RESERVE_CHROMA = 12;
 /** The least reserved light (mm2) and the brush (mm) that rounds its outline. */
