@@ -122,3 +122,14 @@ test('a named mark sets the handling the script leaves out', () => {
   assert.equal(st.length, 6); assert.ok(st.every(q => q.points[0][2] < 0.3 && Math.max(...q.points.map(v => v[2])) > 0.8));
   assert.equal(plan(script([{ ...wall, handling: { mark: 'drag' } }])).layers[0].shapes[0]._valuePlan.move, 'dry on dry');
 });
+
+test('a crop takes the same vector pen strokes, cut to its window and moved, never traced again', async () => {
+  const { cropVectors, cropLines } = await import('../../../tools/painter/pen-crop.mjs');
+  const doc = { sheetMm: 100, heightMm: 50, drawing: { w: 1000, h: 500 }, strokes: [
+    { seq: 0, dark: 1, path: [[5, 5], [8, 5]], widths: [1, 1], outline: [[[5, 4.5], [8, 4.5], [8, 5.5], [5, 5.5]]] },
+    { seq: 1, dark: 1, path: [[50, 20], [60, 20]], widths: [1, 1], outline: [[[50, 19.5], [60, 19.5], [60, 20.5], [50, 20.5]]] }] };
+  const v = cropVectors(doc, 40, 10, 30, 20);
+  assert.equal(v.strokes.length, 1); assert.deepEqual(v.strokes[0].path, [[10, 10], [20, 10]]); assert.equal(v.sheetMm, 30); assert.deepEqual(v.drawing, { w: 300, h: 200 });
+  const l = cropLines({ image: { w: 1000, h: 500 }, lines: [{ points: [[550, 200], [600, 200]] }, { points: [[10, 10], [20, 10]] }] }, 40, 10, 30, 20, 100);
+  assert.equal(l.lines.length, 1); assert.deepEqual(l.lines[0].points[0], [150, 100]);
+});
