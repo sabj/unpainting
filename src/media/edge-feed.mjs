@@ -13,11 +13,11 @@ import { contactDistance, cellEdgeFlux } from './contact-distance.mjs';
 
 const scratch = new WeakMap();
 // A fixed wash no longer has a contact-line evaporation demand.
-export function resetEdgeFeed(sheet) { scratch.delete(sheet); sheet.edgeDemandPending = 0; }
+export function resetEdgeFeed(sheet) { scratch.delete(sheet); sheet.edgeDemandPending = 0; if (sheet.edgePending) sheet.edgePending.fill(0); }
 function bufs(sheet) {
   let b = scratch.get(sheet);
   if (!b || b.n !== sheet.n) {
-    b = { n: sheet.n, lev: new Int32Array(sheet.n), order: new Int32Array(sheet.n), dem: new Float64Array(sheet.n), inner: new Float64Array(sheet.n), rho: new Float64Array(sheet.n), fx: new Float64Array(sheet.n), fy: new Float64Array(sheet.n), pressure: new Float64Array(sheet.n), pending: new Float64Array(sheet.n), cachedSink: new Float64Array(sheet.n), cachedMask: new Int32Array(sheet.n), ex: new Float64Array(sheet.n), geo: new Float32Array(sheet.n), footprint: new Uint8Array(sheet.n), cachedFootprint: new Uint8Array(sheet.n), cachedResist: new Uint8Array(sheet.n), cout: null, W0: new Float64Array(sheet.n) };
+    b = { n: sheet.n, lev: new Int32Array(sheet.n), order: new Int32Array(sheet.n), dem: new Float64Array(sheet.n), inner: new Float64Array(sheet.n), rho: new Float64Array(sheet.n), fx: new Float64Array(sheet.n), fy: new Float64Array(sheet.n), pressure: new Float64Array(sheet.n), cachedSink: new Float64Array(sheet.n), cachedMask: new Int32Array(sheet.n), ex: new Float64Array(sheet.n), geo: new Float32Array(sheet.n), footprint: new Uint8Array(sheet.n), cachedFootprint: new Uint8Array(sheet.n), cachedResist: new Uint8Array(sheet.n), cout: null, W0: new Float64Array(sheet.n) };
     scratch.set(sheet, b);
   }
   if (!b.cout || b.cout.length !== sheet.K) {
@@ -44,7 +44,11 @@ export function edgeFeed(sheet, o, box, mm) {
   mask.fill(0); let surfaceWater = 0;
   for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) { const i = y * w + x; mask[i] = M[i] || ever[i]; surfaceWater += W[i]; }
   if (!(surfaceWater > 0)) return 0;
-  const { fx, fy, pressure, cachedSink, cachedMask, cachedFootprint, cachedResist, pending } = b;
+  const { fx, fy, pressure, cachedSink, cachedMask, cachedFootprint, cachedResist } = b;
+  // the unmet demand is the sheet's own state, not scratch: a painting saved and taken over by a fresh process
+  // (tools/aware) carries it with the sheet, so it dries exactly as one painted without a break
+  if (!sheet.edgePending || sheet.edgePending.length !== sheet.n) sheet.edgePending = new Float64Array(sheet.n);
+  const pending = sheet.edgePending;
   // Damp pores can enlarge the work box without changing the liquid
   // footprint. That must not invalidate an identical pressure problem.
   const key = `${mm}:${E}:${edgeEvap}:${reach}:${o.holeSpan ?? 0}`;
@@ -122,6 +126,9 @@ export function edgeFeed(sheet, o, box, mm) {
     if (!(Etot > 0)) { for (let q = 0; q < n; q++) lev[order[q]] = 0; return 0; }
     cachedMask.set(lev); cachedSink.set(ex); cachedFootprint.set(mask);
     if (resist) cachedResist.set(resist); else cachedResist.fill(0);
+    // a cold start: a solve warm-started from the last one converges to a different last bit, so a painting taken over
+    // by a fresh process (whose scratch starts at zero) would not end as the one painted without a break
+    for (let q = 0; q < n; q++) pressure[order[q]] = 0;
     b.solve = dryingPressure(order, n, lev, w, ex, fx, fy, pressure);
     if (b.solve.relativeResidual > 1e-6) { b.key = null; lev.fill(0); throw new Error(`drying pressure did not converge: ${b.solve.relativeResidual}`); }
     b.count = n; b.key = key;

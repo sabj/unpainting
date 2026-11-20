@@ -745,7 +745,9 @@ function stepBox(sheet, o, box, reduce = false) {
   if (!(iters > 0)) for (let q = 0; q < nw; q++) went[wl[q]] = 0;
   const waterBefore = sc.waterBefore ??= new Float32Array(sheet.n);
   for (let it = 0; it < iters; it++) {
-    for (let q = 0; q < nw; q++) { const i = wl[q]; waterBefore[i] = W[i]; }
+    // both sides of every face: a face's far cell may be dry paper outside the wet list, and an unwritten entry there
+    // held the water of some earlier step (so a painting taken over by a fresh process did not end the same)
+    for (let q = 0; q < nw; q++) { const i = wl[q], fl = wf[q]; waterBefore[i] = W[i]; if (fl & 1) waterBefore[i + 1] = W[i + 1]; if (fl & 2) waterBefore[i + w] = W[i + w]; }
     if (mar) for (let q = 0; q < nw; q++) { const i = wl[q]; if (W[i] < 1e-4) { C[i] = 0; continue; } let c = 0; for (let k = 0; k < K; k++) c += G[k][i]; C[i] = Math.min(2, c / W[i]); }
     // Permeability can exceed one. Bounding flow alone does not bound the explicit stencil.
     for (let q = 0; q < nw; q++) {
