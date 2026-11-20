@@ -4,6 +4,7 @@ import {invalidatePaperCertificate} from '../../src/media/paper-certificate.mjs'
 import {EpochCells} from '../../src/paint/epoch-cells.mjs';
 import {check} from '../../src/media/checks.mjs';
 import {createScriptColourCheck} from '../painter/script-colour-check.mjs';
+import {isMarkPassage, pressedRadius} from '../../src/paint/methods/mark-swatch.mjs';
 import {inkMoved, INK_MOVED_MOST} from '../../src/paint/methods/ink-held.mjs';
 import {splitLoadsFeathered} from '../../src/paint/methods/brushes.mjs';
 import {passageBrushPaths, attachPlaneRamp as attachRampToPaths, planeRampApplies} from '../../src/paint/methods/passage-brush.mjs';
@@ -264,7 +265,7 @@ for (let L = L_START; L < ctx.layers.length; L++) {
   // one passage for the dry-paper gate: its reach is looked over once, before its first lane (passage-dry-gate.mjs)
   ctx.VALUE_PASSAGE = sh._valuePlan ? {} : null;
   // what this passage's own instrument delivers on scrap (instrument-cal.mjs); the charge below is divided by it
-  const ICAL = instrumentOf(T, sh);
+  const ICAL = instrumentOf(T, isMarkPassage(sh) ? null : sh);
   sh.dryAfter = T.dryAfter;
   // A passage is charged its planned amount: its mix was chosen for the shape as a whole from ONE colour (the study's flat
   // colour for the shape, through the mix chooser, study-washes.mjs). No look at the subject's per-cell pigment fit
@@ -487,7 +488,9 @@ for (let L = L_START; L < ctx.layers.length; L++) {
   // how many of this graded wash's sweeps lie over each cell, so each is charged for its share (sweepCount)
   const useGradedCal = Boolean(sh.graded || sh._valuePlan);
   // a wash plan's zigzag (laneFill) counts as the lanes it lays, each a pass over the cells it covers (zigzag-lanes.mjs)
-  const coverPaths = vectorPaths ? paths.flatMap(lanesOfPath).map(sweptPath) : paths;
+  // a passage of separate marks is counted at the width each mark is pressed to (its planned footprint), not at the
+  // brush's full width: a tapered touch counted at full width read as 1.5 to 2 marks deep and was charged half
+  const coverPaths = vectorPaths ? (isMarkPassage(sh) ? paths.map(pts => pts.map(q => ({ ...q, r: Math.max(0.5, pressedRadius(q.r, q.p)) }))) : paths.flatMap(lanesOfPath).map(sweptPath)) : paths;
   const coverStarted = performance.now(), SHARE = num('gradedshare', 0.6), UNDER = useGradedCal && !detail && SHARE > 0 ? sweepCount(coverPaths, W2, H2) : null;
   SPEED_PROFILE?.add('painting:sweep-count', performance.now() - coverStarted);
   let cachedCover;
@@ -502,7 +505,7 @@ for (let L = L_START; L < ctx.layers.length; L++) {
     ctx.WET_TRACE?.lane();
     if (wetEachLane) wetEachLane(pts);
     const r = vectorPaths ? Math.max(...pts.map(p => p.r)) : sh._valuePlan?.brush?.sizeMm?sh._valuePlan.brush.sizeMm/(2*(num('sheetmm', DEFAULT_SHEET_MM)/W2)):(r0 => (PB && FLOOR ? PB.half(PB.pick(r0)) : r0))(Math.max(SC, Math.max(...pts.map(p => p.r))));
-    const CHARGE_CAL=ICAL.cal;
+    let CHARGE_CAL=ICAL.cal;
     const brush = detail
       ? createBrush({ grainShift: num('grainshift', 0), radius: r, bristles: Math.max(8, Math.ceil(r * 3)), capacity: 26, belly: 2, feed: 0.08,
           give: 0.7, free: 0.4, film: 0.22, splay: 0.06, stiffness: 5, wetMix: T.intoWet ? 0.6 : 0.15 * num('drymix', 1),
@@ -536,6 +539,11 @@ for (let L = L_START; L < ctx.layers.length; L++) {
     // the film the plan asks for over every place the brush goes, and a glaze run a little past its outline is a little
     // larger, not thinner. Spread over the paper past the study's cells, marks dried 30 to 45 L* pale and four glazes
     // planned to L* 31 left a window at L* 63 to 79.
+    // a passage of separate marks is charged from a swatch of its own mark, laid as deep as its marks overlap (mark-swatch.mjs)
+    if (isMarkPassage(sh)) {
+      if (!sh._markCal) { sh._markCal = instrumentOf(T, sh); console.log(`mark passage ${sh._valuePlan.script?.passage ?? sh._valuePlan.id}: ${paths.length} marks, ${sh._cover.toFixed(2)} deep over their footprint, charged ${sh._markCal.cal.toFixed(2)}x from their own swatch (a wash lane: ${ICAL.cal.toFixed(2)}x)`); }
+      CHARGE_CAL = sh._markCal.cal;
+    }
     if (sh._spread == null) sh._spread = detail || brush.model !== 'section' || vectorPaths ? 1 : Math.max(1, footprintSpread(paths, up(MASK), W2, H2));
     sh.laidShare = opening;
     // see GRADED_CAL: the whole scrap's delivery, less what runs past this passage's own open edge (in sheet cells)

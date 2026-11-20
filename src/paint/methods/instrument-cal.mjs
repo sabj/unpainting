@@ -33,9 +33,9 @@ export const chargedFromOwnSwatch = (T, { instrumentOn, authored }) => Boolean(i
  *   swatch's { all, escape, edge }, or null when no graded swatch is laid); measure: lays a swatch for a technique
  *   and returns the same reading.
  */
-export function createInstrumentCal({ stock, measure, log = () => {} }) {
+export function createInstrumentCal({ stock, measure, measureMark = null, markKey = null, log = () => {} }) {
   const stockKey = new Map(Object.entries(stock).map(([name, s]) => [name, instrumentKey(s.technique)]));
-  const own = new Map();
+  const own = new Map(), marks = new Map();
   const check = (key, r) => {
     if (!r || !(r.cal > 0) || !Number.isFinite(r.cal)) throw new Error(`instrument calibration: the swatch for ${key} gave no charge factor`);
     return { cal: r.cal, graded: r.graded ?? null };
@@ -52,6 +52,23 @@ export function createInstrumentCal({ stock, measure, log = () => {} }) {
       }
       return { ...own.get(key), key, stock: false };
     },
+    /**
+     * The swatch reading for a passage of separate marks (mark-swatch.mjs): laid with the passage's technique AND its own
+     * mark (brush, length, pressures), read at the mark's core. Washes never come here; `of` is unchanged for them.
+     */
+    ofMark(T, mark) {
+      if (!measureMark || !markKey) throw new Error('instrument calibration: no mark swatch can be laid here');
+      const key = `${instrumentKey(T)}|${markKey(mark)}`;
+      if (!marks.has(key)) {
+        const r = measureMark(T, mark);
+        if (!r || !(r.cal > 0) || !Number.isFinite(r.cal)) throw new Error(`instrument calibration: the mark swatch for ${key} gave no charge factor`);
+        marks.set(key, r);
+        log(`  ${T.name} mark, brush ${(2 * mark.radiusMm).toFixed(1)} mm, ${mark.lengthMm.toFixed(1)} mm long, pressure ${mark.pressure.toFixed(2)}, ${(mark.depth ?? 1) >= 1.25 ? `${mark.depth.toFixed(1)} deep in a mass` : 'apart'}: its own swatch charges ${r.cal.toFixed(2)}x (core delivers ${r.delivered.toFixed(2)}, whole footprint ${r.whole.toFixed(2)}, paint covers ${(100 * r.coverage).toFixed(0)}% of the planned footprint)`);
+      }
+      return { ...marks.get(key), graded: null, key, stock: false };
+    },
+    /** The mark swatches laid, for a report. */
+    markEntries: () => [...marks].map(([key, r]) => [key, { ...r }]),
     /** The stock swatch of a technique's name whatever its load: the calibration before this module. Unknown names charge 1. */
     byName(name) { const s = stock[name]; return { cal: s?.cal ?? 1, graded: s?.graded ?? null, key: null, stock: true }; },
     /** The swatches laid beyond the stock ones, for a cache or a report. */

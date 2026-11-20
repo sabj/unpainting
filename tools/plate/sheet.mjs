@@ -27,6 +27,7 @@ import {recordGraphiteBatch} from '../painter/record-graphite.mjs';
 import {SWATCH, swatchMask, swatchLanes, scrapDelivery, chargeFactor} from '../../src/paint/methods/scrap-swatch.mjs';
 import {painterBrushOptions, isSection} from './painter-brush.mjs';
 import {createInstrumentCal, instrumentKey, chargedFromOwnSwatch} from '../../src/paint/methods/instrument-cal.mjs';
+import {representativeMark, markKey, markLayout, markDelivery, isMarkPassage} from '../../src/paint/methods/mark-swatch.mjs';
 import {nativeDryOptions} from '../painter/native-paint-mode.mjs';
 import {measurePaperBatch, measureBrush} from '../../src/paint/methods/wetdry.mjs';
 import {productionWaterLoad} from '../painter/production-water-load.mjs';
@@ -735,6 +736,18 @@ const scrapSwatches = (techniques, drySwatch) => {
     return { technique: T, plain: scrapDelivery(T, env), graded: CHUNK ? scrapDelivery({ ...T, name: `${T.name} graded`, chunk: CHUNK }, env) : null };
   });
 };
+// One mark on scrap (src/paint/methods/mark-swatch.mjs), with the brushes, dip, stroke, bed and drying the lane swatches use.
+const scrapMark = (T, mark) => {
+  const sheetMm = PAPER_OPTS.mmPerCell ?? 0, L = markLayout(mark, sheetMm);
+  const opts = (r, T) => ({ flat: false, radius: r, bristles: Math.max(12, Math.ceil(r * 2)), capacity: 100, belly: 12, feed: 0.4, give: 0.9, free: num('washfree', 0.4), film: 0.25, splay: WASH_FLAT_SPLAY, stiffness: 8, wetMix: MIX(T), bridge: washBridge(T, T.bridge), bridgeSoft: T.bridgeSoft, seed: 11 });
+  const contactOf = (scrap, pts, r, T) => { const b = createBrush(opts(r, T)); dipBrush(b, { water: WET(T), conc: [0] }); const c = candidateContact(b, scrap, pts, { upright: UPRIGHT, clip: null, neighborRadius: 0, includeTouched: false }); return c.cells.filter(i => c.primaryMask[i]); };
+  const prepareBed = (scrap, pts, r, T, cells = contactOf(scrap, pts, r, T)) => prepareWetBed({ settings: opts(r, T), bristles: Math.max(12, Math.ceil(r * 2)), seed: 911, pigments: 1, target: scrap, points: pts, prepOpts: { upright: UPRIGHT, lift: false },
+    observe: () => measurePaper(scrap, cells, SPEED_PAPER, { uniform: false }), gate: () => measurePaper(scrap, cells, SPEED_PAPER, { stats: 'gate' }), advance: () => step(scrap, { ...O, dt: 2 }), createBrush, dip, thirsty, stroke });
+  const settle = (scrap, cells) => { const observe = () => measurePaper(scrap, cells, SPEED_PAPER, { uniform: false }); layIntoWetBed({ paper: observe(), observe, step: o => step(scrap, o), O, info: { scrap: 'wet on wet mark swatch', cells: cells.length } }); };
+  return markDelivery(T, { mask: L.mask, paths: L.paths, pigment: PIGS[0], physics: O, paperOptions: { ...PAPER_OPTS, seed: 5, mmPerCell: L.mm, ...(PAPER_OPTS.coldPress ? { coldPress: { ...PAPER_OPTS.coldPress, mmPerCell: L.mm } } : {}) },
+    charge: SWATCH.want * num('strength', 2.2) / L.cover, upright: UPRIGHT, water: WET, dip, stroke, step, settle, prepareBed,
+    dry: (scrap, max, o, options) => physicalDry(scrap, max, o, nativeDryOptions(NATIVE_PAINT_MODE.mode, options)), paintBrush: (r, T) => createBrush(opts(r, T)) });
+};
 const gradedReading = g => (g ? { all: g.all, escape: g.escape, edge: g.edge } : null);
 const CAL_RESULT = await cachedStep({...RUN_CACHE,name:'calibration',enabled:RUN_CACHE.enabled,code:CODE_HASH,track:optTrack,inputs:{pigment:PIGS[0],O,PAPER_OPTS,GCHUNK,BRUSH,swatchBrush:swatchBrush(),UPRIGHT,LOADED_CONTACT,WASH_SPLAT_SETTINGS,settles:Boolean(ctx.VALUE_PLAN),physical:PB?{cfg:PB.cfg,mmPerCell:PB.mmPerCell}:null}},async () => {
   const out = {};
@@ -758,10 +771,20 @@ const INSTRUMENT_CAL = createInstrumentCal({
   stock: Object.fromEntries(STOCK_TECHNIQUES.map(T => [T.name, { technique: T, cal: CAL[T.name], graded: GRADED_CAL[`${T.name} graded`] ?? null }])),
   // the scrap dries as the stock swatches do, without touching the painting's own wet-contact records
   measure: T => { const [{ plain, graded }] = scrapSwatches([T], (scrap, max, o, options) => physicalDry(scrap, max, o, nativeDryOptions(NATIVE_PAINT_MODE.mode, options))); return { cal: chargeFactor(plain.delivered), graded: gradedReading(graded) }; },
+  // a mark's swatch: the mark itself on the sheet's own paper, its brush a round of its width, charged as a passage
+  // of separate marks is (no overlap to divide by), so that the mark's whole planned footprint holds the planned paint
+  // (what the preview draws and the planned-against-laid table measures); where the paint covers less of the footprint
+  // than planned the swatch line says so
+  measureMark: (T, mark) => { const r = scrapMark(T, mark); return { cal: chargeFactor(r.whole), delivered: r.delivered, whole: r.whole, coverage: r.coverage }; },
+  markKey,
   log: line => console.log(line),
 });
 const ownSwatch = T => chargedFromOwnSwatch(T, { instrumentOn: true, authored: false });
-const instrumentOf = T => (ownSwatch(T) ? INSTRUMENT_CAL.of(T) : INSTRUMENT_CAL.byName(T.name));
+// a passage of separate marks (a painting script's strokes, touches and lines) is charged from a swatch of its own mark
+const instrumentOf = (T, sh = null) => {
+  if (ownSwatch(T) && isMarkPassage(sh)) { const mark = representativeMark(sh._valuePlan.strokes); if (mark) return INSTRUMENT_CAL.ofMark(T, { ...mark, depth: sh._cover ?? 1 }); }
+  return ownSwatch(T) ? INSTRUMENT_CAL.of(T) : INSTRUMENT_CAL.byName(T.name);
+};
 // every instrument the value plan names is tried on scrap before the first wash
 if (ctx.VALUE_PLAN) {
   const planned = [...new Map(ctx.layers.flatMap(l => (l.shapes ?? []).filter(sh => sh._valuePlan).map(sh => [sh, valueTechnique(sh._valuePlan)])).filter(([, T]) => ownSwatch(T)).map(([, T]) => [instrumentKey(T), T])).values()];
