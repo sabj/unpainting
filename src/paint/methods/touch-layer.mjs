@@ -1,13 +1,13 @@
 // A layer of touches from a richer study, laid over the dry washes: the small shapes the study shows that the washes
 // before it have not laid (a stone warmer or cooler than the wall, a streak of cast shadow, a pane, a leaf cluster),
-// each ONE mark of the brush chosen by its shape (marks.mjs markFor), not a filled outline. Watercolour only darkens,
+// each ONE mark of the brush chosen by its shape (src/paint/marks markFor), not a filled outline. Watercolour only darkens,
 // so a touch goes only where the study is darker than what is laid, or as dark but of another hue (a warm or cool
 // change). Touches are ranked by what they add (area times the change) and only the noise tail is left out: shapes
 // smaller than the least size, and changes too faint to see. Touches of one colour are one mix, laid in one session.
 // Plan time only. Reads the study, never the subject.
 import { labOf } from '../../eval/colour.mjs';
 import { kmeans } from './study-shapes.mjs';
-import { shapeGeometry, markFor } from './marks.mjs';
+import { shapeGeometry, markFor } from '../marks/index.mjs';
 
 /** A touch where the study is at least this much darker (L*) than what is laid, or this far off its hue (a*b*) and not lighter. */
 const DARKER = 3, HUE_OFF = 6, NOT_LIGHTER = 3;

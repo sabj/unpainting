@@ -24,7 +24,7 @@ import { mixFor, mixOver, filmLab } from './puddles.mjs';
 import { kmeans, roundMask, dilate } from './study-shapes.mjs';
 import { monoAt } from './mono-mix.mjs';
 import { touchesFrom } from './touch-layer.mjs';
-import { shapeGeometry, markFor } from './marks.mjs';
+import { shapeGeometry, markFor } from '../marks/index.mjs';
 
 /** The plan's grid cell (mm). */
 const PLAN_MM = 0.5;
@@ -645,7 +645,7 @@ export function planStudyWashes({ k, w, h, studies, flat = false, density = null
     session = { stage: 1, list: [made], ids: new Set([r]) };
     session.list.push(...lifeFor(made, s.cells, shapes, r, new Set(under(r)), what));
     // the family's shapes of another hue but a close value are dropped into the wet under-wash where they sit, each as
-    // marks of the brush shaped to it (marks.mjs): they mingle with it, their edges lost; darker ones are glazed later on
+    // marks of the brush shaped to it (src/paint/marks): they mingle with it, their edges lost; darker ones are glazed later on
     // the dry wash, their edges found
     if (!flat && !MONO) for (const m of members) {
       const t = shapes[m]; if (m === r || t.paper || isDark(m) || done.has(m)) continue;

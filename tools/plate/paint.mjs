@@ -278,7 +278,7 @@ for (let L = L_START; L < ctx.layers.length; L++) {
   // --texflow: texture density over a shape is one number from a 'texture' look; direction comes from the planned flow field
   const flowDark=sh._valuePlan?.texture&&num('texflow',0)>0?(()=>{const lk=paintingLook('texture',`L${L + 1}/s${shIdx}`,MASK,{box:{...MB,w},ref:['px']});if(!lk)return .5;const [r,g,b]=lk.ref.px;return Math.max(0,Math.min(1,1-(.2126*r+.7152*g+.0722*b)/250));})():1;
   // a stroke plan: the passage's strokes and their charge factors were planned before painting (stroke-plan.mjs)
-  const PATH_FACTOR=new WeakMap(),PATH_RAMP=new WeakMap(),strokePlanPaths=s=>s._strokePlan.paths.map((ps,k)=>{const q=ps.map(p=>({...p,x:p.x*SC,y:p.y*SC,r:p.r*SC}));PATH_FACTOR.set(q,s._strokePlan.factors[k]);if(s._strokePlan.ramps?.[k])PATH_RAMP.set(q,s._strokePlan.ramps[k]);return q;});
+  const PATH_FACTOR=new WeakMap(),PATH_RAMP=new WeakMap(),PATH_HAND=new WeakMap(),strokePlanPaths=s=>s._strokePlan.paths.map((ps,k)=>{const q=ps.map(p=>({...p,x:p.x*SC,y:p.y*SC,r:p.r*SC}));PATH_FACTOR.set(q,s._strokePlan.factors[k]);if(s._strokePlan.ramps?.[k])PATH_RAMP.set(q,s._strokePlan.ramps[k]);return q;});
   // the plan's graded plane (graded-demand.mjs) carries the grade through the physical loads below; the single-sweep
   // pressure ramp stands in for it only where there are no physical loads
   const attachPlaneRamp = raw => attachRampToPaths(raw, PB && sh._plane ? null : (sh._rampVec ?? sh._valuePlan?.rampVec), SC, PATH_RAMP);
@@ -293,7 +293,7 @@ for (let L = L_START; L < ctx.layers.length; L++) {
   // A lane is swept with a flat; every other stroke of a wash is a round's (its footprint a disc, as the plan counts it).
   // a wash plan's strokes are a list of laid strokes (layered-washes.mjs), each charged at its own share of the mix (a
   // graded wash: water added at each recharge); a light-to-dark plan's are a count and lane widths for its stroke plan
-  const vectorPaths = Array.isArray(sh._valuePlan?.strokes) ? sh._valuePlan.strokes.map(st => { const round = st.kind !== 'lane' && !st.flat, r = round || st.flat ? Math.max(SC, st.radiusMm * CELLS_PER_MM) : brushFor(st.radiusMm * CELLS_PER_MM); const path = st.points.map(q => ({ x: q[0] * CELLS_PER_MM, y: q[1] * CELLS_PER_MM, r: q[4] != null ? Math.max(0.5, r * q[4]) : r, p: q[2] ?? 1, round, ...(q[3] > 0 ? { v: q[3] } : {}), ...(st.angle != null ? { blade: st.angle } : {}) })); if (st.charge) PATH_FACTOR.set(path, st.charge); return path; }) : null;
+  const vectorPaths = Array.isArray(sh._valuePlan?.strokes) ? sh._valuePlan.strokes.map(st => { const round = st.kind !== 'lane' && !st.flat, r = round || st.flat ? Math.max(SC, st.radiusMm * CELLS_PER_MM) : brushFor(st.radiusMm * CELLS_PER_MM); const path = st.points.map(q => ({ x: q[0] * CELLS_PER_MM, y: q[1] * CELLS_PER_MM, r: q[4] != null ? Math.max(0.5, r * q[4]) : r, p: q[2] ?? 1, round, ...(q[3] > 0 ? { v: q[3] } : {}), ...(st.angle != null ? { blade: st.held === 'fixed' ? st.angle - 90 : st.angle } : {}) })); if (st.charge) PATH_FACTOR.set(path, st.charge); if (st.held === 'fixed' || st.water != null) PATH_HAND.set(path, { fixed: st.held === 'fixed', water: st.water ?? 1 }); return path; }) : null;
   const shapedPaths = vectorPaths ? vectorPaths : sh._valuePlan?.shaped ? (sh._strokePlan ? strokePlanPaths(sh) : attachPlaneRamp(rawShapedPaths())) : null;
   let detail = !sh._valuePlan && through > num('detailfrom', 2);
   // A graded wash runs down its gradient and is not walked, so each few cells can be charged for where they are (--gradedwash).
@@ -549,7 +549,7 @@ for (let L = L_START; L < ctx.layers.length; L++) {
       });
     }
 
-    const initialLoad={ water: detail ? Math.min(T.water, num('detailwater', 0.3)) : WET(T), conc: sh.mix.map((v, j) => v * DCAL(sh, j) * TCAL(sh, T, detail, layer.value) * num('strength', 2.2) * CHARGE_CAL * opening * PF / sh._cover / sh._spread * sh._under * (sh._fb ?? 1) * (detail ? num('detailstrength', 2.0) : 1)) };
+    const initialLoad={ water: (detail ? Math.min(T.water, num('detailwater', 0.3)) : WET(T)) * (PATH_HAND.get(pts)?.water ?? 1), conc: sh.mix.map((v, j) => v * DCAL(sh, j) * TCAL(sh, T, detail, layer.value) * num('strength', 2.2) * CHARGE_CAL * opening * PF / sh._cover / sh._spread * sh._under * (sh._fb ?? 1) * (detail ? num('detailstrength', 2.0) : 1)) };
     productionDip(brush,initialLoad);
     const cadence=nativeBodyCadence({mode:NATIVE_PAINT_MODE.mode,enabled:Boolean(FAST_BODY_ENABLED),detail,instructionBound:false,technique:T.name,radiusCells:r,mmPerCell:num('sheetmm', DEFAULT_SHEET_MM)/W2,every:flowEvery(paths.length),spacing:FAST_BODY_SPACING});
     if(cadence.approximated)BODY_CADENCE_RECORD.sourceSweepsSelected++;
@@ -618,7 +618,7 @@ for (let L = L_START; L < ctx.layers.length; L++) {
       let st = 0;
       clock('strokes', () => { for (let pass = 0; pass < T.passes; pass++) chunks.forEach((ch, k) => { runCharge(ch, { water: WET(T), conc: base.map(v => v * f[k] / mean) }, { upright: UPRIGHT, flowEvery: every, gpuBetween: true, lift: !GFLOOR || k === chunks.length - 1, between: () => { if (++st % every === 0) clock('flow', () => step(ctx.sheet, O)); } },o=>numericalStroke(brush, ctx.sheet, ch, o)); }); });
     } else
-    clock('strokes', () => { for (let pass = 0; pass < T.passes; pass++) runCharge(shaped, initialLoad, { upright: UPRIGHT, flowEvery: every, gpuBetween: true, between: s => { if (s % every === 0) clock('flow', () => step(ctx.sheet, O)); } },o=>numericalStroke(brush, ctx.sheet, shaped, o),{alreadyLoaded:true}); });
+    clock('strokes', () => { for (let pass = 0; pass < T.passes; pass++) runCharge(shaped, initialLoad, { upright: PATH_HAND.get(pts)?.fixed ? true : UPRIGHT, flowEvery: every, gpuBetween: true, between: s => { if (s % every === 0) clock('flow', () => step(ctx.sheet, O)); } },o=>numericalStroke(brush, ctx.sheet, shaped, o),{alreadyLoaded:true}); });
     ctx.laid++;
     // --filmby paint: a frame each time the planned mass laid crosses the next equal share of the plan's; each sweep
     // of the passage is booked an equal part of the passage's mass
