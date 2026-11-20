@@ -36,7 +36,7 @@ const ORDER_DEFAULTS = Object.freeze({
   structureMm: 12,      // pass 1: the big structure, smooth lines at least this long (of every mass, main mass first)
   fineMm: 4,            // pass 3: lines shorter than this are fine detail, laid after every object's outline and divisions
   hatching: 'drawn',
-  threshold: 0,         // lay only strokes whose contribution (stroke-contribution.mjs) is at least this (0: everything)
+  threshold: 0,         // lay only strokes whose contribution (mm2 of ink, stroke-contribution.mjs) is at least this (0: everything)
   objectFloor: 3,       // ... and whatever their rank each object's strongest few strokes and its outline: no element vanishes
   massKeep: 0.3,        // at ink 'forms', inside a mass also the strongest share of its short marks (leaf-cluster curves)
   unitShare: 0.2,       // ... an object is the largest thing round a stroke under this share of the sheet (a window, not the wall)
@@ -383,7 +383,7 @@ export function orderStrokes(strokes, widthMm, heightMm, o = {}) {
     inMass.sort((a, b) => (b.contribution ?? 0) - (a.contribution ?? 0)).slice(Math.ceil(c.massKeep * inMass.length)).forEach(s => { s.taken = true; s.dropped = true; });
   }
   const byObj = new Map(); for (const s of joined) { if (!byObj.has(s.object)) byObj.set(s.object, []); byObj.get(s.object).push(s); }
-  // CONTRIBUTION THRESHOLD: strokes that add less than `threshold` of the drawing's ink (structure-weighted) are not laid,
+  // CONTRIBUTION THRESHOLD: strokes that add less than `threshold` mm2 of the drawing's ink (structure-weighted) are not laid,
   // except each object's strongest `objectFloor` strokes and its outline lines, so every element keeps its form
   if (c.threshold > 0) {
     const keep = new Set();

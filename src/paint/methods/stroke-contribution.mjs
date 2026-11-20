@@ -1,5 +1,5 @@
 // Pipeline: inking, stage 3b (what of a traced drawing is laid). DOM free, no file IO.
-// Each stroke's contribution: the share of the drawing's ink (darkness x area, at the stroke's own width and weight) it
+// Each stroke's contribution: the drawing's ink (darkness x area, at the stroke's own width and weight) it
 // accounts for that the strokes ranked above it do not already cover, times a structure term (long, connected, on an
 // outline), so a thin defining contour outranks a fat scribble and a crumb isolated from every form ranks last. Ranking is
 // greedy in two passes: by own ink x structure, then by the ink left after the strokes above. What is laid is everything
@@ -24,7 +24,8 @@ function along(P, widths, width, step) {
 /**
  * strokes: [{ points (mm), width (mm), widths? (mm per point), weight (0..1), role, len?, touches? (an end meets another line) }];
  * a stroke made of several pieces gives `paths: [{ points, width, widths? }]` instead of its own points and widths.
- * Returns { contribution: Float64Array (share of the drawing's ink each stroke adds, structure-weighted), rank: Int32Array
+ * Returns { contribution: Float64Array (the ink each stroke adds over the strokes above it, mm2 x darkness, structure-weighted:
+ * a mark's own size, whatever the size of the drawing), share: Float64Array (the same as a share of the drawing's ink, unweighted), rank: Int32Array
  * (0 = most), order: indices most first, total: the drawing's ink (mm2 x darkness), curve: cumulative share by rank }.
  */
 export function strokeContributions(strokes, widthMm, heightMm, o = {}) {
@@ -57,13 +58,13 @@ export function strokeContributions(strokes, widthMm, heightMm, o = {}) {
   for (const i of first) { let a = 0; for (const [k, v] of foot[i]) { const add = Math.max(0, Math.min(v, ink[k]) - got[k]); if (add > 0) { a += add; got[k] += add; } } left[i] = a; }
   const order = [...Array(n).keys()].sort((a, b) => left[b] * struct[b] - left[a] * struct[a]);
   got.fill(0);
-  const contribution = new Float64Array(n), rank = new Int32Array(n), curve = new Float64Array(n);
+  const contribution = new Float64Array(n), share = new Float64Array(n), rank = new Int32Array(n), curve = new Float64Array(n);
   let cum = 0;
   order.forEach((i, r) => {
     let a = 0; for (const [k, v] of foot[i]) { const add = Math.max(0, Math.min(v, ink[k]) - got[k]); if (add > 0) { a += add; got[k] += add; } }
-    cum += a; curve[r] = cum / total; rank[i] = r; contribution[i] = (a / total) * struct[i];
+    cum += a; curve[r] = cum / total; rank[i] = r; share[i] = a / total; contribution[i] = a * cell * cell * struct[i];
   });
-  return { contribution, rank, order, total, curve };
+  return { contribution, share, rank, order, total: total * cell * cell, curve };
 }
 
 /** The number of strokes (in rank order) that capture each share of the drawing's ink. */

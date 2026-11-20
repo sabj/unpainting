@@ -120,7 +120,7 @@ test('contribution threshold: a crumb under the threshold is left, every object 
   const S = [...box(10, 10, 90, 60), ...box(20, 20, 35, 40), seg(27.5, 20, 27.5, 40), seg(60, 30, 60.3, 30), seg(60.2, 30, 60.4, 30.1)];
   const all = orderStrokes(S, 100, 70, { mode: 'growth', layIn: 0, emphasisShare: 0, contributions: true });
   assert.ok(all.every(x => x.contribution != null), 'every stroke carries its contribution');
-  const r = orderStrokes(S, 100, 70, { mode: 'growth', layIn: 0, emphasisShare: 0, threshold: 2e-3, objectFloor: 1 });
+  const r = orderStrokes(S, 100, 70, { mode: 'growth', layIn: 0, emphasisShare: 0, threshold: 0.5, objectFloor: 1 });
   const laid = r.flatMap(x => x.parts);
   for (const k of [0, 1, 2, 3, 4, 5, 6, 7]) assert.ok(laid.includes(k), `outline ${k} kept`);
   assert.ok(!laid.includes(10), 'the overlapping crumb is left');

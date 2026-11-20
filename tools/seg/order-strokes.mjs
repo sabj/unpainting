@@ -5,17 +5,18 @@
 // The drawing hand keeps a file whose every line has a seq in that order (drawing-hand.mjs).
 // usage: node tools/seg/order-strokes.mjs IN-lines.json OUT-stem --sheetmm 280 [--ink none|forms|full --masses mask.png] [--weight structure] [--order passes|growth] [--touch light|medium|firm] [--hatching none|sparse|drawn] [--threshold C]
 // --ink: how much is drawn inside the painted masses of --masses (stroke-order.mjs).
-// --threshold C: strokes adding less than C of the drawing's ink (stroke-contribution.mjs) are not laid; each object keeps its
-// form. The default is the noise floor (marks that do not recur between two drawings of the subject); 0 lays everything.
+// --threshold C: strokes adding less than C mm2 of ink (structure-weighted, stroke-contribution.mjs) are not laid; each object
+// keeps its form. The default is the noise floor (NOISE_FLOOR: specks and slivers); 0 lays everything.
 // There is no stroke count: --budget was removed.
 import fs from 'node:fs';
 import sharp from 'sharp';
 import { orderStrokes, orderStats, pathLength, structureWeight, growthWeight } from '../../src/paint/methods/stroke-order.mjs';
 import { strokesFor } from '../../src/paint/methods/stroke-contribution.mjs';
 
-// the contribution under which a stroke is jitter, not drawing: the level below which most strokes of one drawing have no
-// counterpart in a second drawing of the same subject (Yale, seeds 42 and 43; replay/r6/recur.py)
-export const NOISE_FLOOR = 2e-5;
+// the contribution (mm2 of ink added, structure-weighted) under which a mark is a crumb, not a pen stroke: about a 0.4 by
+// 0.3 mm speck, or a sliver over ink already laid. Below it marks recur less between two drawings of one subject (Yale seeds
+// 42 and 43: 25 to 31% have no counterpart against 17 to 22% above it); no level is mostly jitter (replay/r6/recur.py)
+const NOISE_FLOOR = 0.2;
 
 const [inFile, outStem, ...rest] = process.argv.slice(2);
 if (rest.includes('--budget')) { console.error('--budget was removed in 0.4: no stroke count limits the ink; what is laid is set by --threshold (stroke contribution, default the noise floor)'); process.exit(2); }
