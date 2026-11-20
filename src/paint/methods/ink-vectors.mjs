@@ -47,22 +47,71 @@ export function inkForDarkness(darkOf, tMax = 64, n = 400) {
   };
 }
 
+const ringArea = r => { let a = 0; for (let k = 0, n = r.length; k < n; k++) { const p = r[k], q = r[(k + 1) % n]; a += p[0] * q[1] - q[0] * p[1]; } return a / 2; };
+const ringLength = r => { let L = 0; for (let k = 0, n = r.length; k < n; k++) { const p = r[k], q = r[(k + 1) % n]; L += Math.hypot(q[0] - p[0], q[1] - p[1]); } return L; };
+
+/**
+ * A FILL (a leaf mass, a dark pane, a blot), not a LINE: its ink (outer rings less holes) is wider than `widthMm` (twice its
+ * area over its perimeter, the width of a strip) or covers over `areaMm2` and is over 0.8 of that wide, and is COMPACT:
+ * under four widths long (half its perimeter under five widths). Anything longer is a line at any width (a thick branch is laid whole). Same rule as tools/seg/ink-vectors.py is_fill.
+ */
+export function isFill(stroke, widthMm = 0.5, areaMm2 = 1.5) {
+  const a = Math.abs(stroke.outline.reduce((t, r) => t + ringArea(r), 0)), per = stroke.outline.reduce((t, r) => t + ringLength(r), 0);
+  const w = 2 * a / Math.max(per, 1e-9), L = per / 2;
+  return L < 5 * w && (w > widthMm || (a > areaMm2 && w > 0.8 * widthMm));
+}
+
+const pathLength = P => P.reduce((t, q, k) => (k ? t + Math.hypot(q[0] - P[k - 1][0], q[1] - P[k - 1][1]) : 0), 0);
+/** A fill's width: twice its area over its perimeter. */
+function fillWidth(stroke) { const a = Math.abs(stroke.outline.reduce((t, r) => t + ringArea(r), 0)), per = stroke.outline.reduce((t, r) => t + ringLength(r), 0); return 2 * a / Math.max(per, 1e-9); }
+/** Distance from (x, y) to a polyline. */
+function polylineDistance(P, x, y) { return edgeDistance([P.slice(0, -1).concat([P[P.length - 1]])].map(r => r), x, y, false); }
+
+/** Distance from (x, y) to the nearest edge of the rings (same unit). */
+function edgeDistance(R, x, y, closed = true) {
+  let best = Infinity;
+  for (const r of R) for (let k = 0, n = r.length; k < (closed ? n : n - 1); k++) {
+    const a = r[k], b = r[(k + 1) % n], dx = b[0] - a[0], dy = b[1] - a[1], L2 = dx * dx + dy * dy;
+    const t = L2 ? Math.max(0, Math.min(1, ((x - a[0]) * dx + (y - a[1]) * dy) / L2)) : 0, ex = a[0] + t * dx - x, ey = a[1] + t * dy - y, d = ex * ex + ey * ey;
+    if (d < best) best = d;
+  }
+  return Math.sqrt(best);
+}
+
 /**
  * Lays the strokes on `field` (an ink amount per cell, w x h cells of `mm` mm) in seq order; the darker holds where two meet.
  * `inkOf` maps darkness to ink amount (inkForDarkness). `each(stroke, cells)` is told each stroke's area as it is laid.
- * Returns { strokes, cells }.
+ * `fill` (0..1): a FILL stroke (isFill: a compact blob) is laid as one uniform pale shape of diluted ink at `fill` of its
+ * darkness, its edge soft over `softMm` (like ink laid with a brush), nothing drawn inside it. Lines are exact (1:
+ * everything exact). Returns { strokes, cells, fills }.
  */
-export function layVectors(doc, field, w, h, mm, inkOf, { ss = 4, each = null } = {}) {
+export function layVectors(doc, field, w, h, mm, inkOf, { ss = 4, each = null, fill = 1, softMm = 0.2 } = {}) {
   const S = [...doc.strokes].sort((a, b) => a.seq - b.seq), dark = new Float32Array(w * h);
-  let cells = 0;
+  let cells = 0, fills = 0;
   for (const s of S) {
     const r = rasterizeRings(s.outline, w, h, mm, ss); let n = 0;
+    const thin = fill < 1 && isFill(s); if (thin) fills++;
     for (let j = 0; j < r.h; j++) for (let i = 0; i < r.w; i++) {
       const c = r.cov[j * r.w + i]; if (!(c > 0)) continue;
-      const k = (r.y0 + j) * w + r.x0 + i, d = Math.min(1, c * s.dark);
-      if (d > dark[k]) { dark[k] = d; field[k] = inkOf(d); n++; }
+      const f = thin ? fill * Math.min(1, edgeDistance(s.outline, (r.x0 + i + 0.5) * mm, (r.y0 + j + 0.5) * mm) / softMm + 0.35) : 1;
+      const k = (r.y0 + j) * w + r.x0 + i, d = Math.min(1, c * s.dark * f);
+      // the darker holds, against ink already on the sheet too (a closing pen over the opening's ink adds none twice)
+      if (d > dark[k]) { dark[k] = d; const t = inkOf(d); if (t > field[k]) field[k] = t; n++; }
     }
     cells += n; each?.(s, n);
   }
-  return { strokes: S.length, cells };
+  return { strokes: S.length, cells, fills };
 }
+
+/**
+ * A derived line file's vector strokes (a stage, or the lines the ink hold kept): the drawing's own vectors (ink-vectors.py) of the lines the stage holds, matched by the line each
+ * stroke came from (`line` = the line's seq). Never re-traced. A stage of lines without seq, or vectors without `line`,
+ * takes the whole set (the stage is then the whole drawing). Returns the vectors document.
+ */
+export function stageVectors(vec, stageLines) {
+  const seqs = stageLines.map(g => g.seq);
+  if (seqs.some(q => q == null) || vec.strokes.some(s => s.line == null)) return vec;
+  const keep = new Set(seqs.map(Math.floor));
+  return { ...vec, strokes: vec.strokes.filter(s => keep.has(Math.floor(s.line))) };
+}
+
