@@ -320,6 +320,10 @@ const ACCENT_MOST_MM2 = 15, ACCENT_L = 40;
 const GLAZE_STEP_L = 10, GLAZE_STEPS = [1, 0.65, 0.4, 0.22], GLAZE_LEAST_MM2 = 6;
 /** A dark (a window's glass) is glazed whole more times before its glazes shrink. */
 const GLAZE_STEPS_DARK = [1, 1, 0.85, 0.6];
+/** Foliage glazes: each covers the canopy cells at or under this quantile of the finest study's lightness, its colour read
+ * from this study of the stack (0 the block-in), its leaf strokes kept in this share of their clusters; no glaze moves a
+ * place by more than FOLIAGE_STEP_L (L*). */
+const FOLIAGE_STEPS = [1, 0.7, 0.5, 0.33, 0.2, 0.1], FOLIAGE_STUDY = [0, 1, 1, 2, 2, 2], FOLIAGE_KEEP = [1, 1, 0.9, 0.8, 0.7, 0.6], FOLIAGE_STEP_L = 10, FOLIAGE_PITCH = 0.5, FOLIAGE_LEAF = 0.6;
 /** Every wash of at least this size (mm2) has its outline cut first with a round of at most CUT_BRUSH_MM, so its silhouette is clean. */
 const CUT_FROM_MM2 = 30, CUT_BRUSH_MM = 5;
 
@@ -413,7 +417,7 @@ export function planStudyWashes({ k, w, h, studies, flat = false, density = null
 
   const laid = Array.from({ length: k }, () => new Float32Array(pn));
   const mixes = [], layers = [], instructions = [], polygons = [], byStage = [0, 0, 0, 0], perLayer = []; let strokeCount = 0, charges = 0, dabbed = 0, softJoins = 0, glazes = 0;
-  const stagesAt = [], touchLog = [];
+  const stagesAt = [], touchLog = [], glazeLog = [];
   const STAGE = ['', 'first wash', 'charge', 'wash over', 'accent'];
   const underMix = cells => { const u = new Array(k).fill(0); for (const q of cells) for (let j = 0; j < k; j++) u[j] += laid[j][q] / cells.length; return u; };
   const cellsIn = loops => { const m = loopsMask(loops, pw, ph, mmX), out = []; for (let q = 0; q < pn; q++) if (m[q]) out.push(q); return out; };
@@ -506,14 +510,15 @@ export function planStudyWashes({ k, w, h, studies, flat = false, density = null
     // (a shape that loses most of itself is not broken but thin: a mast, a rope, a frame, laid in a pull along its length)
     return 1 - kept / c >= BROKEN_LOST && 1 - kept / c < BROKEN_THIN;
   };
+  const isGreen = shape => { const hue = (Math.atan2(shape.lab[2], shape.lab[1]) * 180 / Math.PI + 360) % 360; return shape.chroma >= 8 && hue >= BROKEN_HUE[0] && hue <= BROKEN_HUE[1]; };
   // a hash of a grid point, 0..1, fixed to the sheet (no picture is read)
   const hash = (a, b, c = 0) => { let x = Math.imul(a * 73856093 ^ b * 19349663 ^ c * 83492791, 2654435761) >>> 0; x ^= x >>> 15; x = Math.imul(x, 2246822519) >>> 0; x ^= x >>> 13; return (x >>> 0) / 4294967296; };
   const dabBrush = [...washKitMm].sort((a, b) => Math.abs(a - DAB_SHARE * sheetWidthMm) - Math.abs(b - DAB_SHARE * sheetWidthMm))[0], dr = dabBrush / 2;
   // loose dabs of a round over a mask, fixed to the sheet (a hash, no picture read): overlapping, in clusters whose dabs
   // lie alike, some clusters left out as gaps of paper; each dab its own size (DAB_SIZE times the brush), length and place
   // within its cell, a leaf stroke pressed and lifted. With keep < 1, whole clusters are kept (the darker dabs come in clumps).
-  const dabsOver = (m, salt, keep = 1) => {
-    const pitch = DAB_PITCH * dabBrush, strokes = [], cl = DAB_CLUSTER;
+  const dabsOver = (m, salt, keep = 1, pitchShare = DAB_PITCH) => {
+    const pitch = pitchShare * dabBrush, strokes = [], cl = DAB_CLUSTER;
     for (let gy = 0; gy * pitch < ph * mmX; gy++) for (let gx = 0; gx * pitch < pw * mmX; gx++) {
       const kx = Math.floor(gx / cl), ky = Math.floor(gy / cl);
       if (hash(kx, ky, salt + 5) < DAB_GAPS || (keep < 1 && (hash(kx, ky, salt + 7) > 1.4 * keep || hash(gx, gy, salt + 8) > 0.75))) continue;
@@ -751,9 +756,31 @@ export function planStudyWashes({ k, w, h, studies, flat = false, density = null
         const gm = new Uint8Array(pn); for (const q of cells) gm[q] = 1;
         const gp = k ? partLoops(gm, roundFirst, paperMask).filter(l => cellsIn(l).length * cellMm2 >= GLAZE_LEAST_MM2) : parts; if (!gp.length) break;
         const gl = gp.flat(), colour = withL(target, Lu - (Lu - Lt) * (k + 1) / K);
-        glazeSteps.push({ k, K, loops: gl, parts: gp, colour, cells, what: `${shadow ? `${what}: a cool shadow` : what}, glaze ${k + 1} of ${K}`, cut: cutOpts(gl, gp), shapes: new Set(group) });
+        glazeSteps.push({ k, K, loops: gl, parts: gp, colour: shadow ? (() => { const [l, a, b] = labOf(colour, 0, paperCol); return labToRgb([l, a, b - 2 * k], paperCol); })() : colour, cells, what: `${shadow ? `${what}: a cool shadow` : what}, glaze ${k + 1} of ${K}`, cut: cutOpts(gl, gp), shapes: new Set(group) });
       }
       continue;
+    }
+    // foliage is built by five or six pale glazes, light to dark, each dried before the next and each a little smaller:
+    // a pale wash over the canopy, then leaf-cluster strokes over the parts the finer studies show darker, in the colour
+    // those studies have there, each moving a place by at most FOLIAGE_STEP_L (the owner, 20 Nov 2026: "more glaze layering
+    // is needed to deliver more nuanced foliage")
+    if (isBroken && !flat && !MONO && studies.length > 1 && isGreen(s)) {
+      const lm = loopsMask(loops, pw, ph, mmX), canopy = own.filter(q => lm[q] && !paperMask[q]);
+      if (canopy.length) {
+        const fl = canopy.map(q => fineL[q]).sort((a, b) => a - b), at = f => fl[Math.min(fl.length - 1, Math.floor(f * fl.length))];
+        const Lc = labOf(s.colour, 0, valueRef)[0];
+        FOLIAGE_STEPS.forEach((f, k) => {
+          const cut = k ? at(f) : Infinity, cells = canopy.filter(q => fineL[q] <= cut); if (cells.length * cellMm2 < GLAZE_LEAST_MM2) return;
+          const g = grids[Math.min(grids.length - 1, FOLIAGE_STUDY[k])], col = [0, 1, 2].map(c => { const v = cells.map(q => g[q * 3 + c]).sort((a, b) => a - b); return v[v.length >> 1]; });
+          const gm = new Uint8Array(pn); for (const q of cells) gm[q] = 1;
+          if (!k) { glazeSteps.push({ k, K: FOLIAGE_STEPS.length, loops, parts, colour: withL(col, Lc + (100 - Lc) * LEAF_UNDER), cells, what: `${what}: foliage, a pale wash over the canopy, glaze 1 of ${FOLIAGE_STEPS.length}`, cut: {}, capL: FOLIAGE_STEP_L }); return; }
+          const strokes = dabsOver(gm, 101 + 17 * k + i, FOLIAGE_KEEP[k], FOLIAGE_PITCH * FOLIAGE_LEAF).map(st => { const n = st.points.length, cx = st.points.reduce((a, q) => a + q[0], 0) / n, cy = st.points.reduce((a, q) => a + q[1], 0) / n; return { ...st, radiusMm: +(st.radiusMm * FOLIAGE_LEAF).toFixed(3), points: st.points.map(q => [+(cx + (q[0] - cx) * FOLIAGE_LEAF).toFixed(3), +(cy + (q[1] - cy) * FOLIAGE_LEAF).toFixed(3), ...q.slice(2)]) }; }); if (strokes.length < 2) return;
+          const sl = maskLoops(footprint(strokes), 0.5); if (!sl.length) return;
+          glazeSteps.push({ k, K: FOLIAGE_STEPS.length, loops: sl, parts: null, strokes, colour: col, cells, what: `${what}: foliage, leaf clusters, glaze ${k + 1} of ${FOLIAGE_STEPS.length}`, cut: {}, capL: FOLIAGE_STEP_L });
+        });
+        dabbed++;
+        continue;
+      }
     }
     const made = isBroken ? dabMass(stage, what, m, loops, s.colour, own) : [wash(stage, shadow ? `${what}: a cool shadow glaze` : what, loops, target, { own, parts, move: soft ? 'beside damp' : 'wet on dry', grade: !flat && !shadow, ...glaze, ...darkOpts })].filter(Boolean);
     if (!made.length) continue;
@@ -768,12 +795,17 @@ export function planStudyWashes({ k, w, h, studies, flat = false, density = null
   stagesAt.push({ stage: 'the first washes and the block-in shapes', layers: layers.length });
   // the glazes, step by step: every first glaze, the sheet dried, every second, and so on; glazes of one step that do not
   // touch share a session
-  for (let k = 0; k < GLAZE_STEPS.length; k++) {
+  const steps = Math.max(GLAZE_STEPS.length, FOLIAGE_STEPS.length);
+  for (let k = 0; k < steps; k++) {
     let sess = [], mask = new Uint8Array(pn);
     for (const g of glazeSteps.filter(x => x.k === k)) {
       const gm = new Uint8Array(pn); for (const q of g.cells) gm[q] = 1; const near = dilate(gm, pw, ph, rC(1));
       if (near.some((v, q) => v && mask[q])) { if (sess.length) layer(3, sess); sess = []; mask = new Uint8Array(pn); }
-      const sh = wash(3, g.what, g.loops, g.colour, { own: g.cells, parts: g.parts, grade: false, ...g.cut });
+      // (a glaze moves a place by at most its cap: the dark is reached by overlap)
+      let colour = g.colour;
+      if (g.capL) { const Lnow = filmLab(underMix(g.cells), pigments, paperCol)[0], Lc = labOf(colour, 0, valueRef)[0]; if (Lc < Lnow - g.capL) colour = withL(colour, Lnow - g.capL); }
+      const sh = wash(3, g.what, g.loops, colour, { own: g.cells, parts: g.parts, grade: false, ...(g.strokes ? { strokes: g.strokes.map(x => ({ ...x })) } : {}), ...g.cut });
+      if (sh) glazeLog.push({ what: g.what, k: g.k, L: +labOf(colour, 0, valueRef)[0].toFixed(1) });
       if (sh) { sess.push(sh); for (const q of g.cells) mask[q] = 1; glazes++; }
     }
     if (sess.length) layer(3, sess);
@@ -893,7 +925,7 @@ export function planStudyWashes({ k, w, h, studies, flat = false, density = null
   const regions = { source: 'block-in study', labels: sheetLabels, regions: shapes.map((s, i) => ({ id: i + 1, colour: s.colour, paper: s.paper, parent: parent[i] >= 0 ? parent[i] + 1 : null, share: +(s.cells.length / pn).toFixed(4) })) };
   const washes = instructions.filter(q => q.stage !== 2).length;
   const summary = { source: 'study', flat, files: studies.map(st => st.file ?? null), layersOfStudy: perLayer, clusters, shapes: shapes.length, paperShapes: shapes.filter(s => s.paper).length, nested, softJoins, dabbed, stages: byStage.filter(Boolean).length, washesByStage: byStage, mixes: mixes.length, washes, charges, planCellMm: mmX, reservedShare,
-    paintedShare: covered.reduce((a, v) => a + v, 0) / pn, meanWashMm2: areas.reduce((a, v) => a + v, 0) / Math.max(1, areas.length), medianWashMm2: areas.length ? areas[areas.length >> 1] : 0, smallestWashMm2: areas[0] ?? 0, plannedStrokes: strokeCount, drawn, stagesAt, touchLog };
+    paintedShare: covered.reduce((a, v) => a + v, 0) / pn, meanWashMm2: areas.reduce((a, v) => a + v, 0) / Math.max(1, areas.length), medianWashMm2: areas.length ? areas[areas.length >> 1] : 0, smallestWashMm2: areas[0] ?? 0, plannedStrokes: strokeCount, drawn, stagesAt, touchLog, glazeLog };
   console.log(`study washes: the wash plan is read from ${studies.length} block-in ${studies.length > 1 ? 'studies' : 'study'} (${studies.map(st => `${st.file ?? '?'}${st.minMm2 ? ` from ${st.minMm2} mm2` : ''}`).join(', ')}), not from the subject (the subject only registers the studies to the sheet${studies[0].registered ? `: ${studies[0].registered}` : ''} and scores the plate; the palette and the drawing are the painter's own as before)${flat ? '; FLAT: plain fills, for comparison' : ''}`);
   perLayer.forEach((pl, li) => console.log(`study washes, layer ${li + 1}${pl.accent ? ' (accents)' : pl.mode === 'glaze' ? ' (connected glazes)' : ''}: ${pl.study}, shapes from ${pl.minMm2 ?? '-'} mm2, registered by ${pl.shift.join(',')} cells: ${pl.washes} washes, ${pl.strokes} strokes`));
   console.log(`study washes: study maker by file name: ${studies.map(st => (/local|seed\d/.test(st.file ?? '') ? 'local image model (mflux)' : 'not named (the RunPod studies carry no tag)')).filter((v, i, a) => a.indexOf(v) === i).join(' and ')}`);
