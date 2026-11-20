@@ -32,7 +32,7 @@ test('saved state round-trips typed arrays, shared references, Sets, Maps and sp
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
-const ARGS = ['tools/paint-plate.mjs', '--recipe', 'none', '--image', 'bench/v2/targets/hills.png', '--washplan', 'flat:bench/v2/targets/hills.png', '--width', '64', '--scale', '1', '--sheetmm', '80', '--palettewide', '1',
+const ARGS = ['tools/paint-plate.mjs', '--recipe', 'none', '--image', 'bench/v2/targets/hills.png', '--washplan', 'bench/v2/targets/hills.png', '--width', '64', '--scale', '1', '--sheetmm', '80', '--palettewide', '1',
   '--physical', '1', '--order', 'painter', '--shapedmarks', '1', '--drawing', 'both', '--outlinemedium', 'ink',
   '--mode', 'fast', '--marks', '1', '--video', '0', '--targetguard', 'gentle', '--seed', '0', '--gpu', 'off', '--allowdirty', '1',
   // segmentation is not under test: off keeps the run free of the SAM python and checkpoint (src/crop/segment-prep.mjs)
@@ -43,7 +43,7 @@ const run = (args, log) => new Promise(resolve => {
 });
 const writeJson = (f, v) => fs.writeFileSync(f, JSON.stringify(v));
 
-for (const extra of [[], ['--inkres','2','--prepfade','0.5'], ['--inkrecipe','wash','--image','bench/ink-heavy/targets/h34-a.jpg','--washplan','flat:bench/ink-heavy/targets/h34-a.jpg','--inkres','2']]) test(`a painting saved at a passage boundary and taken over by a fresh process ends identical (${extra.join(' ')})`, async () => {
+for (const extra of [[], ['--inkres','2','--prepfade','0.5'], ['--inkrecipe','wash','--image','bench/ink-heavy/targets/h34-a.jpg','--washplan','bench/ink-heavy/targets/h34-a.jpg','--inkres','2']]) test(`a painting saved at a passage boundary and taken over by a fresh process ends identical (${extra.join(' ')})`, async () => {
   const args=[...ARGS,...extra];
   const work = fs.mkdtempSync(path.join(os.tmpdir(), 'aware-identity-'));
   const A = path.join(work, 'a'), B = path.join(work, 'b'), pa = path.join(work, 'pa'), pb = path.join(work, 'pb');

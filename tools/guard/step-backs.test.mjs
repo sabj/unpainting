@@ -14,7 +14,7 @@ async function paint(dir, extra) {
   const target = path.join(dir, 'target.png'), out = path.join(dir, 'paint-' + extra.join('').replace(/\W/g, ''));
   if (!fs.existsSync(target)) await sharp(Buffer.from(SVG)).png().toFile(target);
   // Segmentation is not under test: --segments off keeps the run free of the SAM python and checkpoint.
-  const args = ['tools/paint-plate.mjs', '--allowdirty', '1', '--image', target, '--washplan', 'flat:' + target, '--width', '96', '--scale', '1', '--sheetmm', '152.4', '--mode', 'fast', '--gpu', 'off', '--threads', '1',
+  const args = ['tools/paint-plate.mjs', '--allowdirty', '1', '--image', target, '--washplan', target, '--width', '96', '--scale', '1', '--sheetmm', '152.4', '--mode', 'fast', '--gpu', 'off', '--threads', '1',
     '--drawing', 'none', '--frames', '0', '--video', '0', '--segments', 'off', '--out', out, ...extra];
   try { execFileSync(process.execPath, args, { cwd: new URL('../../', import.meta.url), env: { ...process.env, W2_CACHE_DIR: path.join(dir, 'cache') }, stdio: 'pipe', timeout: 240000 }); }
   catch (e) { throw Error(String(e.stdout).split('\n').slice(-20).join('\n') + String(e.stderr)); }
