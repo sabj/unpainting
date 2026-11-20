@@ -220,6 +220,7 @@ def main():
     ap.add_argument('--mergemm', type=float, default=.45, help='close parallel strokes within this (mm, with --sheetmm) are one stroke; 0 keeps them')
     ap.add_argument('--maxwidthmm', type=float, default=1.2, help='wider marks under four widths long are filled darks, left to the paint (mm, with --sheetmm); 0 keeps them')
     ap.add_argument('--densemm', type=float, default=1.5, help='ink covering most of a window this wide (mm) is dense (fur, hair, scribble): laid as strokes along its direction, not thinned; 0 thins everything')
+    ap.add_argument('--medium', default='ink', choices=['ink', 'pencil'], help='the medium the drawing is made in: the painter lays it in this (medium-decision.mjs)')
     ap.add_argument('--fit', type=float, default=.6, help='how far a straight run or arc may lie from the traced line, source pixels')
     args = ap.parse_args()
     bgr = cv2.imread(args.image)
@@ -242,7 +243,7 @@ def main():
         for l in lines:
             l['widthMm'] = round(l['width']*args.sheetmm/w, 3)
     stem = Path(args.out); stem.parent.mkdir(parents=True, exist_ok=True)
-    doc = {'source': 'trace-drawing: a clean line drawing, pre-paint only', 'inputKind': 'drawing', 'widthPolicy': 'one observed width per line',
+    doc = {'source': 'trace-drawing: a clean line drawing, pre-paint only', 'inputKind': 'drawing', 'medium': args.medium, 'widthPolicy': 'one observed width per line',
            'image': {'w': w, 'h': h}, 'targetSHA256': hashlib.sha256(Path(args.target or args.image).read_bytes()).hexdigest(), 'stats': stats, 'lines': lines}
     Path(str(stem)+'-lines.json').write_text(json.dumps(doc)+'\n')
     cv2.imwrite(str(stem)+'-ink.png', (1-mask)*255)
