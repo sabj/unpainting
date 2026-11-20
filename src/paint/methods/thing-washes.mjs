@@ -311,7 +311,8 @@ export function planThingWashes({ demand, k, density, w, h, rgb = null, paperRGB
   for (const a of accents) lay(4, { name: 'accent', kind: thingOf[a.cells[0]] >= 0 ? things[thingOf[a.cells[0]]]?.kind ?? null : null }, polygonsOf(maskOf(a.cells), pw, ph, { planMm, brushMm: smallBrush, tolMm: ACCENT_TOL_MM, leastMm2: leastAccent.washMm2, most: 2 }));
 
   // nothing clips the brush: the lights are kept by the strokes going round them; only the run's own hold stays
-  const protectedCells = new Uint8Array(n); if (hold) for (let i = 0; i < n; i++) if (hold[i]) protectedCells[i] = 1;
+  // (null when the run holds nothing: an empty mask would still be set as a whole-sheet clip on every stroke)
+  const protectedCells = hold?.some(v => v) ? Uint8Array.from(hold, v => (v ? 1 : 0)) : null;
   const lightsOnSheet = lightLoops.length ? loopsMask(lightLoops, w, h, cellMm) : new Uint8Array(n), lc = components(lightsOnSheet, w, h);
   const lightShapes = Array.from({ length: lc.count }, (_, j) => ({ id: j + 1, category: 'bare paper', reason: 'a named light kept as a bare-paper polygon', toneAt: 'retain paper', cells: 0 })); for (const id of lc.labels) if (id) lightShapes[id - 1].cells++;
   const areas = instructions.map(q => q.areaMm2).sort((a, b) => a - b);
