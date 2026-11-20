@@ -511,7 +511,10 @@ for (let L = L_START; L < ctx.layers.length; L++) {
     // (it is laid a little past it so neighbours meet, and its rounds ring it): the charge is spread over all the paper
     // they brush, so the sheet holds the passage's booked mass. Charged for its outline alone, a passage put 1.4 to 2.6
     // times its mass on the sheet. The swatch that calibrates it is charged the same way (sheet.mjs scrapSwatches).
-    if (sh._spread == null) sh._spread = detail || brush.model !== 'section' ? 1 : Math.max(1, footprintSpread(paths, up(MASK), W2, H2));
+    // Marks (src/paint/methods/marks.mjs: a touch, a leaf, a tapered stroke) are each laid at the mix's own strength: their
+    // film is the colour, wherever the tuft reaches. Spread over the paper past the study's cells, they dried pale.
+    const marksOnly = vectorPaths && sh._valuePlan.strokes.every(st => st.mark);
+    if (sh._spread == null) sh._spread = detail || brush.model !== 'section' || marksOnly ? 1 : Math.max(1, footprintSpread(paths, up(MASK), W2, H2));
     sh.laidShare = opening;
     // see GRADED_CAL: the whole scrap's delivery, less what runs past this passage's own open edge (in sheet cells)
     if (useGradedCal && sh._gcal == null) {
