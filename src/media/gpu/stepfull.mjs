@@ -51,7 +51,12 @@ const UF = [['w', 'u'], ['h', 'u'], ['n', 'u'], ['tw', 'u'], ['th', 'u'], ['ntil
   // follows on a 16-byte boundary
   'enclose', 'slideCap', 'holeFill', 'padB', 'filmDiff', 'filmDepth', 'holeSpan', 'mar', 'slope', 'padC', 'mmPerCell', 'edgeFlowDepth',
   // the paper's tooth range and the unit its hollows are measured in (paper.mjs toothHollow), for settling
-  'toothLo', 'toothSpan', 'hollowUnit', 'groundPhys', 'poreHalo', 'poreReach', 'padTime2', 'padTime3'].map(k => [k, 'f'])];
+  'toothLo', 'toothSpan', 'hollowUnit', 'groundPhys', 'poreHalo', 'poreReach', 'padTime2', 'padTime3',
+  // the film branch's sheet (sheet.mjs DEFAULTS): stranding only in a film thinner than holdDepth, a mix settling at its
+  // mean speed (coSettle), and the film's levelling (film-level-wgsl.mjs: lvK0 the face conductance per h^3, lvTx and
+  // lvTy the board's fall a cell, lvTan and lvDm the meniscus, lvR its reach in cells, lvIt and lvSubs the CG iterations
+  // and transport substeps encoded a step, fillRef the hollow fill's reference load)
+  'holdDepth', 'coSettle', 'fillRef', 'lvK0', 'lvTx', 'lvTy', 'lvTan', 'lvDm', 'lvR', 'lvIt', 'lvSubs', 'lvOn'].map(k => [k, 'f'])];
 export { UF, UBYTES_EXPORT as UBYTES, SRC_EXPORT as SRC, analyse, HASH };
 // settling needs the paper's hollow unit (paper.mjs toothHollow): a paper made without it cannot settle on the GPU
 const hollowUnitOf = paper => { if (!(paper?.hollowUnit > 0)) throw new Error('GPU sheet: the paper has no hollowUnit (make it with makePaper or scanPaper)'); return paper.hollowUnit; };
@@ -304,6 +309,8 @@ export class GpuSheet {
       padC: process.env.GPU_SPARSE_TIGHT === '0' || process.env.GPU_STEP === 'old' || o.edgeWidth + 1 > 7 || this.poreTime.iters > TILE ? 0 : 1, holeSpan: o.holeSpan ?? 0, mar: (o.marangoni ?? 0) * fraction, slope: o.slope ?? 0,
       mmPerCell: o.mmPerCell > 0 ? o.mmPerCell : (this.mmPerCell > 0 ? this.mmPerCell : (this.paper?.mmPerCell > 0 ? this.paper.mmPerCell : 0.3)),
       edgeFlowDepth: o.edgeFlowDepth ?? 0.06,
+      // (fallbacks as sheet.mjs DEFAULTS, which a CPU step merges in)
+      holdDepth: o.holdDepth ?? 0.01, coSettle: o.coSettle ?? 0.8, fillRef: o.fillRef ?? 0.4,
       poreHalo: Math.max(1, Math.ceil(this.poreTime.iters / TILE)), poreReach: Math.max(2, this.poreTime.iters),
       toothLo: this.paper?.toothLo ?? 0, toothSpan: this.paper?.toothSpan ?? 0, hollowUnit: hollowUnitOf(this.paper), groundPhys: this.paper?.zUm ? 1 : 0,
     }).forEach(([k, v]) => set(k, v));

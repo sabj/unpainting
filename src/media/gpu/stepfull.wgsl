@@ -373,6 +373,14 @@ fn settleShareG(v: f32, df: f32, gg: f32, hol: f32, Wi: f32) -> f32 {
   if (x < 0.01) { return x * (1.0 - x * (0.5 - x / 6.0)); }
   return 1.0 - exp(-x);
 }
+// the suspension's mean Stokes speed (times settle) by mass, over the pigments worked on (sheet.mjs coSettle: a mix
+// flocculates, its fine particles riding down on the coarse ones); 0 when nothing is suspended or coSettle is off
+fn suspensionSpeed(i: u32) -> f32 {
+  if (u.coSettle <= 0.0) { return 0.0; }
+  var v = 0.0; var gm = 0.0;
+  for (var ka = 0u; ka < u.nAct; ka++) { let k = klAt(ka); let g = G[k * u.n + i]; v += g * pigB(k).x; gm += g; }
+  return select(0.0, v / gm, gm > 0.0);
+}
 fn p3a_tile(wid: vec3<u32>, lid: vec3<u32>) {
   let c = cx(wid, lid); if (!c.ok || M[c.i] != 1u || (RESIST[c.i] & 1u) != 0u) { return; }
   let i = c.i; let Wi = W[i]; let hh = PAPER3[i].z; let hol = hollowAt(i);
@@ -381,6 +389,7 @@ fn p3a_tile(wid: vec3<u32>, lid: vec3<u32>) {
   let turnover = select(0.0, min(1.0, WENT[i] / Wi * (u.mmPerCell / 0.25)), Wi > 1e-6);
   var settled = 0.0;
   if (u.granFill > 0.0) { for (var ka = 0u; ka < u.nAct; ka++) { settled += D[klAt(ka) * u.n + i]; } }
+  let vMix = suspensionSpeed(i);
   for (var ka = 0u; ka < u.nAct; ka++) {
     let k = klAt(ka); let q = k * u.n + i;
     var Gk = G[q]; var Dk = D[q]; var top = 0.0;
@@ -388,7 +397,7 @@ fn p3a_tile(wid: vec3<u32>, lid: vec3<u32>) {
     if (Gk == 0.0 && Dk == 0.0 && !(rewet && top != 0.0)) { continue; }
     let pa = pigA(k); let pb = pigB(k);   // pa: gg, liftOf, scourOf, rep;  pb: Stokes speed (mm/s, times settle), omega, floc, mobility
     let gg = pa.x;
-    let down = Gk * settleShareG(pb.x, pigC(k).x, gg, select(hol, hol * max(0.0, 1.0 - settled * u.granFill), u.granFill > 0.0), Wi);
+    let down = Gk * settleShareG(select(pb.x, (1.0 - u.coSettle) * pb.x + u.coSettle * vMix, u.coSettle > 0.0), pigC(k).x, gg, select(hol, hol * max(0.0, 1.0 - settled * u.granFill), u.granFill > 0.0), Wi);
     let shape = max(0.0, 1.0 + (hh - 1.0) * gg);
     let up = Dk * shape * (pa.y * wetting * u.dt + pa.z * turnover);
     let dn = min(Gk, max(0.0, down)); let uu = min(Dk, max(0.0, up));
@@ -399,7 +408,7 @@ fn p3a_tile(wid: vec3<u32>, lid: vec3<u32>) {
   var gs = 0.0;
   for (var ka = 0u; ka < u.nAct; ka++) { gs += G[klAt(ka) * u.n + i]; }
   let hold = u.holdCap * Wi;
-  if (u.holdOn != 0u && gs > hold) {
+  if (u.holdOn != 0u && Wi < u.holdDepth && gs > hold) {
     let f = 1.0 - hold / gs;
     for (var ka = 0u; ka < u.nAct; ka++) { let q = klAt(ka) * u.n + i; let q2 = G[q] * f; G[q] -= q2; D[q] += q2; }
   }
@@ -774,6 +783,7 @@ fn p3a_dep_tile(wid: vec3<u32>, lid: vec3<u32>) {
     let turnover = select(0.0, min(1.0, WENT[i] / Wi * (u.mmPerCell / 0.25)), Wi > 1e-6);
     var settled = 0.0;
     if (u.granFill > 0.0) { for (var ka = 0u; ka < u.nAct; ka++) { settled += D[klAt(ka) * u.n + i]; } }
+    let vMix = suspensionSpeed(i);
     for (var ka = 0u; ka < u.nAct; ka++) {
       let k = klAt(ka); let q = k * u.n + i;
       var Gk = G[q]; var Dk = D[q]; var top = 0.0;
@@ -781,7 +791,7 @@ fn p3a_dep_tile(wid: vec3<u32>, lid: vec3<u32>) {
       if (Gk == 0.0 && Dk == 0.0 && !(rewet && top != 0.0)) { continue; }
       let pa = pigA(k); let pb = pigB(k);
       let gg = pa.x;
-      let down = Gk * settleShareG(pb.x, pigC(k).x, gg, select(hol, hol * max(0.0, 1.0 - settled * u.granFill), u.granFill > 0.0), Wi);
+      let down = Gk * settleShareG(select(pb.x, (1.0 - u.coSettle) * pb.x + u.coSettle * vMix, u.coSettle > 0.0), pigC(k).x, gg, select(hol, hol * max(0.0, 1.0 - settled * u.granFill), u.granFill > 0.0), Wi);
       let shape = max(0.0, 1.0 + (hh - 1.0) * gg);
       let up = Dk * shape * (pa.y * wetting * u.dt + pa.z * turnover);
       let dn = min(Gk, max(0.0, down)); let uu = min(Dk, max(0.0, up));
@@ -792,7 +802,7 @@ fn p3a_dep_tile(wid: vec3<u32>, lid: vec3<u32>) {
     var gs = 0.0;
     for (var ka = 0u; ka < u.nAct; ka++) { gs += G[klAt(ka) * u.n + i]; }
     let hold = u.holdCap * Wi;
-    if (u.holdOn != 0u && gs > hold) {
+    if (u.holdOn != 0u && Wi < u.holdDepth && gs > hold) {
       let f = 1.0 - hold / gs;
       for (var ka = 0u; ka < u.nAct; ka++) { let q = klAt(ka) * u.n + i; let q2 = G[q] * f; G[q] -= q2; D[q] += q2; }
     }
