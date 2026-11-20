@@ -85,9 +85,10 @@ const smooth = x => (x <= 0 ? 0 : x >= 1 ? 1 : x * x * (3 - 2 * x));
 // The paper under a hair: the tooth averaged over the contact length L (cells) behind the tip, plus fine fibre relief.
 // The tooth is read in the height's own units (toothRange): a paper whose height is its relief in micrometres
 // (paper-relief.mjs) has a height range far narrower than the tooth stretched to 0..1, and against the stretched tooth
-// its coarse hills read as hollows and a dry brush touched the ground between them instead.
+// its coarse hills read as hollows and a dry brush touched the ground between them instead. A paper without units
+// (value noise, both stretched to 0..1) keeps the stretched tooth its brushes were tuned on.
 function groundAt(paper, xx, yy, tx, ty, L, fine, coarse = 0.3) {
-  const { w, h, tooth, height, valley } = paper, [tlo, tspan] = toothRange(paper); let sum = 0, n = 0;
+  const { w, h, tooth, height, valley } = paper, [tlo, tspan] = paper.zUm ? toothRange(paper) : [0, 1]; let sum = 0, n = 0;
   for (let m = 0; m <= L; m++) {
     const bx = Math.round(xx - tx * m), by = Math.round(yy - ty * m); if (bx < 0 || by < 0 || bx >= w || by >= h) break;
     const j = by * w + bx; sum += height[j] - (1 - coarse) * (tlo + tspan * tooth[j]); n++;

@@ -1373,7 +1373,7 @@ fn ground_at(xx: i32, yy: i32, tx: f32, ty: f32, L: i32, fine: f32, coarse: f32)
   for (var m = 0; m <= L; m++) {
     let bx = i32(jround(f32(xx) - tx * f32(m))); let by = i32(jround(f32(yy) - ty * f32(m)));
     if (bx < 0 || by < 0 || bx >= w || by >= h) { break; }
-    let p = BPAP[u32(by * w + bx)]; sum += p.x - (1.0 - coarse) * (u.toothLo + u.toothSpan * p.y); cnt += 1.0;   // the tooth in the height's units
+    let p = BPAP[u32(by * w + bx)]; sum += p.x - (1.0 - coarse) * select(p.y, u.toothLo + u.toothSpan * p.y, u.groundPhys > 0.5); cnt += 1.0;   // the tooth in the height's units on a physical sheet
   }
   let i = u32(yy * w + xx); let p0 = BPAP[i];
   return sum / select(cnt, 1.0, cnt == 0.0) + fine * (p0.x - p0.z);
