@@ -1,3 +1,5 @@
+> **Retired in 0.4.** This task ran on painter 0.2.x and 0.3.x. Its plans (styleSelection, recipe tokens, `example/`) ask for the light-to-dark value plan and options that 0.4 removed, so it cannot run on this trunk: `npm run bench:run` refuses V4 and V5. Check out tag `v0.3.2` to replay it. The next task is the draft in `bench/v6/`.
+
 bash bench/paint.sh <command>     (the painter runs on this machine; it stops at every passage boundary)
 
   start                 check your plan files (as bench/check.sh) and start painting them; answers at the first stop

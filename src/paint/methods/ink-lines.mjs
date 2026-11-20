@@ -1,6 +1,6 @@
 // Pipeline: inking, stage 2 (hold and measure the lines).
-// Ink lines held to the target: a line file's paths smoothed (--linesmooth) and cut to where the target shows a line
-// (--linesupport), with the target's own line darkness and pixel size measured for the pen (ink-lines-file.mjs).
+// Ink lines read against the target: the target's own line darkness and pixel size, measured for the pen
+// (ink-lines-file.mjs); smoothing and the support cut remain as library functions (the bench's closing-ink tool).
 //
 // Support. At each point of a path the target is read across the path: the on-path value is the mean over the path
 // and 0.35 target pixels either side (a line 0.7 pixels wide); each side is the mean from 1 to 2.25 target pixels out.

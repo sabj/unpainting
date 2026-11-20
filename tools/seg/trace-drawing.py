@@ -6,6 +6,14 @@ The drawing is enlarged before thinning, so two lines a pixel apart stay two lin
 pixel to pixel. Each traced line is carried through its junctions (sketch-lines.py), cut at its corners, and each piece
 is replaced by a straight run or a circular arc where one fits within --fit source pixels, else by a smoothed curve.
 Emits the ordinary drawingfile JSON (points and one width per line, in source pixels; widthMm with --sheetmm).
+
+--medium pencil reads a pencil drawing instead: grey lines of every weight on a paper that may not be white. The paper is
+found locally (a light construction line is measured against the paper around it, not against white), graphite grain is
+blurred out, the threshold comes from the paper's own noise, and a faint run is kept only where it joins a firmer one
+(hysteresis). Lines closer than a stroke width fuse into one stroke (a doubled line is drawn twice where it splits). The
+traced line keeps the hand's wobble: it is smoothed, not replaced by straight runs and arcs. Each point carries the drawing's
+own darkness there as `weights` (0..1, the firmest lines near 1), so the pencil presses as the drawing was pressed.
+--reweigh FILE puts those weights on another line file's points (one re-ordered or joined after tracing).
 """
 import argparse
 import hashlib
@@ -98,7 +106,50 @@ def fair(p, tol, spacing):
     return s[[0, -1]] if out is None else out
 
 
-def plan(bgr, zoom=4, ink=.2, fit=.6, min_px=3.0):
+def dense_strokes(grey, region, spacing, width, min_px=3.0, max_len=None, turn_deg=25):
+    """Strokes along the drawing's own direction inside a dense region: streamlines of the structure tensor's line
+    direction, seeded on dark cells and kept `spacing` source pixels apart, each a single pull that stops where the ink
+    ends, where it leaves the region, or where it would turn by more than `turn_deg` (a junction is a break, not a turn)."""
+    dark = 1-np.clip(grey, 0, 1); H, W = grey.shape
+    gx = cv2.Sobel(grey, cv2.CV_32F, 1, 0, ksize=3); gy = cv2.Sobel(grey, cv2.CV_32F, 0, 1, ksize=3)
+    sg = max(1., spacing)
+    jxx = cv2.GaussianBlur(gx*gx, (0, 0), sg); jyy = cv2.GaussianBlur(gy*gy, (0, 0), sg); jxy = cv2.GaussianBlur(gx*gy, (0, 0), sg)
+    theta = .5*np.arctan2(2*jxy, jxx-jyy)+np.pi/2          # along the lines, across the gradient
+    tx, ty = np.cos(theta), np.sin(theta)
+    max_len = max_len or 40*spacing
+    occ = np.zeros((H, W), bool); r = max(1, int(round(spacing/2)))
+    def free(x, y):
+        i, j = int(round(x)), int(round(y))
+        return 0 <= i < W and 0 <= j < H and region[j, i] and not occ[max(0, j-r+1):j+r, max(0, i-r+1):i+r].any()
+    out = []; cos_turn = np.cos(np.radians(turn_deg))
+    ys, xs = np.nonzero(region & (dark > .45))
+    order = np.argsort(-dark[ys, xs])
+    for n in order[::max(1, int(spacing))]:
+        x0, y0 = float(xs[n]), float(ys[n])
+        if not free(x0, y0): continue
+        halves = []
+        for sgn in (1, -1):
+            pts = []; x, y = x0, y0; d0 = None; L = 0
+            while L < max_len/2:
+                i, j = int(round(x)), int(round(y))
+                d = np.array([tx[j, i], ty[j, i]])*sgn
+                if d0 is not None:
+                    if d @ d0 < 0: d = -d
+                    if d @ d0 < cos_turn: break
+                nx, ny = x+.75*d[0], y+.75*d[1]
+                if not (0 <= nx < W-1 and 0 <= ny < H-1) or dark[int(round(ny)), int(round(nx))] < .3 or not free(nx, ny): break
+                pts.append((nx, ny)); x, y, d0 = nx, ny, d; L += .75
+            halves.append(pts)
+        p = np.array(halves[1][::-1]+[(x0, y0)]+halves[0])
+        if len(p) < 2 or arc_length(p) < min_px: continue
+        for (x, y) in p: occ[int(round(y)), int(round(x))] = True
+        q = resample(p, 1)
+        wt = float(np.clip(np.median(dark[np.clip(q[:, 1].round().astype(int), 0, H-1), np.clip(q[:, 0].round().astype(int), 0, W-1)])/.85, .25, 1))
+        out.append({'points': np.round(q[::max(1, len(q)//12)] if len(q) > 24 else q, 3).tolist(), 'width': round(width, 3), 'weight': round(wt, 3), 'role': 'pen stroke', 'length': arc_length(q), 'dense': True})
+    return out
+
+
+def plan(bgr, zoom=4, ink=.2, fit=.6, min_px=3.0, dense_px=0):
     grey = cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY).astype(np.float32)/255
     grey /= max(.1, float(np.percentile(grey, 98)))
     big = cv2.resize(grey, None, fx=zoom, fy=zoom, interpolation=cv2.INTER_CUBIC)
@@ -107,6 +158,14 @@ def plan(bgr, zoom=4, ink=.2, fit=.6, min_px=3.0):
     dark = 1-np.clip(big, 0, 1); r = int(round(1.5*zoom))
     peak = cv2.dilate(dark, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2*r+1, 2*r+1)))
     mask = ((dark > ink) & (dark > .55*peak)).astype('uint8')
+    # dense ink (fur, hair, scribbled foliage, close hatching) thins into a net of junctions; it is laid by streams instead
+    # (dense_strokes), so the thinning sees only the ink outside it
+    dense = None
+    if dense_px > 0:
+        k = int(round(dense_px*zoom)) | 1
+        dense = cv2.blur(mask.astype(np.float32), (k, k)) > .45
+        dense = cv2.morphologyEx(dense.astype(np.uint8), cv2.MORPH_OPEN, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (k, k))) > 0
+        mask = mask & ~dense
     skeleton, _ = thin(mask)
     skeleton, _ = prune_spurs(skeleton, 2*zoom)
     paths = sketch.trace(skeleton, min_points=2, window=2*zoom)
@@ -121,10 +180,131 @@ def plan(bgr, zoom=4, ink=.2, fit=.6, min_px=3.0):
         if arc_length(p) < min_px*zoom:
             continue
         width = max(.6, float(np.median(2*sketch.at(distance, p)))/zoom)
+        # how dark the drawing draws it: the line's core against the paper, 0.85 of full black and over is full weight
+        weight = float(np.clip(np.median(sketch.at(dark, p))/.85, .25, 1))
         q = fair((resample(p.astype(float), 1)+.5)/zoom-.5, fit, 1/zoom)
-        lines.append({'points': np.round(q, 3).tolist(), 'width': round(width, 3), 'weight': 1, 'role': 'pen stroke', 'length': arc_length(q)})
+        lines.append({'points': np.round(q, 3).tolist(), 'width': round(width, 3), 'weight': round(weight, 3), 'role': 'pen stroke', 'length': arc_length(q)})
     lines.sort(key=lambda l: -l['length'])
-    return lines, mask, skeleton, {'inkPixels': int(mask.sum()), 'tracedPaths': len(paths), 'selectedPaths': len(lines), 'joins': joins, 'zoom': zoom, 'fit': fit}
+    if dense is not None and dense.any():
+        small = cv2.resize(dense.astype(np.uint8), (grey.shape[1], grey.shape[0]), interpolation=cv2.INTER_AREA) > 0
+        wid = float(np.median([l['width'] for l in lines])) if lines else 1.0
+        streams = dense_strokes(grey, small, spacing=dense_px/2.5, width=wid, min_px=min_px)
+        lines += streams; lines.sort(key=lambda l: -l['length'])
+    return lines, mask, skeleton, {'denseShare': round(float(dense.mean()), 4) if dense is not None else 0, 'denseStrokes': len(streams) if dense is not None and dense.any() else 0,'inkPixels': int(mask.sum()), 'tracedPaths': len(paths), 'selectedPaths': len(lines), 'joins': joins, 'zoom': zoom, 'fit': fit}
+
+
+def merge_parallels(lines, sep, share=.7):
+    """A line drawn as two or three close parallel strokes (a thick edge, or a sketchy double) is one stroke: a line whose
+    samples lie within `sep` source pixels of one longer line along `share` of its length is folded into it, which takes
+    the span of both as its width and the darker weight. Returns the kept lines and how many were folded."""
+    from scipy.spatial import cKDTree
+    order = sorted(range(len(lines)), key=lambda i: -lines[i]['length'])
+    S = [resample(np.asarray(lines[i]['points'], float), .5) for i in range(len(lines))]
+    owner = np.concatenate([np.full(len(S[i]), i) for i in range(len(lines))]); tree = cKDTree(np.vstack(S))
+    gone = set()
+    for i in reversed(order):           # shortest first
+        hits = {}
+        for k, nb in enumerate(tree.query_ball_point(S[i], sep)):
+            for j in {owner[n] for n in nb}:
+                if j != i and j not in gone and lines[j]['length'] >= lines[i]['length']: hits[j] = hits.get(j, 0) + 1
+        best = max(hits, key=hits.get) if hits else None
+        if best is not None and hits[best] >= share*len(S[i]):
+            a, b = lines[best], lines[i]
+            d = float(np.median(cKDTree(S[best]).query(S[i])[0]))
+            # the span of both, at most 1.6 times the wider (folds of several strokes do not pile up into a bar)
+            a['width'] = round(min(max(a['width'], d + (a['width']+b['width'])/2), 1.6*max(a['width'], b['width'], a.get('width0', a['width']))), 3)
+            a.setdefault('width0', a['width']); a['weight'] = max(a['weight'], b['weight'])
+            gone.add(i)
+    for l in lines: l.pop('width0', None)
+    return [l for k, l in enumerate(lines) if k not in gone], len(gone)
+
+
+def paper_dark(bgr, blur=.7, line_px=3, full=False):
+    """A pencil drawing's lines: darkness against its own local paper, 0 (paper) to 1 (black), grain blurred out and broad
+    tone taken off. `full` also returns the whole darkness (tone included), which sets how firmly a line is pressed."""
+    grey = cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY).astype(np.float32)/255
+    h, w = grey.shape; r = max(5, int(round(.012*max(h, w))))
+    # the paper: the light envelope over about a centimetre of a drawing (a closing removes every line under that width)
+    paper = cv2.dilate(grey, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2*r+1, 2*r+1)))
+    paper = cv2.GaussianBlur(paper, (0, 0), r)
+    dark = 1-np.clip(grey/np.maximum(.05, paper), 0, 1)
+    dark = cv2.GaussianBlur(dark, (0, 0), blur) if blur > 0 else dark
+    # the lines only: shading is graphite too, but broad. An opening wider than a stroke (and a doubled stroke) holds the
+    # tone under the lines, and what stands above it is line; a hatched area keeps its hatching, not its blur
+    tone = cv2.morphologyEx(dark, cv2.MORPH_OPEN, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2*line_px+1, 2*line_px+1)))
+    return (np.clip(dark-tone, 0, 1), dark) if full else np.clip(dark-tone, 0, 1)
+
+
+def pencil_plan(bgr, zoom=4, smooth_px=1.2, min_px=4.0):
+    dark0, whole = paper_dark(bgr, full=True)
+    # the paper's own noise: the spread of the darkness where nothing is drawn (the lower half of the pixels)
+    lo = dark0[dark0 <= np.percentile(dark0, 50)]
+    noise = float(np.median(np.abs(lo-np.median(lo))))*1.4826+1e-4
+    low = max(.03, float(np.median(lo))+5*noise)
+    line = dark0[dark0 > low]
+    firm = float(np.percentile(line, 95)) if line.size else 1.0
+    high = max(2*low, .35*firm)
+    big = cv2.resize(dark0, None, fx=zoom, fy=zoom, interpolation=cv2.INTER_CUBIC)
+    # a line is pencil down to 45% of its own darkness, as for ink, but against the local paper and the noise-set floor
+    r = int(round(1.5*zoom))
+    peak = cv2.dilate(big, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2*r+1, 2*r+1)))
+    mask = ((big > low) & (big > .45*peak)).astype('uint8')
+    # hysteresis: a pale run stays only when it is part of a mark that somewhere reaches the firm level
+    n, lab = cv2.connectedComponents(mask, connectivity=8)
+    top = np.zeros(n, np.float32); np.maximum.at(top, lab.ravel(), big.ravel())
+    keep = top > high; keep[0] = False
+    mask = keep[lab].astype('uint8')
+    skeleton, _ = thin(mask)
+    skeleton, _ = prune_spurs(skeleton, 2*zoom)
+    paths = sketch.trace(skeleton, min_points=2, window=2*zoom)
+    paths, joins = sketch.through_junctions(paths, skeleton, reach=2.5, tangent=3*zoom, stub=2*zoom)
+    before = len(paths)
+    paths = sketch.join(paths, big, gap=3*zoom)
+    joins += before-len(paths)
+    distance = cv2.distanceTransform(mask, cv2.DIST_L2, cv2.DIST_MASK_PRECISE)
+    lines = []
+    for p in paths:
+        p = np.asarray(p, np.float32)
+        if arc_length(p) < min_px*zoom:
+            continue
+        width = max(.6, float(np.median(2*sketch.at(distance, p)))/zoom)
+        q = resample((resample(p.astype(float), 1)+.5)/zoom-.5, 1.0)
+        q = resample(smooth(q, smooth_px), 1.5)
+        lines.append({'points': np.round(q, 3).tolist(), 'width': round(width, 3), 'role': 'pencil stroke', 'length': arc_length(q)})
+    # a stroke is pressed as dark as the drawing is there, its tone included: hatching in a dark mass is firm, not light
+    firm_whole = float(np.percentile(whole[cv2.resize(mask, whole.shape[::-1], interpolation=cv2.INTER_AREA) > 0], 97)) if mask.any() else 1.0
+    weigh(lines, whole, firm_whole)
+    lines.sort(key=lambda l: -l['length'])
+    return lines, mask, skeleton, {'inkPixels': int(mask.sum()), 'tracedPaths': len(paths), 'selectedPaths': len(lines), 'joins': joins, 'zoom': zoom,
+                                   'medium': 'pencil', 'paperNoise': round(noise, 4), 'low': round(low, 4), 'high': round(high, 4), 'firm': round(firm, 4), 'firmWhole': round(firm_whole, 4)}
+
+
+def weigh(lines, dark, firm, reach=1.5):
+    """Each point's darkness in the drawing (the darkest within `reach` pixels, smoothed along the line) over `firm`, as
+    `weights`; the line's median as `weight`. A light construction line comes out light, a pressed contour near 1."""
+    h, w = dark.shape; r = int(np.ceil(reach))
+    peak = cv2.dilate(dark, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2*r+1, 2*r+1)))
+    for l in lines:
+        p = np.asarray(l['points'], float)
+        v = cv2.remap(peak, p[:, 0].astype(np.float32), p[:, 1].astype(np.float32), cv2.INTER_LINEAR, borderMode=cv2.BORDER_REPLICATE)[:, 0] if len(p) else np.zeros(0)
+        if len(v) >= 5:
+            k = np.exp(-.5*(np.arange(-4, 5)/2)**2); k /= k.sum()
+            v = np.convolve(np.pad(v, 4, mode='edge'), k, 'valid')
+        wt = np.clip(v/max(1e-3, firm), .12, 1)
+        l['weights'] = np.round(wt, 3).tolist(); l['weight'] = round(float(np.median(wt)), 3)
+
+
+def reweigh(file, image, out):
+    doc = json.load(open(file)); bgr = cv2.imread(image); dark = paper_dark(bgr, full=True)[1]
+    sx, sy = bgr.shape[1]/doc['image']['w'], bgr.shape[0]/doc['image']['h']
+    firm = doc.get('stats', {}).get('firmWhole') or float(np.percentile(dark[dark > .05], 95))
+    pts = [l['points'] for l in doc['lines']]
+    for l in doc['lines']:
+        l['points'] = [[x*sx, y*sy] for x, y in l['points']]
+    weigh(doc['lines'], dark, firm)
+    for l, p in zip(doc['lines'], pts):
+        l['points'] = p
+    Path(out).write_text(json.dumps(doc)+'\n'); print(len(doc['lines']), 'lines weighed ->', out)
 
 
 def main():
@@ -133,18 +313,39 @@ def main():
     ap.add_argument('--target', help='the picture the drawing is registered to (same size): the line file is bound to it')
     ap.add_argument('--sheetmm', type=float, help='sheet width in mm: adds widthMm to each line')
     ap.add_argument('--zoom', type=int, default=4, help='enlargement before thinning')
+    ap.add_argument('--mergemm', type=float, default=.45, help='close parallel strokes within this (mm, with --sheetmm) are one stroke; 0 keeps them')
+    ap.add_argument('--maxwidthmm', type=float, default=1.2, help='wider marks under four widths long are filled darks, left to the paint (mm, with --sheetmm); 0 keeps them')
+    ap.add_argument('--densemm', type=float, default=1.5, help='ink covering most of a window this wide (mm) is dense (fur, hair, scribble): laid as strokes along its direction, not thinned; 0 thins everything')
+    ap.add_argument('--medium', default='ink', choices=['ink', 'pencil'], help='the medium the drawing is made in: the painter lays it in this (medium-decision.mjs); pencil: grey lines of every weight, kept with their wobble and darkness')
     ap.add_argument('--fit', type=float, default=.6, help='how far a straight run or arc may lie from the traced line, source pixels')
+    ap.add_argument('--reweigh', help='put the drawing\'s darkness on this line file\'s points (pencil) and write it to --out')
     args = ap.parse_args()
+    if args.reweigh:
+        return reweigh(args.reweigh, args.image, args.out)
     bgr = cv2.imread(args.image)
     if bgr is None:
         ap.error('cannot read '+args.image)
     h, w = bgr.shape[:2]
-    lines, mask, skeleton, stats = plan(bgr, args.zoom, fit=args.fit)
+    if args.medium == 'pencil':
+        lines, mask, skeleton, stats = pencil_plan(bgr, args.zoom)
+    else:
+        lines, mask, skeleton, stats = plan(bgr, args.zoom, fit=args.fit, dense_px=args.densemm*w/args.sheetmm if args.sheetmm and args.densemm > 0 else 0)
+    if args.sheetmm and args.medium == 'ink':
+        px = w/args.sheetmm   # source pixels a millimetre
+        if args.mergemm > 0:
+            # strokes laid along dense ink are already one per strand, spaced as drawn
+            dense = [l for l in lines if l.get('dense')]
+            lines, stats['foldedParallels'] = merge_parallels([l for l in lines if not l.get('dense')], args.mergemm*px)
+            lines += dense
+        if args.maxwidthmm > 0:
+            # a filled dark (a fat mark hardly longer than it is wide) is left to the paint
+            n = len(lines); lines = [l for l in lines if l['width'] <= args.maxwidthmm*px or l['length'] >= 4*l['width']]; stats['filledDarksLeft'] = n-len(lines)
+        stats['selectedPaths'] = len(lines)
     if args.sheetmm:
         for l in lines:
             l['widthMm'] = round(l['width']*args.sheetmm/w, 3)
     stem = Path(args.out); stem.parent.mkdir(parents=True, exist_ok=True)
-    doc = {'source': 'trace-drawing: a clean line drawing, pre-paint only', 'inputKind': 'drawing', 'widthPolicy': 'one observed width per line',
+    doc = {'source': f'trace-drawing: a clean {"pencil" if args.medium == "pencil" else "line"} drawing, pre-paint only', 'inputKind': 'drawing', 'medium': args.medium, 'widthPolicy': 'one observed width per line',
            'image': {'w': w, 'h': h}, 'targetSHA256': hashlib.sha256(Path(args.target or args.image).read_bytes()).hexdigest(), 'stats': stats, 'lines': lines}
     Path(str(stem)+'-lines.json').write_text(json.dumps(doc)+'\n')
     cv2.imwrite(str(stem)+'-ink.png', (1-mask)*255)

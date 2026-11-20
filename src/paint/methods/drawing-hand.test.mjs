@@ -28,3 +28,10 @@ test('a flick is set down and lifted in one motion and drawn finer, and a detail
   const detail = handDrawing([mk(40, 2)], { gap: 0, w: 100, h: 100, strokeLength: 1000, detailScale: 0.75, detailWidth: 0.75 }).strokes[0];
   assert.ok(detail.points[20].nw < long.points[20].nw);
 });
+
+test('an ordered drawing (every line numbered) is drawn in its order and direction, unjoined', () => {
+  const a = { ...line(0, 0, 10, 0, 1), seq: 1 }, b = { ...line(10.5, 0, 20, 0, 1), seq: 0 }, c = { ...line(90, 90, 80, 90, 1), seq: 2 };
+  const r = handDrawing([a, b, c], { gap: 2, cos: 0.8, aim: 0.7, w: 100, h: 100, strokeLength: 1000 });
+  assert.equal(r.joined, 0);
+  assert.deepEqual(r.strokes.map(s => Math.round(s.points[0].x)), [11, 0, 90]);
+});

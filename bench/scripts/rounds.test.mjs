@@ -86,40 +86,6 @@ const dryRun = (round, extra) => {
 };
 const runOf = (out, dir, n) => readJson(path.join(out, dir, 'dry-run', String(n), 'run.json'));
 
-test('dry run: V4 plans, is refused once, paints with stops, looks, revises and finishes', () => {
-  const out = dryRun('V4', ['--tries', '1']);
-  const r = runOf(out, 'v4-pipeline', 1), p = r.crops.hills.pipeline;
-  assert.deepEqual(validateRun(r), []);
-  assert.equal(p.outcome, 'painted');
-  assert.equal(p.paintedBy, 'the model');
-  assert.ok(p.looks >= 2 && p.revisions === 1 && p.segments === 2);
-  assert.deepEqual(p.optionCheck.model, []);
-  const ck = fs.readFileSync(path.join(out, 'v4-pipeline', 'dry-run', '1', 'hills-plan', 'CHECKPOINTS.jsonl'), 'utf8');
-  assert.match(ck, /start-refused/);
-  // the painter's copy measure is in the try record, with the plan's line sources beside it; the model is not told
-  assert.ok(Number.isFinite(p.copy.hfCorr) && p.copy.ceiling === 0.53 && typeof p.copy.over === 'boolean', JSON.stringify(p.copy));
-  assert.equal(typeof p.copy.lines, 'number');
-  assert.doesNotMatch(ck, /"copy"/);
-  // the preview was made and the cost is in the try record and run.json: the dry planner ran the check once itself, the
-  // refused start, the start and the revision ran it again; one render, whose segments include the revision's
-  assert.ok(p.cost.checks >= 3 && p.cost.previewSeconds > 0 && p.cost.renders === 1 && p.cost.renderSeconds > 0, JSON.stringify(p.cost));
-  assert.deepEqual([r.session.checks, r.session.renders], [p.cost.checks, 1]);
-  assert.ok(r.session.previewSeconds > 0);
-  fs.rmSync(out, { recursive: true, force: true });
-});
-
-test('dry run: V5 try 2 gets feedback on try 1 and writes its self-review', () => {
-  const out = dryRun('V5', ['--tries', '2']);
-  const r = runOf(out, 'v5-self-study', 2), p = r.crops.hills.pipeline;
-  assert.deepEqual(validateRun(r), []);
-  assert.equal(p.feedback, 'hills-plan/FEEDBACK.md');
-  assert.equal(p.selfReview, 'hills-plan/SELF-REVIEW.md');
-  const dir = path.join(out, 'v5-self-study', 'dry-run', '2', 'hills-plan');
-  assert.match(fs.readFileSync(path.join(dir, 'FEEDBACK.md'), 'utf8'), /previous try \(try 1\)/);
-  assert.equal(runOf(out, 'v5-self-study', 1).score.status, 'dry-run');
-  fs.rmSync(out, { recursive: true, force: true });
-});
-
 test('extra args admit only validated artistic controls, never execution or ink bypasses', () => {
   for (const key of ['segments', 'allowdirty', 'inkrecipe', 'inkres', 'speedvaluecache', 'aware', 'awarefoo', 'physics', 'linesupport', 'inkdarkcap', 'unknown']) {
     for (const args of [[`--${key}`, '1'], [`--${key}=1`]]) assert.ok(checkExtraArgs(args, '/p').length, args.join(' '));

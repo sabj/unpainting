@@ -12,7 +12,7 @@ import { ignoredSettings } from './option-check.mjs';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const pairs = argv => { const m = {}; for (let i = 0; i < argv.length;) { const k = argv[i++]; if (!k.startsWith('--')) continue; m[k.slice(2)] = i < argv.length && !argv[i].startsWith('--') ? argv[i++] : ''; } return m; };
 const profiles = () => ({
-  ...Object.fromEntries(['default', 'general', 'combined', 'penwash'].map(r => [`recipe ${r}`, pairs(expandRecipe({ argv: ['--recipe', r], root: ROOT }).argv)])),
+  ...Object.fromEntries(['default', 'general', 'combined'].map(r => [`recipe ${r}`, pairs(expandRecipe({ argv: ['--recipe', r], root: ROOT }).argv)])),
 });
 
 test('no recipe sets a gated-off or inert setting', () => {

@@ -7,24 +7,15 @@ import { createSheet, dry, step, thickness } from '../../media/sheet.mjs';
 import { makePaper } from '../../media/paper.mjs';
 import { brushedWashPaths, washPaths, containPaths, sweepCover, prewetArea, softArcs, soften } from '../../media/wash.mjs';
 import { distanceToZero } from '../../raster.js';
+import { TECHNIQUES, washBrushOptions } from '../../media/brush-kit.mjs';
 
-/** Technique settings, chooseTechnique's numbers (technique.mjs), keyed by name. */
-export const TECHNIQUES = Object.freeze({
-  'wet on dry': { name: 'wet on dry', water: 0.62, wetMix: 0.55, bridge: 0.78, bridgeSoft: 2.2, intoWet: false, dryAfter: true, passes: 1 },
-  // a first wash: the same brush carried fuller, reaching the bottom of the tooth; a lower bridge leaves paper showing
-  // as white holes. Bridge 0.9 with a transition of 3 matches paint-plate's first stain.
-  'first wash': { name: 'first wash', water: 0.76, wetMix: 0.7, bridge: 0.9, bridgeSoft: 3, intoWet: false, dryAfter: true, passes: 1 },
-  'wet on wet': { name: 'wet on wet', water: 0.88, wetMix: 0.85, bridge: 0.98, bridgeSoft: 3, intoWet: true, dryAfter: false, passes: 1 },
-  glazed: { name: 'glazed', water: 0.58, wetMix: 0.3, bridge: 0.82, bridgeSoft: 2.4, intoWet: false, dryAfter: true, passes: 1 },
-  'dry brush': { name: 'dry brush', water: 0.22, wetMix: 0, bridge: 0.38, bridgeSoft: 1.0, intoWet: false, dryAfter: false, passes: 1 },
-});
+export { TECHNIQUES };
 
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 
 /** A flat mop of radius r for a technique; under 2.5 cells a round brush, since a mop that small is a point. */
 export function brushFor(r, T, seed, { grainShift = 0 } = {}) {
-  if (r < 2.5) return createBrush({ grainShift, radius: r, bristles: Math.max(8, Math.ceil(r * 3)), capacity: 26, belly: 2, feed: 0.08, give: 0.7, free: 0.4, film: 0.22, splay: 0.06, stiffness: 5, wetMix: T.intoWet ? 0.6 : 0.15, bridge: Math.min(T.bridge, 0.55), bridgeSoft: 1.2, streak: 0.5, seed });
-  return createBrush({ grainShift, flat: true, radius: r, bristles: Math.max(12, Math.ceil(r * 2)), capacity: 100, belly: 12, feed: 0.4, give: 0.9, free: 0.4, film: 0.25, splay: 0.03, stiffness: 8, wetMix: T.wetMix, bridge: T.bridge, bridgeSoft: T.bridgeSoft, seed });
+  return createBrush(washBrushOptions(r, T, seed, { grainShift }));
 }
 
 /** A sweep's pressure: it lands, bears down through its body, lifts, and presses harder where the passage wants more. */
@@ -44,7 +35,7 @@ function shapeSweep(pts, want, w, h, amount, { land = 0.06, lift = 0.1, followMi
 /** The sweeps a passage takes with a mop no wider than `maxRadius`, held inside it, and the widest brush among them.
  *  A passage too narrow for the mop gets a small brush drawn down its middle, not skipped. Callers charge by `radius`:
  *  a mop held in a narrow passage is the small brush, and charging it at the mop's yield lays about twice the paint. */
-export function passagePaths(mask, w, h, { maxRadius, want = null, seed = 1, pad = 1.5 } = {}) {
+function passagePaths(mask, w, h, { maxRadius, want = null, seed = 1, pad = 1.5 } = {}) {
   const dist = distanceToZero(mask, w, h);
   let paths = containPaths(brushedWashPaths(mask, w, h, { pad, minRadius: 1, minLength: 3, maxRadius, field: want, seed, overlap: 0.15, walk: true, outerDrift: 1.5 }), dist, w, h, { minRadius: 0.8, minLength: 2, slack: 0.5 });
   if (!paths.length) paths = washPaths(mask, w, h, { pad: 0.2, minRadius: 0.5, minLength: 2 });

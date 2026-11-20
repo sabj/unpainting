@@ -32,7 +32,7 @@ V3 is compared on Hills, France and Ships. The 0.1.1 Muse V3 runs painted all fi
 
 ## Results
 
-All five rounds were painted with painter V096, sim 100 and judges J1, in releases 0.1.0 and 0.1.1. Each result is labelled with its round, painter version, sim version, judge version and release. To benchmark a newer painter or sim, rerun V4 or V5 with it; the new tries form their own group in that round. To reproduce, check out the tag a result names, `v0.1.0` or `v0.1.1`; [versions](../docs/versions.md) explains the scheme.
+All five rounds were painted with painter V096, sim 100 and judges J1, in releases 0.1.0 and 0.1.1. Each result is labelled with its round, painter version, sim version, judge version and release. V4 and V5 were retired in 0.4; tag v0.3.2 reruns them, and a V6 task is drafted in [v6/TASK.md](v6/TASK.md). To reproduce, check out the tag a result names, `v0.1.0` or `v0.1.1`; [versions](../docs/versions.md) explains the scheme.
 
 - [Leaderboard](results/leaderboard.md): scores, intervals, cost and time per model and round
 - [Gallery](results/gallery.md): each model's best painting of each target, shown as its 10 to 100% stages
@@ -49,7 +49,7 @@ All five rounds were painted with painter V096, sim 100 and judges J1, in releas
 
 ## Reproduce
 
-You can rerun every round on your own machine, with the published briefs and rules. V4 and V5 use the checked-out painter: V102, sim 103 in release 0.3.0. Scores can differ from the published V096 runs. From 0.3.3 V4 and V5 paint each target at its own size (about 300 cells wide on a 78 mm sheet, [subjects.json](v4v5/subjects.json)); the published runs painted it enlarged four times, 1200 to 1224 cells wide on 158 and 280 mm sheets. The two sizes never share a result group. The plan's drawing section and explicit arguments control the drawing medium and order; explicit command-line arguments take precedence. Keep new runs under their actual painter, simulator and judge versions rather than rewriting historical results. A V3 session offers `--tries` attempts (default 3). The published sessions offered up to five.
+You can rerun every round on your own machine, with the published briefs and rules. V4 and V5 run from a checkout of tag v0.3.2, whose painter still reads their plans. Scores can differ from the published V096 runs. From 0.3.3 V4 and V5 paint each target at its own size (about 300 cells wide on a 78 mm sheet, [subjects.json](v4v5/subjects.json)); the published runs painted it enlarged four times, 1200 to 1224 cells wide on 158 and 280 mm sheets. The two sizes never share a result group. The plan's drawing section and explicit arguments control the drawing medium and order; explicit command-line arguments take precedence. Keep new runs under their actual painter, simulator and judge versions rather than rewriting historical results. A V3 session offers `--tries` attempts (default 3). The published sessions offered up to five.
 
 ```sh
 npm run bench:test                                   # check every run record, that results/ regenerates unchanged, and dry runs of V3 to V5

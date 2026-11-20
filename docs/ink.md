@@ -10,39 +10,23 @@ In the third image of each row, the pen drawing is thin, brown and hard-edged. I
 
 ## Ink or pencil
 
-`--outlinemedium` defaults to graphite, a light pencil underdrawing, for every source. Ink is drawn only when asked for: with `--outlinemedium ink`, a plan's ink medium, or `--inkrecipe wash` (see [Pen and wash ink](#pen-and-wash-ink)). Pencil is light, neutral and does not move under water, so the washes cover it.
+`--outlinemedium` defaults to graphite, a light pencil drawing. Ink is drawn only when asked for: with `--outlinemedium ink`, a plan's ink medium, or `--inkrecipe wash` (see [Pen and wash ink](#pen-and-wash-ink)). Pencil is light, neutral and does not move under water, so the washes cover it. `--outlinemedium auto` draws in ink if at least 0.5% of the picture reads as ink line (`--penfirst`), and in pencil below that.
 
-`--outlinemedium ink` draws in ink. `--outlinemedium auto` chooses from the target. It draws in ink if at least 0.5% of the picture reads as ink line (`--penfirst`), and in pencil below that. Ink on a target without line would add marks the original lacks.
-
-The medium is decided before painting (`src/paint/methods/medium-decision.mjs`). A `--subjectmedium` on the command line wins. Otherwise a plan's declaration wins: `drawing.medium`, or a style selection of ink-and-wash or urban-sketch for the picture or for any region. With no declaration the drawing is graphite. An ink request on the command line (`--outlinemedium ink` or `auto`, `--inkrecipe wash`, an ink stage) is kept only when the source shows at least `--penfirst` per cent pen line. Below that it becomes the graphite drawing, and no ink option, closing file or `--washinkfree` reaches the washes. The pen share never switches ink on. The run card records the decision and its evidence under `drawing.mediumDecision`.
-
-The graphite drawing carries the structure of the subject. Its lines are the line model's pool, held to the target and decided by meaning like an ink drawing's, then the strongest lines up to `--prepamount` (0.5) of the length, whole. A line's strength is its length times how strongly the subject marks it: the tone step across it plus how much darker the subject is along it than on both its sides, in L*. A plan's own opening lines stay. The planned-passage filter (`--lineedges`) is off for it, since a pencil line under a wash is still drawing. It is skipped when the plan names a line source or stages, or with `--linemodel 0` or `--segments off` (`src/paint/methods/graphite-pool.mjs`). The run card records it, with the line weights, under `drawing.graphitePool`.
-
-Each pool line is drawn as dark as the subject's own line there (`src/paint/methods/line-weight.mjs`). The subject is read along the line: the darkest L* within 0.4 mm of the path against the darker of its two sides, averaged over 2 mm of the line so the grain of a wash cancels, and the median along the line is its darkness. The pencil is tried on a scrap of the painting's paper at ten pressures (`pencil-scrap.mjs`), and the line takes the pressure whose scrap line reads that many L* darker than the paper. A harder pressure also draws wider, by the pencil's profile. A line the subject shows no darker than the light pencil's own line keeps the light pressure, 0.35, so a construction line stays faint. `--openingpressure` is the most any line may press (1 for this drawing; 0.35 holds every line to the light pressure). An HB at full pressure reads about 16 L* darker than the paper at a quarter millimetre a cell; a subject line darker than that is drawn at full pressure and comes out lighter than the subject's. The match is made on bare paper. A wash over a line hides some of it and a dark wash most of it, so a line under dark paint is not carried by the pencil. The run writes the table and the pressures to `graphite-line-weight.json`.
-
-A plan can set this itself. `drawing.medium: "ink"` asks for ink. The `drawing` section also sets the ink color, how many lines and how heavy ([plan-format.md](plan-format.md#value-plans-the-drawing-section)).
+The medium is decided before painting (`src/paint/methods/medium-decision.mjs`). A `--subjectmedium` on the command line wins, then a plan's `drawing.medium`. An ink request is kept only when the source shows at least `--penfirst` per cent pen line; below that the drawing is graphite. The run card records the decision under `drawing.mediumDecision`.
 
 ## Where the lines come from
 
-A plan picks the line set with `drawing.source`:
+The only line is a prepared drawing file (`--drawingfile STEM`, `src/paint/line-source.mjs`). An image model draws a clean line drawing of the subject. `tools/seg/trace-drawing.py` traces it, one stroke per drawn line with its width and darkness, and `tools/seg/order-strokes.mjs` orders the strokes as a hand draws, structure first. For pencil, `tools/seg/pencil-hand.mjs` lays it as a hand would. [tools/seg/README.md](../tools/seg/README.md) has the commands.
 
-| Source | Use it for | Avoid it for |
-|---|---|---|
-| `source-ink` | pen drawings and pen-and-wash masters: the target's own pen lines, traced | photographs (it traces dark ridges, not structure) |
-| `photo-sketch` | architecture photographs: continuous structural lines with a width hierarchy (`tools/seg/sketch-lines.py`) | portraits and loose landscapes, where it is weaker; it needs python3 with numpy and OpenCV |
-| `auto` | anything: `source-ink` when at least 0.5% of the target reads as pen line, else `photo-sketch` when it can run, else the pen finds its own lines | |
-| `none` (default) | a plan with no source: the pen finds its own lines, or draws a `--drawingfile` | |
+The pen or pencil draws the file's lines as they are. Nothing cuts, smooths, re-decides or re-measures them. With no drawing file the log prints `!!! NO LINE` and no line is drawn.
 
-Under the plan's choice, the painter's tools are:
+The painter reads only the target's line darkness, before painting, to set the pen's load (`src/paint/methods/ink-lines-file.mjs`):
 
-- The ink separator in `src/crop/inkwash.mjs` sorts the picture into ink, pigment, edges and bare paper.
-- `tools/seg/ink-lines.mjs` traces that estimated ink into center lines and joins pieces that continue each other.
-- Optional: a trained line model (`tools/seg/lines.py`) makes a line drawing from any target. You don't need it.
-- Optional: `tools/seg/sketch-map.py` runs the published fine and coarse lineart models once before painting. `sketch-lines.py --map` uses that map as evidence ([setup](../tools/seg/README.md)).
+- `--inkdarkmatch c` draws a sample of the stage's strokes on a blank scrap and scales the ink load until they are `c` times as dark as the target's firm lines. The load can rise or fall. It writes `ink-dark-match.json`.
+- `--inkdarkcap c` caps the load so a test line on scrap is at most `c` times as dark as the target's lines (`src/paint/methods/ink-scrap.mjs`). It only lightens.
+- `--inkwidthfloor f` draws no line thinner than `f` target pixels on the sheet.
 
-The line tools need python with numpy and OpenCV. The painter picks `--sketchpython`, else `PAINTER_LINES_PYTHON`, else `$PAINTER_LINES_VENV/bin/python`, else the repo's `.venv-lines/bin/python`, else `python3`. `tools/cloud/setup-lines.sh` installs `.venv-lines`.
-
-The plan picks which candidates to draw. A plan with `lines: "regions"` orders lines by the part of the picture they lie in. Head and hands come first, then clothing, then the setting. `maxLines` caps the count.
+These write the target's line measures to `ink-lines.json`.
 
 ## The pen
 
@@ -56,163 +40,68 @@ The plan picks which candidates to draw. A plan with `lines: "regions"` orders l
 
 The ink color is separate from the wash palette. The default is a warm sepia, and black is the other choice.
 
-Black opening ink sets before the washes by default; sepia stays soluble. `drawing.ink.waterproof` chooses whether it sets (`--inkfast auto|1|0`). The pen uses the declared `--inkconc` load. It keeps one nib reservoir across marks until it needs another dip. A plan can say the target is drawn in pen. Then the pen draws the source's own ink, short descriptive marks included, without the sparse sketch's 12-line, 8 mm limits. The plan says so with an `ink-and-wash` style, `drawing.medium: "ink"`, or a prepared line file (`--drawingfile`). A painted target without such a plan keeps the sparse limits. The separator also reads dark painted edges, such as foliage and windows, as ink. `--sourceink 0|1` overrides the choice. The source-ink closing pen defaults to pressure 0.6. Explicit `--openinglines`, `--closinglines`, `--openingminmm` and pressure flags win.
-
-Three flags shape the closing pen. `--closingshare c` gives the opening and closing pens one line budget, with `c` of it for the closing pass. `--inkdarkskip v` cuts closing lines where the plan's value is above `v`, since the wash already states those edges. `--closingconc f` dilutes the closing ink, so accents stay lighter than the darkest wash.
-
-A line from the plan's own drawing files (`--drawingfile`, `--drawinglast`) must restate an edge of the planned painting. The painter draws it only when at least half of its path lies within one source pixel of a planned passage boundary (`src/paint/methods/line-support.mjs`). A line inside one planned mass would cross a flat fill on the plate, so it is left off whole; lines are never cut into dashes. The test reads the plan's passages, not the target. A source's own pen lines are drawn as they are. `--lineedges 0` turns it off.
-
-## Holding ink to the target
-
-In painter V101, five flags hold the pen to the target's own lines. Each is off by default, so without them V101 draws as V100 does. Before painting, the painter reads the opening (`--drawingfile`) and closing (`--drawinglast`) line files against the target (`src/paint/methods/ink-lines.mjs`). That includes the files the linked drawing stages write (`stage-prepink-lines.json`, `stage-finishink-lines.json`).
-
-An ink drawing is always held and decided: when a run draws in ink and does not set the pruning flags (`--inkdecide`, `--linesupport`, `--linesmooth`, `--inkjoin` and the rest of the wash recipe's line side, `src/paint/methods/ink-hold-defaults.mjs`), those defaults apply, so a plan's authored line files are pruned by the target like a model's lines. Each kept line is faired (src/paint/methods/line-fair.mjs): the line model traces its ridge on a grid of a quarter millimetre or more, and that grid shows as tremor, so a line comes back as a straight run or a circular arc where one fits within a pixel of the trace, else as one smooth curve (smoothed at 1.2 mm), with corners kept and no point moved more than 0.4 mm. A line whose curvature reverses twice or more is a scribble and is left to the wash unless it is a face or hand feature. A line is drawn whole or left off whole: pieces of one contour are joined first, a line is kept when at least half of its length passes the rules, and a piece under 3 mm that is not part of a closed set or a face feature is left to the wash.
-
-- `--linesupport t` decides each line whole: a line is kept when at least half of it runs where the target shows a line, and left off whole otherwise; it is never cut where support lapses. Along the path, the target must be at least `t` L* darker than the mean of both sides, 1 to 2.25 target pixels out. Plain paper, a light line such as a white whisker, and a path along a tonal edge with no line fail. Default 0, off.
-- `--linesmooth mm` smooths traced lines that step from pixel to pixel. Corners sharper than `--linesmoothcorner` degrees (default 50) stay sharp. Default 0, off.
-- `--inkwidthfloor f` draws no ink line thinner than `f` target pixels on the sheet. The nib's widest contact rises to the floor when it must. Default 0, off.
-- `--inkdarkcap c` sets the ink load from a test line on a scrap of the same paper (`src/paint/methods/ink-scrap.mjs`). On blank paper, the pen's line is then `c` times as dark as the target's lines are against what is beside them. Darkness is compared as absorbance. The cap only lightens the ink. Each pen stage is capped from its own line file. Default 0, off.
-- `--inkdamp d` makes the pen find the paper at least `d` damp (0 to 1), as on a sheet not yet quite dry. At 0.3 a line spreads to about twice its contact width with soft edges. Default 0, dry paper.
-
-`--linesupport` and `--linesmooth` write `ink-opening-lines.json` and `ink-closing-lines.json` next to the painting, and the pens draw those. Any of the five writes the target's line measures to `ink-lines.json`. `--inkdarkcap` also writes `ink-dark-cap.json`.
-
-`--inkrecipe v2` sets them at once. From painter V104 it sets `--inkdarkmatch 1` in place of `--inkdarkcap`: the ink load is scaled until the pen's lines are as dark as the source's, and it can rise as well as fall. A flag given on the command line wins over the recipe.
-
-| Flag | Ink v2 | Off |
-|---|---|---|
-| `--linesupport` | 5 | 0 |
-| `--linesmooth` | 1 | 0 |
-| `--linesmoothcorner` | 50 | 50 |
-| `--inkwidthfloor` | 1 | 0 |
-| `--inkdarkmatch` | 1 | 0 |
-| `--inkdamp` | 0.3 | 0 |
-
-The recipe does not turn ink on. Add `--outlinemedium ink --drawing both` for an opening ink drawing with closing accents.
-
-See [Choosing linework](linework.md) for the short job-to-tool guide and its defaults.
+Black opening ink sets before the washes by default; sepia stays soluble. `drawing.ink.waterproof` chooses whether it sets (`--inkfast auto|1|0`). The pen keeps one nib reservoir across marks until it needs another dip.
 
 ## Pen and wash ink
 
-`--inkrecipe wash` is ink for pen drawings and pen-and-wash sources, such as a Guardi or Tiepolo sheet or an ink-led sketch. It is off by default. It turns ink on by itself.
-
-The default is `--inkrecipe none`: the drawing is pencil only, for every source.
-
-- Lines. The pen draws the line model's lines, first and with no pencil (`--linestroke 0`). The lineart models' fused map is traced whole by `tools/seg/copy-lines.py --kind line-map`: a window or a doorway comes out as its outline, and the wash supplies the dark. The tracer carries each line through its junctions along the straightest continuation and bridges a break of up to 7 map pixels where both ends point along it and the map carries on between them, so a wall edge, an eave or an arch is one long stroke. The source's own narrow dark strokes (a black top-hat, `--kind stroke`) are no longer the paths: on a painted source they are dashes, and a dark window became a centre line. They are still thinned and counted, and that count is the subject's own line length (`sourceInkLength`). `--linestroke 1` traces them as before.
-- Models missing. When torch, controlnet_aux or the weights are missing, the run logs a `!!!` line, and `copy-lines.py` traces the source's own ink instead. `--linemodel strict` stops the run instead. `--linemodel 0` turns the models off.
-- Agreement. The fallback tracer takes any narrow dark mark, so it also traces wash edges and the rims of dark brush masses. `--copylinesagree 2` cuts each of its lines to the parts within 2 cells of what the ink separator reads as pen line. The model lines are not cut.
-- Fill. `--copylinesfill 1` fills the separator's pen line that no kept fallback trace covers with the separator's own narrow-ridge lines, cut the same way. It applies to the fallback only.
-- No pen line. `--copylinesfloor 0.6` draws no pen lines when the separator reads under 0.6% of the source as pen line, read at 540 px wide. The source then gets washes only.
-- Placement. On the fallback lines, the support filter keeps a line only where the source shows one, joins gaps up to 0.6 mm and drops pieces under 0.3 mm. On the model lines the filter only measures: every line is kept whole, with its width and darkness read from the source. Smoothing is light, at 0.3 mm, so a short descriptive mark keeps its shape.
-- Width and pressure. `--linemeasure 1` reads the source's line under each point of each stroke: its width, and its darkness against what is beside it. The pen then follows both, so a line swells and fades where the source's does.
-- Economy. `--inkeconomy 1` applies a draughtsman's economy (`src/paint/methods/pen-wash-lines.mjs`) without its random omission: specks under 0.8 mm go, a small mark that nearly repeats a neighbour goes, and no 4 mm square carries more than 9 mm of small marks, longest kept first. Every mark 3 mm across or more stays.
-- Order and strokes. `--drawinghand 1` draws the lines as a hand does. Lines that continue one another are chained into one gesture. Long contours (8 mm and more, tier 1) are drawn before detail, each tier from where the pen last lifted. Pressure and width taper at both ends. `--drawstroke 0` keeps each chained gesture whole without splitting at 10% of the sheet. A piece carries on with the ink on the nib: only a nib that has run low is dipped again, so there is no fresh-dip blot mid-line. A longer stroke makes the fine pen path very slow. Order is by line length, not by subject region.
-- Ink or wash. `--inkdecide 1` decides every candidate model line before it is drawn. SAM's regions are labelled architecture, figure, face, hands, drapery, tree_trunk, foliage, sky, water, ground or shadow_mass. The wash recipe uses `--inklabeljudge simple`: a classifier of each region's colour and size, which sends nothing off the machine. `--inklabeljudge codex` or `agy` has a vision model read an overlay of the regions on the source instead. That uploads the overlay to the model's service, so it is opt-in. A model that cannot run gives the simple labels, logged with `!!!`. Labels are cached by the source's SHA-256 in `work/line-labels`. Each label has an ink rule: foliage, sky and water are wash only; trunks take long strokes only; architecture, figures and drapery take structure and outline; faces and hands take every pen line. A contour is drawn when either side is ink-worthy. A point must also read as a pen line, thin and dark with lighter tone on both sides at its own width, and not as a mass edge, a step between two tone masses. A long, smooth line that is mostly pen line is structure and stays. The decision is written to `ink-labels.json` next to the painting, with the share of line length on mass edges before and after. `tools/judge/ink-labels-view.mjs` tints the regions by label over each crop, and `tools/judge/ink-noise.mjs` colours lines red on mass edges and green on pen lines.
-- Decision options. The wash recipe sets `--inkshadowmask 0` and `--inkdropfaint 0`: the tone pass does not mark dark masses as shadow, and a point with no contrast of its own and no step beside it is kept. So the line-or-mass test and the regions' labels decide. With `--inkshadowmask 1`, a dark mass is a shadow and only a pen line of its own, strong against both sides, is drawn on it. With `--inkdropfaint 1` a point with neither contrast nor step is left to the wash. Both cut deeper and cost recognisability (see the results in the changelog).
-- Geometry. `--inkgeom 1` replaces a trace by a straight run or an arc only where the trace stays within 0.15 mm of it and the source shows a pen line along it. Other pieces stay only if they are form contours (6 mm or more, smooth) or are in a face or hand. A squiggle is left to the wash and is never joined to another. Pieces join only when collinear across a gap of 2.5 mm or less. The log gives the fragment count and the mean curvature energy per stroke before and after.
-- Foliage. `--inkfoliage 1` also marks cells as foliage where the source is green and busy: a green cast smoothed over a millimetre and a spread of L* within it. Leaves are wash. A trunk's own region stays a trunk, and a long smooth stroke through leaves is a branch and stays.
-- Shadows. In pen and wash a shadow is wash: its shape and its edges are never drawn, and only a pen line of its own, strong against both sides, stays on it. `--inkhatch 1` is for pure ink and is off by default. It hatches each shadow mass in strokes of 0.1 mm, spaced by tone (1.5, 0.75 and 0.5 mm as the shadow deepens) at a hand angle (`--hatchangle`, 45 degrees) or along the lines of equal tone (`--hatchform 1`), and crosses them where the shadow is deep.
-- Salience. `--inksalience 1` keeps what makes a subject read first: connected and closed geometry. Pieces whose ends meet within 0.6 mm form a set. A set stays when it is at least 6 mm long (or as long as the ground's own minimum), closed, or a face or hand feature. An isolated short piece is texture and is left to the wash. Sets that are long (20 mm) or closed are drawn first.
-- Importance. The decided, measured lines are ranked and kept until their length reaches the subject's own line length (`src/paint/methods/line-importance.mjs`). A line's importance is its length up to 12 mm, times the square of its weight (the stroke's median darkness in the source and confidence in the map), times 1.5 for a line of a long or closed set, times 1 to 2 by how surely the source itself draws a pen line there (a ridge 10 L* darker than both sides is sure; an edge between two tones is not). There is no cap on the count, and nothing is dropped when the lines are within that length.
-- Stroke widths. Each stroke has one weight. Its width is the median of the source line's width along it, read with a probe of 0.5 mm either way (`--lineprobemm`) and up to 1.2 mm (`--linestrokemax`), and its pressure is the median of the source line's darkness along it. The pen's contact is that width (`--drawwidthgain 1`). The pen does not replay the source's width or darkness point by point. Along the stroke only the hand varies them: it lands firm, eases off by a quarter of the pressure by the far end, lifts over the last third of the stroke, slows on curves, and swells on a pulled stroke; the nib's width follows the pressure. A short end piece past a sharp corner (under 1.2 mm, a turn of 60 degrees or more) is a tracing hook and is not drawn. Lines that continue one another across a gap of up to 2 mm are drawn as one stroke (`--drawjoingap 14`).
-- Model line widths (`--linestroke 0`). A model line's width is the narrower of the source's line and the lineart map's, held to 0.05 to 0.28 mm (`--linewidthmin`, `--linewidthmax`; the wash recipe sets the upper limit to 0.7 mm). A short or tightly curved piece, such as an eye or a pupil, is drawn 0.75 times as wide (`--linedetailratio`). The source's line is read with a probe of 0.2 mm either way (`--lineprobemm`), so a wash beside a line does not widen it. Pressure is the mean of the source's darkness and the map's confidence. With `--inkres N` the margin and the least contact of `--drawwidthmargin` and `--drawwidthmin` are N times smaller, as a fine cell is.
-- Darkness. `--inkdarkmatch 1` draws 60 of the stage's real strokes on a blank sheet and scales the ink load until they match the source's ink. The source's ink is read on its firm lines (the 85th percentile of the line cores) against bare paper, and the scrap is read the same way. A thin line reads pale because a pixel is wider than it is, and a line on a mid-tone wash reads pale against its side, so the median step understated the ink and the pen drew grey. The load can rise or fall, within 1/8 to 4 times.
-- Colour. `--inkhue source` turns the ink's absorption to the colour of the source's own line cells, so a bistre line stays brown and a black ink sketch stays neutral. `--inkhuegain 1.5` raises each channel's share to the power 1.5, because dense ink renders less brown than its absorption direction.
-- Wet lines. `--inkbleed 0.35` draws a fallback line the source shows wide and pale on paper 0.35 damp, so it feathers. Other lines, and every model line, are dry and crisp.
+`--inkrecipe wash` is ink for pen drawings and pen-and-wash sources, such as a Guardi or Tiepolo sheet. It is off by default and turns ink on by itself (`src/paint/methods/ink-recipe.mjs`). A flag given on the command line wins over the recipe.
 
 | Flag | Wash | Off |
 |---|---|---|
 | `--outlinemedium`, `--drawing` | `ink`, `both` | `graphite`, `first` |
-| `--linesource` | `source-ink` | `none` |
-| `--linemodel`, `--linestroke`, `--linestrokemax` | 1, 0, 1.2 | 0, 0, 0.5 |
-| `--inkres` | 2160 over the width, from 1 to 4 | 1 |
-| `--inkwidthfloor` | 0 with `--inkres` 2 or more, else 1 | 0 |
+| `--drawingstages`, `--stages` | `off`, `prepink,finishink` | `auto`, none |
+| `--prepinkfrom`, `--prepinkamount`, `--prepinkkeep`, `--prepinkadd`, `--prepinkdeviate` | `lines`, 1, 1, 0, 0 | stage defaults |
+| `--openingpressure` | 1 | 0.3 on a staged run |
 | `--drawinghand`, `--drawstroke`, `--inkhand` | 1, 0, 1 | 0, 0.12, 0 |
 | `--drawtaperin`, `--drawtaperout`, `--drawtaperstart`, `--drawtaperend` | 2, 6, 0.7, 0.45 | 3, 5, 0.45, 0.3 |
-| `--drawdetailscale`, `--drawflickmm`, `--drawwidthgain` | 0.75, 0, 1 | 1, 0, 0.95 |
-| `--inkdecide`, `--inkshadowmask`, `--inkdropfaint`, `--inklabeljudge` | 1, 0, 0, `simple` | 0, 1, 1, `codex` |
-| `--inkdarkrule`, `--inkjoin`, `--inkfoliage`, `--inkeconomy` | 1, 2.5, 1, 1 | 0, 0, 0, 0 |
-| `--inkgeom`, `--inksalience`, `--inkhatch` | off, 1, off | off |
-| `--copylinesmin` | 0.005 | 0.025 |
-| `--copylinesagree`, `--copylinesfloor`, `--copylinesfill` | 2, 0.6, 1 | 0, 0, 0 |
-| `--drawingstages` | `off` | `auto` |
-| `--stages` | `prepink,finishink` | none |
-| `--prepinkfrom`, `--prepinkamount`, `--prepinkkeep`, `--prepinkadd`, `--prepinkdeviate` | `lines`, 1, 1, 0, 0 | stage defaults |
-| `--openingpressure` | 0.75 | 0.3 on a staged run |
-| `--linesupport`, `--linesmooth`, `--linesmoothcorner` | 5, 0.3, 50 | 0, 0, 50 |
-| `--linegapmm`, `--lineminmm` | 0.6, 1.2 | 2 and 3 file pixels |
-| `--linemeasure` | 1 | 0 |
+| `--drawdetailscale`, `--drawflickmm`, `--drawwidthgain`, `--drawjoingap` | 0.75, 0, 1, 14 | 1, 0, 0.95, 4 |
 | `--inkdarkmatch` | 1 | 0 |
 | `--inkhue`, `--inkhuegain` | `source`, 1.5 | `profile`, 1 |
 | `--inkdamp`, `--inkbleed` | 0, 0.35 | 0, 0 |
+| `--inkres` | 2160 over the width, from 1 to 4 | 1 |
+| `--inkwidthfloor` | 0 with `--inkres` 2 or more, else 1 | 0 |
 
-With `--linemeasure`, a line file drawn on a finer grid than the pen's is read on the pen's grid. The pen's grid is the painting's, or with `--inkres N` it is N times as fine. The wash recipe sets N to 2160 over the painting's width, from 1 to 4, so the pen sheet is near 2160 px wide: 4 at 540 px, 3 at 720 px, 2 at 1080 px, 1 from 2400 px. The saved `drawing-opening.png`, `painting.png` and frames are N times the painting's width. `--paperscan` cannot be used with `--inkres`. `--inkdarkmatch` writes `ink-dark-match.json`; with `--inkres` it draws and reads its sample on a fine sheet. A flag given on the command line wins over the recipe.
+The pens draw on a sheet near 2160 px wide: `--inkres` is 4 at 540 px, 2 at 1080 px, 1 from 2400 px. The saved `drawing-opening.png`, `painting.png` and frames are N times the painting's width.
 
-`--lineinkonly 1` also keeps a line only within a pixel of cells the ink separator reads as pen line. On the ink-led sketches it drops the brush marks in foliage that the tracer reads as lines. On a Guardi it also drops arch mouldings drawn beside wash, so the recipe leaves it off.
+With `--drawingonly 1` the wash recipe lays the drawing alone on dry paper, in near-black drawing ink with the flexible drawing nib, one opening pen.
 
-The recipe is not for photographs. On a target with less pen line than `--penfirst` (0.5%) the painter warns. Fragonard's brush-and-wash Rinaldo reads as 0.41% pen line at 540 px, under `--copylinesfloor`, so it gets no pen lines.
+`--inkrecipe v2` sets `--inkdarkmatch 1` and `--inkdamp 0.3`. It does not turn ink on.
+
+The recipe is not for photographs. On a target with less pen line than `--penfirst` (0.5%) the painter warns.
 
 ## Linework stages
 
-A drawing is up to three jobs, each from the same line set:
+A drawing is up to three jobs, each cut from the drawing file:
 
 | Stage | Job | Medium | When to use it | Skip it when |
 |---|---|---|---|---|
-| `prep` | place the big shapes lightly before any ink | pencil (graphite) | placement is hard: architecture in perspective, portrait proportions, or a style that shows graphite | the subject is a simple silhouette, or the source is pen only |
-| `prepInk` | the opening pen drawing, before the washes | ink | the structure must hold the washes (pen and wash, urban sketch) | pure watercolor with no visible line |
-| `finishInk` | closing accents over the dry washes | ink | edges and darks the washes softened need restating | the opening ink already reads at the finish |
+| `prep` | place the big shapes lightly before any ink | pencil (graphite) | placement is hard: architecture in perspective, portrait proportions | the subject is a simple silhouette, or the source is pen only |
+| `prepInk` | the opening pen drawing, before the washes | ink | the structure must hold the washes | pure watercolor with no visible line |
+| `finishInk` | closing accents over the dry washes | ink | edges the washes softened need restating | the opening ink already reads at the finish |
 
-The stages are linked. Prep ink follows the pencil with small deviations: it refines each line, drops some (that pencil stays visible) and adds a few the pencil left out. Finish ink restates a share of the prep ink where the target's edges or darks are strongest. With no `stages` in the plan, prep ink and finish ink are each planned on their own. With no line file, ink stages (`prepInk`, `finishInk`) extract lines with the fused ControlNet lineart models (`traceLineModel` in `src/paint/methods/line-model.mjs`) when `--linemodel` is active; pencil-only `prep` (or `--linemodel 0`) uses the pen tracer (`src/crop/pen-trace.mjs` through `src/crop/pen-trace-file.mjs`): read at the tracer's pixel (0.93 mm on the sheet), whole contours, one width (read at the source's own resolution) and one weight per line, texture inside dark masses left to the wash, and pale lines only when the subject reads as pen (`readsAsPen` in `src/paint/subject-medium.mjs`: the declared `--subjectmedium`, else the measured pen line at `--penfirst`). Such a set takes the source-ink pressure caps; only edge chains (no pen line found) keep the light construction caps (0.3 opening, 0.35 closing). A line file's `width` on a line with no per-point `widths` is that line's one nib along its whole length.
+`--stages` names them; a plan's `drawing.stages` sets their shares and methods ([plan-format.md](plan-format.md#value-plans-the-drawing-section)). A closing pen needs a finish stage or its own file (`--drawinglast`). Each run with stages writes `stage-prep.jpg`, `stage-prepink.jpg` and `stage-finishink.jpg`.
 
-Each stage takes a few choices ([plan-format.md](plan-format.md#value-plans-the-drawing-section)):
-
-| Choice | Pick | For |
-|---|---|---|
-| `prepInk.method` | `contour` (default) | clean outlines; architecture and most subjects |
-| | `connected` | longer, joined gestures over the same lines |
-| | `scribble` | black or curly coats, dark hair: fewer longer strokes, lit edges left open, dark masses as loose scribble |
-| `finishInk.method` | `accent` (default) | each chosen line restated whole |
-| | `architecture` | frames, arches, cornices and sills restated whole, thin and dark at full pressure (the Y1 closing pen) |
-| `finishInk.masses` | `scribble` | a black coat that needs a pen texture over its paint; off by default, since a dark surface is paint's job |
-
-Ink is waterproof (`drawing.ink.waterproof`) by default for black and soluble for sepia. Waterproof ink suits pen and watercolor and urban sketches, where the line must survive the washes. Soluble sepia suits brown ink-and-wash masters, where a wet wash should soften the line.
-
-Each run with stages writes `stage-prep.jpg`, `stage-prepink.jpg` and `stage-finishink.jpg`, the sheet after each stage. It also writes `layer-*.jpg`, what each stage laid on its own, with the stage line files and `linework.json`.
-
-## Automatic drawing stages
-
-`--drawingstages auto`, the default, chooses the linked stages for each picture (`src/paint/methods/drawing-stages-auto.mjs`). It does not run when the command line names a `--drawingfile` or `--drawinglast`, or the run has a plan with `drawing.stages`, `--drawing none` or `--drawingstages off`.
-
-The rule in `src/paint/methods/drawing-choice.mjs` reads the picture before painting:
-
-- `prep`: a light pencil placement, or a fuller one for built structure. A picture with under 0.5% of its cells on an edge gets none.
-- `prepInk`: ink over the pencil, for a pen source or built structure. A pen source shows at least 2.5% pen line. Built structure has two or more vanishing points carrying 12% of the long edges.
-- `finishInk`: closing ink accents when at least 2% of the cells lie on an edge, which is most pictures.
-
-The choice keeps ink stages only when ink is asked for (`--outlinemedium` other than graphite). Otherwise it keeps the pencil prep alone. A kept ink stage sets `--outlinemedium ink`. An ink finish adds a closing pass, `--drawing both`, or `last` when there is no opening stage. With no stage at all the run draws nothing. A typed `--drawing first` drops the finish. The pen-and-wash style always gets `prepInk` and no `finishInk`. With `OPENROUTER_API_KEY` set, a vision model proposes the stages first; it can drop an ink stage but cannot add one the rule refuses. The choice is written to `drawing-choice.json`. `--drawingstages off` keeps the plain pencil drawing.
+Ink is waterproof by default for black and soluble for sepia. Waterproof ink suits pen and watercolor, where the line must survive the washes. Soluble sepia suits brown ink-and-wash masters, where a wet wash should soften the line.
 
 ## Drawing order
 
-The default recipe sets `--drawing first`: the drawing goes down first and dries, then the washes. A closing pass needs `--drawing both`, a plan's `finishInk` stage or `closingLines`, or an ink finish from the automatic stage choice when ink is asked for. The opening drawing places the forms for the washes to fill. Sepia ink can rewet, so a wash over wet ink would smear it. The pen keeps one reservoir across marks and dips again when it runs low, so a long line does not run dry. The washes soften and partly cover the lines. A closing pass, when asked for, adds a few dark accents where the target has strong edges.
+The default recipe sets `--drawing first`: the drawing goes down first and dries, then the washes. The washes soften and partly cover the lines.
 
 | `--drawing` | Before paint | After paint |
 |---|---|---|
-| `both` | drawing | ink accents |
-| `first` (default) | pencil, or ink if asked | nothing; an ink finish stage or a plan's `closingLines` switches to `both` |
-| `last` | nothing | ink |
+| `both` | drawing | ink accents, from `--drawinglast` or a finish stage |
+| `first` (default) | pencil, or ink if asked | nothing |
+| `last` | nothing | ink, from `--drawinglast` or a finish stage |
 | `none` | nothing | nothing |
 
-Each image run writes `ink.jpg` and `wash.jpg` next to `painting.jpg`.
+Without a closing file or finish stage, `both` and `last` log `!!! NO CLOSING LINE` and skip the closing pen. Each image run writes `ink.jpg` and `wash.jpg` next to `painting.jpg`.
 
 ## Try it
 
 ```sh
-npm run example:drawing
-node tools/paint-plate.mjs --image <target> --outlinemedium ink
-node tools/paint-plate.mjs --image <target> --outlinemedium ink --drawing both
-node tools/paint-plate.mjs --image <target> --outlinemedium ink --inkprofile black-ink
-node tools/paint-plate.mjs --image <target> --drawing last
+npm run example:animal
+node tools/paint-plate.mjs --image <target> --drawingfile <stem> --inkrecipe wash --washplan <study.png>
+node tools/paint-plate.mjs --image <target> --drawingfile <stem> --inkrecipe wash --drawingonly 1
 ```
-
-For a value plan that selects `ink-and-wash`, the default recipe keeps the target's paper tone (`--paperrgb source`), a lean fitted palette, nested light-to-dark value masses and planned stroke lanes (`--strokeplan 1 --laneadapt 1`).
 
 [running.md](running.md#main-command-line-controls) lists the other controls.

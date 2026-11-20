@@ -13,7 +13,6 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import sharp from 'sharp';
 import { checkPlan } from './check.mjs';
-import { checkAreaPlan } from './area-check.mjs';
 import { Painting, bkey } from './painting.mjs';
 
 const ANSWER_AFTER = 90;   // seconds: a waiting command answers "still painting" after this (the client gives up at 100)
@@ -21,7 +20,7 @@ const CLIENT_WAIT = 100;   // seconds: bench/paint.mjs stops waiting after this,
 const readJson = f => { try { return JSON.parse(fs.readFileSync(f, 'utf8')); } catch { return null; } };
 const writeJson = (f, v) => { fs.mkdirSync(path.dirname(f), { recursive: true }); fs.writeFileSync(f + '.tmp', JSON.stringify(v, null, 1)); fs.renameSync(f + '.tmp', f); };
 const sha = f => crypto.createHash('sha256').update(fs.readFileSync(f)).digest('hex');
-const PLAN_FILE = n => n === 'config.json' || n === 'area-plan.json' || n === 'extra-args.json' || n.endsWith('-lines.json');
+const PLAN_FILE = n => n === 'config.json' || n === 'extra-args.json' || n.endsWith('-lines.json');
 const now = () => Date.now() / 1000;
 // A painter steps back from the board a few times while painting, at points such as after a layer has dried; three is
 // a few. The look at the finished painting changes nothing and is not one of them.
@@ -52,9 +51,9 @@ async function lookImages(sheetPng, target, dir, n) {
 
 export class PaintSession {
   /** raw: the try's raw folder for this target; spec: {width, sheetmm}; modelMinutes: the model-time cap. */
-  constructor({ repo, ws, raw, spec, target, modelMinutes = 85, gpu = 'auto', log = () => {}, planOnly = false, planForm = 'token' }) {
-    Object.assign(this, { repo, ws, raw, spec, target, gpu, log, planOnly, planForm });
-    this.check = planForm === 'area' ? checkAreaPlan : checkPlan;
+  constructor({ repo, ws, raw, spec, target, modelMinutes = 85, gpu = 'auto', log = () => {}, planOnly = false }) {
+    Object.assign(this, { repo, ws, raw, spec, target, gpu, log, planOnly });
+    this.check = checkPlan;
     this.io = path.join(ws, 'bench', 'paint-io');
     this.looksDir = path.join(ws, 'bench', 'looks');
     for (const d of [this.io, this.looksDir, raw]) fs.mkdirSync(d, { recursive: true });
@@ -201,7 +200,7 @@ export class PaintSession {
   beginPainting(snapshot, chk, initialStop) {
     const dir = path.join(this.raw, this.restarts ? `painting-r${this.restarts}` : 'painting');
     fs.rmSync(dir, { recursive: true, force: true });
-    this.painting = new Painting({ repo: this.repo, spec: this.spec, target: this.target, dir, gpu: this.gpu, initialStop, planForm: this.planForm });
+    this.painting = new Painting({ repo: this.repo, spec: this.spec, target: this.target, dir, gpu: this.gpu, initialStop });
     const plan = path.join(dir, 'plan-1'); fs.cpSync(snapshot, plan, { recursive: true });
     fs.rmSync(path.join(this.raw, 'plan'), { recursive: true, force: true }); fs.cpSync(snapshot, path.join(this.raw, 'plan'), { recursive: true });
     this.painting.run(plan, variantIn(plan));

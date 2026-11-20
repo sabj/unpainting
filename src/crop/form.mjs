@@ -99,7 +99,7 @@ function ellipse(P, closed, spacing) {
   const n = Math.max(8, Math.ceil(Math.abs(sweep) * Math.max(a, b) * size / spacing)), points = Array.from({ length: n + 1 }, (_, j) => { const t = start + sweep * j / n, u = a * Math.cos(t), v = b * Math.sin(t); return { x: cx + size * (x + ca * u - sa * v), y: cy + size * (y + sa * u + ca * v) }; });
   return { points, type: closed ? 'ellipse' : 'arc', controls: [cx + x * size, cy + y * size, a * size, b * size, angle] };
 }
-export function spline(C, spacing, closed) {
+function spline(C, spacing, closed) {
   const Q = [];
   for (let i = 0; i < C.length - 1; i++) {
     const a = C[i - 1] || (closed ? C.at(-2) : C[i]), b = C[i], c = C[i + 1], d = C[i + 2] || (closed ? C[1] : c), n = Math.max(2, Math.ceil(dist(b, c) / spacing));

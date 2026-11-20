@@ -64,27 +64,3 @@ test('a plan that declares no drawing keeps no drawing when ink is asked for', w
 test('an ink request with no image and no plan fails loudly', withDir(async dir => {
   await assert.rejects(mediumForRun({ argv: ['--inkrecipe', 'wash'], root: dir, penShareOf: never }), /needs --image/);
 }));
-
-test('an area plan that declares ink is the plan\'s word: the harness flag repeating it is not vetoed by the pen share', withDir(async dir => {
-  const f = path.join(dir, 'area-plan.run.json');
-  fs.writeFileSync(f, JSON.stringify({ drawing: { medium: 'ink', reason: 'pen sketch' }, paints: ['sepia'], areas: [] }));
-  const argv = ['--recipe', 'none', '--image', 'x.png', '--outlinemedium', 'ink', '--drawing', 'both', '--drawingfile', 'o', '--drawinglast', 'c', '--areaplan', f];
-  const r = await mediumForRun({ argv, root: dir, penShareOf: never });
-  assert.deepEqual([r.decision.medium, r.decision.basis, r.decision.vetoed], ['pen', 'plan', false]);
-  assert.equal(r.decision.evidence.planDeclared, 'ink (drawing.medium)');
-  assert.deepEqual(r.argv, argv, 'nothing is added or removed');
-}));
-
-test('an area plan that declares graphite removes an ink flag, and one with no drawing section leaves the source to decide', withDir(async dir => {
-  const f = path.join(dir, 'area-plan.run.json'), argv = ['--recipe', 'none', '--image', 'x.png', '--outlinemedium', 'ink', '--areaplan', f];
-  fs.writeFileSync(f, JSON.stringify({ drawing: { medium: 'graphite', reason: 'pencil' }, areas: [] }));
-  const graphite = await mediumForRun({ argv, root: dir, penShareOf: never });
-  assert.deepEqual([graphite.decision.medium, graphite.decision.basis, graphite.decision.vetoed], ['pencil', 'plan', true]);
-  fs.writeFileSync(f, JSON.stringify({ areas: [] }));
-  const bare = await mediumForRun({ argv, root: dir, penShareOf: async () => 0.0009 });
-  assert.deepEqual([bare.decision.medium, bare.decision.basis, bare.decision.vetoed], ['pencil', 'source', true]);
-  // a value plan beside it keeps the first word
-  const v = plan(dir, { drawing: { medium: 'none' } });
-  fs.writeFileSync(f, JSON.stringify({ drawing: { medium: 'ink' }, areas: [] }));
-  assert.equal((await mediumForRun({ argv: [...argv, '--valueplan', v], root: dir, penShareOf: never })).decision.evidence.planDeclared, 'none (drawing.medium)');
-}));

@@ -1,19 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { planStepBacks, createStepBacks } from './step-backs.mjs';
+import { createStepBacks } from './step-backs.mjs';
+
+// a plan of step-backs as one names them (the gate is under test, not who plans them)
+const planOf = ids => ids.map(id => ({ id }));
 
 const fakeGuard = () => { const calls = []; return { calls, look: (...a) => { calls.push(a[1]); return { cells: 99, ref: { px: [10, 10, 10] }, sheet: {} }; } }; };
 
-test('step-backs are planned from the options alone, before the first mark', () => {
-  assert.deepEqual(planStepBacks({}).map(p => p.id), []);
-  assert.deepEqual(planStepBacks({ touchpoints: 1 }).map(p => p.id), ['washes']);
-  // --touchpoints 2 is two rounds, each its own step-back, fixed before painting
-  assert.deepEqual(planStepBacks({ touchpoints: 2 }).map(p => p.id), ['washes', 'washes-2']);
-  assert.deepEqual(planStepBacks({ touchpoints: 2, finalDarks: 1 }).map(p => p.id), ['washes', 'washes-2', 'accents']);
-});
-
 test('a passage takes its own look, any other look needs an open step-back', () => {
-  const g = fakeGuard(), sb = createStepBacks(g, 0, planStepBacks({ touchpoints: 2 }));
+  const g = fakeGuard(), sb = createStepBacks(g, 0, planOf(['washes', 'washes-2']));
   assert.ok(sb.look('passage', 'L1/s0', null), 'a passage looks as it is laid');
   assert.equal(sb.look('texture', 'L2/s3', null), null);
   assert.deepEqual(g.calls, ['L1/s0']);
@@ -30,7 +25,7 @@ test('a passage takes its own look, any other look needs an open step-back', () 
 });
 
 test('a step-back is never repeated, never unplanned, and reads each shape once', () => {
-  const sb = createStepBacks(fakeGuard(), 0, planStepBacks({ touchpoints: 2 }));
+  const sb = createStepBacks(fakeGuard(), 0, planOf(['washes', 'washes-2']));
   assert.throws(() => sb.open('accents'), /not a planned step-back/);
   sb.open('washes');
   sb.look('passage', 'touch1/s4', null);
@@ -44,7 +39,7 @@ test('a step-back is never repeated, never unplanned, and reads each shape once'
 });
 
 test('strict mode takes the planned step-backs with no look at all, passages included', () => {
-  const g = fakeGuard(), sb = createStepBacks(g, 1, planStepBacks({ touchpoints: 2, finalDarks: 1 }));
+  const g = fakeGuard(), sb = createStepBacks(g, 1, planOf(['washes', 'washes-2', 'accents']));
   assert.equal(sb.look('passage', 'L1/s0', null), null);
   sb.open('washes');
   assert.equal(sb.look('passage', 'touch1/s0', null), null);

@@ -103,18 +103,6 @@ test('explicit CLI auto opts back into planning while recipe or plan auto does n
   });
 });
 
-test('linework auto replaces the opening source and generated files are not caller-authored', async t => {
-  await withoutModelKey(async () => {
-    const f = await fixture(t, ['--linework', 'auto'], ['--linework', 'auto', '--drawingfile', 'generated-lines']);
-    assert.equal(f.intent.authoredOpening, false);
-    assert(await f.choose());
-
-    const suppliedThenSuperseded = await fixture(t, ['--linework', 'auto', '--drawingfile', 'old-opening'], ['--linework', 'auto', '--drawingfile', 'old-opening']);
-    assert.equal(suppliedThenSuperseded.intent.authoredOpening, false);
-    assert(await suppliedThenSuperseded.choose());
-  });
-});
-
 test('equals-form options are not recognized as provenance inputs by the split-only CLI parser', async t => {
   const lineworkEquals = await fixture(t, ['--linework=auto', '--drawingfile', 'opening']);
   assert.equal(lineworkEquals.intent.authoredOpening, true);

@@ -11,16 +11,15 @@ Choose each technique from the target, then check that the simulator executed it
 
 ## Default order: drawing, dry, then wash
 
-Draw first. The painter's defaults are `--drawing first --outlinemedium graphite`, a light pencil drawing. Without a prepared drawing or `drawing.stages`, `--drawingstages auto` picks stages per image and can add ink, usually closing accents. Write the drawing into the plan: `drawing.medium: "ink"` or `--outlinemedium ink` for ink, `drawing.stages` to fix the stages, `--drawingstages off` for pencil only. A closing pass needs `--drawing both`. `--outlinemedium auto` gives ink to a source with visible line and graphite to one without. `--inkfast auto` (the default) sets black ink before the washes and leaves sepia soluble.
+Draw first. The painter draws the lines of a prepared drawing file (`--drawingfile`) as they are, before the washes; with no file it draws no line. Pencil is the default medium. `--inkrecipe wash` or `--outlinemedium ink` draws in ink. A closing pass needs its own line file (`--drawinglast`) or a finish stage. `--inkfast auto` (the default) sets black ink before the washes and leaves sepia soluble.
 
-1. Optional: a light preparatory pencil sketch, only where placement is hard to get right in one ink pass. Keep it sparse; the ink follows it.
-2. Choose the drawing medium from the source, and write it in the plan. If the target shows line, draw silhouettes, landmarks, structural junctions and selected texture lines in ink; ink alone is usually best. If the target shows no line, draw the same structure lightly in graphite so it disappears under the washes.
-3. Let the ink dry and set. Inspect the executed drawing on the sheet; planned paths do not prove that ink reached the paper.
-4. Reserve lights, then paint broad, pale, connected washes over the drawing.
-5. Dry to the state the next layer needs. Develop mid-values and shadow glazes.
-6. Add selected dark paint accents and texture.
+1. Choose the drawing medium from the source, and write it in the plan. If the target shows line, draw silhouettes, landmarks, structural junctions and selected texture lines in ink; ink alone is usually best. If the target shows no line, draw the same structure lightly in graphite so it disappears under the washes.
+2. Let the ink dry and set. Inspect the executed drawing on the sheet; planned paths do not prove that ink reached the paper.
+3. Reserve lights, then paint broad, pale, connected washes over the drawing.
+4. Dry to the state the next layer needs. Develop mid-values and shadow glazes.
+5. Add selected dark paint accents and texture.
 
-Match line density and weight to the target. Pressure change and taper should describe form. A later ink pass (`--drawing both` or `last`) is an exception: name its purpose in the plan. Paint-first work also needs a stated reason.
+Match line density and weight to the target. Pressure change and taper should describe form. A later ink pass is an exception: name its purpose in the plan. Paint-first work also needs a stated reason.
 
 Light to dark is a default. You need not dry every stroke, and a soft shadow can be added to a still-wet wash.
 

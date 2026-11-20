@@ -14,7 +14,7 @@ export function createPlaybackUI(seek){
   hide:()=>{sequence.hidden=true;preview.hidden=true;materials.hidden=true;},
   example:(ex,limit,mode)=>{
    recording=mode==='replay';sequence.hidden=false;
-   document.getElementById('sequence-title').textContent=recording?(ex.film.operations?'Recording · completed operations; thumbnails are keyframes':'Recording · jump to a saved frame'):`${Number(limit).toLocaleString()}-stroke painting · jump in anywhere`;
+   document.getElementById('sequence-title').textContent=recording?(ex.film.operations?'Recording · completed operations; thumbnails are keyframes':'Recording · jump to a saved frame'):`${ex.studies?.[limit]?.label??'Recorded painting'} · jump in anywhere`;
    document.getElementById('sequence-target').src=new URL(ex.target,BASE);document.getElementById('sequence-target').alt=ex.title+' target';
    const next=ex.id+limit+mode;if(next===key)return;key=next;thumbs.replaceChildren();
    stops=recording&&ex.film.operations?(ex.film.keyframes||[]):recording?[.1,.25,.5,.75,.9,1].map(f=>({fraction:f,image:ex.film.frames[Math.min(ex.film.frames.length-1,Math.floor(f*(ex.film.frames.length-1)))]})):ex.checkpoints?.[limit]||[];

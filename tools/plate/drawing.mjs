@@ -3,8 +3,6 @@
 import {check} from '../../src/media/checks.mjs';
 import {setTextureFlow, flowField} from '../../src/paint/techniques/shaped-marks.mjs';
 import {DEFAULT_SHEET_MM} from '../../src/media/sheet-size.mjs';
-import {validateProductionDetails} from '../painter/semantic-production-details.mjs';
-import {sha256} from '../painter/semantic-areas.mjs';
 import {measurePaperDry} from '../../src/paint/methods/wetdry.mjs';
 import fs from 'node:fs';
 import crypto from 'node:crypto';
@@ -14,18 +12,11 @@ import {step, thickness, layersChanged} from '../../src/media/sheet.mjs';
 import {assertDeviceHealthy} from '../../src/media/gpu/device-health.mjs';
 import {renderLayers} from '../../src/media/km.mjs';
 import {channelDensity} from '../../src/crop/pigments.mjs';
-import {accentCells, accentFamilies} from '../../src/paint/methods/final-darks.mjs';
-import {tipTouchMm2} from '../../src/paint/methods/final-dark-marks.mjs';
 import {roleBrushMm} from '../../src/paint/methods/brush-footprint.mjs';
 import {dropMask} from '../../src/crop/blockin.mjs';
 import {brushedWashPaths, sweepCover, containPaths, gradientSweepAngle, prewetArea} from '../../src/media/wash.mjs';
-import {loadSubject, splitFirstWash} from '../../src/paint/methods/first-wash.mjs';
 import {pencilBatches, prepFade} from '../../src/paint/methods/pencil-stage.mjs';
 import {renderInkProof} from '../../src/paint/methods/ink-res.mjs';
-import {painterOrder, subjectRegions} from '../../src/paint/methods/painter-order.mjs';
-import {hasLines, loadLines} from '../../src/crop/lines.mjs';
-import {deferredFirstWash} from '../../src/paint/methods/colour-budget.mjs';
-import {distanceToZero} from '../../src/raster.js';
 import {components, removeSmall, dilate, erode} from '../../src/raster.js';
 import {gaussian} from '../../src/keyframes/density.mjs';
 import {applyResist} from '../../src/media/sheet.mjs';
@@ -33,19 +24,17 @@ import {longShare} from '../../src/crop/gestures.mjs';
 import {fillReserved} from '../../src/crop/lights.mjs';
 import {erasePrep} from '../../src/paint/methods/pencil-erase.mjs';
 import {makeMopLanes} from '../../src/paint/methods/mop-lanes.mjs';
-import {paintPenWash} from '../../src/paint/methods/pen-wash.mjs';
-import {joinResist} from '../../src/paint/methods/modulate.mjs';
 import {sealAtBirth, sealTargetMaps} from '../guard/seal-maps.mjs';
 
 export async function drawing(ctx) {
-const { JSONL, opt, num, measurePaper, liftResist, SPEED_PROFILE, root, out, EARLY_LINES, 
-  VALUE_CONFIG, VALUE_ENABLED, MAJOR_INTENT, phaseMark, PX_RAW, TARGET_GUARD, w, h, n, createBrush, 
-  ANCHORS, paperRGB, PIGS, COLOUR_BUDGET, LIGHT_CELLS, SMALL, setClip, MOD, FIRST_FLOOR, TECHNIQUE, techniqueOf, SEP, 
+const { JSONL, opt, num, measurePaper, liftResist, SPEED_PROFILE, root, out, 
+  VALUE_CONFIG, phaseMark, PX_RAW, TARGET_GUARD, w, h, n, createBrush, 
+  ANCHORS, paperRGB, PIGS, LIGHT_CELLS, SMALL, setClip, SEP, 
   PREP_ERASE, STAGE_PLAN, STYLE_ON, INKLOAD, OUTLINE_MEDIUM, INK, PENCIL, PENCIL_STAGE, GRAPHITE, SHEET_PIGS, 
-  GRAPHITE_AT, FINISH_FILE, AREA_FILE, AREA_EXEC, dry, dip, stroke, pencilDraw, SC, W2, H2, N2, PB, paper, INKRES, 
+  GRAPHITE_AT, dry, dip, stroke, pencilDraw, SC, W2, H2, N2, PB, paper, INKRES, 
   PEN_STATE_AUDIT, drawingCapsFor, penDraw, OUT_W, OUT_H, O, GPU_INFO, base, render, view, BRUSH, UPRIGHT, 
   highlights, expected, sheetDensity, drainFrames, mark, WET, CAL, snap, shoot, FILM_BY_PAINT, PEN_FRAMES, 
-  PENWASH_PLAN, penWashFlat, SOURCE_INK, TIER_MASK, planPen } = ctx;
+  SOURCE_INK, planPen } = ctx;
 Object.assign(ctx, { drawPass });
 // The plan's density before anything is laid: every passage booked at its full amount, the way the loop books one it
 // lays whole. The pen-first order needs it to know what the washes will not carry.
@@ -89,59 +78,6 @@ const brushMask = sh => (SMALL && opt('lightfill', '1') !== '0' ? (sh._brushMask
 for (const L2 of ctx.layers) for (const sh of L2.shapes) ctx.plannedMass += sh.amount * sh.area;
 // each passage's booking as planned, before the finish field clips it, so the film's shares add up to the plan's mass
 const FILM_MASS = new WeakMap(); for (const L2 of ctx.layers) for (const sh of L2.shapes) FILM_MASS.set(sh, sh.amount * sh.area);
-// --firstwash: the opening wash paler, off the subject, held to its passage and softened (src/paint/methods/first-wash.mjs)
-const FW = !VALUE_ENABLED && num('firstwash', 0) > 0;
-const FW_SUBJ = FW ? await loadSubject({ file: opt('fwmask', '') ? path.resolve(root, opt('fwmask', '')) : '', w, h, sharp, log: console.log }) : null; ctx.FW_SUBJ = FW_SUBJ;
-// --fwrepay 1: the ground's first wash is laid at --fwopen of its plan; lay the rest as a second light ground wash. Default 0.
-const FW_REPAY = FW && !COLOUR_BUDGET && num('fwrepay', 0) > 0;
-// the broad first wash (--firstfloor) is not split at the subject or deferred: it is the light tone the subject wants,
-// laid whole at --firstopen of its plan (1: all of it, since nothing later comes back for a pale tone)
-const isFirst = l => l.shapes.some(sh => sh.firstWash);
-const FW_LAYERS = FIRST_FLOOR > 0 ? ctx.layers.filter(l => !isFirst(l)) : ctx.layers;
-if (FIRST_FLOOR > 0) for (const l of ctx.layers) for (const sh of l.shapes) if (sh.firstWash) sh._opening = num('firstopen', 1);
-const COLOUR_LATER = FW && (COLOUR_BUDGET || FW_REPAY) ? deferredFirstWash(FW_LAYERS,{subject:FW_SUBJ,n,open:num('fwopen',0.22),tint:FW_REPAY ? 1 : num('fwtint',0)}) : [];
-if (FW) { const r = splitFirstWash(FW_LAYERS, { subject: FW_SUBJ, n, open: num('fwopen', 0.22), tint: num('fwtint', 0), film: FILM_MASS }); console.log(`first wash: ${r.split} value-1 passages split, ${(100 * r.ground / n).toFixed(1)}% of the sheet as ground at ${num('fwopen', 0.22)}, ${(100 * r.subj / n).toFixed(1)}% as subject at ${num('fwtint', 0)} (summed over the pans)`); }
-if(COLOUR_LATER.length) {
-  for(const l of ctx.layers) if(l.value===1) for(const sh of l.shapes) FILM_MASS.set(sh,(FILM_MASS.get(sh)??0)*(sh._opening??1));
-  for(const later of COLOUR_LATER) {
-    // After the first dilute value, before this pan's deeper glazes.
-    let at=ctx.layers.findIndex(l=>l.pigment===later.pigment && l.value>=2);
-    if(at<0) at=ctx.layers.length;
-    for(const sh of later.shapes) FILM_MASS.set(sh,sh.amount*sh.area);
-    ctx.layers.splice(at,0,later);
-  }
-  console.log(`${FW_REPAY ? 'first wash repaid' : 'colour budget'}: ${COLOUR_LATER.length} suppressed first washes deferred, all mix components retained`);
-}
-// --order painter|ladder|legacy-painter: pass order (src/paint/methods/painter-order.mjs). Default painter: ground, subject, mids, darks.
-// --ordermask: the subject (default --fwmask); --orderlight, --orderdark place the bands; --orderregions: rows of ground regions.
-const ORDER = opt('order', 'painter');
-if (!['ladder', 'painter', 'legacy-painter'].includes(ORDER)) throw new Error(`--order: ladder or painter, not ${ORDER}`);
-// An area plan's passes keep the plan's schedule (pass.order, dependsOn, pass.session): the ladder is not reordered or cut.
-if (!VALUE_ENABLED && !ctx.AREA_PLAN && ['painter','legacy-painter'].includes(ORDER)) {
-  const file = opt('ordermask', opt('fwmask', ''));
-  const subject = FW_SUBJ ?? (file ? await loadSubject({ file: path.resolve(root, file), w, h, sharp, log: console.log }) : null);
-  // --ordersubject whole|drawing: drawing lays the subject's light washes by regions the drawing file's lines close off.
-  // --ordersubjmax: most regions; --ordersubjmin: least share of the subject; --ordersubjwall: line thickening in cells.
-  const OS = opt('ordersubject', 'whole');
-  if (!['whole', 'drawing'].includes(OS)) throw new Error(`--ordersubject: whole or drawing, not ${OS}`);
-  let subjectLabels = null;
-  if (OS === 'drawing') {
-    const base = opt('drawingfile', '');
-    if (!subject || !base || !hasLines(base)) throw new Error('--ordersubject drawing needs a subject mask and --drawingfile');
-    const sr = subjectRegions(subject, loadLines(base, w, h, { keepOrder: true }), { w, n, max: Math.max(2, Math.round(num('ordersubjmax', 6))), minShare: num('ordersubjmin', 0.04), dilate: Math.max(0, Math.round(num('ordersubjwall', 0))) });
-    subjectLabels = sr?.label ?? null;
-    console.log(sr ? `order painter: subject in ${sr.areas.length} drawing regions, ${sr.areas.map(a => (100 * a / sr.subjArea).toFixed(0) + '%').join(' ')} of it` : 'order painter: the drawing closes off fewer than two subject regions, subject laid whole');
-  }
-  const r = painterOrder(ctx.layers, { darkFirst: num('darkfirst', 0) > 0, subject, w, n, steps: ctx.steps, light: num('orderlight', 0.25), dark: num('orderdark', 0.6), regions: Math.max(1, Math.round(num('orderregions', 4))), minPart: num('orderminpart', 0.08), minRegion: num('orderminregion', 0.1), film: FILM_MASS, subjectLabels, far: num('orderfar', 0) > 0 });
-  ctx.layers = r.layers;
-  console.log(`order painter: ${ctx.layers.length} passes; ${r.summary.map(s => `${s.phase} ${s.layers} passes, ${s.passages} passages, ${(100 * s.area).toFixed(1)}% of the sheet`).join('; ')}`);
-  // --bgfirst 1: every background pass goes on before the first pass on the figure, each side in painter order. Default 0.
-  if (num('bgfirst', 0) > 0) {
-    const bg = ctx.layers.filter(L => L._order?.side === 'ground'), fg = ctx.layers.filter(L => L._order?.side !== 'ground');
-    ctx.layers = [...bg, ...fg];
-    console.log(`background first: ${bg.length} background passes before ${fg.length} on the figure`);
-  }
-}
 const FILM_FRAMES = Math.max(1, Math.round(num('frames', 40)));
 ctx.filmPass = 0;
 // under --smalllights the fluid goes on the small lights too, whether or not the big lights were worth masking
@@ -152,10 +88,8 @@ const bigLights = (mask, min) => (min > 0 ? removeSmall(mask, w, h, Math.round(m
 const RESIST0 = FLUID ? Uint8Array.from(FLUID, (v, i) => (v || (ctx.masked > n * 0.01 && highlights[i]) ? 1 : 0)) : ctx.masked > n * 0.01 ? bigLights(highlights, num('resistmin', 0)) : null;
 const RESIST_BASE = RESIST0;
 const RESIST_SOFT_BASE = null;
-if(ctx.AREA_PLAN&&MOD&&validateProductionDetails(ctx.AREA_PLAN.doc))MOD.lights=Uint8Array.from(ctx.AREA_PLAN.reserves,(v,i)=>v||ctx.AREA_PLAN.film[i]?1:0);
-let { R: RESIST$, S: RESIST_SOFT } = MOD&&!ctx.AREA_PLAN ? joinResist(RESIST_BASE, RESIST_SOFT_BASE, MOD, { w, h, n, distanceToZero }) : { R: RESIST_BASE, S: RESIST_SOFT_BASE }; ctx.RESIST = RESIST$;
-if(ctx.AREA_PLAN){ctx.RESIST??=new Uint8Array(n);RESIST_SOFT??=new Float32Array(n);for(let i=0;i<n;i++)if(ctx.AREA_PLAN.film[i]){ctx.RESIST[i]=1;RESIST_SOFT[i]=1;}}
-if(ctx.VALUE_PLAN){
+let RESIST_SOFT = RESIST_SOFT_BASE; ctx.RESIST = RESIST_BASE;
+if(ctx.VALUE_PLAN?.protectedCells){
  // The same target-white mask owns planning and physical film; inferred highlights include pale painted planes.
  ctx.RESIST=Uint8Array.from(ctx.VALUE_PLAN.protectedCells);RESIST_SOFT=Float32Array.from(ctx.RESIST);
 }
@@ -184,7 +118,6 @@ if (opt('draw', '1') !== '0') {
   const PLAN_D = planDensityOfLayers();
   if (PEN_FIRST && DRAWING !== 'none') PEN_PLANS.first = await planPen(PLAN_D, { first: true });
   if (DRAW_LAST && DRAWING !== 'none') PEN_PLANS.last = await planPen(PLAN_D);
-  if (opt('finish', '0') !== '0') PEN_PLANS.fine = await planPen(PLAN_D, { fine: true });
 }
 // --texflow d: short texture marks follow the reference's value smoothed over about 2 mm (direction only); d scales density.
 if (num('texflow', 0) > 0) {
@@ -200,8 +133,6 @@ const SKY_WARM_RB = opt('skywarm', '') !== '' ? sealAtBirth(TARGET_GUARD, 'SKY_W
 // each passage's technique, read off the source inside it, is chosen here for the whole plan (planning, before the
 // first mark), not when the brush reaches it
 for (const L2 of ctx.layers) for (const sh of L2.shapes) {
-  // the source's technique is read only for passages no plan wrote (the automatic ladder)
-  if (!sh._valuePlan && !sh._semantic && sh.mask) techniqueOf(sh);
   // Label-backed passages rebuild the same mask on demand. Keeping every expanded
   // mask here costs one full sheet per shape, even before the first stroke.
   if (sh.ids) dropMask(sh);
@@ -215,40 +146,11 @@ for (const L2 of ctx.layers) for (const sh of L2.shapes) if (sh.graded && !sh._f
 }
 // From here to phaseMark('painting') the target and its per-cell maps are closed (--targetguard, default gentle). The
 // only way back to the reference is TARGET_GUARD.look: shape-level means at a peek, a review or a passage.
-// --touchpoints R: once the planned passes are laid, R rounds comparing each planning shape's mean with the reference (TARGET_GUARD.look).
-// A shape that reads lighter gets one corrective glaze; only deficits are glazed, nothing is read cell by cell.
-const TP_ROUNDS = Math.max(0, Math.round(num('touchpoints', 0)));
-ctx.TP_SHAPES = null;
-if (TP_ROUNDS > 0) {
-  const { planningShapes, lineMask } = await import('../../src/paint/methods/shape-refit.mjs');
-  const lf = v => (!v ? null : v.includes('/') ? path.resolve(root, v + '-lines.json') : path.resolve(root, 'work/lines', v + '-lines.json'));
-  const PENCELLS = lineMask([...new Set([lf(opt('drawingfile', '')), lf(opt('drawinglast', ''))])], w, h, { pad: Math.round(num('touchlinepad', 1)), fs });
-  const groups = planningShapes(channelDensity(ctx.px, n, paperRGB), w, h, { families: num('touchfamilies', 24), minCells: Math.max(64, Math.round(num('touchmincells', 0.0008) * n)), pool: false, smooth: Math.round(num('touchsmoothmm', 1) / (num('sheetmm', DEFAULT_SHEET_MM) / w)) });
-  ctx.TP_SHAPES = groups.map(cells => { const mask = new Uint8Array(n), look = new Uint8Array(n); for (const i of cells) { mask[i] = 1; if (!PENCELLS[i]) look[i] = 1; } const t = { mask, area: cells.length, amount: 0, mix: PIGS.map(() => 0), _look: look }; techniqueOf(t); return t; });
-  console.log(`touchpoints: up to ${TP_ROUNDS} rounds, each a step-back, over ${ctx.TP_SHAPES.length} planning shapes (${ctx.TP_SHAPES.reduce((a, t) => a + t.area, 0)} cells), cut before painting`);
-}
-// --finaldarks 1: after the touch-up rounds, one round of small decisive darks (src/paint/methods/final-darks.mjs), laid
-// as marks of the detail brush's tip, accent pieces no smaller than one tip touch (final-dark-marks.mjs). The
-// accent cells and their families are cut here, before painting; at the end each family gets one shape-level look.
-ctx.FD_SHAPES = null;
-if (num('finaldarks', 0) > 0) {
-  const mmCell = (PB?.mm ?? num('sheetmm', DEFAULT_SHEET_MM)) / w, pen = new Uint8Array(n);
-  for (const P of [PEN_PLANS.first, PEN_PLANS.last]) for (const g of P?.scaled ?? []) if (g.draw !== false) for (const q of g.points ?? []) {
-    const x = Math.round(q.x / SC), y = Math.round(q.y / SC);
-    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { const xx = x + dx, yy = y + dy; if (xx >= 0 && yy >= 0 && xx < w && yy < h) pen[yy * w + xx] = 1; }
-  }
-  const cells = accentCells(channelDensity(ctx.px, n, paperRGB), w, h, { mmPerCell: mmCell, pen, darkQ: num('fdquantile', 0.9), minValue: num('fdmin', 0.45), contrast: num('fdcontrast', 0.08), surroundMm: num('fdsurroundmm', 2.5), minMm2: num('fdminmm2', tipTouchMm2(PB ? 2 * PB.detailR * PB.mmPerCell : roleBrushMm(root, 'detail', { brushes: opt('brushes', 'src/paint/brushes.json') }))) });
-  const fams = accentFamilies(cells, w, h, { mmPerCell: mmCell, tileMm: num('fdtilemm', 10), minCells: 64 });
-  const T0 = { name: 'wet on dry', water: 0.62, wetMix: 0.55, bridge: 0.78, bridgeSoft: 2.2, intoWet: false, dryAfter: true, passes: 1 };
-  ctx.FD_SHAPES = fams.map(f => { const mask = new Uint8Array(n); for (const i of f.cells) mask[i] = 1; const t = { mask, area: f.cells.length, amount: 0, mix: PIGS.map(() => 0), _look: mask }; TECHNIQUE.set(t, T0); return t; });
-  let a = 0; for (const v of cells) a += v;
-  console.log(`final darks: ${a} accent cells (${(100 * a / n).toFixed(2)}% of the sheet) in ${ctx.FD_SHAPES.length} families, ${ctx.FD_SHAPES.reduce((s, t) => s + t.area, 0)} cells, cut before painting`);
-}
 const PREP_KEEP = num('prepfade', 0) > 0 ? up(dilate(SEP.ink, w, h, Math.round(num('prepkeep', 2)))) : null;
 SPEED_PROFILE?.add('planningAndSetup', process.uptime() * 1000);
 const PROVENANCE_TARGET_SHA = crypto.createHash('sha256').update(fs.readFileSync(path.resolve(root,opt('image','')))).digest('hex');
 TARGET_GUARD.beginPaint(); if (TARGET_GUARD.mode !== 'off') { const sealed = sealTargetMaps(TARGET_GUARD, ctx); TARGET_GUARD.assertCleanContext('paint step', ctx); console.log(`target guard: ${TARGET_GUARD.mode}, target sealed for the paint step (also ${sealed.join(', ') || 'no other map'})`); }
-if (!ctx.RESUMING && ctx.RESIST) { if(ctx.AREA_PLAN){const cells=Array.from(up(ctx.AREA_PLAN.film),(v,i)=>v?i:-1).filter(i=>i>=0);if(cells.length){const paper=measurePaper(ctx.sheet,cells);check('semantic film requires actual dry paper before apply',paper.dry,{waterMax:paper.waterMax,saturationMax:paper.saturationMax});AREA_EXEC.command('physical film apply and establish',{cells,paper,areaPassIds:ctx.AREA_PLAN.schedule.filter(s=>s.pass.lights.mode==='film').map(s=>s.key),semanticPlanned:true,establishedStrength:1,solventDryingModel:'not separately modeled'},()=>applyResist(ctx.sheet,up(ctx.RESIST),RESIST_SOFT&&upF(RESIST_SOFT)));}else applyResist(ctx.sheet,up(ctx.RESIST),RESIST_SOFT&&upF(RESIST_SOFT));}else applyResist(ctx.sheet, up(ctx.RESIST), RESIST_SOFT && upF(RESIST_SOFT)); ctx.STAGE = { stage: 'frisket', cells: ctx.RESIST.reduce((a, v) => a + v, 0) }; await shoot(); }
+if (!ctx.RESUMING && ctx.RESIST) { applyResist(ctx.sheet, up(ctx.RESIST), RESIST_SOFT && upF(RESIST_SOFT)); ctx.STAGE = { stage: 'frisket', cells: ctx.RESIST.reduce((a, v) => a + v, 0) }; await shoot(); }
 // The planned drawing, laid (planPen made every decision before the first mark).
 // Linked stages: each stage's own layer (what it laid) and the sheet as it stands after it, as layer-<stage>.jpg and
 // stage-<stage>.jpg, so the stages can be judged one at a time.
@@ -284,10 +186,9 @@ async function drawPass(_unused, { first = false, fine = false } = {}) {
   if (!PLAN) throw new Error('drawing: this pen pass was not planned before painting');
   const { preparing, PEN, K, graphiteFirst, inkPig, scaled, wantT1, big, peak, inkVerdict, frozenPeak, per, SELECTED, outlines, gestures } = PLAN;
   ctx.VALUE_ACTIVE=null;
-  ctx.AREA_DRAW_STAGE=first?'opening':'closing';
+  ctx.DRAW_STAGE=first?'opening':'closing';
   if (first && STAGE_PLAN?.files.prep && GRAPHITE) await drawPrepStage(PEN);
   const stageBefore = STAGE_PLAN && !fine ? thickness(ctx.sheet).map(a => Float32Array.from(a)) : null;
-  // --penoutline (pen first only, default on): the main shapes' outlines first, so the drawing alone states the subject.
   if (first && PREP && GRAPHITE && ANCHORS) {
     const points=Object.fromEntries(ANCHORS.landmarks.map(a=>[a.id,{x:a.painting[0]*W2/ANCHORS.canvas[0],y:a.painting[1]*H2/ANCHORS.canvas[1]}]));
     const skeleton=Object.entries(ANCHORS.curves).filter(([name])=>/eye_axis|face_axis|jaw_planes|ear_near|ear_far/.test(name)).map(([,ids])=>({points:ids.map(id=>points[id])}));
@@ -357,51 +258,33 @@ if (!ctx.RESUMING && PEN_FIRST && opt('draw', '1') !== '0' && DRAWING !== 'none'
   if (PREP_ERASE && STAGE_PLAN?.files.prep && GRAPHITE) erasePrep({ sheet: ctx.sheet, k: GRAPHITE_AT, dabs: PREP_ERASE, strength: num('preperase', 0.85), SC, w, W2, layersChanged, log: console.log });
   ctx.INK_THK = thickness(ctx.sheet).map((a, j) => Float32Array.from(a, (v, i) => Math.max(0, v - before[j][i])));
   await sharp(INKRES ? INKRES.compose(view()) : render(), { raw: { width: OUT_W, height: OUT_H, channels: 3 } }).png().toFile(path.join(out, 'drawing-opening.png'));
-  if (PENWASH_PLAN) {
-    // the flat plan over the actual dry ink, multiplied as a transparent wash would sit on it
-    const ink = render(), flat = penWashFlat(), mix = Buffer.alloc(N2 * 3);
-    for (let y = 0; y < H2; y++) for (let x = 0; x < W2; x++) { const i = y * W2 + x, j = ((y / SC) | 0) * w + ((x / SC) | 0); for (let c = 0; c < 3; c++) mix[i * 3 + c] = Math.round(ink[i * 3 + c] * flat[j * 3 + c] / Math.max(1, paperRGB[c])); }
-    await sharp(mix, { raw: { width: W2, height: H2, channels: 3 } }).png().toFile(path.join(out, 'penwash-preview.png'));
-    if (ctx.PENWASH_LINES) fs.writeFileSync(path.join(out, 'penwash-lines.json'), JSON.stringify(ctx.PENWASH_LINES, null, 2));
-  }
 }
 // An actual dry-pen checkpoint, using the same planned strokes and physics as
 // the full painting. The process exit hook still writes the strict guard report.
 if (num('drawingonly', 0) > 0) {
-  // --copylinesfloor can leave a source with no pen lines; its dry opening is the bare sheet
-  const noPenLines = DRAWING === 'none' && EARLY_LINES?.source === 'none' && EARLY_LINES?.requested === 'source-ink';
-  if (ctx.RESUMING || (!noPenLines && (!PEN_FIRST || opt('draw', '1') === '0' || DRAWING === 'none'))) throw new Error('--drawingonly requires an opening drawing');
+  if (ctx.RESUMING || !PEN_FIRST || opt('draw', '1') === '0' || DRAWING === 'none') throw new Error('--drawingonly requires an opening drawing (--drawingfile)');
   assertDeviceHealthy(ctx.sheet);
-  if (noPenLines) await sharp(render(), { raw: { width: W2, height: H2, channels: 3 } }).png().toFile(path.join(out, 'painting.png'));
-  else fs.copyFileSync(path.join(out, 'drawing-opening.png'), path.join(out, 'painting.png'));
+  fs.copyFileSync(path.join(out, 'drawing-opening.png'), path.join(out, 'painting.png'));
   const after = thickness(ctx.sheet);
   const nativeInk = INKRES ? INKRES.nativeInk() : renderInkProof({ thickness: after, pigments: SHEET_PIGS, inkAt: PIGS.length, width: W2, height: H2 });
   await sharp(nativeInk.pixels, { raw: { width: nativeInk.width, height: nativeInk.height, channels: 3 } }).png().toFile(path.join(out, "ink-native.png"));
   fs.writeFileSync(path.join(out, "ink-native.json"), JSON.stringify({ width: nativeInk.width, height: nativeInk.height, sheetWidthMm: PB?.mm ?? num("sheetmm", DEFAULT_SHEET_MM), kind: INKRES ? "deposited ink on native pen sheet, before wash redistribution" : "final deposited coarse ink, including wash redistribution", resized: false }) + "\n");
   fs.writeFileSync(path.join(out, 'pen-state-audit.json'), JSON.stringify(PEN_STATE_AUDIT));
   fs.writeFileSync(path.join(out, 'drawing-checkpoint.json'), JSON.stringify({ stage: 'dry opening drawing', paintExecuted: false, gestures: ctx.drawnCount, backend: GPU_INFO }));
+  // --marks 1: the pen's tape too (the finish stage, which writes it for a whole painting, is not reached)
+  if (ctx.FULL_TAPE && ctx.MARKTAPE) {
+    const { markTapeJSON } = await import('../../src/media/mark-tape-json.mjs'), { PENS, PENOPTS } = await import('../../src/media/brush.mjs');
+    const asTape = p => Object.fromEntries(Object.entries(p).map(([k, v]) => [k, ArrayBuffer.isView(v) ? Array.from(v) : v]));
+    const fineN = INKRES?.N ?? 1;   // the pens draw on the fine sheet: the marks are in its cells
+    const tape = { w: W2 * fineN, h: H2 * fineN, scale: 10, sheetWidthMm: PB?.mm ?? num('sheetmm', DEFAULT_SHEET_MM), version: 2, methods: ctx.RUN_METHODS, drawingOnly: true, paperRGB,
+      base: Array.from(base.subarray(0, 3)), pigments: SHEET_PIGS.map(asTape), penOpts: PENOPTS, pens: PENS, marks: ctx.MARKTAPE,
+      strokeCount: ctx.MARKTAPE.filter(m => ['s', 'P', 'g'].includes(m.k)).length };
+    const fd = fs.openSync(path.join(out, 'marks.json'), 'w');
+    try { for (const chunk of markTapeJSON(tape)) fs.writeFileSync(fd, chunk); } finally { fs.closeSync(fd); }
+    console.log(`marks: drawing only, ${tape.strokeCount} pen marks`);
+  }
   await drainFrames(); if (ctx.FRAMER) ctx.FRAMER.close(); ctx.sheet._gpu?.close();
   console.log('drawing-only: dry opening complete, before washes'); process.exit(0);
-}
-if(MAJOR_INTENT)await sharp(render(),{raw:{width:W2,height:H2,channels:3}}).png().toFile(path.join(out,'major-drawing-opening.png'));
-// A semantic run records the real preparation before washes obscure it; guide and trace stay separate source artifacts.
-if(ctx.AREA_PLAN && PEN_FIRST && opt('draw','1')!=='0' && DRAWING!=='none'){
-  const guide=opt('penpencil',''),base=opt('drawingfile','');
-  const traceFile=base?path.resolve(root,'work/lines',base+'-lines.json'):null;
-  await sharp(render(),{raw:{width:W2,height:H2,channels:3}}).png().toFile(path.join(out,'semantic-drawing-opening.png'));
-  fs.writeFileSync(path.join(out,'semantic-drawing-opening.json'),JSON.stringify({
-   kind:'actual production opening drawing before washes; not artistic acceptance',
-   target:ctx.AREA_PLAN.doc.target,planSHA256:sha256(path.resolve(root,AREA_FILE||FINISH_FILE)),
-   guide:guide?{path:path.resolve(root,guide),sha256:sha256(path.resolve(root,guide))}:null,
-   trace:traceFile&&fs.existsSync(traceFile)?{path:traceFile,sha256:sha256(traceFile)}:null,
-   material:PENCIL?'physical dry graphite':'existing production outline material',
-   drawingCommands:AREA_EXEC.records.filter(r=>r.operation==='actual dry graphite'||r.operation==='physical pen gesture'),
-   prepfadeRequested:num('prepfade',0)>0,closingInkExecuted:false,paintExecuted:false,backend:GPU_INFO
-  },null,2));
-}
-if(opt('areastop','')==='drawing-opening'){
- if(!ctx.AREA_PLAN||!PEN_FIRST||opt('draw','1')==='0'||DRAWING==='none')throw new Error('drawing-opening requires semantic physical opening drawing');
- await drainFrames();if(ctx.FRAMER)ctx.FRAMER.close();ctx.sheet._gpu?.close();console.log('semantic drawing-opening checkpoint before paint');process.exit(0);
 }
 // Bounded material proof after actual opening drawing and ordinary dry, not preparation.
 if(process.env.PHASE_EXIT==='drawing-material-opening'){
@@ -438,16 +321,7 @@ const fadePrep = () => {
 };
 const mopLanes = makeMopLanes({ num });
 const setStage = s => { ctx.STAGE = s; };
-if (PENWASH_PLAN) {
-  const r = await paintPenWash({
-    createBrush, stroke, step, dry, thickness, sheet: ctx.sheet, w, h, n, W2, H2, PIGS, O, SEED, UPRIGHT, CAL, WET, mopLanes, handAngle, flowEvery, dip, up, clock, shoot, setStage, num, log: console.log, expected, used,
-    mmPerCell: num('sheetmm', DEFAULT_SHEET_MM) / W2,
-    checkpoint: async (k, id) => sharp(render(), { raw: { width: W2, height: H2, channels: 3 } }).png().toFile(path.join(out, `penwash-${String(k).padStart(2, '0')}-${id}.png`)),
-  }, PENWASH_PLAN);
-  ctx.laid += r.laid;
-  fs.writeFileSync(path.join(out, 'penwash-run.json'), JSON.stringify({ passages: r.records, lines: ctx.PENWASH_LINES }, null, 2));
-}
-Object.assign(ctx, { up, t0, spent, PROF, prof, handAngle, flowEvery, SHAPE_LOAD_BUFFER, brushMask, FILM_MASS, FW, 
-  isFirst, FILM_FRAMES, used, TECHS, LAST, DRAWING, SKY_WARM_RB, TP_ROUNDS, PROVENANCE_TARGET_SHA, PREPF, 
+Object.assign(ctx, { up, t0, spent, PROF, prof, handAngle, flowEvery, SHAPE_LOAD_BUFFER, brushMask, FILM_MASS, 
+  FILM_FRAMES, used, TECHS, LAST, DRAWING, SKY_WARM_RB, PROVENANCE_TARGET_SHA, PREPF, 
   fadePrep, mopLanes, setStage });
 }

@@ -34,14 +34,16 @@ export function createOperationsUI(sheet, send) {
   if(backdropDirty){
    if(backdrop.width!==w)backdrop.width=w;if(backdrop.height!==h)backdrop.height=h;bg.clearRect(0,0,w,h);
   if(toggle.checked){tint(masks.resist,[129,159,177,115],false,undefined,bg);tint(masks.clip,[177,116,46,210],true,undefined,bg);}
-  if(operation?.mask&&(toggle.checked||!['mask','unmask','clip','unclip'].includes(operation.kind))){const colour=['dry','dryer','clip','unclip'].includes(operation.kind)?[231,148,70,100]:operation.kind==='blot'||operation.kind==='lift'?[185,143,199,120]:[99,165,195,90];tint(operation.mask,colour,false,undefined,bg);
+  // Dry everything is shown by its progress bar, not by tinting the whole sheet.
+  if(operation?.mask&&operation.kind!=='dry'&&(toggle.checked||!['mask','unmask','clip','unclip'].includes(operation.kind))){const colour=['dry','dryer','clip','unclip'].includes(operation.kind)?[231,148,70,100]:operation.kind==='blot'||operation.kind==='lift'?[185,143,199,120]:[99,165,195,90];tint(operation.mask,colour,false,undefined,bg);
    const tool={dryer:'≈ Heat',dry:'≈ Drying',lift:'▱ Damp lifting tool',blot:'▧ Tissue',water:'◦ Clean water'}[operation.kind];
    if(tool){const i=operation.mask.indexOf(1);if(i>=0){const x=Math.min(w-110,Math.max(2,i%w)),y=Math.max(14,Math.floor(i/w));bg.font='10px sans-serif';bg.fillStyle='#faf6e9ee';bg.fillRect(x,y-12,108,16);bg.fillStyle='#544439';bg.fillText(tool,x+3,y);}}
   }
    backdropDirty=false;
   }
   g.drawImage(backdrop,0,0);
-  if(contact&&document.getElementById('show-brush').checked){tint(contact.mask,[76,66,56,205],true,contact);}
+  // The contact outline marks a replayed stroke's cells; a finished hand stroke shows only its paint.
+  if(contact&&playing&&document.getElementById('show-brush').checked){tint(contact.mask,[76,66,56,205],true,contact);}
  }
  toggle.addEventListener('change',()=>{backdropDirty=true;draw();});document.getElementById('show-brush').addEventListener('change',draw);
  function updateStatus(){

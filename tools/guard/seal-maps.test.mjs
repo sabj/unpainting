@@ -72,6 +72,7 @@ test('lint: the painter\'s paint step has no target read that is not acknowledge
   try {
     const { findings, allowed } = lint({ roots: ['tools', 'src'], allow });
     assert.deepEqual(findings.map(f => `${f.file}:${f.line} ${f.rule}`), []);
-    assert.ok(allowed.some(f => f.cat === 'd'), 'the paint-step check runs on the real tree');
+    // the texture pass (HP at paint time) was the last allowed paint-step read; it was removed in 0.4, so none is left
+    assert.deepEqual(allowed.filter(f => f.cat === 'd').map(f => f.file), [], 'no paint-step target read remains, allowed or not');
   } finally { process.chdir(cwd); }
 });

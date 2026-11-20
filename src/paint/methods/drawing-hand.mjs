@@ -72,6 +72,11 @@ export function handDrawing(lines, { gap = 4, cos = .8, aim = .7, strokeLength =
   D = null, w, h, lit = 0, reach = 2, corner = null, ...shape } = {}) {
   // `corner` { span, deg, spur } in cells: a short end piece past a sharp corner is a hook and is not drawn
   const normLines = lines.map(g => ({ ...g, tier: g.tier ?? 1 })).map(g => (corner ? trimHooks(g, corner) : g));
+  // an ordered drawing (every line numbered, tools/seg/order-strokes.mjs) is drawn in its order and direction, unjoined
+  if (normLines.length && normLines.every(g => Number.isFinite(g.seq))) {
+    const kept = [...normLines].sort((a, b) => a.seq - b.seq);
+    return { joined: 0, gestures: kept.length, runs: kept.length, strokes: kept.map(g => shapeGesture(g, shape)).flatMap(g => personStrokes(g, strokeLength)) };
+  }
   const groups = new Map();
   for (const g of normLines) {
     const key = [g.role, g.kind, g.object, g.region, g.tier].join('|');

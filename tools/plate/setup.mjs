@@ -7,20 +7,17 @@ import {painterBrushOptions, isSection} from './painter-brush.mjs';
 import {framePolicy} from '../speed/frame-policy.mjs';
 import {startSpeedProfile} from '../speed/profile.mjs';
 import {runSpeedSequence} from '../speed/sequence.mjs';
-import {estimatePaper} from '../../src/paint/methods/light-to-dark.mjs';
+import {estimatePaper} from '../../src/paint/methods/value-shared.mjs';
 import {sheetColour} from '../../src/paint/methods/paper-colour.mjs';
 import {setTextureVariety} from '../../src/paint/techniques/shaped-marks.mjs';
 import {removePlannedInk} from '../../src/crop/ink-free.mjs';
 import {availableParallelism} from 'node:os';
 import {DEFAULT_SHEET_MM} from '../../src/media/sheet-size.mjs';
 import {nativeBodyCadence} from '../painter/native-body-cadence.mjs';
-import {validateLegacyIntent} from '../painter/legacy-major-intents.mjs';
 import {nativePaintMode, nativeUploadPolicy} from '../painter/native-paint-mode.mjs';
-import {sha256} from '../painter/semantic-areas.mjs';
 import {measurePaper as physicalMeasurePaper} from '../../src/paint/methods/wetdry.mjs';
 import {codeHash, digest} from '../../src/paint/run-cache.mjs';
-import {cachedEarlyLines, outputRelative, planFileDigest} from '../../src/paint/early-lines-cache.mjs';
-import {createStepBacks, planStepBacks} from '../../src/paint/step-backs.mjs';
+import {createStepBacks} from '../../src/paint/step-backs.mjs';
 import fs from 'node:fs';
 import crypto from 'node:crypto';
 import path from 'node:path';
@@ -37,24 +34,20 @@ import {liftResist as physicalLiftResist} from '../../src/media/sheet.mjs';
 import {expandRecipe} from '../../src/paint/recipe.mjs';
 import {reportUnusedPlanKeys} from '../../src/paint/plan-keys.mjs';
 import {versionStamp, versionLine} from '../../src/painter-version.mjs';
-import {prepareLineSource} from '../../src/paint/methods/linework-plan.mjs';
-import {planUniversalLinework} from '../../src/paint/methods/linework-stage.mjs';
 import {registerDrawingFile, lineTargetOf} from '../../src/paint/methods/drawing-registration.mjs';
 import {holdInkLines} from '../../src/paint/methods/ink-lines-file.mjs';
 import {inkRecipeArgs} from '../../src/paint/methods/ink-recipe.mjs';
-import {graphitePoolWanted, prepareGraphitePool} from '../../src/paint/methods/graphite-pool.mjs';
-import {inkHoldArgs} from '../../src/paint/methods/ink-hold-defaults.mjs';
 import {mediumForRun} from '../../src/paint/medium-run.mjs';
 import {sourcePenShare} from '../../src/paint/methods/pen-share.mjs';
 import {subjectMediumNote} from '../../src/paint/subject-medium.mjs';
 import {drawingStageIntent} from '../../src/paint/methods/drawing-stages-auto.mjs';
 import {bindLineTarget} from '../../src/crop/lines.mjs';
 import {prepareSegments} from '../../src/crop/segment-prep.mjs';
+import {outputRelative, planFileDigest} from '../../src/paint/early-lines-cache.mjs';
 import {refuseRemoved} from '../../src/paint/removed-options.mjs';
-import {refuseAreaOwned} from '../../src/paint/area-owned-options.mjs';
-import {strokeBudgetDefaults} from '../../src/paint/methods/stroke-budget.mjs';
+import {lineSource} from '../../src/paint/line-source.mjs';
+import {runMethods, describeMethods} from '../../src/paint/run-methods.mjs';
 import {createTargetGuard, writeGuardReport, DEFAULT_MODE, HARD_LOOK_BUDGET} from '../guard/no-target.mjs';
-import {linePython, resolveLinePython} from '../../src/paint/methods/line-python.mjs';
 import {detectSheetTone} from '../../src/paint/methods/sheet-tone.mjs';
 import {checkSourceScale, sourceReadable} from './source-scale.mjs';
 
@@ -77,8 +70,6 @@ const { argv: argvMedium, decision: MEDIUM_DECISION } = await mediumForRun({ arg
 const { argv, note: RECIPE_NOTE, pipeline: PIPELINE, subjectMedium: SUBJECT_MEDIUM } = expandRecipe({ argv: argvMedium, root: REPO_ROOT });
 // an option the painter no longer has stops the run with its reason (src/paint/removed-options.mjs)
 refuseRemoved(argv);
-// with an area plan, order and wet sessions are the plan's: an order or session option stops the run (src/paint/area-owned-options.mjs)
-refuseAreaOwned(argv);
 // every option name the painter asks for, so options given but never read are reported at the end
 const OPTS_READ = new Set(['recipe']);
 // OPT_TRACK: while a cached step runs (src/paint/run-cache.mjs), every option it reads and the raw value it found
@@ -100,8 +91,6 @@ const num = (n, d) => { const v = read(n, d), x = Number(v); if (Number.isNaN(x)
 // Caller-owned drawing inputs and stage intent, separated from recipe/plan and generated arguments.
 const DRAWING_STAGE_INTENT = drawingStageIntent({ argv0, expandedArgv: argv, pipeline: PIPELINE });
 // An explicit budget changes planning only; absent/zero preserves every default.
-const STROKE_BUDGET = num('strokebudget', 0);
-for(const [key,value] of Object.entries(strokeBudgetDefaults(STROKE_BUDGET))) if(!argv0.includes('--'+key)) argv.push('--'+key,String(value));
 // --texvariety v: how much the short texture marks vary in length and pressure (src/paint/techniques/shaped-marks.mjs)
 setTextureVariety(num('texvariety', 0));
 const optTrack = {
@@ -117,7 +106,6 @@ const SPEED_TRANSFERS = num('speedtransfers', 1) > 0;
 const SPEED_PAPER = num('speedpaper', 1) > 0;
 const SPEED_CONTACT = num('speedcontact', 1) > 0;
 const SPEED_VALUE_CACHE = num('speedvaluecache', 1) > 0;
-const SPEED_VALUE_ONLY = num('speedvalueonly', 1) > 0;
 const SPEED_COVERAGE = num('speedcoverage', 1) > 0;
 setSweepIntervals(SPEED_COVERAGE);
 const SPEED_FLOW_RECT = num('speedflowrect', 1) > 0;
@@ -206,68 +194,24 @@ const INK_RECIPE = { recipe: INK_RECIPE_NAME };
 // the pen-and-wash recipe turns ink on, so a subject with no pen does not take it
 if (NO_PEN_SUBJECT && INK_RECIPE.recipe === 'wash') console.log(`ink recipe: wash not applied, the subject medium is ${opt('subjectmedium', 'pen')}`);
 else argv.push(...inkRecipeArgs(INK_RECIPE.recipe, argv0));
-// checked again: an ink recipe may switch on the region-label ink decision, which an area plan's drawing roles replace
-refuseAreaOwned(argv);
-// an ink drawing is held to the target and decided by meaning whatever made its lines (src/paint/methods/ink-hold-defaults.mjs)
-argv.push(...inkHoldArgs(argv));
-// Legacy extraction flags remain CLI aliases; the plan has one source choice.
-if (!argv0.includes('--linesource')) {
-  if (num('copylines',0)>0) argv.push('--linesource','source-ink');
-  else if (num('sketchlines',0)>0) argv.push('--linesource','photo-sketch');
-  else if (num('sourcelines',0)>0) argv.push('--linesource','source-ink');
-}
-// --linework auto (plan drawing.linework "auto"): the universal linework stage (src/paint/methods/linework-stage.mjs)
-// picks the line source, cleans the lines and gates whether to draw, the medium and how much, before every other line
-// route, and writes an ordinary drawing file that replaces --linesource and any --drawingfile. --linemedium
-// ink|graphite|none, a plan's drawing.medium or --outlinemedium fixes the medium; --sketchcache <dir> holds image-model
-// sketches (tools/seg/sketch-target.mjs); --sketchpython the python for copy-lines. --linework file cleans and gates
-// the given --drawingfile instead of choosing a source; --linejoin 1 joins broken contours before pruning. Off by default.
+// The line comes only from a drawing file (src/paint/line-source.mjs): with none, the run draws no line and says so.
+const LINE_SOURCE = lineSource({ drawing: opt('drawing', 'first'), drawingFile: opt('drawingfile', ''), drawingLast: opt('drawinglast', ''), stages: opt('stages', ''), resolve: f => path.resolve(root, f) });
+if (LINE_SOURCE.warning) { console.log(LINE_SOURCE.warning); argv.push('--drawing', LINE_SOURCE.drawing); }
+console.log(`line source: ${LINE_SOURCE.source}${LINE_SOURCE.file ? ` (${path.basename(LINE_SOURCE.file)})` : ''}`);
+// what makes this plate, recorded in the log, the run card and the stroke tape (src/paint/run-methods.mjs)
+const RUN_METHODS = runMethods({ lineSource: LINE_SOURCE, washPlan: opt('washplan', 'required') === 'required' ? '' : opt('washplan', 'required'), drawingOnly: num('drawingonly', 0) > 0 });
+console.log(describeMethods(RUN_METHODS));
 // every line file is checked against the target (lines.mjs); a --drawingfile made for another image or aspect is
 // registered to the target first (drawing-registration.mjs)
 if (opt('image','')) bindLineTarget(await lineTargetOf(path.resolve(root, opt('image',''))).catch(() => null));
 const DRAWING_REGISTRATION = opt('drawingfile','') && opt('drawing','first') !== 'none' ? await registerDrawingFile({ base: opt('drawingfile'), image: path.resolve(root, opt('image','')), root, out, width: num('width', 700), argv, log: console.log }) : null;
-ctx.LINEWORK_STAGE = null;
-const LINEWORK_SOURCES = { python: resolveLinePython({ flag: opt('sketchpython','') }).path, sketchCache: opt('sketchcache','') ? path.resolve(root, opt('sketchcache','')) : null };
-const LINEWORK_JOIN = num('linejoin', 0) > 0;
-if (opt('linework','off') !== 'off' && opt('drawing','first') !== 'none') {
-  if (!['auto', 'file'].includes(opt('linework'))) throw Error(`--linework: auto, file or off, not ${opt('linework')}`);
-  if (opt('linework') === 'file' && !opt('drawingfile','')) throw Error('--linework file needs --drawingfile');
-  const om = argv.includes('--outlinemedium') ? opt('outlinemedium','graphite') : 'graphite';
-  const requested = opt('linemedium','') || (om === 'auto' ? null : /graphite/.test(om) ? 'graphite' : 'ink');
-  const r = await planUniversalLinework({ image: path.resolve(root, opt('image','')), out, root, width: num('width', 700), sheetMm: num('sheetmm', DEFAULT_SHEET_MM),
-    requested, style: num('penwash',0) > 0 ? 'penwash' : 'default', ...LINEWORK_SOURCES, join: LINEWORK_JOIN, drawingFile: opt('linework') === 'file' ? path.resolve(root, opt('drawingfile','')) : null,
-    seed: num('seed', 0), log: console.log });
-  argv.push(...r.flags);
-  ctx.LINEWORK_STAGE = r.record;
-}
 const SWEEP_CACHE = path.dirname(root) === '/root/sweepwork' ? '/root/sweepwork/cache' : null;
 const RUN_CACHE = {dir:process.env.W2_CACHE_DIR || SWEEP_CACHE || path.join(root,'work','cache'),enabled:opt('runcache','1')!=='0'};
-// the graphite drawing carries the structure of the subject: the line model's pool, held and decided by meaning, drawn light
-// (src/paint/methods/graphite-pool.mjs). It leaves the run alone when a line source, stages, the models or segments are named off,
-// and when the image is missing (the image load that follows fails the run).
-const GRAPHITE_POOL_CHOICE = graphitePoolWanted(argv);
-const GRAPHITE_POOL = GRAPHITE_POOL_CHOICE.wanted && opt('image', '') && fs.existsSync(path.resolve(root, opt('image', ''))) ? await prepareGraphitePool({ opt, num, argv, out, root, image: path.resolve(root, opt('image','')), sheetMm: num('sheetmm', DEFAULT_SHEET_MM), log: console.log }) : null;
-const EARLY_LINES = !['none','auto'].includes(opt('linesource','none')) ? await cachedEarlyLines({
-  cache:RUN_CACHE, code:RUN_CACHE.enabled ? codeHash(root,fs.readdirSync(path.join(root,'tools/seg')).filter(f=>f.endsWith('.py')).map(f=>'tools/seg/'+f),{dependencies:['src/paint/methods/linework-plan.mjs','src/paint/early-lines-cache.mjs']}) : '',
-  track:optTrack, argv, out,
-  inputs:RUN_CACHE.enabled ? {
-    target:fs.readFileSync(path.resolve(root,opt('image',''))),
-    python:linePython({flag:opt('sketchpython',''),log:()=>{},warn:()=>{}}),
-    files:Object.fromEntries(['sketchmap','sketchsegments','drawingfile','drawinglast'].map(k=>{
-      const f=opt(k,'');if(!f)return [k,null];
-      const p=path.resolve(root,f);return [k,fs.existsSync(p)&&fs.statSync(p).isFile()?digest(fs.readFileSync(p)):null];
-    })),
-  } : {},
-  prepare:()=>prepareLineSource({opt,num,argv,out,root,log:console.log}),
-}) : null;
-// Ink lines held to the target (src/paint/methods/ink-lines-file.mjs), after every route that sets the line files.
-// --linesupport t (L*, default 0 off): keep an opening or closing line whole when at least half of it runs along a line
-// in the target at least t L* darker than beside it, and leave it off whole otherwise (never cut point by point). --linesmooth mm (default 0 off): smooth stepped traces at mm,
-// keeping corners sharper than --linesmoothcorner degrees (default 50). Either writes <out>/ink-<stage>-lines.json and
-// points the pen at it. --inkdarkcap and --inkwidthfloor also need the target's measures, so they run it too. It runs
-// again in a process that takes over a saved painting (--resumestate), on the line files as they now stand.
+// The target's own line darkness and pixel size, read for --inkdarkmatch, --inkdarkcap and --inkwidthfloor
+// (src/paint/methods/ink-lines-file.mjs); the drawing files are drawn as they are. It runs again in a process that takes
+// over a saved painting (--resumestate).
 const holdInk = () => opt('drawing','first') !== 'none' && opt('image','')
-  ? holdInkLines({ opt, num, argv, image: path.resolve(root, opt('image','')), root, out, sheetMm: num('sheetmm', DEFAULT_SHEET_MM), log: console.log }) : null;
+  ? holdInkLines({ opt, num, image: path.resolve(root, opt('image','')), root, out, sheetMm: num('sheetmm', DEFAULT_SHEET_MM), log: console.log }) : null;
 ctx.INK_LINES = await holdInk();
 process.env.GPU_DEMAND_READBACK ??= NATIVE_PAINT_MODE.mode==='fast'?'fast':'0';
 process.env.GPU_SIGNED_ZERO ??= NATIVE_PAINT_MODE.mode==='fast'?'ignore':'exact';
@@ -284,10 +228,6 @@ const FAST_BODY_SPACING=num('fastbodyspacing',1.4);
 nativeBodyCadence({mode:NATIVE_PAINT_MODE.mode,enabled:Boolean(FAST_BODY_ENABLED),spacing:FAST_BODY_SPACING});
 const BODY_CADENCE_RECORD={mode:NATIVE_PAINT_MODE.mode,enabled:Boolean(FAST_BODY_ENABLED),selection:opt('fastbodycadence',null)===null?'paint-mode default':'explicit CLI',spacingCells:FAST_BODY_SPACING,sourceSweepsSelected:0,numericalCallsAttempted:0,approximatedCallsAttempted:0,approximatedCallsReturned:0,scope:'Fast-default broad numerical pigment only, including majorintent; --fastbodycadence0 retains prior sampling; semantic authored/drawing/prewet/calibration/detail unchanged',approximation:'travel samples reduced; nominal distance between flow callbacks retained; legacy calibration retained, transfer may differ',calibrationMatchedToApproximation:false,speedGainEstablished:false};
 process.on('exit',()=>fs.writeFileSync(path.join(out,'native-body-cadence.json'),JSON.stringify(BODY_CADENCE_RECORD,null,2)));
-const FAST_SPARSE_CONTACT=num('fastsparsecontact',0);
-if(![0,1].includes(FAST_SPARSE_CONTACT))throw Error('--fastsparsecontact takes 0 or 1');
-const SPARSE_CONTACT_RECORD={mode:NATIVE_PAINT_MODE.mode,enabled:NATIVE_PAINT_MODE.mode==='fast'&&Boolean(FAST_SPARSE_CONTACT),selectedRowContacts:0,scope:'majorintent actual ROW footprint enumeration only; same masks/halos/live paper checks, no contact thinning or stale state',speedGainEstablished:false};
-process.on('exit',()=>fs.writeFileSync(path.join(out,'native-sparse-contact.json'),JSON.stringify(SPARSE_CONTACT_RECORD,null,2)));
 
 
 console.log(`native paint mode: ${NATIVE_PAINT_MODE.mode}; ${NATIVE_PAINT_MODE.approximation}`);
@@ -295,14 +235,10 @@ console.log(`native tracked CPU upload: ${NATIVE_UPLOAD_POLICY.value}; ${NATIVE_
 if (PIPELINE) fs.writeFileSync(path.join(out, 'pipeline-plan.json'), JSON.stringify({plan:PIPELINE, overrides:argv0},null,2));
 const VALUE_CONFIG=(()=>{let c=opt('valueplan','')?JSON.parse(fs.readFileSync(path.resolve(root,opt('valueplan','')))):null;
   if (c && PIPELINE) c = {...c, subjectOrder: PIPELINE.order.subjects};
-  // --regionstyle family=style[,family=style]: per-run region style override on top of the plan's styleSelection.
-  if(!c||!opt('regionstyle',''))return c;const base=c.styleSelection;if(!base)throw Error('--regionstyle needs a value plan with a styleSelection');
-  const regions={...(base.regions??{})};for(const kv of opt('regionstyle','').split(',')){const [family,style]=kv.split('=');if(!family||!style)throw Error('--regionstyle family=style');regions[family]={style,reason:'run override --regionstyle for an A/B test'};}
-  return {...c,styleSelection:{...base,regions}};})();
+  return c;})();
 // value plan keys nothing reads are logged and exit 3 like unused options (src/paint/plan-keys.mjs); --allowunusedplan 1 allows them
 if(opt('valueplan',''))reportUnusedPlanKeys({file:path.resolve(root,opt('valueplan','')),pipeline:Boolean(PIPELINE),out,allow:opt('allowunusedplan','0')!=='0'});
 if(VALUE_CONFIG?.sheet?.widthMm!=null&&Math.abs(num('sheetmm',VALUE_CONFIG.sheet.widthMm)-VALUE_CONFIG.sheet.widthMm)>1e-6)throw Error(`value plan sheet.widthMm ${VALUE_CONFIG.sheet.widthMm} does not match --sheetmm ${num('sheetmm',VALUE_CONFIG.sheet.widthMm)}`);
-const VALUE_ENABLED=!opt('areaplan','') && opt('order','painter')==='painter';
 ctx.LINE_EDGES=null; ctx.VALUE_PLAN=null; ctx.VALUE_ACTIVE=null; ctx.VALUE_OWN_CONTACT=new EpochCells(); ctx.VALUE_PIGMENT_CONTACT=new EpochCells(); ctx.VALUE_COMMAND=0;const VALUE_COUNTS=Array.from({length:5},(_,i)=>({band:i+1,strokes:0,contacts:0}));
 // --washsession 1: the shapes of one pass (the fragments of one passage) are laid in one wet session, with no drying
 // between them; the sheet dries before the pass and after it. 2: also the passes of one band and region in other
@@ -312,10 +248,6 @@ const SOFT_WET_MM = num('softwet', 0);
 const WASH_SESSION = Math.max(0, Math.round(num('washsession', NATIVE_PAINT_MODE.mode==='fast' && opt('valueplan','') ? 1 : 0)));
 ctx.WASH_LAST = null;
 
-const MAJOR_FILE=opt('majorintent',''), MAJOR_INTENT=MAJOR_FILE?validateLegacyIntent(JSON.parse(fs.readFileSync(path.resolve(root,MAJOR_FILE))),{imageSHA:sha256(path.resolve(root,opt('image'))),loadedContact:num('loadedcontact',0)}):null;ctx.MAJOR_TECHNIQUE=null; ctx.MAJOR_COMMAND=0; ctx.MAJOR_PREVIOUS=null; ctx.MAJOR_PLANE_CONTACT=null;
-if(MAJOR_INTENT)fs.writeFileSync(path.join(out,'major-intents-before.json'),JSON.stringify(MAJOR_INTENT,null,2));
-const NUMERIC_TUFT_SHAPES=opt('numerictuftshapes','').split(',').filter(Boolean),NUMERIC_TUFT_CAL=new Map();
-if(NUMERIC_TUFT_SHAPES.length&&!MAJOR_INTENT)throw Error('numerictuftshapes requires target-bound major material instructions');
 // where the wall clock goes between the big sections, printed at the end as `phases:` (changes no output)
 const WALL_PHASES = [`load ${process.uptime().toFixed(1)}s`]; let phaseT = performance.now();
 const phaseMark = name => { const t = performance.now(); WALL_PHASES.push(`${name} ${((t - phaseT) / 1000).toFixed(1)}s`); phaseT = t; if (process.env.PHASE_EXIT === name) { console.log(`phases: ${WALL_PHASES.join(', ')} (PHASE_EXIT)`); process.exit(0); } };
@@ -340,7 +272,7 @@ const PX_RAW = num('washinkfree', 0) > 0 && (opt('washinkfile', '') !== '' || op
 const TARGET_GUARD = createTargetGuard({ mode: opt('targetguard', DEFAULT_MODE), targetPaths: [path.resolve(root, opt('image', ''))], log: null, lookBudget: opt('lookbudget', '') === '' ? null : num('lookbudget', HARD_LOOK_BUDGET) });
 // Painting-time looks happen only at the step-backs planned here, before the first mark (src/paint/step-backs.mjs); with
 // --notargetlooks 1 they return null too, so strict mode takes none.
-const STEP_BACKS = createStepBacks(TARGET_GUARD, num('notargetlooks', 0), planStepBacks({ touchpoints: num('touchpoints', 0), finalDarks: num('finaldarks', 0) }));
+const STEP_BACKS = createStepBacks(TARGET_GUARD, num('notargetlooks', 0), []);
 const paintingLook = STEP_BACKS.look;
 process.on('exit', () => { try { fs.mkdirSync(out, { recursive: true }); fs.writeFileSync(path.join(out, 'step-backs.json'), JSON.stringify(STEP_BACKS.record(), null, 2)); } catch (e) { console.error(`step-backs: could not write step-backs.json: ${e.message}`); } });
 if (TARGET_GUARD.mode !== 'off') process.on('exit', () => { try { fs.mkdirSync(out, { recursive: true }); writeGuardReport(TARGET_GUARD, out, { image: opt('image', '') }); } catch (e) { console.error(`target guard: could not write target-guard.json: ${e.message}`); } });
@@ -404,7 +336,7 @@ setWashSplat(WASH_SPLAT_SETTINGS.enabled,{water:WASH_SPLAT_SETTINGS.water});
 // Sweep jobs unpack into a private /root/sweepwork/<job> tree which is removed after painting.
 // Keep pure, code-and-input-hashed planner entries beside those trees so a repeat target can reuse them on that box.
 const CACHE_ARGV = {}; for(let i=0;i<argv.length;i++)if(argv[i].startsWith('--')) { const key=argv[i],value=argv[i+1]?.startsWith('--')?true:argv[++i];if(!['--out','--pausedir','--resumestate','--resumeprefix','--allowdirty','--speedprofile','--speedcpu'].includes(key))CACHE_ARGV[key]=outputRelative(value,out); }
-const planContentHashes=()=>{const hashes={};for(const key of ['valueplan','areaplan','drawingfile','drawinglast']){const f=opt(key,'');if(f)for(const suffix of ['', '-lines.json','-lines.json.gz']){const p=path.resolve(root,f+suffix);if(fs.existsSync(p)&&fs.statSync(p).isFile())hashes[key+suffix]=planFileDigest(p,out);}}return hashes;};
+const planContentHashes=()=>{const hashes={};for(const key of ['valueplan','drawingfile','drawinglast']){const f=opt(key,'');if(f)for(const suffix of ['', '-lines.json','-lines.json.gz']){const p=path.resolve(root,f+suffix);if(fs.existsSync(p)&&fs.statSync(p).isFile())hashes[key+suffix]=planFileDigest(p,out);}}return hashes;};
 const CACHE_PLAN_HASHES=planContentHashes();
 const CACHE_CONTEXT={argv:CACHE_ARGV,planHashes:CACHE_PLAN_HASHES,targetSHA256:crypto.createHash('sha256').update(fs.readFileSync(path.resolve(root,opt('image','')))).digest('hex'),mode:opt('mode','fast'),backend:'cpu'};
 Object.assign(RUN_CACHE,{context:CACHE_CONTEXT,guard:TARGET_GUARD});
@@ -412,13 +344,13 @@ const CODE_HASH = RUN_CACHE.enabled ? codeHash(root, [ENTRY_FILE]) : '';
 const PALETTE_FROM_FILE = opt('palettefrom', '') && fs.existsSync(path.resolve(root, opt('palettefrom', ''))) ? crypto.createHash('sha256').update(fs.readFileSync(path.resolve(root, opt('palettefrom', '')))).digest('hex') : '';
 SPEED_PROFILE?.add('setup:paper-and-cache-key', performance.now() - paperSetupStarted);
 const paletteFitStarted = performance.now();
-Object.assign(ctx, { GRAPHITE_POOL, MEDIUM_DECISION, SUBJECT_MEDIUM, argv0, argv, PIPELINE, OPTS_READ, optIdx, NAN_GIVEN, TEXT_READ, WORD_GIVEN, WORD_OK, opt, num, 
-  DRAWING_STAGE_INTENT, STROKE_BUDGET, optTrack, NATIVE_PAINT_MODE, SPEED_TRANSFERS, SPEED_PAPER, 
-  SPEED_CONTACT, SPEED_VALUE_CACHE, SPEED_VALUE_ONLY, SPEED_COVERAGE, SPEED_UNIFORM_PAPER, measurePaper, liftResist, 
+Object.assign(ctx, { LINE_SOURCE, RUN_METHODS, MEDIUM_DECISION, SUBJECT_MEDIUM, argv0, argv, PIPELINE, OPTS_READ, optIdx, NAN_GIVEN, TEXT_READ, WORD_GIVEN, WORD_OK, opt, num, 
+  DRAWING_STAGE_INTENT, optTrack, NATIVE_PAINT_MODE, SPEED_TRANSFERS, SPEED_PAPER, 
+  SPEED_CONTACT, SPEED_VALUE_CACHE, SPEED_COVERAGE, SPEED_UNIFORM_PAPER, measurePaper, liftResist, 
   VALUE_CONTACT_WORK, SPEED_GPU_OPTICS, OUTPUT_VIDEO, FRAME_POLICY, SPEED_PROFILE, CPU_PROFILE, PAINTER, root, out, 
-  CODE_STATE, INK_RECIPE, DRAWING_REGISTRATION, RUN_CACHE, EARLY_LINES, holdInk, FAST_BODY_ENABLED, 
-  FAST_BODY_SPACING, BODY_CADENCE_RECORD, SPARSE_CONTACT_RECORD, VALUE_CONFIG, VALUE_ENABLED, VALUE_COUNTS, 
-  SOFT_WET_MM, WASH_SESSION, MAJOR_INTENT, NUMERIC_TUFT_SHAPES, NUMERIC_TUFT_CAL, WALL_PHASES, 
+  CODE_STATE, INK_RECIPE, DRAWING_REGISTRATION, RUN_CACHE, holdInk, FAST_BODY_ENABLED, 
+  FAST_BODY_SPACING, BODY_CADENCE_RECORD, VALUE_CONFIG, VALUE_COUNTS, 
+  SOFT_WET_MM, WASH_SESSION, WALL_PHASES, 
   phaseMark, srcMeta, PX_SOURCE, PX_RAW, TARGET_GUARD, paintingLook, STEP_BACKS, w, h, n, SEGMENTS_RECORD, createBrush, 
   physicalStroke, candidateContact, ANCHORS, lum, TONE_MODE, SHEET_TONE, CALIBRATED_PLAN, PAPER_RULE, paperRGB, 
   WASH_SPLAT_SETTINGS, planContentHashes, CODE_HASH, PALETTE_FROM_FILE, paletteFitStarted, SOURCE_SCALE });
