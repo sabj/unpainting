@@ -242,7 +242,9 @@ export function planStudyWashes({ k, w, h, study, density = null, paperRGB = nul
     if (share(i) >= CHARGE_FROM) {
       const mine = new Uint8Array(pn); for (const q of s.cells) mine[q] = 1;
       const inside = []; { const r = rC(cb + 1); for (const q of s.cells) { const x = q % pw, y = (q / pw) | 0; let ok = true; for (let d = -r; d <= r && ok; d += Math.max(1, r >> 1)) for (const [xx, yy] of [[x + d, y - r], [x + d, y + r], [x - r, y + d], [x + r, y + d]]) if (xx < 0 || yy < 0 || xx >= pw || yy >= ph || !mine[yy * pw + xx]) { ok = false; break; } if (ok) inside.push(q); } }
-      const desc = new Set(under(i)), near = [...s.border].filter(([o]) => !shapes[o].paper && !desc.has(o)).sort((a, b) => b[1] - a[1]), picked = [];
+      // (not a shape nested in it or one it is nested in: those are its own washes)
+      const desc = new Set(under(i)); for (let a = parent[i]; a >= 0; a = parent[a]) desc.add(a);
+      const near = [...s.border].filter(([o]) => !shapes[o].paper && !desc.has(o)).sort((a, b) => b[1] - a[1]), picked = [];
       for (const [o] of near) {
         if (picked.length >= CHARGE_MOST || !inside.length) break;
         // the interior point nearest the neighbour

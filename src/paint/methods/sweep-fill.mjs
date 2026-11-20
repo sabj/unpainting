@@ -269,6 +269,10 @@ export function sweepFill(loops, { kitMm, angle = null, growMm = 0, keepOut = nu
 const SPINE_LONG = 1.6;
 /** A shape is laid down its spine only when this share of its cross-sections are one piece. */
 const SPINE_SIMPLE = 0.9;
+/** The spine's brush is at most this many times as wide as the shape. */
+const SPINE_FATTEST = 1.6;
+/** The least pressure down the spine and at its ends. */
+const SPINE_TIP = 0.3;
 
 /**
  * A shape a brush can lay in one pull: the brush whose belly is about the shape's widest part, drawn down the shape's
@@ -298,17 +302,22 @@ export function spineFill(loops, kit) {
   const widest = Math.max(...cols.flatMap(col => col.spans.map(([p, q]) => q - p))), length = u1 - u0;
   if (single < SPINE_SIMPLE || length < SPINE_LONG * widest || widest > kit[0] * 1.05) return null;
   // the brush whose belly is about the shape's width: the smallest that is at least nine tenths of it, or the widest
-  const brush = [...kit].sort((p, q) => p - q).find(w => w >= 0.9 * widest) ?? kit[0], r = brush / 2;
+  // (but not one more than SPINE_FATTEST times as wide: pressed that lightly it hardly lays paint; the widest narrower one instead,
+  const asc = [...kit].sort((p, q) => p - q), over = asc.find(w => w >= 0.9 * widest);
+  // (or not one less than two thirds as wide; else the shape is no spine stroke)
+  const under = [...asc].reverse().find(w => w < 0.9 * widest), brush = over != null && over <= SPINE_FATTEST * widest ? over : under != null && under >= 0.66 * widest ? under : null;
+  if (brush == null) return null;
+  const r = brush / 2;
   // a point every half radius down the spine, its pressure from the width there (a round lays r (0.25 + 0.75 p) each side)
   const pts = [], step = Math.max(1, Math.round(r / 2 / pitch));
   for (let k = 0; k < cols.length; k += step) {
     const col = cols[k], span = col.spans.reduce((best, sp) => (sp[1] - sp[0] > best[1] - best[0] ? sp : best), [0, 0]); if (!(span[1] > span[0])) continue;
-    const half = (span[1] - span[0]) / 2, p = Math.max(0.15, Math.min(1, (half / r - 0.25) / 0.75));
+    const half = (span[1] - span[0]) / 2, p = Math.max(SPINE_TIP, Math.min(1, (half / r - 0.25) / 0.75));
     pts.push([...toXY([col.u, (span[0] + span[1]) / 2]), +p.toFixed(3)]);
   }
   if (pts.length < 2) return null;
   // the tip goes into the ends: the first and last points sit at the shape's ends, the brush eased off
-  pts[0][2] = Math.min(pts[0][2], 0.15); pts[pts.length - 1][2] = Math.min(pts[pts.length - 1][2], 0.15);
+  pts[0][2] = Math.min(pts[0][2], SPINE_TIP); pts[pts.length - 1][2] = Math.min(pts[pts.length - 1][2], SPINE_TIP);
   return { strokes: [{ kind: 'sweep', radiusMm: +r.toFixed(3), points: pts }], brushMm: brush, angle: th, depthMm: widest / 2, areaMm2: 0, uncovered: 0, spine: true };
 }
 
@@ -323,8 +332,8 @@ export function spineFill(loops, kit) {
 // neighbouring lanes follow the slant instead of stepping. Nothing runs along the outline. What the lanes leave bare (a
 // corner, an arm) is laid the same way with a smaller brush along that part's own long axis.
 
-/** The pressure a lane lands and lifts at (a round lays r (0.25 + 0.75 p) to each side). */
-const TIP = 0.15;
+/** The least pressure a lane is laid at (a round lays r (0.25 + 0.75 p) to each side; lighter, it hardly lays paint). */
+const TIP = 0.35;
 /** Lanes overlap by this share of the brush's width. */
 const LANE_OVERLAP = 0.25;
 /** A shape is laid along its long axis when it is at least this many times as long as it is wide; else level. */
@@ -411,20 +420,28 @@ export function laneFill(loops, { kitMm, growMm = 0, keepOut = null, spine = tru
     const vs = lanes === 1 ? [(v0 + v1) / 2] : Array.from({ length: lanes }, (_, q) => v0 + inset + q * (across - 2 * inset) / (lanes - 1));
     let k = 0;
     for (const v of vs) {
-      // the runs of the part along this lane's centre line
-      const runs = []; let from = null, last = null;
+      // along the lane's centre line the hand presses as wide as the part allows there (half-width no more than the
+      // distance to the outline), so where the outline slants or narrows the lane narrows and ends on its tip: the lane
+      // never runs past the outline and its end follows the slant. Where not even the tip fits, the lane lifts.
+      const samples = [];
       for (let u = u0; u <= u1 + 1e-9; u += pitch / 2) {
-        const x = u * tx + v * nx, y = u * ty + v * ny, i = at(x, y), ok = i >= 0 && part[i];
-        if (ok && from == null) from = u; if (ok) last = u;
-        if (!ok && from != null) { runs.push([from, last]); from = null; }
+        const x = u * tx + v * nx, y = u * ty + v * ny, i = at(x, y), dmm = i >= 0 && part[i] ? D[i] * pitch : 0;
+        samples.push({ u, dmm, in: dmm >= halfAt(r, TIP) });
       }
-      if (from != null) runs.push([from, last]);
-      for (const [ra, rb] of runs) {
-        const len = rb - ra; if (len < 0.6 * r) continue;
-        // the tip lands on the outline (its centre a third of the radius in) and the hand presses over the first radius
-        const e = Math.min(len / 3, 0.3 * r), fw = k % 2 === 0, s = fw ? ra + e : rb - e, f = fw ? rb - e : ra + e, dir = fw ? 1 : -1, run = Math.abs(f - s);
-        const us = run > 2.5 * r ? [[s, TIP], [s + dir * r, 1], [f - dir * r, 1], [f, TIP]] : [[s, TIP], [(s + f) / 2, 1], [f, TIP]];
-        const pts = us.map(([u, p]) => [+(u * tx + v * nx).toFixed(3), +(u * ty + v * ny).toFixed(3), p]);
+      const runs = []; let cur = null;
+      for (const sm of samples) { if (sm.in) (cur ??= []).push(sm); else if (cur) { runs.push(cur); cur = null; } }
+      if (cur) runs.push(cur);
+      for (const run of runs) {
+        const len = run[run.length - 1].u - run[0].u; if (len < 0.6 * r) continue;
+        const seq = k % 2 === 0 ? run : [...run].reverse(), every = Math.max(1, Math.round(r / 3 / (pitch / 2))), pts = [];
+        seq.forEach((sm, q) => {
+          if (q % every && q !== seq.length - 1) return;
+          const p = Math.max(TIP, Math.min(1, (sm.dmm / r - 0.25) / 0.75));
+          // drop a point between two of the same pressure on a straight run
+          if (pts.length >= 2 && Math.abs(pts[pts.length - 1][2] - p) < 0.04 && Math.abs(pts[pts.length - 2][2] - p) < 0.04 && q !== seq.length - 1) pts.pop();
+          pts.push([+(sm.u * tx + v * nx).toFixed(3), +(sm.u * ty + v * ny).toFixed(3), +p.toFixed(3)]);
+        });
+        if (pts.length < 2) continue;
         stamp(pts, r); strokes.push({ kind: 'sweep', radiusMm: +r.toFixed(3), points: pts }); k++;
       }
     }
