@@ -111,4 +111,4 @@ export function stageVectors(vec, stageLines) {
 
 
 /** The vectors file beside a line file (`<stem>-lines.json` -> `<stem>-vectors.json`). */
-export const vectorsBeside = linesFile => linesFile.replace(/-lines\.json(\.gz)?$/, '-vectors.json');
+const vectorsBeside = linesFile => linesFile.replace(/-lines\.json(\.gz)?$/, '-vectors.json');

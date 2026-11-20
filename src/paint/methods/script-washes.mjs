@@ -35,7 +35,7 @@ const WASH_BRUSH_SHARE = 1 / 3;
  * A passage's mix: the script's pigments in its proportions, at the strength whose film on white paper reaches the
  * swatch's lightness (or the dilution's). `pigments` each carry their box `key`. Amounts per pigment, in their order.
  */
-export function scriptMix(paint, pigments) {
+function scriptMix(paint, pigments) {
   const k = pigments.length, keys = pigments.map(p => p.key), white = [255, 255, 255], base = new Array(k).fill(0);
   for (const [key, parts] of Object.entries(paint.pigments)) { const j = keys.indexOf(key); if (j < 0) throw Error(`painting script: pigment ${key} is not in the box`); base[j] += Math.max(0, Number(parts) || 0); }
   const t = base.reduce((a, v) => a + v, 0); if (!(t > 0)) throw Error('painting script: pigment parts must be positive');
