@@ -759,9 +759,21 @@ export function planStudyWashes({ k, w, h, studies, flat = false, density = null
       // a cast shadow's later glazes follow the finest study's dapple: they may run past the block-in shape, within
       // SHADOW_REACH_MM of it, onto any painted cell the finest study shows as dark (the shadow covers the wall, the
       // sunlit patches cut into it)
-      const ownSet = new Uint8Array(pn); for (const q of own) ownSet[q] = 1;
-      const reach = shadow ? dilate(ownSet, pw, ph, rC(SHADOW_REACH_MM)) : ownSet;
-      const reachCells = []; if (shadow) for (let q = 0; q < pn; q++) if (reach[q] && !paperMask[q] && !isDark(label[q]) && !broken(shapes[label[q]])) reachCells.push(q);
+      // (dilated in the shape's own box, padded by the reach: a whole-sheet dilation per shadow made the plan take minutes)
+      const reachCells = [];
+      if (shadow) {
+        const R = rC(SHADOW_REACH_MM); let x0 = pw, y0 = ph, x1 = -1, y1 = -1;
+        for (const q of own) { const x = q % pw, y = (q / pw) | 0; if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+        x0 = Math.max(0, x0 - R); y0 = Math.max(0, y0 - R); x1 = Math.min(pw - 1, x1 + R); y1 = Math.min(ph - 1, y1 + R);
+        const bw = x1 - x0 + 1, bh = y1 - y0 + 1, sub = new Uint8Array(bw * bh);
+        for (const q of own) sub[(((q / pw) | 0) - y0) * bw + (q % pw) - x0] = 1;
+        const grown = dilate(sub, bw, bh, R), okShape = new Map();
+        for (let y = 0; y < bh; y++) for (let x = 0; x < bw; x++) {
+          if (!grown[y * bw + x]) continue; const q = (y + y0) * pw + x + x0; if (paperMask[q]) continue;
+          const li = label[q]; let ok = okShape.get(li); if (ok === undefined) { ok = !isDark(li) && !broken(shapes[li]); okShape.set(li, ok); }
+          if (ok) reachCells.push(q);
+        }
+      }
       const fl = own.map(q => fineL[q]).sort((a, b) => a - b), at = f => fl[Math.min(fl.length - 1, Math.floor(f * fl.length))];
       for (let k = 0; k < K; k++) {
         const cut = k ? at((dark ? GLAZE_STEPS_DARK : GLAZE_STEPS)[k]) : Infinity, cells = (k && shadow ? reachCells : own).filter(q => fineL[q] <= cut); if (cells.length * cellMm2 < GLAZE_LEAST_MM2) break;
