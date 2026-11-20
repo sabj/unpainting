@@ -69,7 +69,8 @@ const shoot = async () => {
   if (ctx.RESUMING) return; // a fresh process taking over a saved painting: its frames are already on disk
   if (!FRAME_POLICY.keep(ctx.STAGE)) return;
   // Fast films only completed paint boundaries: every fourth pass and every dried value band; all other stages survive.
-  if(FRAME_POLICY.all && NATIVE_PAINT_MODE.mode==='fast' && !fastPaintFrame(ctx.STAGE))return;
+  // (and whatever the checkpoint policy keeps: keeping every frame never keeps fewer)
+  if(FRAME_POLICY.all && NATIVE_PAINT_MODE.mode==='fast' && !fastPaintFrame(ctx.STAGE) && !FRAME_POLICY.byDefault)return;
   const stageKey=JSON.stringify(ctx.STAGE);
   if(NATIVE_PAINT_MODE.mode==='fast' && ctx.LAST_FRAME_STAGE===stageKey)return;
   ctx.LAST_FRAME_STAGE=stageKey;

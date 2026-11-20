@@ -47,9 +47,11 @@ export async function layGouache(ctx) {
   if (items.length) {
     // the white, one stroke after another, then the tint of each warm light over the same stroke (same seed and
     // ordinal, so the same pressure and the same cells)
-    const r = pencilDraw(sheet, items.map(s => ({ points: s.points })), at, { amount: GOUACHE_FILM, width: 1, vary: PRESSURE_WANDER, tooth: TOOTH, seed, usePointWidths: true });
+    // every stroke written to the tape (a 'g' mark) is filmed, or the native recording is incomplete and the run fails
+    const filmed = ctx.NATIVE_CAPTURE ? { afterStroke: () => ctx.NATIVE_CAPTURE('graphite') } : {};
+    const r = pencilDraw(sheet, items.map(s => ({ points: s.points })), at, { amount: GOUACHE_FILM, width: 1, vary: PRESSURE_WANDER, tooth: TOOTH, seed, usePointWidths: true, ...filmed });
     drawn = r.drawn;
-    items.forEach((s, gi) => { for (const m of s.tint.mix) pencilDraw(sheet, [{ points: s.points }], m.pigment, { amount: m.amount, width: 1, vary: PRESSURE_WANDER, tooth: TOOTH, seed, ordinal: gi, usePointWidths: true }); });
+    items.forEach((s, gi) => { for (const m of s.tint.mix) pencilDraw(sheet, [{ points: s.points }], m.pigment, { amount: m.amount, width: 1, vary: PRESSURE_WANDER, tooth: TOOTH, seed, ordinal: gi, usePointWidths: true, ...filmed }); });
     layersChanged(sheet);
   }
   const film = sheet.D[at]; let touched = 0;

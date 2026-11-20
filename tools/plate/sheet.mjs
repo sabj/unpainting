@@ -10,8 +10,10 @@ import {prepareWetBed} from '../painter/wet-bed-prep.mjs';
 import {drawFineMaterial, drawOnFineSheet, fineGestures} from '../../src/paint/methods/fine-material.mjs';
 import {createDeliveryCal} from '../../src/paint/methods/delivery-cal.mjs';
 import {drawMaterial, sourceDrawingCaps} from '../../src/paint/methods/material-profiles.mjs';
-import {planLightToDark, valueTechnique} from '../../src/paint/methods/light-to-dark.mjs';
-import {planFairWashes} from '../../src/paint/methods/fair-wash.mjs';
+import {planLightToDark, valueTechnique, estimatePaper, targetValueMap} from '../../src/paint/methods/light-to-dark.mjs';
+import {planLayeredWashes} from '../../src/paint/methods/layered-washes.mjs';
+import {planStudyWashes} from '../../src/paint/methods/study-washes.mjs';
+import {loadStudies} from '../painter/study-load.mjs';
 import {washStrokeHold} from '../../src/paint/methods/wash-strokes.mjs';
 import {smallestBrushMm} from '../../src/paint/methods/light-reserves.mjs';
 import {roleBrushMm,roleBrushPointMm,washKitMm} from '../../src/paint/methods/brush-footprint.mjs';
@@ -267,14 +269,17 @@ if(VALUE_ENABLED){
  const DETAIL_SEG = num('detailseg',0)>0 && opt('image','') ? await (async () => { const { hasSegments, loadSegments } = await import('../../src/crop/segments.mjs'); const b = path.basename(opt('image',''), path.extname(opt('image',''))); return hasSegments(b) ? loadSegments(b, w, h) : null; })() : null;
   const valueOptions={paperRule:PAPER_RULE,calibratedPlan:CALIBRATED_PLAN,ownSwatch:true,smallLightMax:num('smallmarklights',120),detailScale:num('detailscale',0),detailSegments:DETAIL_SEG,layerLocal:num('layerlocal',0)>0,smallMarks:num('smallmarks',0)>0,smallIsolationMm:num('smallisolation',0),washJoin:num('washjoin',0)>0,bandRound:num('bandround',0)>0,valueFloor:opt('valuefloor','')||null,strokePlan:num('strokeplan',0)>0,laneMm:opt('lanemm','')==='auto'?0:num('lanemm',6),laneAdapt:num('laneadapt',0)>0,strokeMm:num('strokemm',30),washReachMm:num('washreach',0),edgeWobbleMm:num('edgewobble',0),shadowThresh:num('shadowthresh',.38),shadowWater:num('shadowwater',0),skyOneLayer:num('skyonelayer',0)>0,minShapeCells:num('minshapecells',0),cellFamilies:num('cellfamilies',VALUE_CONFIG?.view?.wholeOf?1:0)>0,paperRel:num('paperrel',0)>0,paperLights:num('paperlights',0)>0,paperDelta:opt('paperdelta','')?num('paperdelta',10):null,accentShare:num('accentshare',0),accentMin:num('accentmin',.55),layerSmoothMm:num('layersmooth',0),floorBrushMm:roleBrushMm(root,'floor',{brushes:opt('brushes','src/paint/brushes.json'),name:opt('floorbrush','')}),detailPointMm:roleBrushPointMm(root,'detail',{brushes:opt('brushes','src/paint/brushes.json')}),styleGain:num('stylegain',1),skySplit:num('skysplit',0)>0,layerTexture:num('layertexture',0)>0,edgeFadeMm:num('edgefade',0),layerHue:num('layerhue',0)>0,layers:num('midlayers',0),layerIncrement:num('layerincrement',0)>0,pigShare:num('pigshare',0),hueChroma:num('huechroma',0),hueChromaLab:num('huechromalab',0)>0,shadowFamilies:num('shadowfamilies',0)>0,passCap:num('passcap',0),carryMm:num('carrymm',0),holeFill:num('holefill',0),keepMask:num('carrykeep',0)>0,maskMm:num('maskmm',0),paleLights:num('palelights',0),lightFamilies:num('lightfamilies',0)>0,laneMax:num('lanemax',0),nestedBands:num('nestedbands',CALIBRATED_PLAN?1:0)>0,cellLight:num('celllight',CALIBRATED_PLAN?1:0)>0,massTone:num('masstone',CALIBRATED_PLAN?1:0)>0,nested:num('nestedmid',0)>0,midDomains:num('middomain',1)>0,brushChoice:num('brushchoice',0)>0,shaped,pigments:PIGS,subject:VALUE_CONFIG?.subject,styleSelection:VALUE_CONFIG?.styleSelection,demand:ctx.AL,k:PIGS.length,density:ctx.SRC,w,h,rgb:ctx.px,paperRGB,hold:ctx.FUR_HOLD,paleHold:WHITE_HOLD,families:VALUE_CONFIG?.families??MAJOR_INTENT?.families??[],reserves:VALUE_CONFIG?.reserves??[],smallestBrushMm:smallestBrushMm(JSON.parse(fs.readFileSync(path.join(root,opt('brushes','src/paint/brushes.json')),'utf8'))),sheetWidthMm:num('sheetmm', DEFAULT_SHEET_MM)};
 
- // The wash plan (fair-wash.mjs): puddles and whole shapes. A plan that names a style (ink and wash, the wet styles) still
+ // The wash plan (layered-washes.mjs): a first wash, shadow shapes and darks, from the squinted subject. A plan that names a style (ink and wash, the wet styles) still
  // takes the older value plan, whose style profiles the wash plan does not read yet; that path goes when they are ported.
  valueOptions.washBrushMm=roleBrushMm(root,'shape',{brushes:opt('brushes','src/paint/brushes.json')});valueOptions.washKitMm=washKitMm(root,{brushes:opt('brushes','src/paint/brushes.json')});valueOptions.pointBrushMm=roleBrushMm(root,'detail',{brushes:opt('brushes','src/paint/brushes.json')});
- // the things of the picture, for the wash plan's first shapes: the run's segment map on the sheet's cells
- if(ctx.SEGMENTS_RECORD?.stem&&opt('image','')){const {registerSegments,loadSegments}=await import('../../src/crop/segments.mjs');const base=path.basename(opt('image'),path.extname(opt('image')));registerSegments(base,ctx.SEGMENTS_RECORD.stem);valueOptions.segments=(await loadSegments(base,w,h)).labels;}
  // under an ink drawing (the ink-and-wash recipe) the washes stay broad: the line carries the structure
  valueOptions.drawn=opt('inkrecipe','none')==='wash'&&opt('drawing','first')!=='none';
- const planValues=valueOptions.styleSelection?planLightToDark:planFairWashes;
+ // --washplan FILE[:MIN],FILE[:MIN],...: the washes are read from a stack of painter's block-in studies, coarse to fine
+ // (images of the subject simplified to flat shapes), registered to the sheet; the subject is not read for them
+ // (study-washes.mjs; tools/painter/study-load.mjs). squint: from the subject squinted.
+ const WASH_PLAN=opt('washplan','squint');
+ if(WASH_PLAN!=='squint'){Object.assign(valueOptions,await loadStudies(WASH_PLAN,root,w,h));const paper=estimatePaper(valueOptions.rgb,w,h,valueOptions.density);valueOptions.inkValue=targetValueMap(paper?Float32Array.from(valueOptions.density,v=>Math.max(0,v-paper.density)):valueOptions.density);}
+ const planValues=WASH_PLAN!=='squint'?planStudyWashes:valueOptions.styleSelection?planLightToDark:planLayeredWashes;
  const valueStarted=performance.now();
  if(SPEED_VALUE_CACHE){
   const saved=await cachedStep({...RUN_CACHE,name:'value-plan',code:CODE_HASH,track:optTrack,inputs:valueOptions},async()=>({plan:planValues(valueOptions),demand:valueOptions.demand}));
@@ -290,7 +295,9 @@ if(VALUE_ENABLED){
   ctx.layers=ctx.layers.map((l,i)=>({l,i,g:first.get(step(l)+'|'+l._valuePhase),r:l._order?.region??0})).sort((a,b)=>a.g-b.g||(a.l._valuePhase==='shadow'?a.i-b.i:a.r-b.r||a.l.pigment-b.l.pigment||a.i-b.i)).map(q=>q.l);}
  // --darkfirst: shadow-phase layers (shadow glazes, deep accents) before the middle layers, light first still
  if(num('darkfirst',0)>0){const ph=l=>l._valuePhase==='light'?0:l._valuePhase==='shadow'?1:2;ctx.layers=ctx.layers.map((l,i)=>({l,i})).sort((a,b)=>ph(a.l)-ph(b.l)||a.i-b.i).map(q=>q.l);console.log('darkfirst: '+ctx.layers.map(l=>l._valuePhase[0]).join(''));}
- const seams=ctx.layers.filter(l=>l.value===1).flatMap(l=>l.shapes.flatMap(sh=>unsupportedAxisEdges(sh.mask,w,h,ctx.px).map(edge=>({pass:sh._valuePlan.id,...edge}))));
+ // a crop rectangle would show as a straight mask edge the subject does not have; the layered plan's shapes are outlines
+ // of the squinted subject, which sit a squint's width off a straight subject edge, so the test is the older plan's
+ const seams=planValues!==planLightToDark?[]:ctx.layers.filter(l=>l.value===1).flatMap(l=>l.shapes.flatMap(sh=>unsupportedAxisEdges(sh.mask,w,h,ctx.px).map(edge=>({pass:sh._valuePlan.id,...edge}))));
  const baseMass=new Float32Array(n);for(const l of ctx.layers.filter(l=>l.value===1))for(const sh of l.shapes)for(let y=sh.box.y0;y<=sh.box.y1;y++)for(let x=sh.box.x0;x<=sh.box.x1;x++){const i=y*w+x;if(sh.ids[i]===sh.id)baseMass[i]+=(sh.graded?sh.graded[i]:sh.amount);}
  let warm=0,warmPainted=0;for(let i=0;i<n;i++)if(ctx.px[3*i]-ctx.px[3*i+2]>18&&ctx.px[3*i+1]-ctx.px[3*i+2]>8){warm++;if(baseMass[i]>0)warmPainted++;}
  fs.writeFileSync(path.join(out,'value-region-check.json'),JSON.stringify({source:ctx.VALUE_PLAN.regions.source,band1UnsupportedAxisEdges:seams,regionCount:ctx.VALUE_PLAN.regions.regions.length,regions:ctx.VALUE_PLAN.regions.regions,warmTargetCells:warm,warmCellsWithPositiveBand1Pigment:warmPainted,physicalReserve:'same target-white mask as compiled plan'},null,2));
@@ -313,7 +320,7 @@ if(VALUE_ENABLED){
  // passage's cells in paint order, to value-maps.json.gz. Read by nothing in the painter.
  if(num('valuemaps',0)>0){const caps=[.16,.32,.50,.75,1],vv=ctx.VALUE_PLAN.value.values,band=Array.from(vv,v=>v<=0?0:caps.findIndex(t=>v<=t)+1||5);
   const passes=ctx.layers.flatMap((l,L)=>l.shapes.map(sh=>{const m=sh.mask,cells=[];if(m)for(let i=0;i<n;i++)if(m[i])cells.push(i);return {L,id:sh._valuePlan?.id??null,phase:l._valuePhase??null,value:l.value,pigment:l.pigment,amount:sh.amount,area:sh.area,cells};}));
-  fs.writeFileSync(path.join(out,'value-maps.json.gz'),zlib.gzipSync(JSON.stringify({w,h,caps,band,value:Array.from(vv,v=>+v.toFixed(3)),labels:Array.from(ctx.VALUE_PLAN.regions.labels),protected:Array.from(ctx.VALUE_PLAN.protectedCells),passes})));}
+  fs.writeFileSync(path.join(out,'value-maps.json.gz'),zlib.gzipSync(JSON.stringify({w,h,caps,band,value:Array.from(vv,v=>+v.toFixed(3)),labels:Array.from(ctx.VALUE_PLAN.regions.labels),protected:ctx.VALUE_PLAN.protectedCells?Array.from(ctx.VALUE_PLAN.protectedCells):[],passes})));}
  console.log(ctx.VALUE_PLAN.mixes?`wash plan: ${ctx.layers.length} mixes, ${ctx.VALUE_PLAN.instructions.length} washes in ${ctx.VALUE_PLAN.summary.stages} stages`:`target values: ${ctx.layers.length} pigment/region passes, ${ctx.VALUE_PLAN.instructions.length} connected shapes; five light-to-dark bands; shadows never split by region`);
  if(num('valuepreviewonly',0)){
   const preview=await writeValuePreview({plan:ctx.VALUE_PLAN,out,w,h,pigments:PIGS,paperRGB,target:path.resolve(root,opt('image')),photo:VALUE_CONFIG?.photo,subject:VALUE_CONFIG?.subject??'subject',name:VALUE_CONFIG?.name,root,opening:opt('drawingfile',''),closing:opt('drawinglast',''),variant:opt('valuevariant','lighttodark'),version:opt('valueversion','W4'),sheetMm:num('sheetmm', DEFAULT_SHEET_MM)});

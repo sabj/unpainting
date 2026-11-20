@@ -155,7 +155,7 @@ const RESIST_SOFT_BASE = null;
 if(ctx.AREA_PLAN&&MOD&&validateProductionDetails(ctx.AREA_PLAN.doc))MOD.lights=Uint8Array.from(ctx.AREA_PLAN.reserves,(v,i)=>v||ctx.AREA_PLAN.film[i]?1:0);
 let { R: RESIST$, S: RESIST_SOFT } = MOD&&!ctx.AREA_PLAN ? joinResist(RESIST_BASE, RESIST_SOFT_BASE, MOD, { w, h, n, distanceToZero }) : { R: RESIST_BASE, S: RESIST_SOFT_BASE }; ctx.RESIST = RESIST$;
 if(ctx.AREA_PLAN){ctx.RESIST??=new Uint8Array(n);RESIST_SOFT??=new Float32Array(n);for(let i=0;i<n;i++)if(ctx.AREA_PLAN.film[i]){ctx.RESIST[i]=1;RESIST_SOFT[i]=1;}}
-if(ctx.VALUE_PLAN){
+if(ctx.VALUE_PLAN?.protectedCells){
  // The same target-white mask owns planning and physical film; inferred highlights include pale painted planes.
  ctx.RESIST=Uint8Array.from(ctx.VALUE_PLAN.protectedCells);RESIST_SOFT=Float32Array.from(ctx.RESIST);
 }

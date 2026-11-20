@@ -16,8 +16,13 @@ export function framePolicy({ video = false, keepAll = false } = {}) {
     all,
     state() { return {next, firstWash, last, prevOf}; },
     restore(state) { if (state) ({next, firstWash, last, prevOf = 0} = state); },
+    // what the checkpoint policy would keep, worked out under every policy (so keeping all is a superset of it)
+    byDefault: false,
     keep(stage) {
-      if (all) return true;
+      this.byDefault = this.decide(stage);
+      return all || this.byDefault;
+    },
+    decide(stage) {
       const key = JSON.stringify(stage);
       if (key === last) return false;
       if (stage.stage === 'paint') {
