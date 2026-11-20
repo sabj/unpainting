@@ -116,6 +116,9 @@ function moveOf(p, joins) {
   if (load === 'dry') return { move: 'dry on dry', water: LOAD.dry, phase: null };
   if (p.paper === 'wet') return { move: 'wet on wet', water: water ?? 0.88, phase: null, ownBed: !joins };
   if (p.paper === 'damp' && joins) return { move: 'beside damp', water: water ?? 0.62, phase: null };
+  // a lost edge on dry paper: the paint goes into a damp bed of clean water laid under its own footprint first, so its
+  // edges run soft (a painter softens them with a damp brush; laid into damp paper they never harden)
+  if (p.edges === 'lost') return { move: 'wet on wet', water: water ?? 0.75, phase: null, ownBed: true };
   return (p.stage ?? 2) === 3 ? { move: 'wet on dry', water: water ?? 0.58, phase: 'shadow' } : { move: 'wet on dry', water: water ?? 0.62, phase: null };
 }
 

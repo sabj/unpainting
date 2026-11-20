@@ -5,7 +5,9 @@
 // passages of each kind. Also: the same picture after each stage (first washes, local colours, shadows, touches, darks),
 // and after 5, 15, 30, 50, 75 and 100% of the passages, so the order the author chose can be seen.
 //
-//   node tools/painter/script-overlay.mjs SCRIPT.json SUBJECT.png OUT.png [--stages STAGES.png] [--order ORDER.png] [--title TEXT]
+// With --drawing, the pen drawing (dark lines on white, the subject's frame) is laid first, under the paint, as on the sheet.
+//
+//   node tools/painter/script-overlay.mjs SCRIPT.json SUBJECT.png OUT.png [--drawing PEN.png] [--stages STAGES.png] [--order ORDER.png] [--title TEXT]
 import fs from 'node:fs';
 import sharp from 'sharp';
 import { passageStrokes, upgradeScript, hexRgb, DILUTION_L } from '../../src/paint/methods/script-washes.mjs';
@@ -50,13 +52,14 @@ function arrows(strokes, px, col) {
 }
 
 /** The picture after the first `upto` passages: a PNG buffer W x H. `marked` passages (a set of ids) get direction marks. */
-async function picture(script, strokesOf, W, H, px, upto, marked) {
+async function picture(script, strokesOf, W, H, px, upto, marked, pen = null) {
   const layers = script.passages.slice(0, upto).map(p => {
     const all = strokesOf.get(p.id), c = hex(paintColour(p.paint));
     const charge = (p.charges ?? []).map(ch => `<g fill="${hex(paintColour(ch))}">${all.charges.get(ch).map(st => ribbon(st, px)).join('')}</g>`).join('');
     return Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}"><rect width="${W}" height="${H}" fill="white"/><g fill="${c}">${all.main.map(st => ribbon(st, px)).join('')}</g>${charge}</svg>`);
   });
   let img = await sharp({ create: { width: W, height: H, channels: 3, background: { r: PAPER[0], g: PAPER[1], b: PAPER[2] } } }).png().toBuffer();
+  if (pen) img = await sharp(img).composite([{ input: pen, blend: 'multiply' }]).png().toBuffer();
   for (let i = 0; i < layers.length; i += 8) img = await sharp(img).composite(layers.slice(i, i + 8).map(input => ({ input, blend: 'multiply' }))).png().toBuffer();
   const lights = (script.lights ?? []).map(l => `<polygon points="${(l.region ?? l).map(([x, y]) => `${(x * px).toFixed(1)},${(y * px).toFixed(1)}`).join(' ')}" fill="none" stroke="#9a9a9a" stroke-width="0.7" stroke-dasharray="2 3"/>`).join('');
   const marks = script.passages.slice(0, upto).filter(p => marked?.has(p.id)).map(p => arrows(strokesOf.get(p.id).main, px, p.kind === 'wash' ? '#8a8a8a' : '#333')).join('');
@@ -85,15 +88,16 @@ async function tiles(list, tw, th, extra) {
 
 if (import.meta.url === `file://${process.argv[1]}`) {
   const args = process.argv.slice(2), flag = k => { const i = args.indexOf(k); return i >= 0 ? args.splice(i, 2)[1] : null; };
-  const orderFile = flag('--order'), stagesFile = flag('--stages'), title = flag('--title') ?? '';
+  const orderFile = flag('--order'), stagesFile = flag('--stages'), title = flag('--title') ?? '', penFile = flag('--drawing');
   const [scriptFile, subject, outFile] = args;
   const script = upgradeScript(JSON.parse(fs.readFileSync(scriptFile, 'utf8')));
   const lights = (script.lights ?? []).map(l => l.region ?? l);
   const W = 1400, px = W / script.sheet.widthMm, H = Math.round(script.sheet.heightMm * px);
   const chargeStrokes = c => (c.at ?? []).map(([x, y]) => ({ kind: 'sweep', radiusMm: (script.brushes[c.brush]?.widthMm ?? 6) / 2, points: [[x - 1, y, 0.5], [x, y + 0.5, 1], [x + 1, y, 0.4]] }));
   const strokesOf = new Map(script.passages.map(p => [p.id, { main: passageStrokes(p, script.brushes, 0, lights), charges: new Map((p.charges ?? []).map(c => [c, chargeStrokes(c)])) }]));
+  const pen = penFile ? await sharp(penFile).removeAlpha().resize(W, H, { fit: 'fill' }).png().toBuffer() : null;
   const all = new Set(script.passages.filter(p => p.kind !== 'wash').map(p => p.id));
-  const N = script.passages.length, full = await picture(script, strokesOf, W, H, px, N, all), leg = legend(script, strokesOf, W, title);
+  const N = script.passages.length, full = await picture(script, strokesOf, W, H, px, N, all, pen), leg = legend(script, strokesOf, W, title);
   const sub = await sharp(subject).resize(W, H, { fit: 'fill' }).png().toBuffer();
   const top = await sharp({ create: { width: 2 * W + 20, height: H, channels: 3, background: 'white' } }).composite([{ input: full, left: 0, top: 0 }, { input: sub, left: W + 20, top: 0 }]).png().toBuffer();
   const leg2 = legend(script, strokesOf, 2 * W + 20, title);
@@ -104,14 +108,14 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     const list = [];
     for (let s = 1; s <= 5; s++) {
       const upto = script.passages.reduce((a, p, i) => (stageOf(p) <= s ? i + 1 : a), 0), these = new Set(script.passages.filter(p => stageOf(p) === s).map(p => p.id));
-      list.push({ img: await picture(script, strokesOf, W, H, px, upto, these), cap: `after stage ${STAGE_NAME[s]} (${these.size} passages; arrows: this stage)` });
+      list.push({ img: await picture(script, strokesOf, W, H, px, upto, these, pen), cap: `after stage ${STAGE_NAME[s]} (${these.size} passages; arrows: this stage)` });
     }
     list.push({ img: full, cap: `everything: ${N} passages` });
     await (await tiles(list, tw, th, legend(script, strokesOf, 3 * tw, title))).toFile(stagesFile); console.log(stagesFile);
   }
   if (orderFile) {
     const list = [];
-    for (const f of [0.05, 0.15, 0.3, 0.5, 0.75, 1]) { const upto = Math.max(1, Math.round(f * N)), p = script.passages[upto - 1]; list.push({ img: await picture(script, strokesOf, W, H, px, upto, new Set([p.id])), cap: `${Math.round(100 * f)}%: ${upto} of ${N}, last ${p.id} ${(p.what ?? '').slice(0, 50)}` }); }
+    for (const f of [0.05, 0.15, 0.3, 0.5, 0.75, 1]) { const upto = Math.max(1, Math.round(f * N)), p = script.passages[upto - 1]; list.push({ img: await picture(script, strokesOf, W, H, px, upto, new Set([p.id]), pen), cap: `${Math.round(100 * f)}%: ${upto} of ${N}, last ${p.id} ${(p.what ?? '').slice(0, 50)}` }); }
     await (await tiles(list, tw, th, legend(script, strokesOf, 3 * tw, title))).toFile(orderFile); console.log(orderFile);
   }
 }

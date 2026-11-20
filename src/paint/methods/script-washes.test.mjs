@@ -64,6 +64,7 @@ test('the plan: one wash a passage, its charges in its wet session, a passage in
   const [w1, c1, t1] = p.layers[0].shapes.map(s => s._valuePlan);
   assert.equal(w1.move, 'wet on dry'); assert.equal(c1.move, 'wet on wet'); assert.equal(t1.move, 'wet on wet');
   assert.equal(p.layers[1].shapes[0]._valuePlan.phase, 'shadow');
+  assert.equal(plan(script([{ ...wall, edges: 'lost' }])).layers[0].shapes[0]._valuePlan.move, 'wet on wet', 'a lost edge is laid into a damp bed');
   assert.equal(p.summary.charges, 1);
   // the strength follows the dilution: a strong mix carries more paint than a pale one
   assert.ok(p.mixes.at(-1).strength > p.mixes[0].strength);
