@@ -158,7 +158,9 @@ export function assignThings(region, pw, ph, named, leastCells) {
   }
   const thingOf = new Int32Array(pn).fill(-1);
   for (const r of regions.values()) { const o = owner.get(r.id); if (o >= 0) for (const i of r.cells) { things[o].cells.push(i); thingOf[i] = o; } }
-  return { things: things.filter(t => t.cells.length), thingOf, regions };
+  const kept = things.filter(t => t.cells.length), index = things.map(t => kept.indexOf(t));
+  for (let i = 0; i < pn; i++) if (thingOf[i] >= 0) thingOf[i] = index[thingOf[i]];
+  return { things: kept, thingOf, regions };
 }
 
 /** Which thing each thing lies inside: the smallest other thing whose box holds most of its box (or -1). */

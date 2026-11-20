@@ -49,8 +49,9 @@ test('regions go to the most specific named box; shadows take none; boxes in tho
   const pw = 10, ph = 10, region = Int32Array.from({ length: 100 }, (_, i) => (i % 10 < 5 ? 1 : (i / 10 | 0) < 5 ? 2 : 3));
   const named = cleanThings([{ thing: 'wall', kind: 'wall', box: [0, 0, 1000, 1000] }, { thing: 'door', kind: 'door', box: [.5, .5, 1, 1] }, { thing: 'shade', kind: 'shadow', box: [0, 0, 1, 1] }, { thing: 'x', kind: 'nonsense', box: [0, 0, 0, 0] }]);
   assert.equal(named.length, 3); assert.deepEqual(named[0].box, [0, 0, 1, 1]);
-  const { things } = assignThings(region, pw, ph, named, 1), door = things.find(t => t.name === 'door'), wall = things.find(t => t.name === 'wall');
+  const { things, thingOf } = assignThings(region, pw, ph, [{ name: 'unused', kind: 'roof', box: [0, 0, .01, .01] }, ...named], 1), door = things.find(t => t.name === 'door'), wall = things.find(t => t.name === 'wall');
   assert.equal(door.cells.length, 25); assert.equal(wall.cells.length, 75); assert.ok(!things.some(t => t.kind === 'shadow'));
+  assert.equal(things[thingOf[99]].name, 'door', 'cell to thing indices survive dropping a thing with no cells');
 });
 
 test('things are visited nearest next from the largest, and a thing with the things inside it light to dark', () => {
