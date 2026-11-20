@@ -249,6 +249,8 @@ const DAB_SIZE = [0.55, 1.25], DAB_LONG = [2.6, 3.8], DAB_CLUSTER = 3, DAB_TURN 
  * src/media/tuft-section.mjs), so a dab travels DAB_LONG radii: a three-point touch no longer than the brush was wide
  * never opened, and foliage dried as pale dashes over paper. */
 const LEAF_POINTS = 9, LEAF_PRESS = 0.6;
+/** The pale wash under a mass of leaves is this share of the way from the leaves' value to the paper's. */
+const LEAF_UNDER = 0.55;
 /** A darker value is dropped into a dabbed mass of at least this area (mm2). */
 const DARK_DABS_FROM = 100;
 /** Close values: a wash is laid against a neighbour still damp (one session, a soft edge) when their L* differ by no more than this. */
@@ -559,9 +561,11 @@ export function planStudyWashes({ k, w, h, studies, flat = false, density = null
   const dabMass = (stage, what, m0, loops, colour, own) => {
     // dabs only where the wash's outline is (a dab outside it has no footprint in the passage)
     const lm = loopsMask(loops, pw, ph, mmX), m = Uint8Array.from(m0, (v, q) => (v && lm[q] ? 1 : 0));
+    // first a pale wash over the whole mass (the light through the leaves), then the leaves over it in clumps
+    const Lc = labOf(colour, 0, valueRef)[0], pale = flat ? null : wash(stage, `${what}: a pale wash under the leaves`, loops, withL(colour, Lc + (100 - Lc) * LEAF_UNDER), { own });
     const light = dabsOver(m, 11), sh = light.length ? wash(stage, `${what}, in loose dabs`, loops, colour, { strokes: light, own }) : null;
-    if (!sh) return [];
-    const dark = dabsOver(m, 29, DAB_DARK_SHARE), out = [sh];
+    if (!sh) return pale ? [pale] : [];
+    const dark = dabsOver(m, 29, DAB_DARK_SHARE), out = [...(pale ? [pale] : []), sh];
     // (a darker value only in a mass big enough to hold a few dabs of it, away from the sheet's edge)
     if (dark.length >= 3 && own.length * cellMm2 >= DARK_DABS_FROM) { const d = wash(2, `${what}: darker dabs dropped in`, loops, colour, { strokes: dark, amounts: sh.mix.map(v => v * (DAB_DARK - 1)), move: 'wet on wet' }); if (d) out.push(d); }
     dabbed++;
