@@ -214,3 +214,15 @@ test('on a GPU sheet the section brush lays exactly what it lays on a CPU sheet 
   const a = totals(cpu), b = totals(gpu);
   assert.ok(Math.abs(a.water - b.water) < 1e-3 * a.water && Math.abs(a.pig[0] - b.pig[0]) < 1e-3 * a.pig[0], `cpu ${JSON.stringify(a)} gpu ${JSON.stringify(b)}`);
 });
+
+test('the mark tape records the section brush and the hand speed of its strokes', async () => {
+  const marks = await import('./brush.mjs'), tape = marks.recordMarks(true);
+  try {
+    const sheet = createSheet(paperAt(20, 10, 0.25), pigments); sheet._tape = true;
+    const b = round(0.25, 1); dip(b, { water: 1, conc: [0.5, 0] });
+    stroke(b, sheet, [{ x: 10, y: 20, p: 1 }, { x: 60, y: 20, p: 1 }], { speed: 30 });
+    const s = tape.find(m => m.k === 's');
+    assert.equal(s.vs, 30);
+    assert.equal(marks.BRUSHOPTS[0].model, 'section');
+  } finally { marks.recordMarks(false); }
+});
