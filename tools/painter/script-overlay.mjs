@@ -53,10 +53,16 @@ function arrows(strokes, px, col) {
 
 /** The picture after the first `upto` passages: a PNG buffer W x H. `marked` passages (a set of ids) get direction marks. */
 async function picture(script, strokesOf, W, H, px, upto, marked, pen = null) {
-  const layers = script.passages.slice(0, upto).map(p => {
-    const all = strokesOf.get(p.id), c = hex(paintColour(p.paint));
-    const charge = (p.charges ?? []).map(ch => `<g fill="${hex(paintColour(ch))}">${all.charges.get(ch).map(st => ribbon(st, px)).join('')}</g>`).join('');
-    return Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}"><rect width="${W}" height="${H}" fill="white"/><g fill="${c}">${all.main.map(st => ribbon(st, px)).join('')}</g>${charge}</svg>`);
+  // a wet passage (a wash, or anything laid wet or with lost edges) is drawn as wet paint looks: its strokes varied in
+  // strength by their charge and run together, its edge softened, its charges spread as soft blooms; a dry passage keeps
+  // its strokes' own edges
+  const layers = script.passages.slice(0, upto).map((p, i) => {
+    const all = strokesOf.get(p.id), c = hex(paintColour(p.paint)), wet = p.kind === 'wash' || p.paper === 'wet' || p.paper === 'damp' || p.edges === 'lost';
+    const soft = wet ? (p.edges === 'found' ? 0.25 : p.edges === 'mixed' ? 0.6 : 1.2) * px : 0;
+    const body = all.main.map(st => `<g fill-opacity="${Math.min(1, 0.7 + 0.3 * (st.charge ?? 1)).toFixed(2)}">${ribbon(st, px)}</g>`).join('');
+    const charge = (p.charges ?? []).map(ch => `<g fill="${hex(paintColour(ch))}" filter="url(#b${i})" fill-opacity="0.85">${all.charges.get(ch).map(st => ribbon({ ...st, radiusMm: st.radiusMm * 2.2 }, px)).join('')}</g>`).join('');
+    const defs = `<defs><filter id="s${i}" x="-5%" y="-5%" width="110%" height="110%"><feGaussianBlur stdDeviation="${soft.toFixed(1)}"/></filter><filter id="b${i}" x="-5%" y="-5%" width="110%" height="110%"><feGaussianBlur stdDeviation="${(2.5 * px).toFixed(1)}"/></filter></defs>`;
+    return Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}">${defs}<rect width="${W}" height="${H}" fill="white"/><g fill="${c}"${soft ? ` filter="url(#s${i})"` : ''}>${body}</g>${charge}</svg>`);
   });
   let img = await sharp({ create: { width: W, height: H, channels: 3, background: { r: PAPER[0], g: PAPER[1], b: PAPER[2] } } }).png().toBuffer();
   if (pen) img = await sharp(img).composite([{ input: pen, blend: 'multiply' }]).png().toBuffer();

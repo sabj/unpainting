@@ -111,6 +111,7 @@ test('shapes of a study named by number become the passage\'s regions, its reser
   assert.deepEqual(r.passages[0].regions, [square]); assert.equal(r.passages[0].reserveRegions.length, 1); assert.equal(r.lights[0].region.length, 4);
   assert.deepEqual(r.passages[1].strokes[0].from, [35, 10]); assert.equal(r.passages[1].strokes[0].direction, 90);
   assert.throws(() => resolveScript(script([{ ...wall, shapes: [9] }]), shapes), /shape 9/);
+  assert.throws(() => resolveScript(script([{ ...wall, paint: { pigments: { rose: 1 } } }]), shapes), /rose, which is not in the script's palette/);
   // a passage's own reserve is worked round by its lanes
   const st = passageStrokes({ ...r.passages[0], brush: 'r8' }, brushes).flatMap(q => q.points);
   assert.ok(!st.some(([x, y]) => x > 32 && x < 38 && y > 27 && y < 33));

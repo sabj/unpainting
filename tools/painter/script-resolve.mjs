@@ -13,6 +13,10 @@ export function resolveScript(script, shapeList) {
   const get = (id, where) => { const s = byId.get(Number(id)); if (!s) throw Error(`painting script: ${where} names shape ${id}, which the study does not have`); return s; };
   const outlines = (ids, where) => (ids ?? []).map(id => get(id, where).outline);
   const lights = (script.lights ?? []).map((l, i) => (l.shapes ? outlines(l.shapes, `light ${i + 1}`).map(region => ({ what: l.what, region })) : [l])).flat();
+  // every paint must be in the script's palette (the painter is given only those): caught here, before any preview
+  const palette = new Set(script.palette ?? []);
+  for (const p of script.passages) for (const [k] of [...Object.entries(p.paint?.pigments ?? {}), ...(p.charges ?? []).flatMap(c => Object.entries(c.pigments ?? {}))])
+    if (!palette.has(k)) throw Error(`painting script: passage ${p.id} uses ${k}, which is not in the script's palette (${[...palette].join(', ')})`);
   const passages = script.passages.map(p => {
     const q = { ...p };
     if (p.shapes?.length) q.regions = [...(p.regions ?? (p.region ? [p.region] : [])), ...outlines(p.shapes, p.id)];
