@@ -52,3 +52,13 @@ test('fills: a stroke the fitter marked as a fill is one; under paint it is one 
   assert.throws(() => layVectors({ strokes: [branch] }, new Float32Array(400), 20, 20, 0.5, d => d, { fill: 0.25 }), /does not mark its fills/);
   layVectors({ strokes: [branch] }, new Float32Array(400), 20, 20, 0.5, d => d);
 });
+
+test('a line finer than a cell is laid a cell wide at its own darkness, not spread paler; on a finer sheet it is exact', () => {
+  const line = { seq: 0, dark: 0.3, drawn: 'path', path: [[1, 2.25], [9, 2.25]], widths: [0.2, 0.2], outline: [[[1, 2.15], [9, 2.15], [9, 2.35], [1, 2.35]]] };
+  const coarse = new Float32Array(400), r = layVectors({ strokes: [line] }, coarse, 20, 20, 0.5, d => d);
+  assert.equal(r.widened, 1);
+  assert.ok(Math.abs(coarse[4 * 20 + 8] - 0.3) < 0.01, `on half-millimetre cells the line reads at its darkness: ${coarse[4 * 20 + 8]}`);
+  const fine = new Float32Array(200 * 200), q = layVectors({ strokes: [line] }, fine, 200, 200, 0.05, d => d);
+  assert.equal(q.widened, 0);
+  assert.ok(Math.abs(fine[45 * 200 + 80] - 0.3) < 0.01 && fine[40 * 200 + 80] === 0);
+});

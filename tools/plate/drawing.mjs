@@ -210,7 +210,7 @@ function layExactVectors(file, { closing = false } = {}) {
   if (fineSheet) { INKRES.changed(); INKRES.carry(); } else { layersChanged(sheet); sheet._gpu?.cpuWroteAll?.(); }
   fs.copyFileSync(file, path.join(out, closing ? 'ink-vectors-closing.json' : 'ink-vectors.json'));
   ctx.drawnCount += r.strokes;
-  console.log(`ink vectors: ${r.strokes} strokes laid exactly from ${path.basename(file)} (${pencil ? 'graphite' : 'ink'}) on a ${w} x ${h} sheet (${(sheetMm / w).toFixed(3)} mm cells), ${r.cells} cells inked${fill < 1 ? `, ${r.fills} fills at ${fill} inside` : ''}; no tracer, no pen gestures`);
+  console.log(`ink vectors: ${r.strokes} strokes laid exactly from ${path.basename(file)} (${pencil ? 'graphite' : 'ink'}) on a ${w} x ${h} sheet (${(sheetMm / w).toFixed(3)} mm cells), ${r.cells} cells inked${fill < 1 ? `, ${r.fills} fills at ${fill} inside` : ''}${r.widened ? `, ${r.widened} lines finer than a cell laid a cell wide` : ''}; no tracer, no pen gestures`);
 }
 async function drawPass(_unused, { first = false, fine = false } = {}) {
   const speedDrawStart = performance.now();

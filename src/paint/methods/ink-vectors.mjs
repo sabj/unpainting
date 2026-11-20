@@ -65,30 +65,42 @@ function edgeDistance(R, x, y, closed = true) {
   return Math.sqrt(best);
 }
 
+/** The width of an outlined shape taken as a strip: twice its area over its perimeter (mm). */
+function stripWidth(rings) {
+  let area = 0, per = 0;
+  for (const r of rings) for (let k = 0, n = r.length; k < n; k++) { const p = r[k], q = r[(k + 1) % n]; area += (p[0] * q[1] - q[0] * p[1]) / 2; per += Math.hypot(q[0] - p[0], q[1] - p[1]); }
+  return per > 0 ? 2 * Math.abs(area) / per : 0;
+}
+const medianPositive = W => { const v = W.filter(x => x > 0).sort((p, q) => p - q); return v.length ? v[v.length >> 1] : 0; };
+
 /**
  * Lays the strokes on `field` (an ink amount per cell, w x h cells of `mm` mm) in seq order; the darker holds where two meet.
  * `inkOf` maps darkness to ink amount (inkForDarkness). `each(stroke, cells)` is told each stroke's area as it is laid.
  * `fill` (0..1): a FILL stroke (isFill: a compact blob) is laid as one uniform pale shape of diluted ink at `fill` of its
  * darkness, its edge soft over `softMm` (like ink laid with a brush), nothing drawn inside it. Lines are exact (1:
- * everything exact). Returns { strokes, cells, fills }.
+ * everything exact). Returns { strokes, cells, fills, widened } (widened: lines finer than a cell, laid a cell wide).
  */
 export function layVectors(doc, field, w, h, mm, inkOf, { ss = 4, each = null, fill = 1, softMm = 0.2 } = {}) {
   const S = [...doc.strokes].sort((a, b) => a.seq - b.seq), dark = new Float32Array(w * h);
   if (fill < 1 && doc.fills !== 'marked') throw new Error('ink vectors: this file does not mark its fills (made before the fitter found them): refit it with tools/seg/ink-vectors.py before laying it under paint');
-  let cells = 0, fills = 0;
+  let cells = 0, fills = 0, widened = 0;
   for (const s of S) {
     const r = rasterizeRings(s.outline, w, h, mm, ss); let n = 0;
     const thin = fill < 1 && isFill(s); if (thin) fills++;
+    // a line finer than a cell of this sheet would be spread over the cell and read paler than it was drawn (a 0.2 mm pencil
+    // line on half-millimetre cells at two fifths of its darkness): it is laid a cell wide at its own darkness, the finest
+    // line this sheet can show (up to three times its ink; a finer sheet lays it exactly)
+    const lw = s.fill ? 0 : s.drawn === 'path' && s.widths ? medianPositive(s.widths) : stripWidth(s.outline), gain = lw > 0 && lw < mm ? Math.min(3, mm / lw) : 1; if (gain > 1) widened++;
     for (let j = 0; j < r.h; j++) for (let i = 0; i < r.w; i++) {
       const c = r.cov[j * r.w + i]; if (!(c > 0)) continue;
       const f = thin ? fill * Math.min(1, edgeDistance(s.outline, (r.x0 + i + 0.5) * mm, (r.y0 + j + 0.5) * mm) / softMm + 0.35) : 1;
-      const k = (r.y0 + j) * w + r.x0 + i, d = Math.min(1, c * s.dark * f);
+      const k = (r.y0 + j) * w + r.x0 + i, d = Math.min(1, c * gain) * s.dark * f;
       // the darker holds, against ink already on the sheet too (a closing pen over the opening's ink adds none twice)
       if (d > dark[k]) { dark[k] = d; const t = inkOf(d); if (t > field[k]) field[k] = t; n++; }
     }
     cells += n; each?.(s, n);
   }
-  return { strokes: S.length, cells, fills };
+  return { strokes: S.length, cells, fills, widened };
 }
 
 /**
