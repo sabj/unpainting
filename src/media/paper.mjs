@@ -5,7 +5,7 @@
 
 // `scale` is cells per pixel of the picture. Every length below is a paper length, multiplied by it, so the grid
 // does not decide how coarse the paper is.
-export function makePaper(w, h, { seed = 1, fibres = 0.5, tooth = 0.5, fibreLength = 14, cmin = 0.2, cmax = 0.55, scale = 1, toothScale = 1, patternScale = 1, proudBlur = 1, coldPress = null, mmPerCell = 0 } = {}) {
+export function makePaper(w, h, { seed = 1, fibres = 0.5, tooth = 0.5, fibreLength = 14, cmin = 0.2, cmax = 0.55, scale = 1, toothScale = 1, patternScale = 1, proudBlur = 1, coldPress = null, mmPerCell = 0, grainAmp = FINE_GRAIN } = {}) {
   // Opt-in physical fibres: fibre size and count follow physical area.
   const fs = mmPerCell > 0 ? (280 / 1086) / mmPerCell : scale;
   const n = w * h, fib = new Float32Array(n), c2 = new Float32Array(n), s2 = new Float32Array(n); // fibre amount, and orientation as doubled angles (a fibre has no head or tail)
@@ -13,6 +13,9 @@ export function makePaper(w, h, { seed = 1, fibres = 0.5, tooth = 0.5, fibreLeng
   // noise, with hollows and tooth in millimetres (0.4 mm a unit), so the sheet reads the same at any resolution.
   const ts = coldPress ? 0.4 / coldPress.mmPerCell : (mmPerCell > 0 ? fs : scale) * toothScale, ps = (mmPerCell > 0 ? fs : scale) * patternScale;
   const CP = coldPress ? coldPressField(w, h, coldPress.mmPerCell, seed, coldPress) : null;
+  // the fine grain of the sheet, in millimetres: only a physical sheet has it, since its sizes are lengths on the paper
+  const physMm = coldPress ? coldPress.mmPerCell : mmPerCell;
+  const FG = physMm > 0 && grainAmp > 0 ? fineGrain(w, h, physMm, seed) : null;
   const blur = r => Math.max(1, Math.round(r * ts));
   let s = seed * 9301 + 49297; const rnd = () => (s = (s * 16807) % 2147483647) / 2147483647;
   // fibres: many short, slightly curved strands laid at random, a little thicker in the middle
@@ -33,11 +36,13 @@ export function makePaper(w, h, { seed = 1, fibres = 0.5, tooth = 0.5, fibreLeng
     // Two roughnesses: the tooth, a pixel or two across, leaves specks of paper in a wash; the pattern, several
     // pixels across, makes a wash pool in patches. One noise field cannot be both.
     const i = y * w + x, t = CP ? CP[i] : 0.6 * vn(x / (2.5 * ts), y / (2.5 * ts)) + 0.4 * vn(x / (7 * ps) + 11, y / (7 * ps) + 3);
-    height[i] = fibres * Math.min(1, blurred[i] * fscale) + tooth * t; lo = Math.min(lo, height[i]); hi = Math.max(hi, height[i]);
+    height[i] = fibres * Math.min(1, blurred[i] * fscale) + tooth * t + (FG ? grainAmp * FG[i] : 0); lo = Math.min(lo, height[i]); hi = Math.max(hi, height[i]);
   }
   for (let i = 0; i < n; i++) height[i] = (height[i] - lo) / (hi - lo || 1);
   // pigment settles and water pools at the scale of the paper's hollows, a few fibres across, not per fibre
-  const valley = box(height, w, h, blur(1)); let vl = Infinity, vh = -Infinity; for (const v of valley) { vl = Math.min(vl, v); vh = Math.max(vh, v); }
+  // On a physical sheet that is the height itself (each cell already averages the grain over its area): granulating pigment settles into
+  // hollows a few tenths of a millimetre across (looks/ref-washes.jpg), and a millimetre's blur left only a mottle.
+  const valley = FG ? Float32Array.from(height) : box(height, w, h, blur(1)); let vl = Infinity, vh = -Infinity; for (const v of valley) { vl = Math.min(vl, v); vh = Math.max(vh, v); }
   for (let i = 0; i < n; i++) { valley[i] = (valley[i] - vl) / (vh - vl || 1); capacity[i] = valley[i] * (cmax - cmin) + cmin; }
   // the tooth a dragged brush feels: hills and hollows about a millimetre across, over which a clump rides
   const toothH = box(box(box(height, w, h, blur(2)), w, h, blur(2)), w, h, blur(2)); let tl = Infinity, th = -Infinity; for (const v of toothH) { tl = Math.min(tl, v); th = Math.max(th, v); }
@@ -93,6 +98,30 @@ export function coldPressField(w, h, mmPerCell, seed = 1, { bumpMm = [0.5, 2], c
   let lo = Infinity, hi = -Infinity; for (let i = 0; i < n; i++) { lo = Math.min(lo, f[i]); hi = Math.max(hi, f[i]); }
   for (let i = 0; i < n; i++) f[i] = (f[i] - lo) / (hi - lo || 1);
   return f;
+}
+
+// The fine grain's share of the height on a physical sheet (makePaper `grainAmp`). Measured against the real washes in
+// refs/ (tools/lab/wash-sheet.mjs): their density varies about evenly from 0.2 to 2 mm, so the paper's relief has to
+// as well; the cold-press field alone had almost none below half a millimetre.
+export const FINE_GRAIN = 0.35;
+// Octaves of value noise at these wavelengths (mm), each of this amplitude: the felt's fine tooth and the fibres in it.
+const GRAIN_OCTAVES = [[0.1, 0.9], [0.2, 1.1], [0.4, 0.9], [0.8, 0.7]];
+/** The sheet's fine grain, about -0.5..0.5 a cell: octaves of value noise laid out in millimetres and averaged over
+ *  each cell's area, so a coarser grid sees the same paper smoothed, not a different paper. */
+export function fineGrain(w, h, mmPerCell, seed = 1) {
+  const out = new Float32Array(w * h);
+  const hash = (x, y, o) => { let q = Math.imul(x | 0, 374761393) ^ Math.imul(y | 0, 668265263) ^ Math.imul(seed + 101 * o, 2246822519); q = Math.imul(q ^ (q >>> 13), 1274126177); return ((q ^ (q >>> 16)) >>> 0) / 4294967296 - 0.5; };
+  const vn = (x, y, o) => { const xi = Math.floor(x), yi = Math.floor(y), fx = x - xi, fy = y - yi, sx = fx * fx * (3 - 2 * fx), sy = fy * fy * (3 - 2 * fy), a = hash(xi, yi, o), b = hash(xi + 1, yi, o), c = hash(xi, yi + 1, o), d = hash(xi + 1, yi + 1, o); return a + (b - a) * sx + (c - a) * sy + (a - b - c + d) * sx * sy; };
+  for (const [o, [lam, amp]] of GRAIN_OCTAVES.entries()) {
+    // samples a cell: enough to average this octave over the cell (two a wavelength), and one where the cell is finer
+    const k = Math.max(1, Math.min(8, Math.ceil((2 * mmPerCell) / lam))), f = mmPerCell / lam, off = 17.3 * o;
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      let s = 0;
+      for (let a = 0; a < k; a++) for (let b = 0; b < k; b++) s += vn((x + (b + 0.5) / k) * f + off, (y + (a + 0.5) / k) * f - off, o);
+      out[y * w + x] += amp * (s / (k * k));
+    }
+  }
+  return out;
 }
 
 function box(src, w, h, r) {

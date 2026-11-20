@@ -75,6 +75,29 @@ if (refs.length) {
   }
   y += rowH + GAP;
 }
+// The six strokes of tools-lab-compare/engine-cases.mjs (wash, cross, bar on dry, bar on wet, bloom, pen; 60 x 40 mm at
+// 0.2 mm a cell) for each version given by --engine label=<dir>,..., one row a version, under one real crop
+const ENGINE = arg('engine', '').split(',').filter(Boolean).map(e => { const [label, dir] = e.split('='); return { label, dir }; });
+if (ENGINE.length) {
+  const EPX = Number(arg('enginepx', 11)), cases = ['wash', 'cross', 'barDry', 'barWet', 'bloom', 'pen'];
+  svg.push(label(`the six strokes of the version comparison (looks/engine-versions-cpu.jpg), ${EPX} px a mm`, GAP, y + 30, 30)); y += 44;
+  if (refs.length) {
+    const c = refs[0], pw = Math.round(c.w * c.mm * EPX), ph = Math.round(c.h * c.mm * EPX), cw = Math.min(pw, 6 * 60 * EPX), ch = Math.min(ph, 40 * EPX);
+    comps.push({ input: await sharp(c.file).resize(pw, ph, { kernel: 'lanczos3' }).extract({ left: 0, top: 0, width: cw, height: ch }).png().toBuffer(), left: GAP, top: y + 30 });
+    svg.push(label(`real: ${c.name}, same scale`, GAP, y + 22, 22)); y += ch + 30 + GAP;
+  }
+  for (const e of ENGINE) {
+    const info = JSON.parse(fs.readFileSync(path.join(e.dir, 'info-cpu.json'), 'utf8'));
+    svg.push(label(e.label, GAP, y + 22, 24));
+    for (const [k, name] of cases.entries()) {
+      const f = path.join(e.dir, `${name}-cpu.rgb`); if (!fs.existsSync(f)) continue;
+      const img = await sharp(fs.readFileSync(f), { raw: { width: info.W, height: info.H, channels: 3 } }).resize(Math.round(info.W * 0.2 * EPX), Math.round(info.H * 0.2 * EPX), { kernel: 'lanczos3' }).png().toBuffer();
+      comps.push({ input: img, left: GAP + k * (60 * EPX + 10), top: y + 30 });
+      svg.push(label(name, GAP + k * (60 * EPX + 10) + 4, y + 30 + 40 * EPX - 6, 18, '#555'));
+    }
+    y += 40 * EPX + 30 + GAP;
+  }
+}
 // rows: one per case and version; columns: one per mode and cell size
 let W = GAP + cols.length * (panel + GAP);
 for (const name of cases) for (const r of RUNS) {

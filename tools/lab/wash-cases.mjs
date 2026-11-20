@@ -46,12 +46,12 @@ const CASES = {
   sweeps: (sheet, mm) => {
     for (let k = 0; k < 5; k++) { const y = 9 + k * 8, b = flat(mm, 60 + k); B.dip(b, { water: 1, conc: [0.6, 0] }); const [a, z] = k % 2 ? [45, 5] : [5, 45]; lay(sheet, mm, b, [{ x: a, y, p: 0.9 }, { x: z, y, p: 0.9 }], { upright: 'sweep' }); }
   },
-  // (c) a bloom: a 40 mm wash left until damp (its shine gone), then a wetter 12 mm drop of the same colour into it
+  // (c) a bloom: a 40 mm wash left until damp (its shine gone), then a 12 mm drop of nearly clean water into it
   bloom: (sheet, mm) => {
     const { w } = sheet;
-    for (let y = Math.round(5 / mm); y < Math.round(45 / mm); y++) for (let x = Math.round(5 / mm); x < Math.round(45 / mm); x++) S.deposit(sheet, y * w + x, 0.15, [0.15, 0]);
-    flowFor(sheet, 70);
-    disc(sheet, mm, 25, 25, 6, 0.3, [0.5, 0]);
+    for (let y = Math.round(5 / mm); y < Math.round(45 / mm); y++) for (let x = Math.round(5 / mm); x < Math.round(45 / mm); x++) S.deposit(sheet, y * w + x, 0.2, [0.25, 0]);
+    flowFor(sheet, Number(arg('bloomwait', 60)));
+    disc(sheet, mm, 25, 25, 6, 0.25, [0.05, 0]);
   },
 };
 const cells = arg('cells', '0.25,0.1').split(',').map(Number), modes = arg('modes', 'full,fast').split(','), only = arg('cases', Object.keys(CASES).join(',')).split(',');
