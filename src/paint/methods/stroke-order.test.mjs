@@ -111,3 +111,9 @@ test('hatching: none drops runs, sparse keeps every second line of a run by a fo
   const n = hatching => orderStrokes(S, 100, 70, { hatching }).filter(x => x.role === 'hatch').length;
   assert.deepEqual([n('none'), n('sparse'), n('drawn')], [0, 3, 6]);
 });
+
+test('stroke budget: only the most important strokes, containers and outlines first', () => {
+  const S = [...box(10, 10, 90, 60), ...box(20, 20, 35, 40), seg(27.5, 20, 27.5, 40), zig(40, 50, 12), seg(60, 30, 62, 30)];
+  const r = orderStrokes(S, 100, 70, { mode: 'growth', budget: 4, layIn: 0, emphasisShare: 0 });
+  assert.deepEqual(r.flatMap(x => x.parts).sort((a, b) => a - b), [0, 1, 2, 3]);
+});

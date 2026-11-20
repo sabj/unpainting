@@ -32,7 +32,8 @@ export const ORDER_DEFAULTS = Object.freeze({
   foregroundShare: 0.75, // ... and joints in the lowest quarter of the sheet stay
   structureMm: 12,      // pass 1: the big structure, smooth lines at least this long (of every mass, main mass first)
   fineMm: 4,            // pass 3: lines shorter than this are fine detail, laid after every object's outline and divisions
-  hatching: 'drawn',    // none | sparse | drawn (see above)
+  hatching: 'drawn',
+  budget: 0,            // lay only the this many most important strokes (0: all)    // none | sparse | drawn (see above)
   mode: 'passes',       // 'passes' (structure, objects, detail) or 'growth' (lay-in, growth from the main form, development, emphasis)
   growthPull: 0.7,      // growth: the next stroke is the cheapest by hop + growthPull x its distance from the main form
   layIn: 12,            // growth: the light placement lines of the biggest masses
@@ -365,6 +366,16 @@ export function orderStrokes(strokes, widthMm, heightMm, o = {}) {
     const lines = (byObj.get(main.id) ?? []).filter(s => s.role === 'outline');
     if (lines.length) pen = lines.reduce((a, b) => (a.len >= b.len ? a : b)).points[0];
   }
+  // STROKE BUDGET: only the `budget` most important strokes are laid: containers before contents (an object with objects
+  // inside it counts more), outlines before inner lines before detail and texture, long before short, the main form before
+  // the periphery
+  if (c.budget > 0) {
+    const live = joined.filter(s => !s.taken);
+    const P = (main.id != null ? byObj.get(main.id) ?? [] : []).flatMap(s => s.points), ctr = P.length ? [P.reduce((a, p) => a + p[0], 0) / P.length, P.reduce((a, p) => a + p[1], 0) / P.length] : [widthMm / 2, heightMm / 2];
+    const diag = Math.hypot(widthMm, heightMm), roleW = { outline: 3, inner: 2, fine: 1, hatch: 0.4, texture: 0.4, small: 0.2 };
+    const score = s => pathLength(s.points) * (roleW[s.role] ?? 1) * (s.object >= 0 && objects[s.object]?.children.length ? 1.5 : 1) * (1.3 - 0.6 * dist(ctr, s.points[0]) / diag);
+    live.sort((a, b) => score(b) - score(a)).slice(c.budget).forEach(s => { s.taken = true; s.dropped = true; });
+  }
   if (c.mode === 'growth') return growthOrder({ joined, objects, main, byObj, c, heightMm, start: pen });
   // pass 1: the big structure of the whole picture, the long smooth lines of every mass, from the main mass's longest
   // line, the nearest next (a person sketches the whole composition in before any object is worked)
@@ -460,7 +471,9 @@ function growthOrder({ joined, objects, main, byObj, c, heightMm, start }) {
   const structural = live.filter(s => (s.role === 'outline' || s.role === 'inner') && s.len >= c.fineMm);
   const outlineLeft = new Map(); for (const s of structural) if (s.role === 'outline') outlineLeft.set(s.object, (outlineLeft.get(s.object) ?? 0) + 1);
   if (big.length) pen = big.reduce((a, b) => (rad(a) <= rad(b) ? a : b)).points[0];
-  walk(structural, 'growth', s => s.role === 'outline' || !(outlineLeft.get(s.object) > 0), s => { if (s.role === 'outline') outlineLeft.set(s.object, outlineLeft.get(s.object) - 1); });
+  // hard rules: a child's outline waits for its parent's outline to be closed; an object's inner lines wait for its own
+  const parentOpen = s => { let p = objects[s.object]?.parent; while (p != null) { if (outlineLeft.get(p) > 0) return true; p = objects[p].parent; } return false; };
+  walk(structural, 'growth', s => (s.role === 'outline' ? !parentOpen(s) : !(outlineLeft.get(s.object) > 0) && !parentOpen(s)), s => { if (s.role === 'outline') outlineLeft.set(s.object, outlineLeft.get(s.object) - 1); });
   // 3. development: the remaining lines, then texture and hatching (runs laid together), everything else last
   walk(live.filter(s => !s.taken && (s.role === 'outline' || s.role === 'inner' || s.role === 'fine')), 'detail');
   const runs = new Map(); for (const s of live) if (!s.taken && s.role === 'hatch') { if (!runs.has(s.run)) runs.set(s.run, []); runs.get(s.run).push(s); }
