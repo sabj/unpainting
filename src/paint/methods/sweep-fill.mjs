@@ -179,14 +179,16 @@ export function sweepFill(loops, { kitMm, angle = null, growMm = 0, keepOut = nu
     }
     let made = 0;
     const emit = line => { stamp(line, radius); strokes.push({ kind: 'sweep', radiusMm: +radius.toFixed(3), points: line.map(([gx2, gy2]) => toXY([ou + gx2 * pitch, ov + gy2 * pitch])) }); made++; };
-    const insideLine = (A, B) => { for (let t = 0; t <= 8; t++) { const x = Math.round(A[0] + (B[0] - A[0]) * t / 8 - .5), y = Math.round(A[1] + (B[1] - A[1]) * t / 8 - .5); if (!(D[y * gw + x] >= .9 * rc)) return false; } return true; };
+    const insideLine = (A, B) => { for (let t = 0; t <= 8; t++) { const x = Math.round(A[0] + (B[0] - A[0]) * t / 8 - .5), y = Math.round(A[1] + (B[1] - A[1]) * t / 8 - .5); if (!(D[y * gw + x] >= .8 * rc)) return false; } return true; };
     for (const ch of chains) {
       let line = [];
       ch.runs.forEach(({ gy, run: [a, b] }, k) => {
         const rightward = k % 2 === 0, start = rightward ? a : b, end = rightward ? b : a, y = gy + .5;
         if (line.length) {
           // the turn: in from the last lane's end, down beside the outline, out to this lane's end
-          const last = line[line.length - 1], inA = [last[0] + (rightward ? rc : -rc), last[1]], inB = [start + .5 + (rightward ? rc : -rc), y];
+          // each turn point is where the brush's whole disc first fits, walking in from the lane's end
+          const fitFrom = (x0, yy, dir) => { let x = x0; for (let t = 0; t < 3 * rc && !(D[Math.round(yy - .5) * gw + Math.round(x - .5)] >= rc); t++) x += dir; return [x, yy]; };
+          const last = line[line.length - 1], inA = fitFrom(last[0], last[1], rightward ? 1 : -1), inB = fitFrom(start + .5, y, rightward ? 1 : -1);
           if (insideLine(inA, inB)) line.push(inA, inB);
           else { if (line.length >= 2) emit(line); line = []; }
         }
