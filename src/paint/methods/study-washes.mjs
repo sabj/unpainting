@@ -241,7 +241,12 @@ const BROKEN_HUE = [95, 170], BROKEN_LOST = 0.15, BROKEN_THIN = 0.6, BROKEN_LONG
 const DAB_SHARE = 0.025, DAB_PITCH = 0.6, DAB_DARK_SHARE = 0.35, DAB_DARK = 1.6;
 /** Dabs vary in size between these shares of the brush and in length between these shares of their width; they come in clusters
  * this many cells across, the dabs of a cluster turned alike (within DAB_TURN radians), this share of the clusters left out as paper. */
-const DAB_SIZE = [0.55, 1.25], DAB_LONG = [0.6, 1.8], DAB_CLUSTER = 3, DAB_TURN = 0.45, DAB_GAPS = 0.12;
+const DAB_SIZE = [0.55, 1.25], DAB_LONG = [2.6, 3.8], DAB_CLUSTER = 3, DAB_TURN = 0.45, DAB_GAPS = 0.12;
+/** A dab is a leaf stroke, pressed and lifted: this many points along it, pressed as sin(pi u) to this power. The round
+ * lands on its point and opens to its belly only over the tuft it draws down (about 2.8 radii at full pressure,
+ * src/media/tuft-section.mjs), so a dab travels DAB_LONG radii: a three-point touch no longer than the brush was wide
+ * never opened, and foliage dried as pale dashes over paper. */
+const LEAF_POINTS = 9, LEAF_PRESS = 0.6;
 /** A darker value is dropped into a dabbed mass of at least this area (mm2). */
 const DARK_DABS_FROM = 100;
 /** Close values: a wash is laid against a neighbour still damp (one session, a soft edge) when their L* differ by no more than this. */
@@ -470,7 +475,7 @@ export function planStudyWashes({ k, w, h, studies, flat = false, density = null
   const dabBrush = [...washKitMm].sort((a, b) => Math.abs(a - DAB_SHARE * sheetWidthMm) - Math.abs(b - DAB_SHARE * sheetWidthMm))[0], dr = dabBrush / 2;
   // loose dabs of a round over a mask, fixed to the sheet (a hash, no picture read): overlapping, in clusters whose dabs
   // lie alike, some clusters left out as gaps of paper; each dab its own size (DAB_SIZE times the brush), length and place
-  // within its cell, landing and lifting on the tip. With keep < 1, whole clusters are kept (the darker dabs come in clumps).
+  // within its cell, a leaf stroke pressed and lifted. With keep < 1, whole clusters are kept (the darker dabs come in clumps).
   const dabsOver = (m, salt, keep = 1) => {
     const pitch = DAB_PITCH * dabBrush, strokes = [], cl = DAB_CLUSTER;
     for (let gy = 0; gy * pitch < ph * mmX; gy++) for (let gx = 0; gx * pitch < pw * mmX; gx++) {
@@ -481,7 +486,7 @@ export function planStudyWashes({ k, w, h, studies, flat = false, density = null
       const q = Math.min(ph - 1, Math.floor(cy / mmX)) * pw + Math.min(pw - 1, Math.floor(cx / mmX)); if (!m[q]) continue;
       const r = dr * (DAB_SIZE[0] + (DAB_SIZE[1] - DAB_SIZE[0]) * hash(gx, gy, salt + 4));
       const a = Math.PI * hash(kx, ky, salt + 2) + DAB_TURN * (2 * hash(gx, gy, salt + 2) - 1), len = r * (DAB_LONG[0] + (DAB_LONG[1] - DAB_LONG[0]) * hash(gx, gy, salt + 3)), ux = Math.cos(a) * len / 2, uy = Math.sin(a) * len / 2;
-      strokes.push({ kind: 'sweep', radiusMm: +r.toFixed(3), points: [[cx - ux, cy - uy, .35], [cx, cy, 1], [cx + ux, cy + uy, .35]].map(p => p.map(v => +v.toFixed(3))) });
+      strokes.push({ kind: 'sweep', radiusMm: +r.toFixed(3), points: Array.from({ length: LEAF_POINTS }, (_, j) => { const u = j / (LEAF_POINTS - 1); return [cx + (2 * u - 1) * ux, cy + (2 * u - 1) * uy, Math.max(0.05, Math.sin(Math.PI * u) ** LEAF_PRESS)]; }).map(p => p.map(v => +v.toFixed(3))) });
     }
     return strokes;
   };
