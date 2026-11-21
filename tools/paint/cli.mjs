@@ -9,7 +9,8 @@ import { fileURLToPath } from 'node:url';
 import { parseArgs, USAGE } from './args.mjs';
 import { loadRegistry, resolveSubject, checkInputs } from './subjects.mjs';
 import { buildCommand, describeRun, shellLine, runFolder } from './command.mjs';
-import { refuseThirdGpuPaint, cacheDirFor, switchesOf, segEnvFor, runPainter, collectResults } from './run.mjs';
+import { refuseExtraGpuPaint, gpuPaintCount, cacheDirFor, switchesOf, segEnvFor, runPainter, collectResults } from './run.mjs';
+import { expandSubjects, pool, gpuPlace, throughput, jobsNow, DEFAULT_JOBS, PLAN_JOBS } from './queue.mjs';
 import { writeRunSheet, writeGridSheet, runPictures, formsImage } from './sheet.mjs';
 import { authorOf, authorLabel, readScript, preparePacket, askAuthor, retryPrompt } from './author.mjs';
 import { qwenRoute, studyRequestPrompt, parseStudyRequests, writeStudyRequest, makeStudies, withAuthorStudies } from './studies.mjs';
@@ -28,12 +29,13 @@ const variants = JSON.parse(fs.readFileSync(path.join(HERE, 'variants.json'), 'u
 const models = JSON.parse(fs.readFileSync(path.join(ROOT, 'bench', 'models.json'), 'utf8')).models;
 const ownAuthors = JSON.parse(fs.readFileSync(path.join(HERE, 'authors.json'), 'utf8')).authors;
 const known = new Set(scanOptions(ROOT).keys());
-const code = codeState(ROOT), switches = switchesOf();
+const code = codeState(ROOT), switches = switchesOf(), jobs = req.jobs ?? DEFAULT_JOBS;
+const codeOf = c => ({ commit: c.commit, dirty: Boolean(c.dirty), tracked: c.tracked, untracked: c.untracked.map(u => u.file), diffSha256: c.diffSha256 });
 // the painter's environment: where segmentation lives, and a cache folder keyed on the experiment switches
 const segEnv = { ...segEnvFor(ROOT), W2_CACHE_DIR: cacheDirFor(process.env.W2_CACHE_DIR || path.join(ROOT, 'work', 'cache'), switches) };
 
 // every subject and author is resolved and checked before anything runs
-let registry, specs, authors, qwen = null;
+let registry, specs, authors, qwen = null; const refused = [];
 try {
   registry = loadRegistry();
   authors = req.authors.map(a => authorOf(a, ownAuthors, models));
@@ -43,11 +45,19 @@ try {
     if (!qwen.ready) throw new Error(`--studies author needs the local study route, and this machine lacks: ${qwen.missing.join('; ')}. Run with --studies locked.`);
     if (authors.some(a => !a.cli || a.cli === 'script')) throw new Error('--studies author: every author must be a model (auto and kept scripts make no studies)');
   }
-  specs = req.subjects.map(({ id, variant }) => {
-    const v = variant ? variants[id]?.[variant] : null;
-    if (variant && !v) throw new Error(`subject ${id} has no variant "${variant}" in tools/paint/variants.json${variants[id] ? ` (it has: ${Object.keys(variants[id]).join(', ')})` : ''}`);
-    return checkInputs(resolveSubject(registry, id, { sets: req.sets, variant: v, variantName: variant }));
+  const asked = expandSubjects(req.subjects, registry.subjects.map(s => s.id));
+  specs = asked.flatMap(({ id, variant }) => {
+    try {
+      const v = variant ? variants[id]?.[variant] : null;
+      if (variant && !v) throw new Error(`subject ${id} has no variant "${variant}" in tools/paint/variants.json${variants[id] ? ` (it has: ${Object.keys(variants[id]).join(', ')})` : ''}`);
+      return [checkInputs(resolveSubject(registry, id, { sets: req.sets, variant: v, variantName: variant }))];
+    } catch (e) {
+      // in a queue of several subjects one whose inputs are wrong is recorded as not run and the rest go on
+      if (asked.length === 1) throw e;
+      refused.push({ subject: variant ? `${id}:${variant}` : id, failure: e.message }); return [];
+    }
   });
+  if (!specs.length) throw new Error(`no subject can run\n${refused.map(x => x.failure).join('\n')}`);
 } catch (e) { fail(e.message); }
 
 const many = specs.length * authors.length > 1;
@@ -72,31 +82,47 @@ for (const spec of specs) for (const author of authors) {
       masks: spec.masks.receipt ? { receipt: spec.masks.receipt, from: spec.masks.from, mask: spec.masks.mask, review: spec.masks.review, forms: spec.masks.forms, read: command.masksRead,
         whyNotRead: command.masksRead ? null : 'an authored script is laid as written' } : { receipt: null, none: spec.masks.none },
       author: { key: author.key, name: author.name, label: authorLabel(author), id: author.id ?? null, cli: author.cli ?? null, effort: author.effort ?? null },
-      settings: command.settings, switches, code: { commit: code.commit, dirty: Boolean(code.dirty), tracked: code.tracked, untracked: code.untracked.map(u => u.file), diffSha256: code.diffSha256 },
+      settings: command.settings, switches, code: codeOf(code),
       environment: command.env, command: shellLine(command), argv: command.argv, results: null, exit: null, seconds: null, failure: null,
     },
   });
 }
 
 for (const r of runs) { console.log(''); for (const l of describeRun(r.record)) console.log(l); }
+for (const x of refused) console.log(`\nNOT RUN: ${x.failure}`);
 if (req.dryRun) { console.log('\ndry run: nothing was started'); process.exit(0); }
 console.log('');
 
 // Several runs go on together: model replies in parallel (agy one at a time: its sessions interrupt one another),
-// CPU plans three at a time, GPU paintings one after another.
-const pool = n => { let free = n; const wait = []; return async fn => { if (free > 0) free--; else await new Promise(r => wait.push(r)); try { return await fn(); } finally { const next = wait.shift(); if (next) next(); else free++; } }; };
-const painterSlot = pool(req.mode === 'plan' ? 3 : 1), agySlot = pool(1), modelSlot = pool(6), qwenSlot = pool(1);
+// CPU plans three at a time, GPU paintings --jobs at a time (queue.mjs).
+// a queue's places can be changed while it runs: write the number into <out>/jobs
+const readJobs = () => { try { return jobsNow(jobs, fs.readFileSync(path.join(outRoot, 'jobs'), 'utf8')); } catch { return jobs; } };
+const painterSlot = pool(req.mode === 'plan' ? PLAN_JOBS : many ? 16 : jobs), startGate = pool(1), agySlot = pool(1), modelSlot = pool(6), qwenSlot = pool(1);
 const say = (r, text) => console.log(`[${r.spec.id} · ${r.record.author.name}] ${text}`);
 const SHOWN = /^(study washes: \d|wash plan:|plan values|phases|!!!|UNUSED|IGNORED|named forms|painting script)/;
 
-/** The painter once, into a fresh folder. {failure, results}; never throws. */
-async function paintOnce(r, command, plate, logFile) {
+/**
+ * The painter once, into a fresh folder. commandFor(dirty) builds the command when the run's turn comes, from the
+ * code as it is then: in a long queue each run records the commit it painted with. {failure, results}; never throws.
+ */
+async function paintOnce(r, commandFor, plate, logFile) {
   const { record } = r; let failure = null, done = null;
   try {
     if (fs.existsSync(plate) && fs.readdirSync(plate).length) throw new Error(`${plate} already holds a painting; give a fresh --out`);
     done = await painterSlot(async () => {
-      if (req.mode === 'paint') refuseThirdGpuPaint();
-      return runPainter(command, { cwd: ROOT, logFile, onLine: l => { if (SHOWN.test(l) || /^\s*(Error|TypeError|RangeError)/.test(l)) say(r, l.trim().slice(0, 300)); } });
+      // the wait for a place and the start are one step at a time, so two runs never take the same free place
+      const going = await startGate(async () => {
+        if (req.mode === 'paint') {
+          // one painting by itself is refused when the places are taken; a queue waits for one
+          if (many) record.gpuPaintsAtStart = await gpuPlace({ most: readJobs, running: gpuPaintCount, onWait: n => say(r, `waiting: ${n} GPU paintings are running and --jobs is ${readJobs()}`) }), record.jobsAtStart = readJobs();
+          else record.gpuPaintsAtStart = refuseExtraGpuPaint(jobs);
+        }
+        const now = codeState(ROOT), command = commandFor(now.dirty);
+        Object.assign(record, { code: codeOf(now), command: shellLine(command), argv: command.argv, plate, startedMs: Date.now() });
+        if (many) say(r, `started at ${new Date().toTimeString().slice(0, 8)} on ${now.commit?.slice(0, 8)}${now.dirty ? ' plus uncommitted changes (allow-dirty passed)' : ''}`);
+        return { ended: runPainter(command, { cwd: ROOT, logFile, onLine: l => { if (SHOWN.test(l) || /^\s*(Error|TypeError|RangeError)/.test(l)) say(r, l.trim().slice(0, 300)); } }) };
+      });
+      try { return await going.ended; } finally { record.endedMs = Date.now(); }
     });
     record.exit = done.exit; record.seconds = (record.seconds ?? 0) + done.seconds;
     // exit 3: the painting is written but an option was read by nothing (unused-options.txt)
@@ -106,6 +132,8 @@ async function paintOnce(r, command, plate, logFile) {
     }
   } catch (e) { failure = e.message; }
   const results = collectResults(plate, req.mode);
+  // no silent fallback: a painting that did not stay on the GPU is a failed cell
+  if (!failure && req.mode === 'paint' && (results.backend?.backend !== 'gpu' || results.backend?.fallback !== false)) failure = `the painting did not stay on the GPU (backend.json: ${results.backend ? `backend ${results.backend.backend}, fallback ${results.backend.fallback}` : 'missing'})`;
   if (!failure && ['no plan', 'unfinished'].includes(results.state)) failure = `the painter ended without ${req.mode === 'plan' ? 'a plan' : 'a finished painting'}`;
   return { failure, results };
 }
@@ -115,7 +143,7 @@ async function oneRun(r) {
   fs.mkdirSync(record.out, { recursive: true });
   try {
     if (author.key === 'auto') {
-      const got = await paintOnce(r, buildCommand(spec, { mode: req.mode, out: record.plate, known, dirty: code.dirty, segEnv }), record.plate, path.join(record.out, 'run.log'));
+      const got = await paintOnce(r, dirty => buildCommand(spec, { mode: req.mode, out: record.plate, known, dirty, segEnv }), record.plate, path.join(record.out, 'run.log'));
       record.failure = got.failure; record.results = got.results;
     } else {
       // the author's script: a kept one, or one a model writes now from the locked inputs. A model whose answer is
@@ -161,9 +189,8 @@ async function oneRun(r) {
         if (!got.ok) { why = got.error; prompt = model ? retryPrompt(packet.prompt, got.raw, got.error) : null; continue; }
         fs.writeFileSync(kept, JSON.stringify(got.script, null, 1) + '\n');
         Object.assign(record.author, { passages: got.script.passages.length, palette: got.paints, brushes: Object.fromEntries(Object.entries(got.script.brushes).map(([k, b]) => [k, b.widthMm])) });
-        const plate = attempt === 1 ? record.plate : `${record.plate}-retry`, command = buildCommand(spec, { mode: req.mode, out: plate, known, dirty: code.dirty, segEnv, script: { file: kept, paints: got.paints } });
-        record.command = shellLine(command); record.argv = command.argv; record.plate = plate;
-        const painted = await paintOnce(r, command, plate, path.join(record.out, attempt === 1 ? 'run.log' : 'run-retry.log'));
+        const plate = attempt === 1 ? record.plate : `${record.plate}-retry`, commandFor = dirty => buildCommand(spec, { mode: req.mode, out: plate, known, dirty, segEnv, script: { file: kept, paints: got.paints } });
+        const painted = await paintOnce(r, commandFor, plate, path.join(record.out, attempt === 1 ? 'run.log' : 'run-retry.log'));
         record.results = painted.results; why = painted.failure;
         if (!why) break;
         say(r, `the painter refused the script: ${why}`);
@@ -182,12 +209,12 @@ async function oneRun(r) {
   say(r, `${record.results.state}${p ? `: ${p.shapes ?? '-'} shapes, ${p.washes} washes, ${p.strokes ?? '-'} strokes, widest wash brush ${p.widestBrushMm} mm` : ''}${record.results.cheatRisk?.level ? `; cheat-risk ${record.results.cheatRisk.level}` : ''}; painter ${record.seconds ?? 0} s; sheet ${record.sheetImage}`);
 }
 await Promise.all(runs.map(oneRun));
-const failed = runs.filter(r => r.record.failure).length;
+const failed = runs.filter(r => r.record.failure).length + refused.length;
 
 let show = runs[0].record.sheetImage;
 if (many) {
-  const grid = await writeGridSheet(runs.map(r => r.record), path.join(outRoot, 'sheet.jpg'), { title: `${specs.map(s => s.id).join(', ')} · ${req.mode}` });
-  fs.writeFileSync(path.join(outRoot, 'run.json'), JSON.stringify({ schema: 'unpaint-paint/grid@1', started, mode: req.mode, sheet: grid.file, runs: runs.map(r => ({ subject: r.record.subject.id, author: r.record.author.key, model: r.record.author.id, effort: r.record.author.effort, out: r.record.out, state: r.record.results.state, plan: r.record.results.plan, authorSeconds: r.record.author.seconds ?? null, tokens: r.record.author.tokens ?? null, costUSD: r.record.author.costUSD ?? null, painterSeconds: r.record.seconds, failure: r.record.failure })) }, null, 1) + '\n');
+  const grid = await writeGridSheet(runs.map(r => r.record), path.join(outRoot, 'sheet.jpg'), { title: `${specs.map(s => s.id).join(', ')} · ${req.mode}${refused.length ? ` · NOT RUN (inputs): ${refused.map(x => x.subject).join(', ')}` : ''}` });
+  fs.writeFileSync(path.join(outRoot, 'run.json'), JSON.stringify({ schema: 'unpaint-paint/grid@1', started, mode: req.mode, sheet: grid.file, runs: runs.map(r => ({ subject: r.record.subject.id, author: r.record.author.key, model: r.record.author.id, effort: r.record.author.effort, out: r.record.out, state: r.record.results.state, plan: r.record.results.plan, authorSeconds: r.record.author.seconds ?? null, tokens: r.record.author.tokens ?? null, costUSD: r.record.author.costUSD ?? null, painterSeconds: r.record.seconds, commit: r.record.code.commit, dirty: r.record.code.dirty, backend: r.record.results.backend ?? null, gpuPaintsAtStart: r.record.gpuPaintsAtStart ?? null, jobsAtStart: r.record.jobsAtStart ?? null, startedMs: r.record.startedMs ?? null, endedMs: r.record.endedMs ?? null, failure: r.record.failure })), refused, jobs: req.mode === 'paint' ? jobs : PLAN_JOBS, throughput: throughput(runs.map(r => r.record)) }, null, 1) + '\n');
   console.log(`\ngrid: ${grid.file}`); show = grid.file;
 }
 // Preview is opened without this session's variables, so nothing started from it inherits them

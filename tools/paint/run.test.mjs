@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { gpuPaints, refuseThirdGpuPaint, cacheDirFor, switchesOf, segEnvFor, collectResults } from './run.mjs';
+import { gpuPaints, refuseExtraGpuPaint, gpuPaintCount, cacheDirFor, switchesOf, segEnvFor, collectResults } from './run.mjs';
 
 const PS = ` 101 node --max-old-space-size=18432 tools/paint-plate.mjs --gpu on --image a.png
  102 /opt/bin/node tools/paint-plate.mjs --image b.png
@@ -11,10 +11,11 @@ const PS = ` 101 node --max-old-space-size=18432 tools/paint-plate.mjs --gpu on 
  104 zsh -c node tools/paint-plate.mjs --gpu on
  105 node tools/paint/cli.mjs kasha paint`;
 
-test('GPU paintings are painter processes that are not --gpu off; a third is refused', () => {
+test('GPU paintings are painter processes that are not --gpu off; one over --jobs is refused', () => {
   assert.deepEqual(gpuPaints(PS).map(p => p.pid), [101, 102]);
-  assert.throws(() => refuseThirdGpuPaint(PS), /2 GPU paintings are already running \(pids 101, 102\)/);
-  assert.equal(refuseThirdGpuPaint(PS.split('\n').slice(1).join('\n')), 1);
+  assert.throws(() => refuseExtraGpuPaint(2, PS), /2 GPU paintings are already running \(pids 101, 102\)/);
+  assert.equal(refuseExtraGpuPaint(4, PS), 2); assert.equal(gpuPaintCount(PS), 2);
+  assert.equal(refuseExtraGpuPaint(2, PS.split('\n').slice(1).join('\n')), 1);
 });
 
 test('the cache folder is keyed on the experiment switches', () => {

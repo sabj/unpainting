@@ -4,7 +4,7 @@ import { parseArgs } from './args.mjs';
 
 test('one subject and a mode, with the defaults', () => {
   const r = parseArgs(['kasha-watercolor', 'plan']);
-  assert.deepEqual(r, { subjects: [{ id: 'kasha-watercolor', variant: null }], mode: 'plan', authors: ['auto'], studies: 'locked', sets: [], out: null, dryRun: false, open: true });
+  assert.deepEqual(r, { subjects: [{ id: 'kasha-watercolor', variant: null }], mode: 'plan', authors: ['auto'], studies: 'locked', sets: [], jobs: null, out: null, dryRun: false, open: true });
 });
 
 test('several subjects, authors, settings and a variant', () => {
@@ -16,6 +16,9 @@ test('several subjects, authors, settings and a variant', () => {
 });
 
 test('what is wrong is said', () => {
+  assert.equal(parseArgs(['a,all', 'paint', '--jobs', '4']).jobs, 4);
+  assert.throws(() => parseArgs(['all', 'paint', '--jobs', '0']), /--jobs/);
+  assert.throws(() => parseArgs(['all', 'paint', '--jobs', 'two']), /--jobs/);
   assert.throws(() => parseArgs(['kasha']), /plan or paint/);
   assert.throws(() => parseArgs(['kasha', 'render']), /plan or paint, not "render"/);
   assert.throws(() => parseArgs(['kasha', 'plan', '--fast']), /unknown option --fast/);

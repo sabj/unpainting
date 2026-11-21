@@ -5,9 +5,6 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync, spawn } from 'node:child_process';
 
-/** At most this many GPU paintings at once on one machine. */
-const MOST_GPU_PAINTS = 2;
-
 /** The GPU paintings in a `ps -axo pid=,command=` listing: paint-plate runs that are not --gpu off. [{pid, command}] */
 export function gpuPaints(psText) {
   return psText.split('\n').map(l => /^\s*(\d+)\s+(.*)$/.exec(l)).filter(Boolean)
@@ -15,10 +12,14 @@ export function gpuPaints(psText) {
     .map(m => ({ pid: Number(m[1]), command: m[2] }));
 }
 
-/** Throws when two GPU paintings are already running. */
-export function refuseThirdGpuPaint(psText = execFileSync('ps', ['-axo', 'pid=,command='], { encoding: 'utf8', maxBuffer: 1 << 26 })) {
+const psNow = () => execFileSync('ps', ['-axo', 'pid=,command='], { encoding: 'utf8', maxBuffer: 1 << 26 });
+/** How many GPU paintings are running now. */
+export const gpuPaintCount = (psText = psNow()) => gpuPaints(psText).length;
+
+/** Throws when `most` GPU paintings are already running (one painting asked for by itself is refused, not queued). */
+export function refuseExtraGpuPaint(most, psText = psNow()) {
   const running = gpuPaints(psText);
-  if (running.length >= MOST_GPU_PAINTS) throw new Error(`${running.length} GPU paintings are already running (pids ${running.map(r => r.pid).join(', ')}); a third is refused. Wait for one to end, or run "plan".`);
+  if (running.length >= most) throw new Error(`${running.length} GPU paintings are already running (pids ${running.map(r => r.pid).join(', ')}); one more is refused at --jobs ${most}. Wait for one to end, or run "plan".`);
   return running.length;
 }
 
@@ -79,7 +80,7 @@ export function collectResults(out, mode) {
   const painting = has('painting.png') ?? has('painting.jpg');
   const lastFrame = files.filter(f => /^f\d+\.jpg$/.test(f)).sort().pop();
   const strip = fs.existsSync(path.join(out, 'stages', 'strip.jpg')) ? path.join(out, 'stages', 'strip.jpg') : null;
-  const sum = plan?.summary ?? null, passes = plan?.passes ?? [];
+  const sum = plan?.summary ?? null, passes = plan?.passes ?? [], be = readJson(path.join(out, 'backend.json'));
   const widest = passes.reduce((m, p) => Math.max(m, Number(p.widestBrushMm) || 0), 0);
   return {
     state: mode === 'plan' ? (stage || plan ? 'plan only' : 'no plan') : painting ? 'finished' : plan || lastFrame ? 'unfinished' : 'no plan',
@@ -90,6 +91,7 @@ export function collectResults(out, mode) {
       widestBrushMm: widest || null, softJoins: sum?.softJoins ?? null, dabbed: sum?.dabbed ?? null,
       studies: (sum?.layersOfStudy ?? []).map(l => ({ study: l.study, minMm2: l.minMm2, shapes: l.shapes, washes: l.washes, strokes: l.strokes })),
     } : null,
+    backend: be ? { backend: be.backend ?? null, fallback: be.fallback ?? null, adapter: be.adapter ?? null } : null,
     cheatRisk: risk ? { level: risk.level ?? null, risk: risk.risk ?? null, parts: risk.parts ?? null, flags: risk.flags ?? [], error: risk.error ?? null } : null,
   };
 }

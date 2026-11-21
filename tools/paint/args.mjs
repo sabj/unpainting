@@ -1,6 +1,6 @@
 // The command line of `npm run paint`:
 //   npm run paint -- <subject[,subject...]> plan|paint [--author auto|<model key>[,...]] [--studies locked|author]
-//                    [--set key=value ...] [--out <dir>] [--dry-run] [--no-open]
+//                    [--set key=value ...] [--jobs N] [--out <dir>] [--dry-run] [--no-open]
 // Nothing here touches a file: it turns the words into one request object, or throws with the usage.
 
 export const USAGE = `usage: npm run paint -- <subject[,subject...]> plan|paint [options]
@@ -16,16 +16,21 @@ export const USAGE = `usage: npm run paint -- <subject[,subject...]> plan|paint 
   --set key=value       one setting for this run, repeatable. drawing=<stem>, width=<cells>, sheetmm=<mm>,
                         masks=<receipt.json>|none, floors=6,4,2, study2.clusters=20 (a
                         wash-plan setting of the second study), heapmb=<MB>; any other key is a paint-plate option.
+  --jobs N              GPU paintings at once (default 2; four is the measured best on this machine). Paintings
+                        started elsewhere count; a queue waits for a free place, and a failed painting is
+                        recorded in its cell while the rest go on. A running queue takes a new
+                        number written into <out>/jobs.
   --out <dir>           where the run is written (default work/paint/<time>-<subjects>-<mode>)
   --dry-run             print what would run and stop
   --no-open             do not open the sheet in Preview
 
-A subject may name a variant kept in tools/paint/variants.json: h36:approved.`;
+A subject may name a variant kept in tools/paint/variants.json: h36:approved.
+"all" is every registered subject not already named: all, or mittens,beach,all to paint those two first.`;
 
-const VALUED = new Set(['--author', '--studies', '--set', '--out']);
+const VALUED = new Set(['--author', '--studies', '--set', '--out', '--jobs']);
 const FLAGS = new Set(['--dry-run', '--no-open']);
 
-/** {subjects: [{id, variant}], mode, authors, studies, sets: [[key, value]], out, dryRun, open}. Throws on anything unknown. */
+/** {subjects: [{id, variant}], mode, authors, studies, sets: [[key, value]], jobs, out, dryRun, open}. Throws on anything unknown. */
 export function parseArgs(argv) {
   const words = [], given = { '--set': [] }, flags = new Set();
   for (let i = 0; i < argv.length; i++) {
@@ -59,7 +64,9 @@ export function parseArgs(argv) {
   });
   const keys = sets.map(([k]) => k);
   if (new Set(keys).size !== keys.length) throw new Error('a --set key is given twice');
-  return { subjects, mode, authors, studies, sets, out: given['--out'] ?? null, dryRun: flags.has('--dry-run'), open: !flags.has('--no-open') };
+  const jobs = given['--jobs'] === undefined ? null : Number(given['--jobs']);
+  if (jobs !== null && !(Number.isInteger(jobs) && jobs >= 1 && jobs <= 16)) throw new Error('--jobs: a whole number of paintings at once, 1 to 16');
+  return { subjects, mode, authors, studies, sets, jobs, out: given['--out'] ?? null, dryRun: flags.has('--dry-run'), open: !flags.has('--no-open') };
 }
 
 function list(s) { return s.split(',').map(x => x.trim()).filter(Boolean); }
