@@ -56,6 +56,46 @@ An image run writes:
 
 `examples/output/` holds saved outputs made with release 0.1.0 (painter V096, sim 100).
 
+## One command for a registered subject
+
+`npm run paint` paints a subject by name from the subject list (`SUBJECTS.json`, found through `UNPAINT_SUBJECTS`).
+The record gives the source, the sheet, the opening drawing, the three studies and the painter options. Every pinned
+input is checked against its sha256 before anything starts. The code is in `tools/paint/`.
+
+```sh
+npm run paint -- <subject[,subject...]> plan|paint [--author auto|<model key>[,...]] [--studies locked|author]
+                 [--set key=value ...] [--out <dir>] [--dry-run] [--no-open]
+```
+
+`plan` makes the wash plan only, on the CPU, in minutes. `paint` makes the whole painting on the GPU and refuses to
+start when two GPU paintings are already running. Before a run the command prints the subject, source, sheet, drawing,
+studies, named forms, author, mode, every setting that differs from its default, the commit and the exact
+`paint-plate` command. Every run ends with one labelled picture, `<out>/sheet.jpg` (source, opening drawing, studies,
+named forms, wash plan, painting, and the stage strip when painted), and `<out>/run.json`. The painter's own files are
+in `<out>/plate/`. Several subjects or authors also make one grid, subjects down and authors across.
+
+```sh
+# the wash plan of one picture, to look at before painting
+npm run paint -- kasha-watercolor plan
+
+# two pictures painted, one grid at the end
+npm run paint -- mittens-closeup,beach paint
+
+# the approved Rosewalk reference (a named variant in tools/paint/variants.json): print the command, start nothing
+npm run paint -- h36:approved paint --dry-run
+```
+
+Settings for one run are `--set key=value`: `drawing=<stem>`, `width=<cells>`, `sheetmm=<mm>`, `floors=6,4,2` (the
+least shape of each study, mm2), `study2.clusters=20` (a wash-plan setting of one study), `masks=<receipt.json>` (named
+SAM forms), `heapmb=<MB>`, or any `paint-plate` option by its name (`threads=2`; `outlinemedium=default` leaves an
+option of the record out). A run that differs from the record says so in its printed block and on its sheet.
+
+`--author auto` is the code planner, the control. `--author <key>` (a model of `bench/models.json`) gives that model
+the same locked inputs with the brief `tools/paint/AUTHOR-BRIEF.md` and paints the painting script it writes
+([painting-script.md](painting-script.md)) with the same engine. `--author script:FILE.json` paints a kept script.
+The model runs with its permission prompts off, as in the benchmark: use a disposable machine. The target guard stays
+in gentle mode. `--studies author` (the author briefs its own studies) is refused: its tools are not on this trunk.
+
 ## Main command-line controls
 
 Flags use `--name value`. The last repeated flag wins. The default recipe (`src/paint/recipe.mjs`) puts its flags first, and flags you type win.

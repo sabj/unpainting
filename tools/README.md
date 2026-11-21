@@ -5,6 +5,7 @@ Command-line tools. Run each from the repository root with `node tools/<path>`. 
 | folder | what it holds | start with |
 |---|---|---|
 | `tools/` | the painter and the stroke-plan runner | `paint-plate.mjs --image FILE --out DIR`, `run-plan.mjs PLAN.json` |
+| `paint/` | one command for a registered subject: `npm run paint -- <subject> plan\|paint` (docs/running.md) | `cli.mjs kasha-watercolor plan` |
 | `painter/` | the modules `paint-plate.mjs` imports: loading studies, wet beds, softening, calibration, production checks | `study-load.mjs` |
 | `aware/` | stops at passage boundaries (`--pausedir`) and the take-over of a saved painting by a fresh process (`--resumestate`), written for rounds V4 and V5 (retired in 0.4) | `pause.mjs` (the pause folder's files), `aware.test.mjs` |
 | `guard/` | the target guard (a check that blocks target-pixel reads), the cheat-risk score, the deliberate-cheat test and the source lint | `cheat-test.mjs`, `promote-check.mjs RUNDIR` |
