@@ -31,18 +31,20 @@ import { namedForms, formCoverage } from './named-forms.mjs';
 const PLAN_MM = 0.25;
 /** The settings of a study's reading, each a default that a wash plan may change for one study with @name=value after
  * its file (tools/painter/study-load.mjs): FILE:MIN@clusters=24@join=8@shapes=120.
- * clusters, join: colour clusters asked for, and clusters nearer than `join` (Lab) are one. Coarser (16 and 10, the values
- *   until 21 Nov 2026) a faint change in the study cannot move a cell between clusters, but close colours run together (a
- *   dog's tongue and its harness were one shape); the finer default keeps them apart.
+ * clusters, join: colour clusters asked for, and clusters nearer than `join` (Lab) are one. The default stays coarse (16
+ *   and 10): a faint change in the study cannot move a cell between clusters, and while every shape is laid hard-edged,
+ *   finer colours (24 and 8, 32 and 6, tried on the 20 subjects on 21 Nov 2026) turn a cat's face into a mosaic of pink and
+ *   violet patches and cut a wedge into a cheek, for little gain elsewhere. Finer is for a study that needs it (close
+ *   colours that must stay apart: a tongue against a harness), or for when shapes are joined wet.
  * shapes: the block-in (the first study) has at most this many shapes; the smallest join the neighbour nearest in colour
  *   (0: no limit). It was a fixed 48, which made a face one shape.
  * leastMm2: the least shape (mm2) of a study that names none (FILE without :MIN). The least size is a size on paper; it
  *   does not grow with the sheet (it was also held to 0.08% of the sheet, 77 mm2 on a 380 mm sheet). */
-export const READ = Object.freeze({ clusters: 32, join: 6, shapes: 160, leastMm2: 6 });
+export const READ = Object.freeze({ clusters: 16, join: 10, shapes: 160, leastMm2: 6 });
 const CLUSTERS = READ.clusters, CLUSTER_JOIN = READ.join;
 /** The planted-pattern copy test of this reading (19-20 Nov 2026; no drawing; copied with the spread of the same measure
  * against patterns not planted, and stable against two studies of the clean piece that differ only in seed): */
-const COPY_TEST = 'NOT rerun for the reading as it is now (finer colours, more block-in shapes, least size in mm2 only: 21 Nov 2026); the last copy test, at 16 colours joined under 10, 48 shapes, laid as at 02db12b0 (under-washes, joined shadows, cut darks), 20 Nov 2026: mini 1 (RunPod studies) flat copied -0.00/-0.06 at 1.8/3.4 mm (null max 0.08/0.08), d1 +0.02/-0.05 (0.10/0.08), d2 +0.03/-0.04 (0.05/0.08), stable 0.85 to 0.90 against a seed floor of 0.47 to 0.52; mini 2 (local studies) flat -0.05/-0.02 (0.07/0.16), d1 -0.04/+0.02 (0.13/0.14), d2 -0.04/+0.02 (0.13/0.14), stable 0.61 to 0.73 against a seed floor of 0.65 to 0.74; every copy within its null; no copy above +0.03';
+const COPY_TEST = 'NOT rerun for the reading as it is now (up to 160 block-in shapes, least size in mm2 only: 21 Nov 2026); the last copy test, at 48 shapes, laid as at 02db12b0 (under-washes, joined shadows, cut darks), 20 Nov 2026: mini 1 (RunPod studies) flat copied -0.00/-0.06 at 1.8/3.4 mm (null max 0.08/0.08), d1 +0.02/-0.05 (0.10/0.08), d2 +0.03/-0.04 (0.05/0.08), stable 0.85 to 0.90 against a seed floor of 0.47 to 0.52; mini 2 (local studies) flat -0.05/-0.02 (0.07/0.16), d1 -0.04/+0.02 (0.13/0.14), d2 -0.04/+0.02 (0.13/0.14), stable 0.61 to 0.73 against a seed floor of 0.65 to 0.74; every copy within its null; no copy above +0.03';
 /** Two regions each over this share of the sheet are never merged into one (a roof and its wall stay two shapes). */
 const BIG = 0.02;
 /** A small shape this much darker (L*) than the neighbour it would be merged into is kept. */

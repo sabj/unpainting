@@ -196,9 +196,9 @@ test('the least shape is the wash plan\'s mm2 and does not grow with the sheet: 
 
 test('the block-in shape count, the colour groups and their join distance are settings with defaults', async () => {
   const { READ } = await import('./study-washes.mjs');
-  assert.deepEqual([READ.shapes, READ.clusters, READ.join, READ.leastMm2], [160, 32, 6, 6]);
-  const dflt = planField(null), few = planField({ shapes: 4 }), coarse = planField({ clusters: 4, join: 30 });
-  assert.ok(dflt.summary.shapes >= 8, `${dflt.summary.shapes} shapes by default`);
+  assert.deepEqual([READ.shapes, READ.clusters, READ.join, READ.leastMm2], [160, 16, 10, 6]);
+  const dflt = planField({ clusters: 32, join: 6 }), few = planField({ clusters: 32, join: 6, shapes: 4 }), coarse = planField({ clusters: 4, join: 30 });
+  assert.ok(dflt.summary.shapes >= 8, `${dflt.summary.shapes} shapes at @clusters=32@join=6`);
   assert.ok(few.summary.shapes < dflt.summary.shapes, `${few.summary.shapes} with @shapes=4`);
   assert.ok(coarse.summary.clusters < dflt.summary.clusters && coarse.summary.shapes < dflt.summary.shapes, `${coarse.summary.clusters} colours, ${coarse.summary.shapes} shapes with @clusters=4@join=30`);
 });
