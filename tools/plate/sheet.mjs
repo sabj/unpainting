@@ -770,15 +770,18 @@ GRADED_CAL = CAL_RESULT.value.GRADED_CAL;
 // and passes (src/paint/methods/instrument-cal.mjs). A value plan's shadow glaze is one pass of a 0.45-water brush; the
 // stock glazed swatch is two passes at 0.58 and lays 2.5 times as much. A passage
 // laid into wet is charged the same way (chargedFromOwnSwatch).
+/** The least share of a mark's planned footprint its charge is reckoned over (see measureMark). */
+const MARK_COVER_LEAST = 0.75;
 const INSTRUMENT_CAL = createInstrumentCal({
   stock: Object.fromEntries(STOCK_TECHNIQUES.map(T => [T.name, { technique: T, cal: CAL[T.name], graded: GRADED_CAL[`${T.name} graded`] ?? null }])),
   // the scrap dries as the stock swatches do, without touching the painting's own wet-contact records
   measure: T => { const [{ plain, graded }] = scrapSwatches([T], (scrap, max, o, options) => physicalDry(scrap, max, o, nativeDryOptions(NATIVE_PAINT_MODE.mode, options))); return { cal: chargeFactor(plain.delivered), graded: gradedReading(graded) }; },
   // a mark's swatch: the mark itself on the sheet's own paper, its brush a round of its width, charged as a passage
-  // of separate marks is (no overlap to divide by), so that the mark's whole planned footprint holds the planned paint
-  // (what the preview draws and the planned-against-laid table measures); where the paint covers less of the footprint
-  // than planned the swatch line says so
-  measureMark: (T, mark) => { const r = scrapMark(T, mark); return { cal: chargeFactor(r.whole), delivered: r.delivered, whole: r.whole, coverage: r.coverage }; },
+  // of separate marks is, so that its planned footprint holds the planned paint (what the preview draws and the
+  // planned-against-laid table measures). A mark whose paint covers less than MARK_COVER_LEAST of its planned footprint
+  // (a dab shorter than its brush is wide covers 39%) is not charged up to fill the rest: where its paint lies the film
+  // is at most 1 / MARK_COVER_LEAST of the mix's. The swatch's log line gives the coverage
+  measureMark: (T, mark) => { const r = scrapMark(T, mark); return { cal: chargeFactor(r.covered * Math.max(r.coverage, MARK_COVER_LEAST)), delivered: r.delivered, whole: r.whole, coverage: r.coverage, covered: r.covered }; },
   markKey,
   log: line => console.log(line),
 });

@@ -87,9 +87,10 @@ export function markLayout(mark, sheetMm) {
  * Lay a mark's swatch and read it. `T`: the passage's technique (its water, passes, whether it goes into wet); `env`:
  * paths and mask (markLayout), pigment, physics, paperOptions, charge (the concentration that should lay SWATCH.want),
  * upright, water(T), paintBrush(r, T), dip, stroke, step, dry, and prepareBed/settle for a mark laid into wet (as
- * scrap-swatch.mjs). Returns {delivered, whole, coverage}: the core's thickness over want (the darker half of the
- * planned footprint), the whole footprint's, and the share of the footprint the mark's paint covers (cells holding at
- * least a quarter of the core's film).
+ * scrap-swatch.mjs). Returns {delivered, whole, coverage, covered}: the core's thickness over want (the darker half of the
+ * planned footprint), the whole footprint's, the share of the footprint the mark's paint covers (cells holding at
+ * least a quarter of the core's film), and the mean film over those covered cells, over want. The caller charges a passage so its
+ * planned footprint holds the planned paint, reckoning the footprint as no less covered than a floor (tools/plate/sheet.mjs).
  */
 export function markDelivery(T, { mask, paths, pigment, physics, paperOptions, charge, upright, water, paintBrush, dip, stroke, step, dry, prepareBed = null, settle = null }) {
   if (!Number.isInteger(T.passes) || T.passes < 1) throw new RangeError(`mark swatch: ${T.name} needs a whole number of passes, got ${T.passes}`);
@@ -118,5 +119,6 @@ export function readMark(th, mask, want) {
   if (!v.length) throw new Error('mark swatch: the mark has no footprint on the scrap');
   v.sort((a, b) => b - a);
   const half = Math.max(1, v.length >> 1), core = v.slice(0, half).reduce((a, x) => a + x, 0) / half, whole = v.reduce((a, x) => a + x, 0) / v.length;
-  return { delivered: core / want, whole: whole / want, coverage: core > 0 ? v.filter(x => x >= 0.25 * core).length / v.length : 0 };
+  const lies = core > 0 ? v.filter(x => x >= 0.25 * core) : [];
+  return { delivered: core / want, whole: whole / want, coverage: lies.length / v.length, covered: lies.length ? lies.reduce((a, x) => a + x, 0) / lies.length / want : 0 };
 }

@@ -16,18 +16,18 @@ export function hueDiff(a, b, least = 6) {
 }
 
 /** The mean sRGB of `rgb` (W2 x H2 x 3) over the plan-grid cells `cells` (w wide), each scaled up `SC` times; as Lab against white. */
-export function meanLab(rgb, cells, { w, SC, W2 }) {
+export function meanLab(rgb, cells, { w, SC, W2, skip = null }) {
   let r = 0, g = 0, b = 0, n = 0;
-  for (const i of cells) { const x = i % w, y = (i / w) | 0; for (let dy = 0; dy < SC; dy++) for (let dx = 0; dx < SC; dx++) { const q = ((y * SC + dy) * W2 + x * SC + dx) * 3; r += (rgb[q] / 255) ** 2.2; g += (rgb[q + 1] / 255) ** 2.2; b += (rgb[q + 2] / 255) ** 2.2; n++; } }
+  for (const i of cells) { const x = i % w, y = (i / w) | 0; for (let dy = 0; dy < SC; dy++) for (let dx = 0; dx < SC; dx++) { if (skip?.[(y * SC + dy) * W2 + x * SC + dx]) continue; const q = ((y * SC + dy) * W2 + x * SC + dx) * 3; r += (rgb[q] / 255) ** 2.2; g += (rgb[q + 1] / 255) ** 2.2; b += (rgb[q + 2] / 255) ** 2.2; n++; } }
   if (!n) return null;
   const c = [r, g, b].map(v => Math.round(255 * (v / n) ** (1 / 2.2)));
   return labOf(c, 0, [255, 255, 255]);
 }
 
 /** The same over only the darker half of those cells (where the strokes laid their paint, not the paper between them). */
-export function coreLab(rgb, cells, { w, SC, W2 }) {
+export function coreLab(rgb, cells, { w, SC, W2, skip = null }) {
   const px = [];
-  for (const i of cells) { const x = i % w, y = (i / w) | 0; for (let dy = 0; dy < SC; dy++) for (let dx = 0; dx < SC; dx++) { const q = ((y * SC + dy) * W2 + x * SC + dx) * 3; px.push([rgb[q], rgb[q + 1], rgb[q + 2]]); } }
+  for (const i of cells) { const x = i % w, y = (i / w) | 0; for (let dy = 0; dy < SC; dy++) for (let dx = 0; dx < SC; dx++) { if (skip?.[(y * SC + dy) * W2 + x * SC + dx]) continue; const q = ((y * SC + dy) * W2 + x * SC + dx) * 3; px.push([rgb[q], rgb[q + 1], rgb[q + 2]]); } }
   if (!px.length) return null;
   px.sort((a, b) => (a[0] + a[1] + a[2]) - (b[0] + b[1] + b[2]));
   const half = px.slice(0, Math.max(1, px.length >> 1)), m = [0, 1, 2].map(c => Math.round(255 * (half.reduce((a, p) => a + (p[c] / 255) ** 2.2, 0) / half.length) ** (1 / 2.2)));
@@ -46,10 +46,12 @@ export function createScriptColourCheck({ out, w, SC, W2 }) {
         pending.push({ id: s.passage, kind: sh._valuePlan.kind, planned: s.planned, cells });
       }
     },
-    measure(rgb, when) {
+    // `inked`: the sheet cells the pen's ink lies on (a 0/1 field on the sheet's grid): left out of the measure, since the
+    // plan's colour is the paint's alone and a drawing under a wash would read as the wash laid dark
+    measure(rgb, when, inked = null) {
       for (const p of pending) {
-        const laid = meanLab(rgb, p.cells, { w, SC, W2 }); if (!laid) continue;
-        const core = coreLab(rgb, p.cells, { w, SC, W2 });
+        const laid = meanLab(rgb, p.cells, { w, SC, W2, skip: inked }); if (!laid) continue;
+        const core = coreLab(rgb, p.cells, { w, SC, W2, skip: inked }); if (!core) continue;
         const row = { id: p.id, kind: p.kind, when, planned: p.planned.map(v => +v.toFixed(1)), laid: laid.map(v => +v.toFixed(1)), dL: +(laid[0] - p.planned[0]).toFixed(1), dHue: +hueDiff(laid, p.planned).toFixed(0), dE: +Math.hypot(laid[0] - p.planned[0], laid[1] - p.planned[1], laid[2] - p.planned[2]).toFixed(1), core: core.map(v => +v.toFixed(1)), coreDL: +(core[0] - p.planned[0]).toFixed(1) };
         rows.push(row); fs.appendFileSync(file, JSON.stringify(row) + '\n');
       }

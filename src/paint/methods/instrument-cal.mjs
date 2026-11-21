@@ -63,7 +63,7 @@ export function createInstrumentCal({ stock, measure, measureMark = null, markKe
         const r = measureMark(T, mark);
         if (!r || !(r.cal > 0) || !Number.isFinite(r.cal)) throw new Error(`instrument calibration: the mark swatch for ${key} gave no charge factor`);
         marks.set(key, r);
-        log(`  ${T.name} mark, brush ${(2 * mark.radiusMm).toFixed(1)} mm, ${mark.lengthMm.toFixed(1)} mm long, pressure ${mark.pressure.toFixed(2)}, ${(mark.depth ?? 1) >= 1.25 ? `${mark.depth.toFixed(1)} deep in a mass` : 'apart'}: its own swatch charges ${r.cal.toFixed(2)}x (core delivers ${r.delivered.toFixed(2)}, whole footprint ${r.whole.toFixed(2)}, paint covers ${(100 * r.coverage).toFixed(0)}% of the planned footprint)`);
+        log(`  ${T.name} mark, brush ${(2 * mark.radiusMm).toFixed(1)} mm, ${mark.lengthMm.toFixed(1)} mm long, pressure ${mark.pressure.toFixed(2)}, ${(mark.depth ?? 1) >= 1.25 ? `${mark.depth.toFixed(1)} deep in a mass` : 'apart'}: its own swatch charges ${r.cal.toFixed(2)}x (where its paint lies it delivers ${(r.covered ?? r.whole).toFixed(2)}, over its whole planned footprint ${r.whole.toFixed(2)}; the paint covers ${(100 * r.coverage).toFixed(0)}% of the planned footprint)`);
       }
       return { ...marks.get(key), graded: null, key, stock: false };
     },

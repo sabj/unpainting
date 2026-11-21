@@ -34,5 +34,5 @@ test('a swatch is read at its core: a narrow track at full film reads full, with
   const mask = new Uint8Array(100).fill(1), th = new Float32Array(100);
   for (let i = 0; i < 60; i++) th[i] = 0.3;
   const r = readMark(th, mask, 0.3);
-  assert.ok(Math.abs(r.delivered - 1) < 1e-6); assert.ok(Math.abs(r.whole - 0.6) < 1e-6); assert.ok(Math.abs(r.coverage - 0.6) < 1e-6);
+  assert.ok(Math.abs(r.delivered - 1) < 1e-6); assert.ok(Math.abs(r.whole - 0.6) < 1e-6); assert.ok(Math.abs(r.coverage - 0.6) < 1e-6); assert.ok(Math.abs(r.covered - 1) < 1e-6, 'where the paint lies it is the full film');
 });
