@@ -1,4 +1,5 @@
 import {verifyNativeMarkCoverage} from './native-operation-recorder.mjs';
+import {PRESSURE_SOLVER} from '../../src/media/drying-pressure.mjs';
 import {renderInkProof} from '../../src/paint/methods/ink-res.mjs';
 // Lifting, the closing pen, gouache, and the files a finished painting writes.
 // Stage 7 of 7 of tools/paint-plate.mjs. The stages run in order and share one object, ctx: see the entry file.
@@ -268,7 +269,7 @@ const placed = FRAMES.map((f, i) => {
 if (opt('thkdump', '0') !== '0') { coherent(ctx.sheet); const th = thickness(ctx.sheet); fs.writeFileSync(path.join(out, 'thickness.f32'), Buffer.concat(th.map(a => Buffer.from(a.buffer, a.byteOffset, a.byteLength)))); }
 if(PEN_STATE_GATE) fs.writeFileSync(path.join(out,'pen-state-audit.json'),JSON.stringify(PEN_STATE_AUDIT,null,2));
 if(ctx.sheet._layerStoragePolicy)compactLowerLayers(ctx.sheet,ctx.sheet._layerStoragePolicy());
-fs.writeFileSync(path.join(out, 'backend.json'), JSON.stringify({ ...PAINTER, ...GPU_INFO, layerStorage:{main:layerStorageStats(ctx.sheet),...(INKRES?{fine:layerStorageStats(INKRES.fine)}:{})}, gpuStats: gpuStats(ctx.sheet), performanceOptions: { opticalThreads: ctx.opticalThreads, trackedTransfers: SPEED_TRANSFERS, edgePingPong: process.env.GPU_EDGE_PINGPONG === '1', fusedWetScanRequested: process.env.GPU_FUSE_WETSCAN === '1' } }, null, 1));
+fs.writeFileSync(path.join(out, 'backend.json'), JSON.stringify({ ...PAINTER, ...GPU_INFO, layerStorage:{main:layerStorageStats(ctx.sheet),...(INKRES?{fine:layerStorageStats(INKRES.fine)}:{})}, gpuStats: gpuStats(ctx.sheet), performanceOptions: { opticalThreads: ctx.opticalThreads, trackedTransfers: SPEED_TRANSFERS, edgePingPong: process.env.GPU_EDGE_PINGPONG === '1', fusedWetScanRequested: process.env.GPU_FUSE_WETSCAN === '1', pressureSolver: PRESSURE_SOLVER } }, null, 1));
 console.log(backendLine(GPU_INFO)); // the backend this painting was made on, again at the end (details in backend.json)
 fs.writeFileSync(path.join(out, 'frames.json'), JSON.stringify({ ...PAINTER, width: OUT_W, height: OUT_H, presentation: { framePolicy: FRAME_POLICY.all ? 'all' : 'checkpoints', checkpoints: [10,25,50,75,100], video: Boolean(OUTPUT_VIDEO), requestedTimeline: TIMELINE, retimed: Boolean(RETIMED) }, ...(RETIMED ? { timeline: { target: RETIMED.target.code, fallback: RETIMED.target.fallback, milestones: RETIMED.target.milestones } } : {}), frames: num('phaselabels', 0) > 0 ? labelFrames(placed, RETIMED?.target.milestones ?? null) : placed }, null, 1));
 // The plan as a picture, through the sheet's optics, to tell a bad plan from one the brushes failed to carry out.

@@ -8,13 +8,16 @@
 // Speed: the work arrays are kept between calls (sized to the sheet) and only the entries of the cells solved are
 // set back afterwards, and every loop walks the sorted cells by index. The arithmetic and its order are those of the
 // first version, so the result is the same to the bit (drying-pressure.test.mjs keeps that version and compares).
+import { pressureMultigrid } from './pressure-mg.js';
+// the preconditioner: 'mg' (default; pressure-mg.mjs) or 'ic' (IC(0), the solver of 20 Nov; UNPAINT_PRESSURE_SOLVER=ic)
+export const PRESSURE_SOLVER = (typeof process !== 'undefined' && process.env?.UNPAINT_PRESSURE_SOLVER) === 'ic' ? 'ic' : 'mg';
 let POOL = null;
 function pool(n) {
   if (POOL && POOL.n === n) return POOL;
   POOL = { n, r: new Float64Array(n), z: new Float64Array(n), p: new Float64Array(n), ap: new Float64Array(n), degree: new Uint8Array(n), edges: new Int32Array(4 * n).fill(-1), component: new Int32Array(n), anchor: new Uint8Array(n), diagonal: new Float64Array(n), west: new Float64Array(n), north: new Float64Array(n), temporary: new Float64Array(n), queue: new Int32Array(n), means: [0], gauges: [0] };
   return POOL;
 }
-export function dryingPressure(order, count, index, width, sink, fluxX, fluxY, pressure) {
+export function dryingPressure(order, count, index, width, sink, fluxX, fluxY, pressure, solver = PRESSURE_SOLVER) {
   const n = pressure.length, B = pool(n), { r, z, p, ap, degree, edges, component, anchor, diagonal, west, north, temporary, queue } = B;
   const sorted = order.slice(0, count).sort();
   for (let q = 0; q < count; q++) {
@@ -58,7 +61,7 @@ export function dryingPressure(order, count, index, width, sink, fluxX, fluxY, p
     if (u >= 0 && !anchor[u]) north[i] = -1 / diagonal[u];
     diagonal[i] = Math.sqrt(Math.max(1e-14, degree[i] - west[i] ** 2 - north[i] ** 2));
   }
-  const precondition = () => {
+  const precondition = solver === 'mg' ? multigridPreconditioner(sorted, count, edges, anchor, degree, width, r, z, component) : () => {
     for (let q = 0; q < count; q++) {
       const i = sorted[q];
       if (anchor[i]) { temporary[i] = 0; continue; }
@@ -118,4 +121,25 @@ export function dryingPressure(order, count, index, width, sink, fluxX, fluxY, p
     edges[e] = -1; edges[e + 1] = -1; edges[e + 2] = -1; edges[e + 3] = -1;
   }
   return { components, iterations, relativeResidual: norm ? Math.sqrt(residual / norm) : Math.sqrt(residual) };
+}
+
+// the multigrid preconditioner on the solve's cells, numbered by their place in sorted order (pressure-mg.mjs)
+let LOC = null;
+function multigridPreconditioner(sorted, count, edges, anchor, degree, width, r, z, component) {
+  const n = edges.length / 4;
+  if (!LOC || LOC.length !== n) LOC = new Int32Array(n).fill(-1);
+  for (let q = 0; q < count; q++) LOC[sorted[q]] = q;
+  const cell = sorted, ledges = new Int32Array(4 * count), lanchor = new Uint8Array(count), ldegree = new Uint8Array(count), lcomp = new Int32Array(count);
+  for (let q = 0; q < count; q++) {
+    const i = sorted[q]; lanchor[q] = anchor[i]; ldegree[q] = degree[i]; lcomp[q] = component[i];
+    for (let a = 0; a < 4; a++) { const j = edges[4 * i + a]; ledges[4 * q + a] = j >= 0 ? LOC[j] : -1; }
+  }
+  for (let q = 0; q < count; q++) LOC[sorted[q]] = -1;
+  const mg = pressureMultigrid({ count, cell, edges: ledges, anchor: lanchor, degree: ldegree, width, component: lcomp });
+  const lr = new Float64Array(count), lz = new Float64Array(count);
+  return () => {
+    for (let q = 0; q < count; q++) lr[q] = r[sorted[q]];
+    mg.precondition(lr, lz);
+    for (let q = 0; q < count; q++) z[sorted[q]] = lz[q];
+  };
 }

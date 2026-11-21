@@ -146,9 +146,60 @@ test('the pooled solve gives the first version pressures and fluxes to the bit, 
     const sink = Float64Array.from(index, (m, i) => m ? (rnd() < 0.2 ? rnd() : 0) : 0);
     const run = f => { const fx = new Float64Array(n), fy = new Float64Array(n), pr = new Float64Array(n); const r = f(order, order.length, index, w, sink, fx, fy, pr); return { r, fx, fy, pr }; };
     const a = run(referencePressure);
-    for (const b of [run(dryingPressure), run(dryingPressure)]) {   // the second call reuses the first's work arrays
+    const ic = (...a) => dryingPressure(...a, 'ic'); // the IC(0) path keeps the first version's bits
+    for (const b of [run(ic), run(ic)]) {   // the second call reuses the first's work arrays
       assert.deepEqual(b.r, a.r);
       for (const k of ['fx', 'fy', 'pr']) for (let i = 0; i < n; i++) assert.ok(Object.is(a[k][i], b[k][i]), `trial ${trial} ${k}[${i}] ${a[k][i]} vs ${b[k][i]}`);
     }
   }
+});
+
+// The multigrid-preconditioned solve against the IC(0) solve of 20 Nov, on the shapes a wash takes. The two stop by the
+// same residual rule (relative 1e-11), so they agree far inside 1e-9 of the largest pressure and the largest flux.
+async function shapeCases() {
+  const cases = [];
+  const grid = (name, w, h, wet) => cases.push({ name, w, h, wet });
+  grid('oval', 240, 160, (x, y) => ((x - 120) / 110) ** 2 + ((y - 80) / 70) ** 2 < 1);
+  grid('ring with a hole', 200, 200, (x, y) => { const d = Math.hypot(x - 100, y - 100); return d < 90 && d > 35; });
+  grid('two separate puddles', 220, 120, (x, y) => Math.hypot(x - 55, y - 60) < 45 || ((x - 160) / 50) ** 2 + ((y - 60) / 30) ** 2 < 1);
+  grid('a thin strip', 400, 40, (x, y) => y >= 18 && y <= 20 + ((x / 40) | 0) % 3 && x > 5 && x < 395);
+  // a real wash: the middle values of a block-in study in the repository, as ragged as a painter's mask gets
+  const sharp = (await import('sharp')).default, file = new URL('../../examples/studies/sargent-a-tramp-study.png', import.meta.url);
+  const { data, info } = await sharp(file.pathname).resize(360).removeAlpha().raw().toBuffer({ resolveWithObject: true });
+  grid('a block-in study wash', info.width, info.height, (x, y) => { const k = 3 * (y * info.width + x), l = (data[k] + data[k + 1] + data[k + 2]) / 3; return l > 90 && l < 175; });
+  return cases;
+}
+function solveBoth(w, h, wet) {
+  const n = w * h, index = new Uint8Array(n);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) index[y * w + x] = wet(x, y) ? 1 : 0;
+  const order = Int32Array.from(Array.from({ length: n }, (_, i) => i).filter(i => index[i]));
+  // the edge feed's sink: extra drying at the cells on the outline (edge-geometry.mjs), none inside
+  const sink = Float64Array.from(index, (m, i) => m && (!(i % w) || !index[i - 1] || !index[i + 1] || !index[i - w] || !index[i + w]) ? 1e-3 * (1 + (i % 5) / 10) : 0);
+  const out = {};
+  for (const solver of ['ic', 'mg']) {
+    const fx = new Float64Array(n), fy = new Float64Array(n), pressure = new Float64Array(n), t = performance.now();
+    out[solver] = { res: dryingPressure(order, order.length, index, w, sink, fx, fy, pressure, solver), fx, fy, pressure, ms: performance.now() - t };
+  }
+  const rel = (a, b) => { let d = 0, m = 0; for (let i = 0; i < a.length; i++) { d = Math.max(d, Math.abs(a[i] - b[i])); m = Math.max(m, Math.abs(a[i])); } return m ? d / m : d; };
+  return { out, count: order.length, pressure: rel(out.ic.pressure, out.mg.pressure), flux: Math.max(rel(out.ic.fx, out.mg.fx), rel(out.ic.fy, out.mg.fy)) };
+}
+test('multigrid and IC(0) give the same pressure and fluxes to 1e-9 on an oval, a ring, two puddles, a strip and a study wash', async () => {
+  for (const c of await shapeCases()) {
+    const r = solveBoth(c.w, c.h, c.wet), note = `${c.name}: ${r.count} cells, IC ${r.out.ic.res.iterations} iterations, multigrid ${r.out.mg.res.iterations}`;
+    // the same stopping rule as IC(0) (relative to the larger of the sink and the first residual): as tight or tighter
+    assert.ok(r.out.mg.res.relativeResidual <= Math.max(1.5e-11, 2 * r.out.ic.res.relativeResidual), `${note}: residual ${r.out.mg.res.relativeResidual}`);
+    assert.ok(r.pressure < 1e-9, `${note}: pressure differs by ${r.pressure}`);
+    assert.ok(r.flux < 1e-9, `${note}: flux differs by ${r.flux}`);
+    assert.equal(r.out.mg.res.components, r.out.ic.res.components, note);
+    assert.ok(r.out.mg.res.iterations <= 60, note);
+  }
+});
+test('a full-scale first wash (900k cells) is solved by multigrid in bounded time', { timeout: 120000 }, () => {
+  const w = 1462, h = 975, n = w * h, index = new Uint8Array(n), order = new Int32Array(n); let count = 0;
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (((x - w / 2) / (w * .45)) ** 2 + ((y - h / 2) / (h * .45)) ** 2 < 1) { const i = y * w + x; index[i] = 1; order[count++] = i; }
+  const sink = Float64Array.from(index, (m, i) => m && (!index[i - 1] || !index[i + 1] || !index[i - w] || !index[i + w]) ? 1e-3 : 0);
+  const t = performance.now(), res = dryingPressure(order, count, index, w, sink, new Float64Array(n), new Float64Array(n), new Float64Array(n), 'mg');
+  const seconds = (performance.now() - t) / 1000;
+  assert.ok(res.relativeResidual <= 1.5e-11, String(res.relativeResidual));
+  assert.ok(res.iterations <= 60 && seconds < 20, `${count} cells: ${res.iterations} iterations, ${seconds.toFixed(1)} s`);
 });

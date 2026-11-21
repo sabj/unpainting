@@ -1,5 +1,6 @@
 // Options and the source image.
 // Stage 1 of 7 of tools/paint-plate.mjs. The stages run in order and share one object, ctx: see the entry file.
+import {PRESSURE_SOLVER} from '../../src/media/drying-pressure.mjs';
 import {EpochCells} from '../../src/paint/epoch-cells.mjs';
 import {setStrict, writeContinuedChecks} from '../../src/media/checks.mjs';
 import {scaleBrushForDensity} from '../../src/media/brush-density.mjs';
@@ -231,6 +232,7 @@ process.on('exit',()=>fs.writeFileSync(path.join(out,'native-body-cadence.json')
 
 
 console.log(`native paint mode: ${NATIVE_PAINT_MODE.mode}; ${NATIVE_PAINT_MODE.approximation}`);
+console.log(`drying pressure: ${PRESSURE_SOLVER === 'mg' ? 'multigrid-preconditioned CG' : 'IC(0) CG (UNPAINT_PRESSURE_SOLVER=ic)'}, relative residual 1e-11 (src/media/drying-pressure.mjs)`);
 console.log(`native tracked CPU upload: ${NATIVE_UPLOAD_POLICY.value}; ${NATIVE_UPLOAD_POLICY.selection}`);
 if (PIPELINE) fs.writeFileSync(path.join(out, 'pipeline-plan.json'), JSON.stringify({plan:PIPELINE, overrides:argv0},null,2));
 const VALUE_CONFIG=(()=>{let c=opt('valueplan','')?JSON.parse(fs.readFileSync(path.resolve(root,opt('valueplan','')))):null;
