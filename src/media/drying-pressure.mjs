@@ -73,20 +73,26 @@ export function dryingPressure(order, count, index, width, sink, fluxX, fluxY, p
       z[i] = (temporary[i] - (e >= 0 ? west[e] * z[e] : 0) - (d >= 0 ? north[d] * z[d] : 0)) / diagonal[i];
     }
   };
-  let norm = 0, residual = 0;
+  let norm = 0, residual = 0, centred = 0;
   for (let q = 0; q < count; q++) {
     const i = sorted[q];
     const rhs = means[component[i]] - sink[i]; norm += sink[i] * sink[i];
     if (anchor[i]) continue;
+    centred += rhs * rhs;
     let lap = degree[i] * pressure[i];
     for (let a = 4 * i; a < 4 * i + 4; a++) if (edges[a] >= 0) lap -= pressure[edges[a]];
     r[i] = rhs - lap; residual += r[i] * r[i];
   }
   const tolerance = Math.max(Math.max(norm, residual) * 1e-22, 1e-30);
+  // multigrid stops by a tighter rule: relative to the smallest of the sink, the first residual and the equations' own
+  // right-hand side (the sink less its puddle's mean, which can be far smaller than the sink), with no absolute floor;
+  // it stops early only once it is inside the IC rule and has stalled (no halving in 20 iterations: roundoff)
+  const tight = solver === 'mg' ? Math.max(Math.min(norm, residual, centred) * 1e-22, 1e-300) : tolerance;
+  let best = residual, since = 0;
   precondition(); let rz = 0;
   for (let q = 0; q < count; q++) { const i = sorted[q]; p[i] = z[i]; rz += r[i] * z[i]; }
   let iterations = 0;
-  for (; residual > tolerance && iterations < 16 * Math.sqrt(count) + 500; iterations++) {
+  for (; residual > tight && !(residual <= tolerance && since >= 20) && iterations < 16 * Math.sqrt(count) + 500; iterations++) {
     let pap = 0;
     for (let q = 0; q < count; q++) {
       const i = sorted[q];
@@ -98,6 +104,7 @@ export function dryingPressure(order, count, index, width, sink, fluxX, fluxY, p
     if (!(pap > 0)) break;
     const alpha = rz / pap; residual = 0;
     for (let q = 0; q < count; q++) { const i = sorted[q]; pressure[i] += alpha * p[i]; r[i] -= alpha * ap[i]; residual += r[i] * r[i]; }
+    if (residual < 0.5 * best) { best = residual; since = 0; } else since++;
     precondition(); let next = 0;
     for (let q = 0; q < count; q++) { const i = sorted[q]; next += r[i] * z[i]; }
     const beta = next / rz; rz = next;

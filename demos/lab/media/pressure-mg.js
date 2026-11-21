@@ -12,7 +12,7 @@
 
 // nodes per puddle solved directly; coarse correction weight (unsmoothed aggregation wants more than 1); Gauss-Seidel
 // sweeps each side; corrections per level (2: a W-cycle, which ragged masks need: 47 iterations against 130 for a V-cycle)
-const COARSEST = 200, OMEGA = 1.4, SWEEPS = 1, GAMMA = 2; // nodes solved directly; coarse correction weight (unsmoothed aggregation needs > 1)
+const COARSEST = 16, OMEGA = 1.4, SWEEPS = 1, GAMMA = 2; // nodes solved directly; coarse correction weight (unsmoothed aggregation needs > 1)
 
 function cholesky(n, A) { // A: n x n row-major, overwritten by L (lower)
   for (let j = 0; j < n; j++) {
@@ -48,11 +48,12 @@ export function pressureMultigrid({ count, cell, edges, anchor, degree, width, c
       if (most <= COARSEST || levels.length > 24) break; }
     let W = 0, H = 0; for (let k = 0; k < F.n; k++) { if (F.X[k] > W) W = F.X[k]; if (F.Y[k] > H) H = F.Y[k]; }
     // a node never joins cells of two puddles (a 2 x 2 block can hold two that touch only at a corner)
+    let K = 1; for (let k = 0; k < F.n; k++) if (F.comp[k] >= K) K = F.comp[k] + 1; // keys stay below 2^53: slots x puddles
     const CW = (W >> 1) + 1, key = new Map(), agg = new Int32Array(F.n).fill(-1);
     let n = 0; const Xs = [], Ys = [], Cs = [];
     for (let k = 0; k < F.n; k++) {
       if (F.skip && F.skip[k]) continue;
-      const kk = ((F.Y[k] >> 1) * CW + (F.X[k] >> 1)) * 65536 + F.comp[k];
+      const kk = ((F.Y[k] >> 1) * CW + (F.X[k] >> 1)) * K + F.comp[k];
       let I = key.get(kk); if (I === undefined) { I = n++; key.set(kk, I); Xs.push(F.X[k] >> 1); Ys.push(F.Y[k] >> 1); Cs.push(F.comp[k]); }
       agg[k] = I;
     }
@@ -71,7 +72,7 @@ export function pressureMultigrid({ count, cell, edges, anchor, degree, width, c
       diag[I] = st[9 * I + 4];
       for (let s = 0; s < 9; s++) {
         if (s === 4 || st[9 * I + s] === 0) continue;
-        const dx = s % 3 - 1, dy = ((s / 3) | 0) - 1, J = key.get(((Y[I] + dy) * CW + (X[I] + dx)) * 65536 + comp[I]);
+        const dx = s % 3 - 1, dy = ((s / 3) | 0) - 1, J = key.get(((Y[I] + dy) * CW + (X[I] + dx)) * K + comp[I]);
         nb[9 * I + s] = J; off[9 * I + s] = st[9 * I + s];
       }
     }

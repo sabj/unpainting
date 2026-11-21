@@ -203,3 +203,36 @@ test('a full-scale first wash (900k cells) is solved by multigrid in bounded tim
   assert.ok(res.relativeResidual <= 1.5e-11, String(res.relativeResidual));
   assert.ok(res.iterations <= 60 && seconds < 20, `${count} cells: ${res.iterations} iterations, ${seconds.toFixed(1)} s`);
 });
+
+// Inputs Astra built against the first multigrid (review/consult/*perf-mg1*): each must converge on the equations themselves.
+function centredResidual(w, h, wet, sinkAt, solver = 'mg') {
+  const n = w * h, index = new Uint8Array(n);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) index[y * w + x] = wet(x, y) ? 1 : 0;
+  const order = Int32Array.from(Array.from({ length: n }, (_, i) => i).filter(i => index[i])), sink = new Float64Array(n);
+  for (const i of order) sink[i] = sinkAt(i % w, (i / w) | 0);
+  const fx = new Float64Array(n), fy = new Float64Array(n), p = new Float64Array(n), t = performance.now();
+  const res = dryingPressure(order, order.length, index, w, sink, fx, fy, p, solver);
+  return { res, seconds: (performance.now() - t) / 1000, fx, p };
+}
+test('multigrid converges where the sink is nearly uniform or nearly zero (the stopping rule follows the equations)', () => {
+  const strip = centredResidual(202, 1, () => true, x => x === 0 ? 1e-12 : 0);
+  assert.ok(strip.res.relativeResidual < 1e-9, JSON.stringify(strip.res));
+  const square = centredResidual(8, 8, () => true, (x, y) => 0.001 + (x === 0 && y === 0 ? 1e-12 : 0));
+  assert.ok(square.res.relativeResidual < 1e-11, JSON.stringify(square.res));
+  // the exact answer of the square: the offset at one cell drives a flux of order 1e-12, not of order 1e-14
+  assert.ok(Math.abs(square.fx[0]) > 1e-14 && Math.abs(square.fx[0]) < 1e-11, String(square.fx[0]));
+});
+test('puddles at the same place in two labellings never share a coarse node (65537 puddles)', { timeout: 120000 }, () => {
+  const w = 520, h = 521;
+  const dots = new Set(); let k = 0;
+  for (let y = 0; y <= 510 && k < 65535; y += 2) for (let x = 8; x <= 518 && k < 65535; x += 2) { dots.add(y * w + x); k++; }
+  const r = centredResidual(w, h, (x, y) => (x === 4 && y <= 515) || dots.has(y * w + x) || (x === 2 && y >= 512) || (y === 519 && x <= 1), (x, y) => x === 4 && y === 510 ? 1 : 0);
+  assert.ok(r.res.relativeResidual < 1e-9, JSON.stringify(r.res));
+});
+test('a fragmented full-scale footprint (6200 puddles) solves in bounded time and memory', { timeout: 120000 }, () => {
+  const before = process.memoryUsage().rss;
+  const r = centredResidual(1500, 930, (x, y) => x % 15 < 14 && y % 15 < 14, (x, y) => (x % 15 === 0 || y % 15 === 0) ? 1e-3 : 0);
+  const grown = (process.memoryUsage().rss - before) / 2 ** 20;
+  assert.ok(r.res.relativeResidual < 1e-9 && r.seconds < 30, `${r.res.iterations} iterations, ${r.seconds.toFixed(1)} s`);
+  assert.ok(grown < 1500, `${grown.toFixed(0)} MB`);
+});
