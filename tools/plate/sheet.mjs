@@ -741,8 +741,11 @@ const scrapMark = (T, mark) => {
   const sheetMm = PAPER_OPTS.mmPerCell ?? 0, L = markLayout(mark, sheetMm);
   const opts = (r, T) => ({ flat: false, radius: r, bristles: Math.max(12, Math.ceil(r * 2)), capacity: 100, belly: 12, feed: 0.4, give: 0.9, free: num('washfree', 0.4), film: 0.25, splay: WASH_FLAT_SPLAY, stiffness: 8, wetMix: MIX(T), bridge: washBridge(T, T.bridge), bridgeSoft: T.bridgeSoft, seed: 11 });
   const contactOf = (scrap, pts, r, T) => { const b = createBrush(opts(r, T)); dipBrush(b, { water: WET(T), conc: [0] }); const c = candidateContact(b, scrap, pts, { upright: UPRIGHT, clip: null, neighborRadius: 0, includeTouched: false }); return c.cells.filter(i => c.primaryMask[i]); };
-  const prepareBed = (scrap, pts, r, T, cells = contactOf(scrap, pts, r, T)) => prepareWetBed({ settings: opts(r, T), bristles: Math.max(12, Math.ceil(r * 2)), seed: 911, pigments: 1, target: scrap, points: pts, prepOpts: { upright: UPRIGHT, lift: false },
-    observe: () => measurePaper(scrap, cells, SPEED_PAPER, { uniform: false }), gate: () => measurePaper(scrap, cells, SPEED_PAPER, { stats: 'gate' }), advance: () => step(scrap, { ...O, dt: 2 }), createBrush, dip, thirsty, stroke });
+  // a mark laid into wet goes into a bed wider than itself (the wet passage it is laid in), wetted along the mark's path
+  // with a round at least twice its width pressed flat: a bed only as wide as a thin mark is mostly edge and never reads as wet
+  const prepareBed = (scrap, pts0, r0, T) => { const r = Math.max(2 * r0, 6), pts = pts0.map(q => ({ ...q, r, p: 1 })), cells = contactOf(scrap, pts, r, T);
+    return prepareWetBed({ settings: opts(r, T), bristles: Math.max(12, Math.ceil(r * 2)), seed: 911, pigments: 1, target: scrap, points: pts, prepOpts: { upright: UPRIGHT, lift: false },
+    observe: () => measurePaper(scrap, cells, SPEED_PAPER, { uniform: false }), gate: () => measurePaper(scrap, cells, SPEED_PAPER, { stats: 'gate' }), advance: () => step(scrap, { ...O, dt: 2 }), createBrush, dip, thirsty, stroke }); };
   const settle = (scrap, cells) => { const observe = () => measurePaper(scrap, cells, SPEED_PAPER, { uniform: false }); layIntoWetBed({ paper: observe(), observe, step: o => step(scrap, o), O, info: { scrap: 'wet on wet mark swatch', cells: cells.length } }); };
   return markDelivery(T, { mask: L.mask, paths: L.paths, pigment: PIGS[0], physics: O, paperOptions: { ...PAPER_OPTS, seed: 5, mmPerCell: L.mm, ...(PAPER_OPTS.coldPress ? { coldPress: { ...PAPER_OPTS.coldPress, mmPerCell: L.mm } } : {}) },
     charge: SWATCH.want * num('strength', 2.2) / L.cover, upright: UPRIGHT, water: WET, dip, stroke, step, settle, prepareBed,
@@ -782,7 +785,12 @@ const INSTRUMENT_CAL = createInstrumentCal({
 const ownSwatch = T => chargedFromOwnSwatch(T, { instrumentOn: true, authored: false });
 // a passage of separate marks (a painting script's strokes, touches and lines) is charged from a swatch of its own mark
 const instrumentOf = (T, sh = null) => {
-  if (ownSwatch(T) && isMarkPassage(sh)) { const mark = representativeMark(sh._valuePlan.strokes); if (mark) return INSTRUMENT_CAL.ofMark(T, { ...mark, depth: sh._cover ?? 1 }); }
+  if (ownSwatch(T) && isMarkPassage(sh)) {
+    const mark = representativeMark(sh._valuePlan.strokes);
+    // a mark swatch that cannot be laid (its wet bed never reached its window on the scrap) does not stop the plate: the
+    // passage is charged from its technique's lane swatch, and the log says so in capitals
+    if (mark) try { return INSTRUMENT_CAL.ofMark(T, { ...mark, depth: sh._cover ?? 1 }); } catch (e) { console.log(`MARK SWATCH FAILED for passage ${sh._valuePlan.script?.passage ?? sh._valuePlan.id} (${T.name}, brush ${(2 * mark.radiusMm).toFixed(1)} mm): ${e.message.slice(0, 160)}; CHARGED FROM THE WASH LANE SWATCH INSTEAD`); ctx.MARK_SWATCH_FAILURES = (ctx.MARK_SWATCH_FAILURES ?? 0) + 1; }
+  }
   return ownSwatch(T) ? INSTRUMENT_CAL.of(T) : INSTRUMENT_CAL.byName(T.name);
 };
 // every instrument the value plan names is tried on scrap before the first wash
