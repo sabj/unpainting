@@ -86,14 +86,14 @@ export function dryingPressure(order, count, index, width, sink, fluxX, fluxY, p
   }
   const tolerance = Math.max(Math.max(norm, residual) * 1e-22, 1e-30);
   // multigrid stops by a tighter rule: relative to the smallest of the sink, the first residual and the equations' own
-  // right-hand side (the sink less its puddle's mean, which can be far smaller than the sink), with no absolute floor;
-  // it stops early only once it is inside the IC rule and has stalled (no halving in 20 iterations: roundoff)
+  // right-hand side (the sink less its puddle's mean, which can be far smaller than the sink), with no practical
+  // absolute floor; it converges in tens of iterations, and 400 bound an input roundoff keeps from the rule
   const tight = solver === 'mg' ? Math.max(Math.min(norm, residual, centred) * 1e-22, 1e-300) : tolerance;
-  let best = residual, since = 0;
+  const cap = solver === 'mg' ? 400 : 16 * Math.sqrt(count) + 500;
   precondition(); let rz = 0;
   for (let q = 0; q < count; q++) { const i = sorted[q]; p[i] = z[i]; rz += r[i] * z[i]; }
   let iterations = 0;
-  for (; residual > tight && !(residual <= tolerance && since >= 20) && iterations < 16 * Math.sqrt(count) + 500; iterations++) {
+  for (; residual > tight && iterations < cap; iterations++) {
     let pap = 0;
     for (let q = 0; q < count; q++) {
       const i = sorted[q];
@@ -105,7 +105,6 @@ export function dryingPressure(order, count, index, width, sink, fluxX, fluxY, p
     if (!(pap > 0)) break;
     const alpha = rz / pap; residual = 0;
     for (let q = 0; q < count; q++) { const i = sorted[q]; pressure[i] += alpha * p[i]; r[i] -= alpha * ap[i]; residual += r[i] * r[i]; }
-    if (residual < 0.5 * best) { best = residual; since = 0; } else since++;
     precondition(); let next = 0;
     for (let q = 0; q < count; q++) { const i = sorted[q]; next += r[i] * z[i]; }
     const beta = next / rz; rz = next;

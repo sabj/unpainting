@@ -236,3 +236,13 @@ test('a fragmented full-scale footprint (6200 puddles) solves in bounded time an
   assert.ok(r.res.relativeResidual < 1e-9 && r.seconds < 30, `${r.res.iterations} iterations, ${r.seconds.toFixed(1)} s`);
   assert.ok(grown < 1500, `${grown.toFixed(0)} MB`);
 });
+
+test('multigrid reaches the equations on a comb of thin rows with a 1e-16 sink, and stops in bounded iterations from a warm start', () => {
+  const comb = (x, y) => y % 2 === 0 || (y % 4 === 1 ? x === 95 : x === 0);
+  const a = centredResidual(96, 96, comb, (x, y) => x === 0 && y === 0 ? 1e-16 : 0);
+  assert.ok(a.res.relativeResidual < 1e-9, JSON.stringify(a.res));
+  const n = 96 * 96, index = new Uint8Array(n); for (let i = 0; i < n; i++) index[i] = comb(i % 96, (i / 96) | 0) ? 1 : 0;
+  const order = Int32Array.from(Array.from({ length: n }, (_, i) => i).filter(i => index[i])), p = Float64Array.from(index, (m, i) => m ? Math.sin(i) : 0);
+  const r = dryingPressure(order, order.length, index, 96, new Float64Array(n), new Float64Array(n), new Float64Array(n), p, 'mg');
+  assert.ok(r.iterations <= 400 && r.relativeResidual < 1e-9, JSON.stringify(r));
+});
