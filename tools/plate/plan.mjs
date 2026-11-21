@@ -415,7 +415,7 @@ const INK_HUE=opt('inkhue','profile')==='source'&&!INK_K_DECLARED?inkKFromSource
 if(opt('inkhue','profile')==='source')console.log(INK_HUE?`ink hue from the target's lines: K ${INK_HUE.K.join(',')} over ${INK_HUE.cells} line cells (profile ${INK_PROFILE.pigment.K.join(',')})`:'ink hue: too few target line cells, profile hue kept');
 // An ink drawing with a pencil lay-in under it (strokes of its vectors file marked medium 'graphite') needs graphite on the
 // sheet: the lay-in is laid in graphite before the ink, in the opening pen (drawing.mjs layExactVectors; from 3e27d30c)
-const DRAWING_DOC=(()=>{const base=opt('drawingfile','');if(!base)return null;const f=(base.endsWith('-lines.json')?base.slice(0,-'-lines.json'.length):base)+'-vectors.json';return fs.existsSync(f)?JSON.parse(fs.readFileSync(f,'utf8')):null;})();
+const DRAWING_DOC=(()=>{const base=opt('drawingfile','');if(!base||opt('drawing','first')==='none')return null;const f=(base.endsWith('-lines.json')?base.slice(0,-'-lines.json'.length):base)+'-vectors.json';return fs.existsSync(f)?JSON.parse(fs.readFileSync(f,'utf8')):null;})();
 const LAYIN_GRAPHITE=DRAWING_DOC?.medium==='ink'&&DRAWING_DOC.strokes.some(q=>q.medium==='graphite'&&!q.wash);
 const INK={...INK_PROFILE.pigment,omega:INK_FAST?60:INK_PROFILE.pigment.omega,K:(INK_K_DECLARED??INK_HUE?.K??INK_PROFILE.pigment.K).map(v=>v*num('inkkscale',1))};
 console.log('drawing material profiles:',JSON.stringify({ink:{...INK_PROFILE,pigment:INK,rewets:INK.omega<60},graphite:GRAPHITE_PROFILE}));
