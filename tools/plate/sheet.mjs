@@ -15,6 +15,7 @@ import {planStudyWashes} from '../../src/paint/methods/study-washes.mjs';
 import {planScriptWashes} from '../../src/paint/methods/script-washes.mjs';
 import {monoPaints} from '../../src/paint/methods/mono-mix.mjs';
 import {loadStudies} from '../painter/study-load.mjs';
+import {studyThingMasks} from '../painter/thing-masks.mjs';
 import {washStrokeHold, LANE_OVERLAP, FLAT_OVERLAP} from '../../src/paint/methods/wash-strokes.mjs';
 import {smallestBrushMm} from '../../src/paint/methods/light-reserves.mjs';
 import {roleBrushMm,roleBrushPointMm,washKitMm} from '../../src/paint/methods/brush-footprint.mjs';
@@ -192,6 +193,11 @@ const pencilDraw=(target,gs,pigment,options)=>{
  // --washplan script:FILE.json: the washes are a painting script written by an author (script-washes.mjs,
  // docs/painting-script.md): passages in painting order, each laid in whole strokes; no study is read
  const SCRIPT=WASH_PLAN.startsWith('script:')?JSON.parse(fs.readFileSync(path.resolve(root,WASH_PLAN.slice(7)),'utf8')):null;
+ // --thingmasks RECEIPT.json (default auto: IMAGE.named-sam.json beside the source, when there is one): the source's named
+ // forms (a reviewed SAM id map bound to the source by its receipt) for the study wash plan; --things names the label file
+ // the receipt must match. No receipt: no named forms, and the plan is as it was without them.
+ const thingMasks=await studyThingMasks({root,source:opt('image'),maskOption:opt('thingmasks','auto'),labelsOption:opt('things','auto'),blockIn:Boolean(WASH_PLAN&&!SCRIPT)});
+ if(thingMasks){valueOptions.thingMasks=thingMasks;console.log(`named forms: ${thingMasks.names.length} forms from a named-sam-v1 receipt (${thingMasks.names.map((n,i)=>`${n}${thingMasks.kinds[i]?` [${thingMasks.kinds[i]}]`:''}`).join(', ')})`);}
  if(SCRIPT){valueOptions.script=SCRIPT;const paper=estimatePaper(valueOptions.rgb,w,h,valueOptions.density);valueOptions.inkValue=targetValueMap(paper?Float32Array.from(valueOptions.density,v=>Math.max(0,v-paper.density)):valueOptions.density);}
  if(WASH_PLAN&&!SCRIPT){Object.assign(valueOptions,await loadStudies(WASH_PLAN,root,w,h));
   // a near-monochrome subject is mixed from its own one or two paints, read from it at a coarse scale as the palette is (mono-mix.mjs)

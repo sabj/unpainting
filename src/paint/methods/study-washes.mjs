@@ -25,6 +25,7 @@ import { kmeans, roundMask, dilate } from './study-shapes.mjs';
 import { monoAt } from './mono-mix.mjs';
 import { touchesFrom } from './touch-layer.mjs';
 import { shapeGeometry, markFor } from '../marks/index.mjs';
+import { namedForms, formCoverage } from './named-forms.mjs';
 
 /** The plan's grid cell (mm). */
 const PLAN_MM = 0.25;
@@ -336,13 +337,17 @@ const CUT_FROM_MM2 = 30, CUT_BRUSH_MM = 5;
 // `studies`: the stack, coarse to fine: [{rgb (w x h x 3), file, minMm2, mode}] (mode 'glaze': a few connected glazes
 // from that study instead of every shape it adds). `flat`: every shape one flat fill of its own,
 // butted, no nesting, charging, load, soft edges or dabs (for comparison only).
-export function planStudyWashes({ k, w, h, studies, flat = false, density = null, paperRGB = null, pigments = [], sheetWidthMm = 280, washBrushMm, washKitMm = [washBrushMm], subject = null, shaped = true, drawn = false, inkValue = null, mono = null }) {
+// `thingMasks`: the source's named forms (tools/painter/thing-masks.mjs: a reviewed SAM id map with each form's name and
+// kind), or null. With it every plan cell has its form's id and kind (named-forms.mjs) and every wash records the forms
+// it lies in; without it the plan is exactly as it was.
+export function planStudyWashes({ k, w, h, studies, flat = false, density = null, paperRGB = null, pigments = [], sheetWidthMm = 280, washBrushMm, washKitMm = [washBrushMm], subject = null, shaped = true, drawn = false, inkValue = null, mono = null, thingMasks = null }) {
   const n = w * h, cellMm = sheetWidthMm / w, paperCol = paperRGB ?? [252, 251, 248];
   if (!studies?.length || studies.some(st => !st?.rgb || st.rgb.length !== n * 3)) throw Error('the study wash plan needs its studies registered to the sheet (w x h x 3)');
   if (pigments.length !== k || k < 1) throw Error('the wash plan needs the pigments');
   if (!(washBrushMm > 0)) throw Error('the wash plan needs the smallest wash brush');
   const pw = Math.max(1, Math.round(sheetWidthMm / Math.max(PLAN_MM, cellMm))), ph = Math.max(1, Math.round(h * pw / w)), pn = pw * ph, mmX = sheetWidthMm / pw, cellMm2 = mmX * mmX;
   const rC = mm => Math.max(1, Math.round(mm / mmX));
+  const named = namedForms(thingMasks, pw, ph);
   const grids = studies.map(st => toGrid(st.rgb, w, h, pw, ph));
   // the studies drift a little: each is registered to the first by a shift of at most 2% of the sheet
   const shifts = grids.map((g, i) => (i ? registerShift(grids[0], g, pw, ph, paperCol, Math.max(2, Math.round(0.02 * pw))) : [0, 0]));
@@ -491,7 +496,7 @@ export function planStudyWashes({ k, w, h, studies, flat = false, density = null
       layer: stage, break: null, load: { water: wet ? .88 : .62, pigment: 'the mix at its strength; calibrated delivery', reload: 'existing finite instrument route' },
       edges: { hardCells: [], softCells: [], policy: move === 'wet on wet' ? 'soft: dropped into a wet wash' : move === 'beside damp' ? 'soft: laid against a neighbour still damp' : 'hard: the edge is where the strokes end' },
       outline: loops, strokes: fill.strokes, softEdges: [], depthMm: +(fill.depthMm ?? 0).toFixed(1), uncoveredShare: +(fill.uncovered ?? 0).toFixed(4), widestBrushMm: fill.brushMm,
-      protectedLights: ['the study\'s white shapes, left as paper'], failureSigns: 'Lost lights, muddy overlaps, stripes.', stop: 'after the shape' };
+      protectedLights: ['the study\'s white shapes, left as paper'], failureSigns: 'Lost lights, muddy overlaps, stripes.', stop: 'after the shape', ...(named ? { forms: formCoverage(cells, named) } : {}) };
     sh._valuePlan = intent; instructions.push({ ...intent, area, plannedPigmentMass: strength * area });
     polygons.push({ stage, thing: what, kind: STAGE[stage], colour, loops });
     byStage[stage - 1]++;
@@ -949,7 +954,7 @@ export function planStudyWashes({ k, w, h, studies, flat = false, density = null
   const regions = { source: 'block-in study', labels: sheetLabels, regions: shapes.map((s, i) => ({ id: i + 1, colour: s.colour, paper: s.paper, parent: parent[i] >= 0 ? parent[i] + 1 : null, share: +(s.cells.length / pn).toFixed(4) })) };
   const washes = instructions.filter(q => q.stage !== 2).length;
   const summary = { source: 'study', flat, files: studies.map(st => st.file ?? null), layersOfStudy: perLayer, clusters, shapes: shapes.length, paperShapes: shapes.filter(s => s.paper).length, nested, softJoins, dabbed, stages: byStage.filter(Boolean).length, washesByStage: byStage, mixes: mixes.length, washes, charges, planCellMm: mmX, reservedShare,
-    paintedShare: covered.reduce((a, v) => a + v, 0) / pn, meanWashMm2: areas.reduce((a, v) => a + v, 0) / Math.max(1, areas.length), medianWashMm2: areas.length ? areas[areas.length >> 1] : 0, smallestWashMm2: areas[0] ?? 0, plannedStrokes: strokeCount, drawn, stagesAt, touchLog, glazeLog };
+    paintedShare: covered.reduce((a, v) => a + v, 0) / pn, meanWashMm2: areas.reduce((a, v) => a + v, 0) / Math.max(1, areas.length), medianWashMm2: areas.length ? areas[areas.length >> 1] : 0, smallestWashMm2: areas[0] ?? 0, plannedStrokes: strokeCount, drawn, stagesAt, touchLog, glazeLog, ...(named ? { namedForms: { provenance: thingMasks.provenance ?? null, forms: named.forms.map(f => ({ id: f.id, name: f.name, kind: f.kind, share: +(f.cells / pn).toFixed(4) })) } } : {}) };
   console.log(`study washes: the wash plan is read from ${studies.length} block-in ${studies.length > 1 ? 'studies' : 'study'} (${studies.map(st => `${st.file ?? '?'}${st.minMm2 ? ` from ${st.minMm2} mm2` : ''}`).join(', ')}), not from the subject (the subject only registers the studies to the sheet${studies[0].registered ? `: ${studies[0].registered}` : ''} and scores the plate; the palette and the drawing are the painter's own as before)${flat ? '; FLAT: plain fills, for comparison' : ''}`);
   perLayer.forEach((pl, li) => console.log(`study washes, layer ${li + 1}${pl.accent ? ' (accents)' : pl.mode === 'glaze' ? ' (connected glazes)' : ''}: ${pl.study}, shapes from ${pl.minMm2 ?? '-'} mm2, registered by ${pl.shift.join(',')} cells: ${pl.washes} washes, ${pl.strokes} strokes`));
   console.log(`study washes: study maker by file name: ${studies.map(st => (/local|seed\d/.test(st.file ?? '') ? 'local image model (mflux)' : 'not named (the RunPod studies carry no tag)')).filter((v, i, a) => a.indexOf(v) === i).join(' and ')}`);
@@ -957,6 +962,7 @@ export function planStudyWashes({ k, w, h, studies, flat = false, density = null
   const fmtT = t => `${t.wash ? 'glaze' : t.name} ${t.areaMm2.toFixed(0)} mm2 (${t.length.toFixed(0)} x ${t.width.toFixed(1)} mm) L* ${t.L.toFixed(0)} at ${t.cx},${t.cy} mm, layer ${t.layer}`;
   console.log(`study washes, the ten largest touches: ${[...touchLog].sort((a, b) => b.areaMm2 - a.areaMm2).slice(0, 10).map(fmtT).join('; ')}`);
   console.log(`study washes, the ten darkest marks: ${touchLog.filter(t => !t.wash).sort((a, b) => a.L - b.L).slice(0, 10).map(fmtT).join('; ')}`);
+  if (named) console.log(`study washes: named forms on the plan grid: ${named.forms.filter(f => f.cells).map(f => `${f.name} [${f.kind}] ${(100 * f.cells / pn).toFixed(1)}%`).join(', ')}; ${(100 * named.ids.reduce((a, v) => a + (v ? 0 : 1), 0) / pn).toFixed(1)}% in no named form`);
   console.log(`study washes: ${clusters} colours, ${shapes.length} block-in shapes (${summary.paperShapes} left as paper, ${(100 * reservedShare).toFixed(1)}% of the sheet); ${washes} washes (${byStage[0]} first, ${byStage[2]} over a lighter wash, ${byStage[3]} accents), ${nested} nested, ${softJoins} laid against a damp neighbour, ${dabbed} in dabs, ${charges} charges, ${glazes} glazes; ${strokeCount} strokes`);
   return { opticsReport: null, paper: null, style: null, layers, instructions, protectedCells: null, value: inkValue ?? { values: density ?? new Float32Array(n) }, regions, omittedDemand: 0, lightShapes, summary, mixes, polygons,
     geometry: 'Washes from a stack of block-in studies, coarse to fine: the block-in\'s flat shapes, each one mix, lightest and largest first, a darker shape of like hue laid over its lighter one (wash within wash), close values laid against each other damp, broken masses in dabs, the darkest small shapes last; each richer study adds only where it is darker or stronger than what is laid. Whites left as paper.' };

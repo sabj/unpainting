@@ -147,3 +147,24 @@ test('a near-monochrome subject: every mix is its own paint, and one cluster of 
     assert.ok(washes.slice(1).every(q => q.areaMm2 < washes[0].areaMm2));
   } finally { console.log = log; }
 });
+
+// --- named forms (a SAM id map of the source with each form's name and kind) ---
+// the left half of the sheet a face, the right half sky; a strip at the bottom in no form
+const halves = (w, h) => ({ width: w, height: h, ids: Uint8Array.from({ length: w * h }, (_, i) => (((i / w) | 0) >= 0.9 * h ? 0 : i % w < w / 2 ? 1 : 2)), names: ['a face', 'the sky'], kinds: ['face', 'sky'], provenance: { schema: 'named-sam-v1' } });
+function planWith(st, extra = {}, read = null) {
+  const log = console.log; console.log = () => {};
+  try { return planStudyWashes({ k: pigments.length, w: st.w, h: st.h, studies: [{ rgb: st.rgb, file: 'test', ...(read ? { read } : {}) }], paperRGB: PAPER, pigments, sheetWidthMm: 160, washBrushMm: 5, washKitMm: [38, 25.4, 7, 5], ...extra }); } finally { console.log = log; }
+}
+
+test('named forms: every wash records the forms it lies in, with their kinds; without masks the plan is exactly as before', () => {
+  const st = wallStudy(), plain = planWith(st), named = planWith(st, { thingMasks: halves(st.w, st.h) });
+  assert.ok(plain.instructions.every(q => !('forms' in q)) && !('namedForms' in plain.summary));
+  assert.deepEqual(JSON.parse(JSON.stringify(planWith(st, { thingMasks: null }).instructions)), JSON.parse(JSON.stringify(plain.instructions)));
+  // the same washes and strokes with masks; each also names its forms
+  assert.deepEqual(JSON.parse(JSON.stringify(named.instructions.map(({ forms, ...q }) => q))), JSON.parse(JSON.stringify(plain.instructions)));
+  assert.deepEqual(named.summary.namedForms.forms.map(f => [f.id, f.name, f.kind]), [[1, 'a face', 'face'], [2, 'the sky', 'sky']]);
+  // the under-wash of the wall spans both halves; the window (x 100 to 115 of 160 mm) lies in the sky half only
+  assert.deepEqual(named.instructions[0].forms.map(f => f.kind).sort(), ['face', 'sky']);
+  const windowWash = named.instructions.find(q => q.forms.length === 1 && q.forms[0].share > 0.95 && q.areaMm2 < 600);
+  assert.equal(windowWash.forms[0].name, 'the sky');
+});
