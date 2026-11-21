@@ -29,3 +29,29 @@ test('a two-stage pen run lays the drawing\'s vector strokes in both stages; no 
     fs.rmSync(dir, { recursive: true, force: true });
   }
 });
+
+// An ink drawing whose strokes are partly marked medium 'graphite' (a pencil under-drawing under selective ink): the opening
+// pen lays those strokes first in graphite and the rest in ink, with no --outlinemedium graphite asked for; a drawing with
+// no graphite strokes puts no graphite on the sheet.
+test('an ink drawing with pencil strokes lays them first in graphite, the rest in ink', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ink-vectors-layin-')), cwd = new URL('../../../', import.meta.url);
+  try {
+    const target = path.join(dir, 'target.png'), out = path.join(dir, 'paint'), stem = path.join(dir, 'set');
+    await sharp(Buffer.from('<svg width="48" height="36"><rect width="48" height="36" fill="#faf7ef"/><rect x="6" y="6" width="30" height="22" fill="#9db0c0"/></svg>')).png().toFile(target);
+    const lines = Array.from({ length: 6 }, (_, i) => ({ seq: i, points: [[6, 6 + 4 * i], [40, 6 + 4 * i]], width: 1, weight: 1, role: 'pen stroke', length: 34 }));
+    fs.writeFileSync(`${stem}-lines.json`, JSON.stringify({ image: { w: 48, h: 36 }, inputKind: 'drawing', medium: 'ink', lines }));
+    const strokes = lines.map(l => ({ seq: l.seq, line: l.seq, dark: 1, path: [[6.5, 6.5 + 4 * l.seq], [40.5, 6.5 + 4 * l.seq]], widths: [0.6, 0.6], outline: [[[6, 6.2 + 4 * l.seq], [41, 6.2 + 4 * l.seq], [41, 6.8 + 4 * l.seq], [6, 6.8 + 4 * l.seq]]] }));
+    strokes.forEach((s, i) => { if (i % 2) { s.medium = 'graphite'; s.dark = 0.5; } else s.medium = 'ink'; });
+    fs.writeFileSync(`${stem}-vectors.json`, JSON.stringify({ sheetMm: 48, heightMm: 36, medium: 'ink', fills: 'marked', strokes }));
+    const log = run(['--image', target, '--washplan', target, '--drawingfile', stem, '--inkrecipe', 'wash', '--stages', 'none', '--drawing', 'first', '--out', out], cwd);
+    assert.match(log, /pencil lay-in: 3 graphite strokes laid before the ink, [1-9]\d* cells/, log.split('\n').slice(-30).join('\n'));
+    assert.match(log, /ink vectors: 3 strokes laid exactly/);
+    strokes.forEach(s => { s.medium = 'ink'; });
+    fs.writeFileSync(`${stem}-vectors.json`, JSON.stringify({ sheetMm: 48, heightMm: 36, medium: 'ink', fills: 'marked', strokes }));
+    const all = run(['--image', target, '--washplan', target, '--drawingfile', stem, '--inkrecipe', 'wash', '--stages', 'none', '--drawing', 'first', '--out', out + '2'], cwd);
+    assert.doesNotMatch(all, /pencil lay-in/);
+    assert.match(all, /ink vectors: 6 strokes laid exactly/);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});

@@ -413,6 +413,10 @@ const INK_FAST=opt('inkfast','auto')==='auto'?!INK_PROFILE.rewets:num('inkfast',
 if(!['profile','source'].includes(opt('inkhue','profile')))throw Error('--inkhue: profile or source');
 const INK_HUE=opt('inkhue','profile')==='source'&&!INK_K_DECLARED?inkKFromSource(PX_SOURCE,SEP.ink,paperRGB,INK_PROFILE.pigment.K,{gain:num('inkhuegain',1)}):null;
 if(opt('inkhue','profile')==='source')console.log(INK_HUE?`ink hue from the target's lines: K ${INK_HUE.K.join(',')} over ${INK_HUE.cells} line cells (profile ${INK_PROFILE.pigment.K.join(',')})`:'ink hue: too few target line cells, profile hue kept');
+// An ink drawing with a pencil lay-in under it (strokes of its vectors file marked medium 'graphite') needs graphite on the
+// sheet: the lay-in is laid in graphite before the ink, in the opening pen (drawing.mjs layExactVectors; from 3e27d30c)
+const DRAWING_DOC=(()=>{const base=opt('drawingfile','');if(!base)return null;const f=(base.endsWith('-lines.json')?base.slice(0,-'-lines.json'.length):base)+'-vectors.json';return fs.existsSync(f)?JSON.parse(fs.readFileSync(f,'utf8')):null;})();
+const LAYIN_GRAPHITE=DRAWING_DOC?.medium==='ink'&&DRAWING_DOC.strokes.some(q=>q.medium==='graphite'&&!q.wash);
 const INK={...INK_PROFILE.pigment,omega:INK_FAST?60:INK_PROFILE.pigment.omega,K:(INK_K_DECLARED??INK_HUE?.K??INK_PROFILE.pigment.K).map(v=>v*num('inkkscale',1))};
 console.log('drawing material profiles:',JSON.stringify({ink:{...INK_PROFILE,pigment:INK,rewets:INK.omega<60},graphite:GRAPHITE_PROFILE}));
 // --outlinemedium graphite: pen-first outlines in pencil, not ink; graphite is a neutral grey, waterproof and light.
@@ -424,9 +428,13 @@ const PENCIL = opt('penpencil', '') && DRAWS_FIRST ? await (async () => {
   return { ...m, pig: {...GRAPHITE_PROFILE.pigment,strength:GRAPHITE_PROFILE.concentration} };
 })() : null;
 const PENCIL_STAGE = DRAWS_FIRST && num('pencilstage', 0) > 0;
-const GRAPHITE = PENCIL ? (({ strength, ...pig }) => pig)(PENCIL.pig) : (STAGE_PLAN?.files.prep || OUTLINE_MEDIUM === 'graphite' || (OUTLINE_MEDIUM !== 'ink' && OUTLINE_MEDIUM !== 'none' && (OUTLINE_MEDIUM === 'none' ? materialProfile('graphite') : materialProfile(OUTLINE_MEDIUM)).kind==='graphite')) && opt('drawing', 'first') !== 'none' && DRAWS_FIRST
+const GRAPHITE_OWN = PENCIL ? (({ strength, ...pig }) => pig)(PENCIL.pig) : (STAGE_PLAN?.files.prep || OUTLINE_MEDIUM === 'graphite' || (OUTLINE_MEDIUM !== 'ink' && OUTLINE_MEDIUM !== 'none' && (OUTLINE_MEDIUM === 'none' ? materialProfile('graphite') : materialProfile(OUTLINE_MEDIUM)).kind==='graphite')) && opt('drawing', 'first') !== 'none' && DRAWS_FIRST
   ? GRAPHITE_PROFILE.pigment
   : null;
+// (graphite only for an ink drawing's lay-in: LAYIN_ONLY, so nothing else in the run draws in pencil)
+const LAYIN_ONLY = !GRAPHITE_OWN && LAYIN_GRAPHITE && DRAWS_FIRST && opt('drawing', 'first') !== 'none';
+const GRAPHITE = GRAPHITE_OWN ?? (LAYIN_ONLY ? GRAPHITE_PROFILE.pigment : null);
+if (LAYIN_ONLY) console.log(`pencil lay-in: ${DRAWING_DOC.strokes.filter(q => q.medium === 'graphite').length} strokes of the ink drawing are graphite, laid before the ink`);
 // --wickfloor f: least share of a granulating paint's water-borne pigment the pores take, 0..0.9, so peaks stay pale. Default 0.
 // A comma list sets it per pigment in palette order; the last value carries on, 0 leaves a pigment alone.
 const WICK_FLOORS = String(opt('wickfloor', '0')).split(',').map(v => Math.min(0.9, Math.max(0, Number(v) || 0)));
@@ -445,6 +453,6 @@ Object.assign(ctx, { PALETTE, PIGS, COLOUR_BUDGET, STYLE, D_AIM, LIGHT_CELLS, GO
   EDGE, maskBox, FULLBOX, 
   FINISH, SEP, OUTLINE, PREP_ERASE, STAGE_PLAN, FACE_INK, REQUESTED_DRAW_MEDIUM, STYLE_ON, 
   INKLOAD, INK_WIDTH_FLOOR_MM, INK_DAMP, STYLE_INK_DEFAULT, INK_PROFILE, GRAPHITE_PROFILE, OUTLINE_MEDIUM, INK, 
-  PENCIL, PENCIL_STAGE, GRAPHITE, GRAPHITE_AT, 
+  PENCIL, PENCIL_STAGE, GRAPHITE, GRAPHITE_AT, LAYIN_ONLY, 
   EARLY_DRY_VALUE });
 }

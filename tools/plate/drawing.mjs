@@ -207,7 +207,18 @@ function layExactVectors(file, { closing = false } = {}) {
   // whole and nothing is dropped. Tried at 0.25 as the default under paint and rejected (flat grey patches, mud under
   // colour): the code stays, unused unless asked for.
   const fill = Math.max(0, Math.min(1, num('inkfill', 1)));
-  const r = layVectors(doc, sheet.D[at], w, h, sheetMm / w, inkForDarkness(darkOf), { fill });
+  // An ink drawing's pencil lay-in (strokes marked medium 'graphite') is laid first, in graphite on the painting's sheet, at
+  // its own darkness; the ink goes over it (from 3e27d30c). Laid exact: this painter has no paper tooth for vector strokes.
+  const layin = !pencil && GRAPHITE_AT != null && GRAPHITE ? doc.strokes.filter(q => q.medium === 'graphite' && !q.wash) : [];
+  if (layin.length) {
+    const gp = ctx.sheet.pigments[GRAPHITE_AT], gDark = t => { const c = renderLayers([[Float32Array.of(t)]], [gp], white, 1, 1); return 1 - (c[0] + c[1] + c[2]) / 765; };
+    if (!ctx.sheet.D[GRAPHITE_AT]) throw new Error('ink vectors: the pencil lay-in has no graphite layer on the sheet');
+    coherent(ctx.sheet);
+    const g = layVectors({ ...doc, strokes: layin }, ctx.sheet.D[GRAPHITE_AT], W2, H2, sheetMm / W2, inkForDarkness(gDark), {});
+    layersChanged(ctx.sheet); ctx.sheet._gpu?.cpuWroteAll?.();
+    console.log(`pencil lay-in: ${g.strokes} graphite strokes laid before the ink, ${g.cells} cells`);
+  }
+  const r = layVectors(layin.length ? { ...doc, strokes: doc.strokes.filter(q => q.medium !== 'graphite') } : doc, sheet.D[at], w, h, sheetMm / w, inkForDarkness(darkOf), { fill });
   if (fineSheet) { INKRES.changed(); INKRES.carry(); } else { layersChanged(sheet); sheet._gpu?.cpuWroteAll?.(); }
   fs.copyFileSync(file, path.join(out, closing ? 'ink-vectors-closing.json' : 'ink-vectors.json'));
   ctx.drawnCount += r.strokes;

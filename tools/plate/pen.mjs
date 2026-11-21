@@ -28,7 +28,7 @@ export async function penPlan(ctx) {
 const { opt, num, optTrack, NATIVE_PAINT_MODE, FRAME_POLICY, root, out, RUN_CACHE, VALUE_CONFIG, 
   phaseMark, srcMeta, PX_RAW, TARGET_GUARD, w, h, n, paperRGB, PIGS, COLOUR_BUDGET, 
   DRAW_STYLE, EDGE, FINISH, SEP, STAGE_PLAN, FACE_INK, REQUESTED_DRAW_MEDIUM, STYLE_ON, STYLE_INK_DEFAULT, 
-  GRAPHITE_PROFILE, OUTLINE_MEDIUM, INK, PENCIL, GRAPHITE, GRAPHITE_AT, SC, W2, H2, N2, PB, paper, INKRES, 
+  GRAPHITE_PROFILE, OUTLINE_MEDIUM, INK, PENCIL, GRAPHITE, GRAPHITE_AT, LAYIN_ONLY, SC, W2, H2, N2, PB, paper, INKRES, 
   TARGET_DRAW_EDGE, sourceInkDrawing, drawingCapsFor, OUT_W, OUT_H, base, SHADE, TONE_STAGE, view, framer, 
   drainFrames } = ctx;
 Object.assign(ctx, { planPen });
@@ -189,7 +189,7 @@ async function planPenInner(planD0, { first = false, fine = false } = {}) {
   // --firstpen graphite: the first pen's drawing as a light pencil lay-in, ink kept for the closing pen. Needs a graphite
   // outline medium; --prep does the same.
   // linked stages: the pencil is its own pass (prep), and the first pen is ink
-  const graphiteFirst = first && GRAPHITE && !(STAGE_PLAN && OUTLINE_MEDIUM === 'ink') && (preparing || !!PENCIL || OUTLINE_MEDIUM==='graphite' || GRAPHITE_PROFILE.kind==='graphite');
+  const graphiteFirst = first && GRAPHITE && !LAYIN_ONLY && !(STAGE_PLAN && OUTLINE_MEDIUM === 'ink') && (preparing || !!PENCIL || OUTLINE_MEDIUM==='graphite' || GRAPHITE_PROFILE.kind==='graphite');
   const inkPig = graphiteFirst ? GRAPHITE_AT : INK ? PIGS.length : PIGS.map((p, j) => [j, p.K[0] + p.K[1] + p.K[2]]).sort((a, b) => b[1] - a[1])[0][0];
   // As much line as the source shows, and no more: see lineBudget. --inkbudget 0 draws every gesture found.
   // --drawfloor s: ink share assumed when the source is not a drawing, so it still gets a preparatory drawing (default 0.04 with --prep).
