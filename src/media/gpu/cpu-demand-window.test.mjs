@@ -98,3 +98,57 @@ test('fresh window preserves Uint8 M/ever, Uint16 and Float32 offset views byte 
     assert.equal(p[10],7);
   });
 });
+
+test('a read-ahead leaves the host as the plain path leaves it, widening the window with no further reads', () => {
+  // the same demands with and without the read-ahead: every host bit equal, the same window, fewer reads
+  const run = ahead => {
+    const f = fixture(), downloads = [], copy = (dest, rect) => {
+      const [x, y, w, h] = rect;
+      for (let p = 0; p < f.rp.length; p++) for (let r = y; r < y + h; r++) bits(dest[p]).set(bits(f.rp[p]).subarray(r * f.width + x, r * f.width + x + w), r * f.width + x);
+    };
+    const pack = rect => { const [x, y, w, h] = rect, a = w * h, out = new Float32Array(a * f.rp.length);
+      f.rp.forEach((p, k) => { for (let r = 0; r < h; r++) bits(out).set(bits(p).subarray((y + r) * f.width + x, (y + r) * f.width + x + w), k * a + r * w); }); return out; };
+    const win = new CpuDemandWindow(f.width, f.height, f.host, rect => { downloads.push(rect.slice()); copy(f.host, rect); }, 1, rect => { downloads.push(rect.slice()); return pack(rect); });
+    f.rp.forEach((p, k) => { for (let i = 0; i < f.n; i++) p[i] = k * 1000 + i; });
+    bits(f.rp[3])[6 * f.width + 11] = 0x80000000; // a negative zero on the GPU
+    f.host.forEach(p => bits(p).fill(0x7fc12345));
+    win.entry([6, 4, 4, 3]);
+    f.host.forEach((p, k) => { bits(p)[5 * f.width + 7] = k % 2 ? 0x80000000 : 0x7fc23456; }); // a CPU write inside the window
+    if (ahead) win.prefetch([3, 1, 10, 9]);
+    win.require([5, 3, 2, 2]);
+    f.host.forEach(p => { bits(p)[2 * f.width + 12] = 0x7fc0beef; }); // a CPU write outside the window, later covered
+    win.require([11, 8, 2, 2]); win.require([4, 2, 1, 1]);
+    return { host: f.host.map(p => bits(p).slice()), rect: win.rect.slice(), downloads };
+  };
+  const a = run(false), b = run(true);
+  assert.deepEqual(b.rect, a.rect);
+  for (let k = 0; k < a.host.length; k++) assert.deepEqual(b.host[k], a.host[k]);
+  assert.equal(a.downloads.length, 4); assert.equal(b.downloads.length, 2);
+});
+
+test('a demand outside the read-ahead falls back to the union read; a flow forgets it', () => {
+  const f = fixture(), calls = [];
+  const win = new CpuDemandWindow(f.width, f.height, f.host, rect => calls.push(['down', rect.slice()]), 1, rect => { calls.push(['ahead', rect.slice()]); return new Float32Array(rect[2] * rect[3] * f.host.length); });
+  win.entry([6, 4, 4, 3]); win.prefetch([5, 3, 6, 5]);
+  assert.deepEqual(calls, [['down', [6, 4, 4, 3]]], 'no transfer before a contact needs it');
+  win.require([14, 10, 2, 2]); assert.deepEqual(calls.at(-1), ['down', [6, 4, 10, 8]]); assert.equal(win.ahead, null);
+  win.prefetch([0, 0, 19, 13]); win.afterFlow(); assert.equal(win.ahead, null); assert.equal(win.rect, null);
+  win.entry([1, 1, 2, 2]); const n = calls.length; win.prefetch([1, 1, 2, 2]); assert.equal(calls.length, n); // nothing to read ahead
+});
+
+test('with no window yet (fast demand), a read-ahead serves whole-tile demands with the same host bits', () => {
+  const run = ahead => {
+    const f = fixture(), downloads = [];
+    const pack = rect => { const [x, y, w, h] = rect, a = w * h, out = new Float32Array(a * f.rp.length);
+      f.rp.forEach((p, k) => { for (let r = 0; r < h; r++) bits(out).set(bits(p).subarray((y + r) * f.width + x, (y + r) * f.width + x + w), k * a + r * w); }); return out; };
+    const win = new CpuDemandWindow(f.width, f.height, f.host, rect => { downloads.push(rect.slice()); f.copy(f.host, f.rp, rect); }, 8, rect => { downloads.push(rect.slice()); return pack(rect); });
+    f.rp.forEach((p, k) => { for (let i = 0; i < f.n; i++) p[i] = k * 1000 + i; });
+    f.host.forEach(p => bits(p).fill(0x7fc12345));
+    if (ahead) win.prefetch([0, 0, 16, 13]);
+    win.require([3, 2, 2, 2]); f.host.forEach(p => { bits(p)[3 * f.width + 3] = 0x7fc0beef; }); win.require([9, 9, 2, 2]);
+    return { host: f.host.map(p => bits(p).slice()), rect: win.rect.slice(), downloads };
+  };
+  const a = run(false), b = run(true);
+  assert.deepEqual(b.rect, a.rect); for (let k = 0; k < a.host.length; k++) assert.deepEqual(b.host[k], a.host[k]);
+  assert.equal(a.downloads.length, 2); assert.equal(b.downloads.length, 1);
+});

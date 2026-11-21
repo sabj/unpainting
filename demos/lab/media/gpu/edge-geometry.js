@@ -9,7 +9,7 @@
 // private there), as of edge-feed.mjs clearing its footprint by box and contactDistance working on the box's lattice; the shared parts (dryingPressure, contactDistance, cellEdgeFlux) are imported, not copied. The GPU
 // edge parity tests (gpu-edge-feed.test.mjs) fail if the copies drift.
 import { dryingPressure } from '../drying-pressure.js';
-import { contactDistance, cellEdgeFlux } from '../contact-distance.js';
+import { contactDistance, applyEdgeFlux } from '../contact-distance.js';
 
 const TILE = 32;
 /** sheet.mjs wetBoxes, scanning the whole sheet: boxes [x0, y0, x1, y1] round the wet or damp cells, grown by `margin`. */
@@ -63,7 +63,12 @@ export function wetBoxes({ w, h, M, s, capacity }, margin = 2) {
  * otherwise the cells the feed works on (`order`, `n` of them) and, at those cells, the extra evaporation rate `ex` and
  * the face fluxes towards +x (`fx`) and +y (`fy`) of the pressure solve. `S` is scratch reused between calls.
  */
-export function edgeGeometry({ w, h, M, ever, resist }, o, box, mm, S) {
+export function edgeGeometry(sheet, o, box, mm, scratch) {
+  return finishEdgeGeometry(prepareEdgeGeometry(sheet, o, box, mm, scratch));
+}
+
+// Independent of contact distance: these weights can be built while the GPU finds the pinned line.
+export function prepareEdgeGeometry({ w, h, M, ever, resist }, o, box, mm, S) {
   const edgeEvap = o.edgeEvap ?? 0, E = o.edgeMm ?? 1;
   const n0 = w * h;
   if (!S.lev || S.lev.length !== n0) Object.assign(S, { maskBox: null, lev: new Int32Array(n0), order: new Int32Array(n0), ex: new Float64Array(n0), geo: new Float32Array(n0), mask: new Uint8Array(n0), fx: new Float64Array(n0), fy: new Float64Array(n0), pressure: new Float64Array(n0), buckets: [] });
@@ -124,8 +129,7 @@ export function edgeGeometry({ w, h, M, ever, resist }, o, box, mm, S) {
     sat[k] = (dryAt(ax0 + xx - 1, ay0 + yy - 1) ? 1 : 0) + sat[k - 1] + sat[k - aw] - sat[k - aw - 1];
   }
   const dryShare = (x, y) => { const xa = x - reach - ax0, ya = y - reach - ay0, xb = xa + 2 * reach + 1, yb = ya + 2 * reach + 1; return (sat[yb * aw + xb] - sat[ya * aw + xb] - sat[yb * aw + xa] + sat[ya * aw + xa]) / ((2 * reach + 1) ** 2); };
-  const distance = contactDistance(mask, w, h, pinnedAt, box);
-  let Etot = 0;
+
   for (let q = 0; q < n; q++) {
     const i = order[q], l = lev[i];
     let g = 0;
@@ -133,10 +137,16 @@ export function edgeGeometry({ w, h, M, ever, resist }, o, box, mm, S) {
       const u = Math.min(1, Math.max(0, (dryShare(i % w, (i / w) | 0) - 0.1) / 0.2)); g = u * u * (3 - 2 * u);
     } else for (let e = 0; e < 4; e++) { const j = nb(i, e); if (j >= 0 && lev[j] && lev[j] < l && geo[j] > g) g = geo[j]; }
     geo[i] = g;
-    const e0 = g > 0 ? edgeEvap * g * cellEdgeFlux(distance, i % w, (i / w) | 0, mm, E) : 0;
-    ex[i] = e0; Etot += e0;
+    ex[i] = g > 0 ? edgeEvap * g : 0;
   }
-  if (!(Etot > 0)) return null;
+  return { w, h, mask, pinnedAt, box, order, n, lev, ex, fx, fy, pressure, mm, E };
+}
+
+export function finishEdgeGeometry(prepared, field) {
+  if (!prepared) return null;
+  const { w, h, mask, pinnedAt, box, order, n, lev, ex, fx, fy, pressure, mm, E } = prepared;
+  const distance = field ?? contactDistance(mask, w, h, pinnedAt, box);
+  if (!(applyEdgeFlux(distance, order, n, w, mm, E, ex) > 0)) return null;
   for (let q = 0; q < n; q++) pressure[order[q]] = 0;
   const solve = dryingPressure(order, n, lev, w, ex, fx, fy, pressure);
   if (solve.relativeResidual > 1e-6) throw new Error(`drying pressure did not converge: ${solve.relativeResidual}`);

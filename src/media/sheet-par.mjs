@@ -9,6 +9,8 @@ import { useRenderThreads, useRenderCellsThreads } from './km.mjs';
 import { useFlowThreads } from './wash.mjs';
 import { useUnmixThreads } from '../crop/pigments.mjs';
 import { useBlurThreads } from '../keyframes/density.mjs';
+import { usePressureThreads } from './pressure-mg.mjs';
+import { useEdgeFluxThreads } from './contact-distance.mjs';
 import { runJob } from './jobs-kernel.mjs';
 import { SIZING } from './sizing.mjs';
 import {
@@ -51,8 +53,9 @@ export function start(n, { opticsOnly = false } = {}) {
   // the workers start on their own threads; wait for each to be listening before the first step can need it
   const t0 = Date.now(); let r;
   while ((r = Atomics.load(ctrl, READY)) < T - 1) { if (Date.now() - t0 > 30000) throw new Error(`sheet: ${r} of ${T - 1} workers started`); Atomics.wait(ctrl, READY, r, 100); }
-  POOL = { T, ctrl, prm, workers, gen: Atomics.load(ctrl, GEN), ctxs: new WeakMap(), live: [], nextId: 1, stats: { par: 0, serial: 0, render: 0, flow: 0, tiles: 0, thick: 0 } };
+  POOL = { T, ctrl, prm, workers, gen: Atomics.load(ctrl, GEN), ctxs: new WeakMap(), live: [], nextId: 1, stats: { par: 0, serial: 0, render: 0, flow: 0, tiles: 0, thick: 0, edgeFlux: 0, pressureRestricts: 0 } };
   if (T > 1) {
+    if (!opticsOnly) useEdgeThreads(T);
     useRenderThreads(renderLayers);
     if (process.env.KM_PARALLEL_CELLS === '1') useRenderCellsThreads(renderCellsParallel);
     if (!opticsOnly) { useFlowThreads(flowField); useUnmixThreads(unmix); useBlurThreads(blur); }
@@ -61,6 +64,8 @@ export function start(n, { opticsOnly = false } = {}) {
 }
 
 export function stop() {
+  useEdgeFluxThreads(null); usePressureThreads(null);
+  BUFS.delete('edge.samples'); BUFS.delete('edge.flux');
   if (!POOL) return;
   const { ctrl } = POOL;
   ctrl[PHASE] = PH.QUIT; Atomics.store(ctrl, GEN, (POOL.gen + 1) | 0); Atomics.notify(ctrl, GEN);
@@ -172,6 +177,36 @@ function buf(key, Ctor, n) {
   return b;
 }
 const into = (key, a) => { if (isShared(a)) return a; const b = buf(key, a.constructor, a.length); b.set(a); return b; };
+
+// The painter shares its existing pool. The GPU worker starts its own helpers only at the first
+// large curved-edge integral or pressure grid.
+export function useEdgeThreads(n) {
+  if (n <= 1) return;
+  const ready = () => { if (!POOL) start(n); };
+  useEdgeFluxThreads((...args) => { ready(); return edgeFlux(...args); });
+  usePressureThreads({
+    shared,
+    restrict(args) { ready(); job({ kind: 'pressureRestrict', ...args }); POOL.stats.pressureRestricts++; },
+  });
+}
+
+// Share just the 3 x 3 half-cell distances at each curved edge. A sparse mark on a large sheet
+// never copies its interior or the sheet-wide pressure arrays to the workers.
+function edgeFlux(distance, width, bases, mm, edgeMm) {
+  const n = bases.length, capacity = Math.max(BUFS.get('edge.flux')?.length ?? 0, 2 ** Math.ceil(Math.log2(n)));
+  const samples = buf('edge.samples', Float64Array, 9 * capacity);
+  const out = buf('edge.flux', Float64Array, capacity);
+  for (let j = 0; j < n; j++) {
+    const base = bases[j];
+    for (let y = 0; y < 3; y++) {
+      const to = 9 * j + 3 * y, from = base + width * y;
+      samples[to] = distance[from]; samples[to + 1] = distance[from + 1]; samples[to + 2] = distance[from + 2];
+    }
+  }
+  job({ kind: 'edgeFlux', samples, out, n, mm, edgeMm });
+  POOL.stats.edgeFlux++;
+  return out;
+}
 
 /** km.mjs renderLayers in shares of cells; null where it declines. */
 function renderLayers(layers, pigments, paperRGB, n, scale) {

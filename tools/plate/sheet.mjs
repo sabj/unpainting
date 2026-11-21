@@ -379,7 +379,7 @@ if (opt('gpustrokes', '') === 'capdebug') process.env.GPU_STROKES = 'capdebug';
 if (opt('gpustrokes', '') === 'check') process.env.GPU_STROKES = 'check'; // compare eligible ordinary GPU strokes without within-stroke flow (src/media/gpu/stroke-check.mjs)
 const GPU_MODE = opt('gpu', 'auto');
 if (!['auto', 'on', 'off'].includes(GPU_MODE)) throw new Error(`--gpu takes auto, on or off, not ${GPU_MODE}`);
-const GPU_INFO = {...attachGpu(ctx.sheet, O, { mode: GPU_MODE }),nativePaintMode:NATIVE_PAINT_MODE};
+const GPU_INFO = {...attachGpu(ctx.sheet, O, { mode: GPU_MODE, edgeThreads: ctx.gpuEdgeThreads }),nativePaintMode:NATIVE_PAINT_MODE};
 console.log(backendLine(GPU_INFO));
 const base = Buffer.alloc(N2 * 3);
 const SHADE = num('papershade', 0.04);

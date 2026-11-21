@@ -10,7 +10,7 @@
 // be printed into the wash. Advective transport is upwind and simultaneous;
 // substeps obey a shared 50% donor budget and evaporation removes only water.
 import { dryingPressure } from './drying-pressure.js';
-import { contactDistance, cellEdgeFlux } from './contact-distance.js';
+import { contactDistance, applyEdgeFlux } from './contact-distance.js';
 
 const scratch = new WeakMap();
 // A fixed wash no longer has a contact-line evaporation demand.
@@ -120,7 +120,6 @@ export function edgeFeed(sheet, o, box, mm) {
     }
     const dryShare = (x, y) => { const xa = x - reach - ax0, ya = y - reach - ay0, xb = xa + 2 * reach + 1, yb = ya + 2 * reach + 1; return (sat[yb * aw + xb] - sat[ya * aw + xb] - sat[yb * aw + xa] + sat[ya * aw + xa]) / ((2 * reach + 1) ** 2); };
     const distance = contactDistance(mask, w, h, pinnedAt, box);
-    let Etot = 0;
     for (let q = 0; q < n; q++) {
       const i = order[q], l = lev[i];
       let g = 0;
@@ -128,9 +127,9 @@ export function edgeFeed(sheet, o, box, mm) {
         const u = Math.min(1, Math.max(0, (dryShare(i % w, (i / w) | 0) - 0.1) / 0.2)); g = u * u * (3 - 2 * u);
       } else for (let e = 0; e < 4; e++) { const j = nb(i, e); if (j >= 0 && lev[j] && lev[j] < l && geo[j] > g) g = geo[j]; }
       geo[i] = g;
-      const e0 = g > 0 ? edgeEvap * g * cellEdgeFlux(distance, i % w, (i / w) | 0, mm, E) : 0;
-      ex[i] = e0; Etot += e0;
+      ex[i] = g > 0 ? edgeEvap * g : 0;
     }
+    const Etot = applyEdgeFlux(distance, order, n, w, mm, E, ex);
     if (!(Etot > 0)) { for (let q = 0; q < n; q++) lev[order[q]] = 0; return 0; }
     cachedMask.set(lev); cachedSink.set(ex); cachedFootprint.set(mask);
     if (resist) cachedResist.set(resist); else if (b.cacheResist) cachedResist.fill(0);

@@ -14,6 +14,13 @@
 // sweeps each side; corrections per level (2: a W-cycle, which ragged masks need: 47 iterations against 130 for a V-cycle)
 const COARSEST = 16, OMEGA = 1.4, SWEEPS = 1, GAMMA = 2; // nodes solved directly; coarse correction weight (unsmoothed aggregation needs > 1)
 
+// Independent coarse cells can restrict their children in parallel. Keep the small levels in the
+// calling thread: the coarse cells have at most four children each, regardless of the sheet size.
+let pressureThreads = null;
+export function usePressureThreads(driver) { pressureThreads = driver; }
+const largeLevel = n => pressureThreads && n >= 32768;
+const vector = (Ctor, n, threaded) => threaded ? pressureThreads.shared(Ctor, n) : new Ctor(n);
+
 function cholesky(n, A) { // A: n x n row-major, overwritten by L (lower)
   for (let j = 0; j < n; j++) {
     let d = A[j * n + j];
@@ -31,7 +38,8 @@ export function pressureMultigrid({ count, cell, edges, anchor, degree, width, c
   for (let q = 0; q < count; q++) { const i = cell[q], x = i % width, y = (i / width) | 0; if (x < x0) x0 = x; if (y < y0) y0 = y; }
   const levels = [];
   { // fine level, 5-point: off-diagonals to wet neighbours that are not gauges; a gauge row is the identity
-    const X = new Int32Array(count), Y = new Int32Array(count), diag = new Float64Array(count), nb = new Int32Array(4 * count).fill(-1);
+    const threaded = largeLevel(count);
+    const X = new Int32Array(count), Y = new Int32Array(count), diag = vector(Float64Array, count, threaded), nb = vector(Int32Array, 4 * count, threaded).fill(-1);
     for (let q = 0; q < count; q++) {
       const i = cell[q]; X[q] = i % width - x0; Y[q] = ((i / width) | 0) - y0;
       if (anchor[q]) { diag[q] = 1; continue; }
@@ -67,7 +75,8 @@ export function pressureMultigrid({ count, cell, edges, anchor, degree, width, c
       if (F.five) { for (let a = 0; a < 4; a++) { const j = F.nb[4 * k + a]; if (j >= 0 && agg[j] >= 0) add(I, agg[j], -1); } }
       else for (let s = 0; s < 9; s++) { if (s === 4) continue; const j = F.nb[9 * k + s]; if (j >= 0 && agg[j] >= 0) add(I, agg[j], F.off[9 * k + s]); }
     }
-    const diag = new Float64Array(n), nb = new Int32Array(9 * n).fill(-1), off = new Float64Array(9 * n);
+    const threaded = largeLevel(n);
+    const diag = vector(Float64Array, n, threaded), nb = vector(Int32Array, 9 * n, threaded).fill(-1), off = vector(Float64Array, 9 * n, threaded);
     for (let I = 0; I < n; I++) {
       diag[I] = st[9 * I + 4];
       for (let s = 0; s < 9; s++) {
@@ -94,7 +103,21 @@ export function pressureMultigrid({ count, cell, edges, anchor, degree, width, c
       C.blocks.push({ nodes: Int32Array.from(nodes), m, L: cholesky(m, A), y: new Float64Array(m) });
     }
   }
-  for (const L of levels) { L.b = new Float64Array(L.n); L.x = new Float64Array(L.n); L.r = new Float64Array(L.n); }
+  for (let l = 0; l < levels.length; l++) {
+    const L = levels[l], next = levels[l + 1];
+    const threaded = next && largeLevel(L.n);
+    L.b = vector(Float64Array, L.n, threaded || (l > 0 && levels[l - 1].children));
+    L.x = vector(Float64Array, L.n, threaded);
+    L.r = new Float64Array(L.n);
+    if (!threaded) continue;
+    // Visit each 2 x 2 aggregate's children in the same order that the serial scatter adds them.
+    L.children = pressureThreads.shared(Int32Array, 4 * next.n).fill(-1);
+    const counts = new Uint8Array(next.n);
+    for (let k = 0; k < L.n; k++) {
+      const parent = L.agg[k];
+      if (parent >= 0) L.children[4 * parent + counts[parent]++] = k;
+    }
+  }
   // y = b - (A - D) x at node k, written out for the 5-point and the 9-point stencils
   const sweep = (L, b, x, forward) => {
     const n = L.n, nb = L.nb, d = L.diag;
@@ -134,12 +157,15 @@ export function pressureMultigrid({ count, cell, edges, anchor, degree, width, c
     const L = levels[l], { b, x, r } = L;
     if (l === levels.length - 1) { solveCoarsest(L, b, x); return; }
     x.fill(0); for (let s = 0; s < SWEEPS; s++) sweep(L, b, x, true);
-    residual(L, b, x, r);
     const N = levels[l + 1];
     for (let g = 0; g < GAMMA; g++) { // a W-cycle (GAMMA 2) corrects twice, the second time from the new residual
-      if (g) residual(L, b, x, r);
-      N.b.fill(0);
-      for (let k = 0; k < L.n; k++) if (L.agg[k] >= 0) N.b[L.agg[k]] += r[k];
+      if (L.children && pressureThreads) {
+        pressureThreads.restrict({ b, x, nb: L.nb, diag: L.diag, off: L.off, children: L.children, out: N.b, n: N.n });
+      } else {
+        residual(L, b, x, r);
+        N.b.fill(0);
+        for (let k = 0; k < L.n; k++) if (L.agg[k] >= 0) N.b[L.agg[k]] += r[k];
+      }
       cycle(l + 1);
       for (let k = 0; k < L.n; k++) if (L.agg[k] >= 0) x[k] += OMEGA * N.x[L.agg[k]];
     }

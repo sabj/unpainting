@@ -18,15 +18,37 @@ function checkRect(rect, width, height) {
 }
 
 export class CpuDemandWindow {
-  constructor(width, height, planes, download, tile = 1) {
+  constructor(width, height, planes, download, tile = 1, readAhead = null) {
     this.width = width; this.height = height; this.planes = planes;
     this.tile = tile;
     this.download = download; this.rect = null; this.epoch = 0;
+    // `ahead`: a rectangle read ahead in this epoch, kept apart from the host planes ({rect, data} packed plane by plane
+    // in `planes` order, as readAhead returns it). The window grows into it by copying, cell for cell what a read of the
+    // grown window would bring then: host cells are only ever written where the window grows, as before.
+    this.ahead = null; this.readAhead = readAhead;
   }
   // Call only once the GPU has actually advanced. A scheduled callback is not an epoch.
-  afterFlow() { this.rect = null; this.epoch++; }
+  afterFlow() { this.rect = null; this.ahead = null; this.epoch++; }
   covers(rect) { return !!this.rect && contains(this.rect, rect); }
-  entry(rect) { checkRect(rect, this.width, this.height); this.download(rect); this.rect = rect.slice(); }
+  entry(rect) { checkRect(rect, this.width, this.height); this.download(rect); this.rect = rect.slice(); this.ahead = null; }
+  /** Reserve one transfer for the next demand inside this rectangle. A stroke with no
+   *  footprint, or a window that never grows, pays for no speculative read. */
+  prefetch(rect) {
+    checkRect(rect, this.width, this.height);
+    if (!this.readAhead || (this.rect && (!contains(rect, this.rect) || contains(this.rect, rect)))) return;
+    this.ahead = { rect: rect.slice(), data: null };
+  }
+  // host cells of `next` outside `old` from the read-ahead
+  widenFromAhead(old, next) {
+    const { rect } = this.ahead, [ax, ay, aw, ah] = rect, area = aw * ah;
+    const data = this.ahead.data ??= this.readAhead(rect);
+    const copy = (row, x, n) => { if (n <= 0) return; const j = (row - ay) * aw + (x - ax), i = row * this.width + x;
+      this.planes.forEach((plane, p) => plane.set(data.subarray(p * area + j, p * area + j + n), i)); };
+    for (let row = next[1]; row < next[1] + next[3]; row++) {
+      if (!old || row < old[1] || row >= old[1] + old[3]) { copy(row, next[0], next[2]); continue; }
+      copy(row, next[0], old[0] - next[0]); copy(row, old[0] + old[2], next[0] + next[2] - old[0] - old[2]);
+    }
+  }
   require(rect) {
     checkRect(rect, this.width, this.height);
     if (this.rect && contains(this.rect, rect)) return;
@@ -34,6 +56,8 @@ export class CpuDemandWindow {
     const tile=this.tile,x=Math.floor(rect[0]/tile)*tile,y=Math.floor(rect[1]/tile)*tile;
     const expanded=[x,y,Math.min(this.width,Math.ceil((rect[0]+rect[2])/tile)*tile)-x,Math.min(this.height,Math.ceil((rect[1]+rect[3])/tile)*tile)-y];
     const old = this.rect, next = union(old, expanded);
+    if (this.ahead && contains(this.ahead.rect, next)) { this.widenFromAhead(old, next); this.rect = next; return; }
+    this.ahead = null;
     // A union includes fresh CPU writes as well as stale cells. Preserve the
     // entire old window bit-for-bit, including signed zero and NaN payloads.
     const saved = old && this.planes.map(plane => {

@@ -10,6 +10,9 @@ import { observeFrontier } from './frontier-layout.mjs';
 import { instrumentDispatches } from './dispatch-profile.mjs';
 import { watchDevice, markBroken, assertHealthy } from './device-health.mjs';
 
+// Direct library callers may choose one thread. The pool starts on the first large curved edge or pressure grid.
+const edgePool = workerData.edgeThreads > 1 ? await import('../sheet-par.mjs') : null;
+edgePool?.useEdgeThreads(workerData.edgeThreads);
 const keepAlive = setInterval(() => {}, 1000);
 if (process.env.GPU_STROKES === 'capdebug') globalThis.GPU_CAP_DEBUG = true; // say when a step in a stroke had more active tiles than it was sized for
 const RING_FLOATS = 6144; // must match link.mjs
@@ -221,7 +224,7 @@ async function handleOp(m) {
       new Uint8Array(rectData.buffer).set(data);ctrl[1]=data.length;break;
     }
     case 'dryStats': {const m=gpu.dryTelemetry??{};ctrl[1]=m.calls??0;ctrl[4]=m.fastChunk??50;ctrl[6]=m.lastWetCounter??-1;ctrl[12]=m.counterReads??0;ctrl[13]=Math.min(2147483647,Math.round((m.counterReadMs??0)*1000));ctrl[14]=m.fastIterations??0;ctrl[15]=m.fastChunks??0;break;}
-    case 'prof': { gpu.flushStrokes(); const b = new TextEncoder().encode(JSON.stringify({ ...(PROF ?? {}), dryTelemetry: gpu.dryTelemetry ?? null, capabilities: { wetCounterPolicy: 'on-demand; frontier maintained every step', fastDryChunkPolicy: 'adaptive 50/150/200; explicit override supported', maxStorageBuffersPerShaderStage: gpu.device.limits.maxStorageBuffersPerShaderStage, fusedWetScan: process.env.GPU_FUSE_WETSCAN !== '0' && gpu.device.limits.maxStorageBuffersPerShaderStage >= 10 }, timingScope: SERIAL_PROF ? 'legacy serialized worker wall time' : 'worker handling wall time; data-dependent readbacks include queued GPU work; unawaited stroke execution excluded', dispatchBatches: gpu.device.dispatchProfile?.snapshot(), timestamps: await gpu.timestamps.result(), optical: gpu.optical ? { ...gpu.optical.stats, timestamps: await gpu.optical.timestamps.result() } : null })); new Uint8Array(rectData.buffer).set(b); ctrl[1] = b.length; break; }
+    case 'prof': { gpu.flushStrokes(); const b = new TextEncoder().encode(JSON.stringify({ ...(PROF ?? {}), dryTelemetry: gpu.dryTelemetry ?? null, gpuDistanceBoxes: gpu.gpuDistanceBoxes ?? 0, edgeFluxThreads: edgePool?.threads() ?? 1, edgeFluxJobs: edgePool?.stats()?.edgeFlux ?? 0, pressureRestricts: edgePool?.stats()?.pressureRestricts ?? 0, capabilities: { wetCounterPolicy: 'on-demand; frontier maintained every step', fastDryChunkPolicy: 'adaptive 50/150/200; explicit override supported', maxStorageBuffersPerShaderStage: gpu.device.limits.maxStorageBuffersPerShaderStage, fusedWetScan: process.env.GPU_FUSE_WETSCAN !== '0' && gpu.device.limits.maxStorageBuffersPerShaderStage >= 10 }, timingScope: SERIAL_PROF ? 'legacy serialized worker wall time' : 'worker handling wall time; data-dependent readbacks include queued GPU work; unawaited stroke execution excluded', dispatchBatches: gpu.device.dispatchProfile?.snapshot(), timestamps: await gpu.timestamps.result(), optical: gpu.optical ? { ...gpu.optical.stats, timestamps: await gpu.optical.timestamps.result() } : null })); new Uint8Array(rectData.buffer).set(b); ctrl[1] = b.length; break; }
     case 'close': clearInterval(keepAlive); process.exit(0);
   }
   if (m.wait !== false) ack();

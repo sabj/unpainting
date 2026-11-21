@@ -212,7 +212,7 @@ function centredResidual(w, h, wet, sinkAt, solver = 'mg') {
   for (const i of order) sink[i] = sinkAt(i % w, (i / w) | 0);
   const fx = new Float64Array(n), fy = new Float64Array(n), p = new Float64Array(n), t = performance.now();
   const res = dryingPressure(order, order.length, index, w, sink, fx, fy, p, solver);
-  return { res, seconds: (performance.now() - t) / 1000, fx, p };
+  return { res, seconds: (performance.now() - t) / 1000, fx, fy, p };
 }
 test('multigrid converges where the sink is nearly uniform or nearly zero (the stopping rule follows the equations)', () => {
   const strip = centredResidual(202, 1, () => true, x => x === 0 ? 1e-12 : 0);
@@ -245,4 +245,21 @@ test('multigrid reaches the equations on a comb of thin rows with a 1e-16 sink, 
   const order = Int32Array.from(Array.from({ length: n }, (_, i) => i).filter(i => index[i])), p = Float64Array.from(index, (m, i) => m ? Math.sin(i) : 0);
   const r = dryingPressure(order, order.length, index, 96, new Float64Array(n), new Float64Array(n), new Float64Array(n), p, 'mg');
   assert.ok(r.iterations <= 400 && r.relativeResidual < 1e-9, JSON.stringify(r));
+});
+
+test('threaded multigrid restriction preserves pressures, face fluxes and the stopping rule', async t => {
+  const pool = await import('./sheet-par.mjs');
+  t.after(() => pool.stop());
+  const wet = (x, y) => x !== 207 && !(x > 19 && x < 37 && y % 17 === 5);
+  const sinkAt = (x, y) => (x < 4 || y < 5 || x > 420) ? .001 + .0003 * Math.sin(x + y) : 0;
+  // Large enough to exercise both the five-neighbour and nine-neighbour level operators.
+  const run = () => centredResidual(427, 361, wet, sinkAt);
+  const ref = run();
+  pool.useEdgeThreads(3);
+  const actual = run();
+  assert.ok(pool.stats().pressureRestricts > 0);
+  assert.deepEqual(actual.res, ref.res);
+  for (const key of ['fx', 'fy', 'p']) {
+    assert.ok(Buffer.from(ref[key].buffer).equals(Buffer.from(actual[key].buffer)), key);
+  }
 });

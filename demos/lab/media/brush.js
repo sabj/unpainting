@@ -436,6 +436,8 @@ function splatStrokeGpu(brush, sheet, path, { spacing, between, lift, upright })
   return undefined;
 }
 
+// A private snapshot of nearby GPU tiles lets a section brush widen its CPU window without another transfer.
+const sectionPrefetchMargin = Math.max(0, Math.floor(Number(ENV.GPU_SECTION_PREFETCH ?? 4)) || 0);
 // CPU_STROKE_TRACE=1: count why strokes stayed on the CPU copy, printed at exit
 const CPU_TRACE = ENV.CPU_STROKE_TRACE === '1' ? new Map() : null;
 if (CPU_TRACE) process.on('exit', () => { for (const [k, n] of CPU_TRACE) console.error(`CPUSTROKE ${n} ${k}`); });
@@ -472,7 +474,13 @@ export function stroke(brush, sheet, path, options = {}) {
     if (link.check) { invalidatePaperCertificate(sheet); return checkedStroke(brush, sheet, path, options, { cpuStroke: strokeImpl, gpuStroke: strokeGpu, rect: link.validRect(strokeRect(brush, sheet, path)) }); }
     return strokeGpu(brush, sheet, path, options);
   }
-  link.beginStroke(sheet, strokeRect(brush, sheet, path), { tracked: !options.between || options.gpuBetween === true, instrument:'brush', planOverflow:!!link.brushGpu&&onGpu(brush,sheet)&&!fits, periodic:options.gpuBetween===true&&typeof options.between==='function', flowEvery:options.flowEvery??0 });
+  const transport = {
+    tracked: !options.between || options.gpuBetween === true, instrument: 'brush',
+    planOverflow: !!link.brushGpu && onGpu(brush, sheet) && !fits,
+    periodic: options.gpuBetween === true && typeof options.between === 'function', flowEvery: options.flowEvery ?? 0,
+  };
+  if (brush.model === 'section' && brush.radius > 0 && sectionPrefetchMargin > 0) transport.prefetch = Math.ceil(brush.radius) + sectionPrefetchMargin;
+  link.beginStroke(sheet, strokeRect(brush, sheet, path), transport);
   try { return strokeImpl(brush, sheet, path, options); } finally { link.endStroke(sheet); }
 }
 

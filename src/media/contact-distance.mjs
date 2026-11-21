@@ -48,8 +48,15 @@ export function contactDistance(mask, w, h, pinned, box = null) {
 // half-cell samples, so straight contact lines are represented exactly.
 export function cellEdgeFlux(field, x, y, mm, E) {
   const { distance: d, width: w } = field, x0 = 2 * x - (field.ox ?? 0), y0 = 2 * y - (field.oy ?? 0);
-  if (d[(y0 + 1) * w + x0 + 1] * mm > E + Math.SQRT2 * mm) return 0;
-  const base = y0 * w + x0, first = d[base], gx = .5 * (d[base + 2] - first), gy = .5 * (d[base + 2 * w] - first);
+  const base = y0 * w + x0;
+  return analyticFlux(d, base, w, mm, E) ?? curvedEdgeFlux(d, base, w, mm, E);
+}
+
+// Outside the edge band and along straight lines the cell average is analytic.
+// A curved edge needs the square quadrature below.
+function analyticFlux(d, base, w, mm, E) {
+  if (d[base + w + 1] * mm > E + Math.SQRT2 * mm) return 0;
+  const first = d[base], gx = .5 * (d[base + 2] - first), gy = .5 * (d[base + 2 * w] - first);
   let straight = Math.abs(Math.abs(2 * gx) - 1) < 1e-12 && Math.abs(gy) < 1e-12 || Math.abs(Math.abs(2 * gy) - 1) < 1e-12 && Math.abs(gx) < 1e-12;
   if (straight) for (let iy = 0; iy < 3; iy++) for (let ix = 0; ix < 3; ix++) if (Math.abs(d[base + iy * w + ix] - first - ix * gx - iy * gy) > 1e-12) straight = false;
   if (straight) {
@@ -57,16 +64,60 @@ export function cellEdgeFlux(field, x, y, mm, E) {
     const b = Math.max(first, d[base + 2], d[base + 2 * w], d[base + 2 * w + 2]) * mm;
     return edgeProfile(a, b, E);
   }
+}
+
+export function curvedEdgeFlux(d, base, w, mm, E) {
   // Samples 0.005 E apart, but at most 64 a side: a cell several millimetres wide (a coarse sheet, or the scrap a coarse
   // sheet calibrates on) asked for 635 a side, 400,000 samples an edge cell and a step, and a 48-cell painting took
   // minutes in its swatches. At 64 a 3 mm cell is still sampled every 0.05 mm, twenty samples across a 1 mm band.
-  const count = Math.min(64, Math.max(2, Math.ceil(mm / (.005 * E)))), tail = 1 / Math.sqrt(1.02), norm = 2 * (Math.sqrt(1.02) - Math.sqrt(.02)) - tail;
+  const count = samplesPerSide(mm, E), tail = 1 / Math.sqrt(1.02), norm = 2 * (Math.sqrt(1.02) - Math.sqrt(.02)) - tail;
   let sum = 0;
   for (let iy = 0; iy < count; iy++) for (let ix = 0; ix < count; ix++) {
     const xq = 2 * (ix + .5) / count, yq = 2 * (iy + .5) / count, ax = Math.floor(xq), ay = Math.floor(yq), fx = xq - ax, fy = yq - ay;
-    const i = (y0 + ay) * w + x0 + ax;
+    const i = base + ay * w + ax;
     const dist = ((1 - fy) * ((1 - fx) * d[i] + fx * d[i + 1]) + fy * ((1 - fx) * d[i + w] + fx * d[i + w + 1])) * mm;
     if (dist < E) sum += (1 / Math.sqrt(dist / E + .02) - tail) / norm;
   }
   return sum / (count * count);
+}
+
+const samplesPerSide = (mm, E) => Math.min(64, Math.max(2, Math.ceil(mm / (.005 * E))));
+
+let runCurvedFlux = null;
+export function useEdgeFluxThreads(run) { runCurvedFlux = run; }
+
+/** Integrate the active cells' double-precision prefactors in place, then sum in their original order. */
+export function applyEdgeFlux(field, order, n, sheetWidth, mm, E, ex) {
+  const samples = samplesPerSide(mm, E);
+  // For a few cells, packaging their nine samples costs more than computing them locally.
+  const minCells = Math.max(32, Math.ceil(131072 / (samples * samples)));
+  const parallel = runCurvedFlux && n >= minCells;
+  if (!parallel) {
+    let total = 0;
+    for (let q = 0; q < n; q++) {
+      const i = order[q];
+      if (ex[i] > 0) ex[i] *= cellEdgeFlux(field, i % sheetWidth, Math.floor(i / sheetWidth), mm, E);
+      total += ex[i];
+    }
+    return total;
+  }
+  const { distance, width, ox = 0, oy = 0 } = field, cells = [], bases = [];
+  for (let q = 0; q < n; q++) {
+    const i = order[q];
+    if (!(ex[i] > 0)) continue;
+    const base = (2 * Math.floor(i / sheetWidth) - oy) * width + 2 * (i % sheetWidth) - ox;
+    const flux = analyticFlux(distance, base, width, mm, E);
+    if (flux === undefined) { cells.push(i); bases.push(base); }
+    else ex[i] *= flux;
+  }
+  // A large wash may have just a handful of curved cells. Start or wake workers only for substantial quadrature.
+  if (cells.length >= minCells) {
+    const flux = runCurvedFlux(distance, width, bases, mm, E);
+    for (let j = 0; j < cells.length; j++) ex[cells[j]] *= flux[j];
+  } else {
+    for (let j = 0; j < cells.length; j++) ex[cells[j]] *= curvedEdgeFlux(distance, bases[j], width, mm, E);
+  }
+  let total = 0;
+  for (let q = 0; q < n; q++) total += ex[order[q]];
+  return total;
 }

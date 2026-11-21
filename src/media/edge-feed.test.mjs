@@ -123,7 +123,10 @@ test('unmet evaporation remains a demand for the next subcycle, rather than disa
   assert.ok(s.W.every(v => v >= 0));
 });
 
-test('the faster edge feed moves the same water and pigment as the first version, to the bit', async () => {
+test('the threaded edge feed moves the same water and pigment as the first version, to the bit', async t => {
+  const pool = await import('./sheet-par.mjs');
+  pool.start(3);
+  t.after(() => pool.stop());
   const { edgeFeedReference } = await import('./edge-feed-reference.mjs');
   const mm = 0.5, n = 40;
   // two identical sheets; marks laid, boxes moved and masking fluid put on and off between the calls, as a painting does
@@ -144,4 +147,5 @@ test('the faster edge feed moves the same water and pigment as the first version
     for (const box of boxes) { const a = edgeFeed(A, o, box, mm), b = edgeFeedReference(B, o, box, mm); assert.ok(Object.is(a, b), `call ${call}: evaporated ${a} vs ${b}`); }
     same(`call ${call}`);
   }
+  assert.ok(pool.stats().edgeFlux > 0, 'curved-edge quadrature ran across threads');
 });

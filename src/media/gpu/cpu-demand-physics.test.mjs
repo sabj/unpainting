@@ -91,16 +91,17 @@ function fixture(enabled) {
     hostMask:link.wetMask,sentMask:link.sentMask,activeCounts:link.actCount.slice(),version:link.version,fullBrushPigments });
   return { local, remote, link, O, rows, logical, capture,checkedReads:()=>checkedReads };
 }
-function run(enabled, { tracked = true, thirsty = false, metered = false, pen = false, flat = false, draw = false, late=false,multiple=false,offsheet=false,noFlow=false,observer=false,perContact=false,interval=8 } = {}) {
+function run(enabled, { tracked = true, thirsty = false, metered = false, pen = false, flat = false, draw = false, late=false,multiple=false,offsheet=false,noFlow=false,observer=false,perContact=false,interval=8, model = 'row', skipPrefetch = false } = {}) {
   recordMarks(true);
   const f = fixture(enabled), sh = f.local; tapeSheet(TAPE); sh._tape = true;
+  if (skipPrefetch) f.link.beginStroke = (sheet, rect, opts) => GpuLink.prototype.beginStroke.call(f.link, sheet, rect, { ...opts, prefetch: 0 });
   setClip(sh, Uint8Array.from({ length: sh.n }, (_, i) => (i % 40 > 4 + 2 * Math.sin(i / 100) && i % 40 < 36 ? 1 : 0)));
   const resist = Uint8Array.from({ length: sh.n }, (_, i) => (i % 40 > 18 && i % 40 < 23 && i / 40 > 18 && i / 40 < 24 ? 1 : 0));
   // Pre-attach resist initialization avoids exercising unrelated full-upload plumbing.
   sh.resist = f.remote.resist = resist;
   const path = [{ x: 5, y: 10, r: 4, p: .25, v: 1 }, { x: 29, y: 22, r: 6, p: .85, v: .8 }, { x: 10, y: 33, r: 3, p: .5, v: 1.4 }, { x: 37, y: 40, r: 5, p: .75, v: 1 }];
   if(offsheet){path[0].x=-10;path.at(-1).x=49;}
-  let b = pen ? createPen({ reach: 3 }) : createBrush({ radius: 6, bristles: 18, capacity: 12, wetMix: .7, seed: 17, flat, depositDepth: metered ? .3 : 0 });
+  let b = pen ? createPen({ reach: 3 }) : createBrush({ radius: 6, bristles: 18, capacity: 12, wetMix: .7, seed: 17, flat, model, depositDepth: metered ? .3 : 0 });
   if (pen) dipPen(b, [.15]); else dip(b, { water: thirsty ? .02 : .88, conc: thirsty ? [0] : [.2] });
   const options = { gpuBetween: tracked,flowEvery:perContact?0:interval, between: k => {
     if(observer && k%8===4){f.link.ensureFresh(sh,[0,0,sh.w,sh.h]);assert.ok(Number.isFinite(sh.W.reduce((a,v)=>a+v,0)));}
@@ -135,6 +136,20 @@ for (const [name, config] of [['loaded-round', {}], ['thirsty', { thirsty: true 
 }
 
 // Cadence affects a conservative geometry hint, not the actual flow epoch.
+test('a section brush reads ahead through the GPU link and keeps its wet film and brush charge', t => {
+  for (const flat of [false, true]) {
+    const options = { model: 'section', flat, late: true };
+    const base = run('fast', { ...options, skipPrefetch: true });
+    const ahead = run('fast', options);
+    assert.deepEqual(ahead.rows, base.rows);
+    assert.deepEqual(ahead.logical, base.logical);
+    assert.deepEqual(ahead.tape, base.tape);
+    assert.equal(ahead.link.stats.downAhead, 1);
+    assert.ok(ahead.link.stats.down < base.link.stats.down, `expected fewer section reads than ${base.link.stats.down}, got ${ahead.link.stats.down}`);
+    t.diagnostic(`${flat ? 'flat' : 'round'} section stroke reads ${base.link.stats.down} → ${ahead.link.stats.down}`);
+  }
+});
+
 for(const interval of [1,76,173,184,187,296,4096])test('explicit lookahead '+interval+' preserves exact state with earlier/later actual8-contact flows',()=>{const a=run(false,{interval}),b=run(true,{interval});assert.deepEqual(b.rows,a.rows);assert.deepEqual(clone(fields(b.local)),clone(fields(a.local)));assert.deepEqual(b.local.layers,a.local.layers);assert.deepEqual(b.tape,a.tape);assert.deepEqual(b.logical,a.logical);assert.ok(b.checkedReads()>0);});
 
 test('Fast real CPU brush fallback shares lookahead readbacks and preserves physical output',()=>{

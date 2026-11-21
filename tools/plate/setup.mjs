@@ -156,14 +156,16 @@ if (SUBJECT_MEDIUM) console.log(subjectMediumNote(SUBJECT_MEDIUM.medium, SUBJECT
 const PAINTER = versionStamp();
 console.log(`${versionLine(PAINTER)}${PAINTER.commit ? ` at ${PAINTER.commit.slice(0, 12)}` : ''}`);
 // --threads N: large wet boxes step in row bands on N threads (src/media/sheet-par.mjs); output is bit-identical.
-// Default up to 6 in fast mode, 1 in full mode.
-const THREADS_DEFAULT = NATIVE_PAINT_MODE.mode === 'fast' ? Math.max(1, Math.min(6, availableParallelism() - 2)) : 1;
-if (await setThreads(num('threads', THREADS_DEFAULT)) > 1) process.on('exit', () => console.log(`threads: ${num('threads', THREADS_DEFAULT)}, boxes stepped in bands and serially: ${JSON.stringify(threadStats())}`));
+// All modes can split large wet-edge quadratures without changing their arithmetic.
+const cpuThreads = await setThreads(num('threads', Math.max(1, Math.min(6, availableParallelism() - 2))));
+if (cpuThreads > 1) process.on('exit', () => console.log(`threads: ${cpuThreads}, sheet jobs: ${JSON.stringify(threadStats())}`));
 ctx.opticalThreads = 1;
 if (SPEED_RENDER_THREADS > 1) {
   const opticsPool = await import('../../src/media/sheet-par.mjs');
   ctx.opticalThreads = opticsPool.threads() > 1 ? opticsPool.threads() : opticsPool.start(SPEED_RENDER_THREADS, { opticsOnly: true });
 }
+// The GPU may be working while the painter uses its own CPU pool. Budget its helpers from the cores left over.
+ctx.gpuEdgeThreads = Math.max(1, Math.min(cpuThreads, availableParallelism() - Math.max(cpuThreads, ctx.opticalThreads)));
 const root = path.dirname(path.dirname(ENTRY_FILE));
 const out = path.resolve(root, opt('out', 'work/plate'));
 // The source is not enlarged: the sheet's cells across (--width x --scale) against the source's pixels across, checked
