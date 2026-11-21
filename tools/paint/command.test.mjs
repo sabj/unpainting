@@ -6,7 +6,7 @@ const spec = (over = {}) => ({
   id: 'dune', name: 'dune-dog', variant: null,
   source: { abs: '/r/src/dune.png' }, sheet: { widthMm: 390, cells: 1500 }, drawing: { abs: '/r/vec/dune' },
   studies: [{ abs: '/r/a.png', floorMm2: 6, read: {} }, { abs: '/r/b.png', floorMm2: 4, read: { clusters: 20, join: 6 } }],
-  labels: { abs: '/r/labels.json' }, masks: null, otherSets: [],
+  labels: { abs: '/r/labels.json' }, masks: { receipt: null, none: 'no receipt' }, otherSets: [],
   options: [['recipe', 'default'], ['gpu', 'on'], ['targetguard', 'gentle'], ['marks', '1'], ['outlinemedium', 'ink'], ['inkrecipe', 'wash']],
   ...over,
 });
@@ -47,9 +47,9 @@ test('what the command owns cannot be set, and gentle mode stays', () => {
 });
 
 test('named forms go to the planner when the painter reads them; an authored script replaces the studies', () => {
-  const masks = { receipt: '/m/receipt.json', forms: [] };
+  const masks = { receipt: '/m/receipt.json', labels: '/m/labels.json', forms: [] };
   const c = buildCommand(spec({ masks }), { mode: 'plan', out: '/o', known });
-  assert.equal(value(c, 'thingmasks'), '/m/receipt.json'); assert.equal(value(c, 'things'), '/r/labels.json'); assert.equal(c.masksRead, true);
+  assert.equal(value(c, 'thingmasks'), '/m/receipt.json'); assert.equal(value(c, 'things'), '/m/labels.json'); assert.equal(c.masksRead, true);
   assert.equal(buildCommand(spec({ masks }), { mode: 'plan', out: '/o', known: new Set() }).masksRead, false);
   const s = buildCommand(spec({ masks }), { mode: 'paint', out: '/o', known, script: { file: '/o/author/script.json', paints: ['ochre', 'ultramarine'] } });
   assert.equal(value(s, 'washplan'), 'script:/o/author/script.json'); assert.equal(value(s, 'paints'), 'ochre,ultramarine'); assert.equal(value(s, 'paintsextend'), '0');
@@ -67,7 +67,7 @@ test('the block before a run says everything in plain rows', () => {
     sheet: { widthMm: 280, heightMm: 186.7, cells: 1200, rows: 800, cellMm: 0.2333 },
     drawing: { stem: 'vec/old', medium: 'ink', pinned: false },
     studies: [{ path: 'st/a.png', role: 'block-in', floorMm2: 6, read: { clusters: 20 } }],
-    masks: null, author: { key: 'auto' }, settings: [{ name: 'threads', value: '2', default: '(painter default)' }], switches: { X_NO_CHARGES: '1' },
+    masks: { receipt: null, none: 'no receipt at /f/dune/receipt.json' }, author: { key: 'auto' }, settings: [{ name: 'threads', value: '2', default: '(painter default)' }], switches: { X_NO_CHARGES: '1' },
     code: { commit: 'db0bb9df1992', dirty: true, tracked: ['a'], untracked: [] },
   }).join('\n');
   for (const want of [/subject: +dune \(dune-dog\), variant "old"/, /sheet: +280 x 186.7 mm, 1200 x 800 cells, 0.2333 mm a cell/, /drawing: +vec\/old, ink \(not the record's drawing; unpinned\)/,

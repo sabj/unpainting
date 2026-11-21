@@ -1,0 +1,11 @@
+{
+  "note": "Models that can write the wash plan for `npm run paint -- ... --author <key>`. cli is how the model is called (claude, codex or agy), read-only, one reply; effort is the reasoning setting sent. A key that is not here is looked up in bench/models.json.",
+  "authors": [
+    { "key": "opus", "name": "Opus 5.5", "id": "claude-opus-5-5", "effort": "high", "cli": "claude" },
+    { "key": "fable", "name": "Fable 5.2", "id": "claude-fable-5-2", "effort": "high", "cli": "claude" },
+    { "key": "astra", "name": "Codex Astra", "id": "gpt-6.2-astra", "effort": "high", "cli": "codex" },
+    { "key": "argon", "name": "Gemini 4 Argon", "id": "gemini-4-argon-high", "effort": "high", "cli": "agy" },
+    { "key": "neon", "name": "Gemini 4 Neon", "id": "gemini-4-neon-high", "effort": "high", "cli": "agy" },
+    { "key": "hydrogen", "name": "Gemini 4 Hydrogen", "id": "gemini-4-hydrogen-high", "effort": "high", "cli": "agy" }
+  ]
+}

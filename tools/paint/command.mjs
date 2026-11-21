@@ -31,10 +31,10 @@ export function buildCommand(spec, { mode, out, known, script = null, dirty = fa
   }
   if (mode === 'plan') { opts.set('gpu', 'off'); opts.set('valuepreviewonly', '1'); } else opts.set('gpu', 'on');
   if (script) { opts.set('paints', script.paints.join(',')); opts.set('paintsextend', '0'); }
-  const masksRead = Boolean(spec.masks && !script && known?.has('thingmasks'));
+  const masksRead = Boolean(spec.masks?.receipt && !script && known?.has('thingmasks'));
   const argv = [...opts].flatMap(([k, v]) => [`--${k}`, v]);
   argv.push('--washplan', script ? `script:${script.file}` : washPlanOf(spec.studies), '--drawingfile', spec.drawing.abs);
-  if (masksRead) argv.push('--thingmasks', spec.masks.receipt, ...(spec.labels ? ['--things', spec.labels.abs] : []));
+  if (masksRead) argv.push('--thingmasks', spec.masks.receipt, ...(spec.masks.labels ? ['--things', spec.masks.labels] : []));
   argv.push('--image', spec.source.abs, '--width', String(spec.sheet.cells), '--sheetmm', String(spec.sheet.widthMm), '--out', out);
   if (dirty) argv.push('--allowdirty', '1');
   const line = opts.get('outlinemedium') ?? 'graphite';
@@ -59,9 +59,9 @@ export function describeRun(run) {
   row('sheet', `${sheet.widthMm}${sheet.heightMm ? ` x ${sheet.heightMm}` : ''} mm, ${sheet.cells}${sheet.rows ? ` x ${sheet.rows}` : ''} cells, ${sheet.cellMm} mm a cell`);
   row('drawing', `${drawing.stem}, ${drawing.medium}${drawing.pinned ? '' : ' (not the record\'s drawing; unpinned)'}`);
   studies.forEach((st, i) => row(`study ${i + 1}`, `${st.path}, ${st.role}, shapes from ${st.floorMm2 ?? '?'} mm2${Object.entries(st.read).map(([k, v]) => `, ${k} ${v}`).join('')}`));
-  row('masks', masks ? `${masks.forms.length} named forms (${masks.forms.map(f => f.name).join(', ')}) from ${masks.receipt}; ${masks.read ? 'given to the planner' : 'shown on the sheet only: ' + masks.whyNotRead}` : 'none (no named-forms receipt for this subject)');
+  row('masks', masks.receipt ? `${masks.forms.length} named forms (${masks.forms.map(f => f.name).join(', ')}) from ${masks.receipt} (${masks.from === 'set' ? '--set masks' : 'the named-forms folder'}); ${masks.read ? 'given to the planner' : 'shown to the author and on the sheet: ' + masks.whyNotRead}` : `none (${masks.none})`);
   row('labels', s.labels ? `${s.labels}${s.labelCount ? `, ${s.labelCount} things` : ''}` : 'none');
-  row('author', author.key === 'auto' ? 'auto: the code planner (the control)' : `${author.name} (${author.id}, ${author.runner})`);
+  row('author', author.key === 'auto' ? 'auto: the code planner (the control)' : author.cli === 'script' ? author.name : `${author.label} (${author.id}, called read-only through ${author.cli})`);
   row('mode', `${run.mode === 'plan' ? 'plan only, CPU' : 'full painting, GPU'}; ${run.studiesMode === 'author' ? 'open tools (the author may brief and review its own studies)' : 'locked inputs'}; target guard gentle`);
   if (s.deviations.length) for (const d of s.deviations) row('DIFFERS', `${d.what}: ${d.now} (the record: ${d.record})`);
   if (run.settings.length) for (const d of run.settings) row('setting', `${d.name} = ${d.value ?? 'painter default'} (default ${d.default})`);

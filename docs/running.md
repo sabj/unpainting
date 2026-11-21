@@ -86,15 +86,40 @@ npm run paint -- h36:approved paint --dry-run
 ```
 
 Settings for one run are `--set key=value`: `drawing=<stem>`, `width=<cells>`, `sheetmm=<mm>`, `floors=6,4,2` (the
-least shape of each study, mm2), `study2.clusters=20` (a wash-plan setting of one study), `masks=<receipt.json>` (named
-SAM forms), `heapmb=<MB>`, or any `paint-plate` option by its name (`threads=2`; `outlinemedium=default` leaves an
+least shape of each study, mm2), `study2.clusters=20` (a wash-plan setting of one study), `masks=<receipt.json>` or
+`masks=none`, `heapmb=<MB>`, or any `paint-plate` option by its name (`threads=2`; `outlinemedium=default` leaves an
 option of the record out). A run that differs from the record says so in its printed block and on its sheet.
 
-`--author auto` is the code planner, the control. `--author <key>` (a model of `bench/models.json`) gives that model
-the same locked inputs with the brief `tools/paint/AUTHOR-BRIEF.md` and paints the painting script it writes
-([painting-script.md](painting-script.md)) with the same engine. `--author script:FILE.json` paints a kept script.
-The model runs with its permission prompts off, as in the benchmark: use a disposable machine. The target guard stays
-in gentle mode. `--studies author` (the author briefs its own studies) is refused: its tools are not on this trunk.
+Named forms (a reviewed SAM id map with its receipt) are found in this order: `--set masks=`, then
+`<forms folder>/<subject id>/receipt.json`, then none. The forms folder is `UNPAINT_FORMS`, else `named-forms` beside
+`SUBJECTS.json`. The receipt must name the subject's source by its sha256. The code planner reads the forms; an author
+is shown them.
+
+### A model as the author
+
+`--author auto` is the code planner, the control. `--author <key>` asks a model (`tools/paint/authors.json`, else
+`bench/models.json`) to write the wash plan as a painting script ([painting-script.md](painting-script.md)); the same
+engine paints it. `--author script:FILE.json` paints a kept script. Several authors make a benchmark grid:
+
+```sh
+npm run paint -- mittens-closeup,morisot-face plan --author auto,opus,astra,argon,neon
+```
+
+The model gets the brief `tools/paint/AUTHOR-BRIEF.md` with the run's sheet, kit and paints written in, and the
+source, the opening drawing, the three studies and the named forms as pictures with a millimetre grid. It is called
+once, read-only (`claude --allowedTools Read`, `codex exec -s read-only`, `agy --mode plan --sandbox`), in a temporary
+folder that holds only those pictures. Its answer is checked against the script format, the sheet and the paint box.
+A refused answer, or a script the painter cannot plan, goes back to the model once with the reason. After that the
+failure is the result: it is written in that cell of the grid and in `run.json`, and the other cells are unaffected.
+Each call's prompt, answer, time, tokens and cost (where the command reports them) are kept in `<out>/author/`. The
+target guard stays in gentle mode.
+
+`--studies author` (open tools) lets a model brief its own block-in studies before it writes: it answers with up to
+three briefs, the local image model (Qwen Image Edit through mflux, `tools/paint/assisted-studies.py`) makes them one
+at a time, and they take the place of the registered studies of those roles in what the author sees. It needs the
+local route (the driver, the `one-model` launcher, the mflux python, the model and its Lightning LoRA in the Hugging
+Face cache) and refuses with the missing pieces named when one is absent. A study run needs most of this machine's
+memory for several minutes.
 
 ## Main command-line controls
 

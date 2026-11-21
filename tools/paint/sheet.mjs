@@ -49,7 +49,7 @@ export async function formsImage(maskFile) {
 /** A blank panel with words in it (a painting that was not painted). A PNG buffer. */
 export function wordsImage(words, width, height) {
   const lines = [].concat(words);
-  return sharp(Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}"><rect width="100%" height="100%" fill="#ececec"/>${lines.map((l, i) => `<text x="50%" y="${height / 2 + (i - (lines.length - 1) / 2) * 34}" text-anchor="middle" font-family="${FONT}" font-size="${i ? 20 : 28}" font-weight="${i ? 400 : 700}" fill="#8a1f1f">${xml(l)}</text>`).join('')}</svg>`)).png().toBuffer();
+  return sharp(Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}"><rect width="100%" height="100%" fill="#ececec"/>${lines.map((l, i) => `<text x="50%" y="${height / 2 + (i - (lines.length - 1) / 2) * 34}" text-anchor="middle" font-family="${FONT}" font-size="${i ? 19 : 28}" font-weight="${i ? 400 : 700}" fill="#8a1f1f">${xml(l)}</text>`).join('')}</svg>`)).png().toBuffer();
 }
 
 /**
@@ -109,7 +109,18 @@ export function riskLine(r) {
   const p = r.parts;
   return `cheat-risk: ${String(r.level).toUpperCase()} ${r.risk} (order of work ${p.progression}, copying ${p.copy}, small marks ${p.small}, pixel fit ${p.pixelFit})${r.flags?.length ? `; ${r.flags.join('; ')}` : ''}`;
 }
-const planLine = p => (p ? `${p.shapes ?? '?'} shapes, ${p.washes ?? '?'} washes, ${p.strokes ?? '?'} strokes` : 'no plan was written');
+const planLine = p => (p ? `${p.passages != null ? `${p.passages} passages` : `${p.shapes ?? '?'} shapes`}, ${p.washes ?? '?'} washes, ${p.strokes ?? '?'} strokes` : 'no plan was written');
+/** What the author cost: its time, and tokens and dollars when its command reports them. */
+const authorLine = a => (a.key === 'auto' || a.cli === 'script' ? '' : `author ${a.seconds != null ? `${a.seconds} s` : 'not called'}${a.calls?.length > 1 ? ` in ${a.calls.length} calls` : ''}${a.tokens ? `, ${a.tokens.toLocaleString('en-US')} tokens` : ', tokens not reported'}${a.costUSD != null ? `, $${a.costUSD.toFixed(2)}` : ''}`);
+/** Words wrapped to lines of about `chars` letters. */
+export function wrap(text, chars, most = 9) {
+  const lines = [''];
+  for (const w of String(text).split(/\s+/)) {
+    if (lines.at(-1) && (lines.at(-1) + ' ' + w).length > chars) lines.push('');
+    lines[lines.length - 1] = (lines.at(-1) + ' ' + w).trim().slice(0, chars);
+  }
+  return lines.length > most ? [...lines.slice(0, most - 1), lines[most - 1].slice(0, chars - 1) + '…'] : lines;
+}
 
 /** The panels of one run, left to right, and the lines over them. run: the record of run.json; pics: prepared images. */
 export function runPanels(run, pics) {
@@ -119,8 +130,9 @@ export function runPanels(run, pics) {
     const got = res?.plan?.studies?.[i];
     panels.push({ title: `Study ${i + 1}: ${s.role.split(" (")[0]}`, captions: [`${s.path.split('/').pop()}, shapes from ${s.floorMm2 ?? '?'} mm2`, got ? `gave ${got.shapes} shapes, ${got.washes} washes, ${got.strokes} strokes` : ''], image: s.abs });
   });
-  if (pics.forms) panels.push({ title: `Named forms (SAM), ${run.masks.forms.length}`, captions: [fit(run.masks.forms.map(f => f.name).join(', '), 4000, 16), run.masks.read ? 'given to the planner' : 'not read by the planner in this run'], image: pics.forms });
-  if (pics.plan) panels.push({ title: `Wash plan by ${run.author.name}`, captions: [planLine(res?.plan), `widest wash brush ${mm(res?.plan?.widestBrushMm)}; ${res?.plan?.stages ?? '?'} stages`], image: pics.plan });
+  if (pics.forms) panels.push({ title: `Named forms (SAM), ${run.masks.forms.length}`, captions: [fit(run.masks.forms.map(f => f.name).join(', '), 4000, 16), run.masks.read ? 'given to the planner' : 'shown to the author; a script is laid as written'], image: pics.forms });
+  if (pics.plan) panels.push({ title: `Wash plan by ${run.author.label ?? run.author.name}`, alert: res?.planPreview ? null : 'NO PLAN',
+    captions: [res?.planPreview ? planLine(res?.plan) : 'no plan compiled', res?.planPreview ? `widest wash brush ${mm(res?.plan?.widestBrushMm)}; ${res?.plan?.stages ?? '?'} stages` : '', authorLine(run.author)], image: pics.plan });
   const state = res?.state ?? 'not run';
   panels.push({ title: state === 'finished' ? 'Painting' : `Painting: ${state.toUpperCase()}`, alert: state === 'finished' ? null : state === 'plan only' ? 'PLAN ONLY' : state === 'unfinished' ? 'UNFINISHED' : 'NOT PAINTED',
     captions: [state === 'finished' ? `painted in ${Math.round((run.seconds ?? 0) / 60)} min` : state === 'plan only' ? 'the plan preview shows intended shapes, not brush marks' : `painter exit ${run.exit ?? '?'}; see run.log`, riskLine(res?.cheatRisk)], image: pics.painting });
@@ -129,11 +141,12 @@ export function runPanels(run, pics) {
 
 /** The header of one run. */
 export function runHeader(run) {
-  const c = run.code, h = [`${run.subject.id} (${run.subject.name}) · ${run.mode === 'plan' ? 'PLAN ONLY (CPU)' : 'painting (GPU)'} · author ${run.author.name} · ${run.studiesMode === 'author' ? 'open tools' : 'locked inputs'} · ${c.commit ? c.commit.slice(0, 8) : 'no commit'}${c.dirty ? ' + uncommitted changes' : ''} · ${run.started}`];
+  const c = run.code, h = [`${run.subject.id} (${run.subject.name}) · ${run.mode === 'plan' ? 'PLAN ONLY (CPU)' : 'painting (GPU)'} · author ${run.author.label ?? run.author.name} · ${run.studiesMode === 'author' ? 'open tools' : 'locked inputs'} · ${c.commit ? c.commit.slice(0, 8) : 'no commit'}${c.dirty ? ' + uncommitted changes' : ''} · ${run.started}`];
   h.push(`sheet ${run.sheet.widthMm} mm, ${run.sheet.cells} cells, ${run.sheet.cellMm} mm a cell · ${riskLine(run.results?.cheatRisk)} · widest wash brush ${mm(run.results?.plan?.widestBrushMm)}`);
   for (const d of run.subject.deviations) h.push(`DIFFERS from the record: ${d.what} ${d.now} (record ${d.record})`);
   if (run.settings.length) h.push(`settings changed: ${run.settings.map(s => `${s.name}=${s.value ?? 'painter default'} (default ${s.default})`).join(', ')}`);
   if (Object.keys(run.switches).length) h.push(`SWITCHES in the environment: ${Object.entries(run.switches).map(([k, v]) => `${k}=${v}`).join(' ')}`);
+  if (run.author.studiesNote) h.push(`DIFFERS: ${run.author.studiesNote}; the registered studies were used`);
   if (run.failure) h.push(`FAILED: ${run.failure}`);
   return h;
 }
@@ -147,9 +160,12 @@ export async function runPictures(run, { panelWidth = 900 } = {}) {
     pics.drawing = await sharp(Buffer.from(d.svg)).png().toBuffer();
     pics.drawingNote = `${d.ink} ink strokes, ${d.pencil} pencil${d.dropped ? `, ${d.dropped} left out` : ''}`;
   } else { pics.drawing = await wordsImage(['no drawing vectors'], 600, 400); }
-  if (run.masks?.mask && fs.existsSync(run.masks.mask)) pics.forms = await formsImage(run.masks.mask);
-  if (res?.planPreview) pics.plan = res.planPreview;
+  if (run.masks?.review && fs.existsSync(run.masks.review)) pics.forms = run.masks.review;
+  else if (run.masks?.mask && fs.existsSync(run.masks.mask)) pics.forms = await formsImage(run.masks.mask);
   const src = await sharp(pics.source).metadata(), W = 600, H = Math.round(600 * src.height / src.width);
+  // a run whose plan did not compile keeps its cell, with the reason in it
+  if (res?.planPreview) pics.plan = res.planPreview;
+  else if (run.failure) pics.plan = await wordsImage(['NO PLAN', ...wrap(run.failure, 52)], W, H);
   pics.painting = res?.painting ?? await wordsImage(res?.state === 'plan only' ? ['PLAN ONLY', 'not painted'] : ['NOT PAINTED', run.failure ? fit(run.failure, 560, 20) : 'no painting was written'], W, H);
   return pics;
 }
@@ -174,12 +190,12 @@ export async function writeGridSheet(runs, file, { title, height = 400 } = {}) {
     for (const a of authors) {
       const run = mine.find(r => r.author.key === a); if (!run) continue;
       const all = runPanels(run, await runPictures(run));
-      for (const p of all.filter(p => (run.mode === 'plan' ? /^Wash plan/ : /^Wash plan|^Painting/).test(p.title))) panels.push({ ...p, title: `${run.author.name}: ${p.title.replace(/ by .*/, '')}` });
+      for (const p of all.filter(p => (run.mode === 'plan' ? /^Wash plan/ : /^Wash plan|^Painting/).test(p.title))) panels.push({ ...p, title: p.title.replace(/^Wash plan by /, '').replace(/^Painting/, `${run.author.name}: painting`) });
     }
     rows.push({ label: `${mine[0].subject.id} (${mine[0].subject.name})`, height, panels });
   }
   const first = runs[0], c = first.code;
-  const header = [title ?? `${subjects.length} subjects x ${authors.length} authors`, `${first.mode === 'plan' ? 'PLAN ONLY (CPU)' : 'painting (GPU)'} · authors across: ${authors.map(a => runs.find(r => r.author.key === a).author.name).join(', ')} · ${c.commit ? c.commit.slice(0, 8) : 'no commit'}${c.dirty ? ' + uncommitted changes' : ''} · ${first.started}`];
+  const header = [title ?? `${subjects.length} subjects x ${authors.length} authors`, `${first.mode === 'plan' ? 'PLAN ONLY (CPU)' : 'painting (GPU)'} · authors across: ${authors.map(a => { const x = runs.find(r => r.author.key === a).author; return x.label ?? x.name; }).join(' | ')} · locked inputs · target guard gentle · ${c.commit ? c.commit.slice(0, 8) : 'no commit'}${c.dirty ? ' + uncommitted changes' : ''} · ${first.started}`];
   if (Object.keys(first.switches).length) header.push(`SWITCHES in the environment: ${Object.entries(first.switches).map(([k, v]) => `${k}=${v}`).join(' ')}`);
   return composeSheet({ header, rows, file });
 }

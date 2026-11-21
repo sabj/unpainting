@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import path from 'node:path';
-import { registryPath, resolveSubject, checkInputs, optionPairs } from './subjects.mjs';
+import { registryPath, formsPath, resolveSubject, checkInputs, optionPairs } from './subjects.mjs';
 
 const BASE = path.resolve('/reg');
 const record = () => ({
@@ -54,7 +54,7 @@ test('a variant is a named list of settings; this run\'s own settings win', () =
 
 test('every pinned input is checked; a missing file and a changed file both stop the run', () => {
   const ok = checkInputs(resolveSubject(registry(), 'dune'), disk(good()));
-  assert.equal(ok.masks, null, 'no receipt beside the source: no named forms');
+  assert.equal(ok.masks.receipt, null, 'no receipt in the folder: no named forms');
   const bad = good(); bad[path.join(BASE, 'st/b.png')] = 'zz'; delete bad[path.join(BASE, 'vec/dune-lines.json')];
   assert.throws(() => checkInputs(resolveSubject(registry(), 'dune'), disk(bad)), e => /missing drawing file/.test(e.message) && /study 2 changed/.test(e.message));
   const other = { ...good(), [path.join(BASE, 'vec/old-lines.json')]: 'o1', [path.join(BASE, 'vec/old-vectors.json')]: 'o2' };
@@ -62,15 +62,23 @@ test('every pinned input is checked; a missing file and a changed file both stop
   assert.deepEqual(s.drawing.files.map(f => f.unpinnedSha256), ['o1', 'o2']);
 });
 
-test('named forms come from a receipt beside the source or --set masks, and are bound to the source', () => {
-  const receipt = path.join(BASE, 'src/dune.png.named-sam.json'), mask = path.join(BASE, 'src/named-sam.png');
-  const doc = { schema: 'named-sam-v1', source: { sha256: 'aa' }, labels: { sha256: 'lab' }, mask: { path: 'named-sam.png', sha256: 'mm' }, forms: [{ id: 1, name: 'sky', kind: 'sky' }, { id: 2, name: 'dog face', kind: 'face' }] };
-  const files = { ...good(), [receipt]: 'r', [receipt + ':json']: doc, [mask]: 'mm' };
-  const s = checkInputs(resolveSubject(registry(), 'dune'), disk(files));
-  assert.deepEqual(s.masks.forms.map(f => f.name), ['sky', 'dog face']); assert.equal(s.masks.labelsMatch, true);
-  assert.throws(() => checkInputs(resolveSubject(registry(), 'dune'), disk({ ...files, [mask]: 'changed' })), /mask changed/);
-  assert.throws(() => checkInputs(resolveSubject(registry(), 'dune'), disk({ ...files, [receipt + ':json']: { ...doc, source: { sha256: 'bb' } } })), /another source/);
-  assert.throws(() => checkInputs(resolveSubject(registry(), 'dune', { sets: [['masks', '/nowhere/receipt.json']] }), disk(good())), /missing named-forms receipt/);
+test('named forms: --set masks first, then the named-forms folder, then none; bound to the source', () => {
+  const forms = path.resolve('/forms'), receipt = path.join(forms, 'dune', 'receipt.json'), mask = path.join(forms, 'dune', 'named-sam.png');
+  const doc = { schema: 'named-sam-v1', source: { sha256: 'aa' }, labels: { path: 'labels.json', sha256: 'lab' }, mask: { path: 'named-sam.png', sha256: 'mm' }, forms: [{ id: 1, name: 'sky', kind: 'sky' }, { id: 2, name: 'dog face', kind: 'face' }] };
+  const files = { ...good(), [receipt]: 'r', [receipt + ':json']: doc, [mask]: 'mm', [path.join(forms, 'dune', 'review.jpg')]: 'rv' };
+  const get = (sets, disk0) => checkInputs(resolveSubject(registry(), 'dune', { sets, formsDir: forms }), disk(disk0));
+  const s = get([], files);
+  assert.equal(s.masks.from, 'folder'); assert.deepEqual(s.masks.forms.map(f => f.name), ['sky', 'dog face']);
+  assert.equal(s.masks.review, path.join(forms, 'dune', 'review.jpg')); assert.equal(s.masks.labels, path.join(forms, 'dune', 'labels.json'));
+  assert.deepEqual(s.deviations, [], 'the folder receipt is the default, not a difference');
+  const none = get([], good()); assert.equal(none.masks.receipt, null); assert.match(none.masks.none, /no receipt at/);
+  const off = get([['masks', 'none']], files); assert.equal(off.masks.receipt, null); assert.match(off.masks.none, /turned off/); assert.equal(off.deviations[0].what, 'named forms');
+  const other = path.resolve('/else/receipt.json'), viaSet = get([['masks', other]], { ...files, [other]: 'r2', [other + ':json']: doc, [path.resolve('/else/named-sam.png')]: 'mm' });
+  assert.equal(viaSet.masks.from, 'set'); assert.equal(viaSet.masks.receipt, other);
+  assert.throws(() => get([], { ...files, [mask]: 'changed' }), /mask changed/);
+  assert.throws(() => get([], { ...files, [receipt + ':json']: { ...doc, source: { sha256: 'bb' } } }), /another source/);
+  assert.throws(() => get([['masks', '/nowhere/receipt.json']], good()), /missing named-forms receipt/);
+  assert.equal(formsPath({ base: '/reg' }, { UNPAINT_FORMS: '/f' }), path.resolve('/f')); assert.equal(formsPath({ base: '/reg' }, {}), path.resolve('/reg/named-forms'));
 });
 
 test('record options must be pairs', () => {

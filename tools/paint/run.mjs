@@ -86,7 +86,7 @@ export function collectResults(out, mode) {
     planPreview: stage ? path.join(out, stage.input) : has('plan.jpg'),
     painting: painting ?? (lastFrame ? path.join(out, lastFrame) : null), strip,
     plan: plan ? {
-      shapes: sum?.shapes ?? null, washes: sum?.washes ?? passes.length, strokes: sum?.plannedStrokes ?? null, stages: sum?.stages ?? null,
+      shapes: sum?.shapes ?? null, passages: sum?.passages ?? null, washes: sum?.washes ?? passes.length, strokes: sum?.plannedStrokes ?? null, stages: sum?.stages ?? null,
       widestBrushMm: widest || null, softJoins: sum?.softJoins ?? null, dabbed: sum?.dabbed ?? null,
       studies: (sum?.layersOfStudy ?? []).map(l => ({ study: l.study, minMm2: l.minMm2, shapes: l.shapes, washes: l.washes, strokes: l.strokes })),
     } : null,

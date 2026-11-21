@@ -48,7 +48,7 @@ const run = (dir, over = {}) => ({
   subject: { key: 'dune:', id: 'dune', name: 'dune-dog', source: 'src/dune.png', sourceAbs: path.join(dir, 'a.png'), deviations: [{ what: 'cells across', now: '1200', record: '1500' }] },
   sheet: { widthMm: 280, cells: 1200, cellMm: 0.2333 }, drawing: { stem: 'vec/dune', medium: 'pencil (graphite)', files: [path.join(dir, 'dune-vectors.json')] },
   studies: [{ path: 'st/a.png', abs: path.join(dir, 'b.png'), role: 'block-in (the broad shapes)', floorMm2: 6, read: {} }],
-  masks: null, author: { key: 'auto', name: 'auto' }, settings: [], switches: {}, code: { commit: 'db0bb9df1992', dirty: false },
+  masks: { receipt: null }, author: { key: 'auto', name: 'auto' }, settings: [], switches: {}, code: { commit: 'db0bb9df1992', dirty: false },
   results: { state: 'plan only', planPreview: path.join(dir, 'b.png'), painting: null, strip: null, cheatRisk: null,
     plan: { shapes: 12, washes: 30, strokes: 400, stages: 4, widestBrushMm: 25.4, studies: [{ shapes: 12, washes: 20, strokes: 300 }] } },
   ...over,

@@ -19,6 +19,11 @@ export function registryPath(env = process.env) {
   return path.resolve(env.UNPAINT_SUBJECTS || path.join(os.homedir(), 'Scratch', 'unpainting-033', 'SUBJECTS.json'));
 }
 
+/** Where the reviewed named-form receipts are: $UNPAINT_FORMS, else the folder named-forms beside SUBJECTS.json. */
+export function formsPath(registry, env = process.env) {
+  return path.resolve(env.UNPAINT_FORMS || path.join(registry.base, 'named-forms'));
+}
+
 export function loadRegistry(file = registryPath()) {
   if (!fs.existsSync(file)) throw new Error(`no subject list at ${file} (set UNPAINT_SUBJECTS to its SUBJECTS.json)`);
   const doc = JSON.parse(fs.readFileSync(file, 'utf8'));
@@ -40,7 +45,7 @@ export function optionPairs(flat) {
  * The run's inputs for one subject. `sets` are [key, value] pairs; `variant` is an entry of variants.json
  * ({why, set}) or null. Reads no file but the registry already loaded: checkInputs does the reading.
  */
-export function resolveSubject(registry, id, { sets = [], variant = null, variantName = null } = {}) {
+export function resolveSubject(registry, id, { sets = [], variant = null, variantName = null, formsDir = null } = {}) {
   const rec = registry.subjects.find(s => s.id === id || s.name === id);
   if (!rec) throw new Error(`no subject "${id}" in ${registry.file}. Subjects: ${registry.subjects.map(s => s.id).join(', ')}`);
   const abs = p => path.resolve(registry.base, p);
@@ -81,18 +86,18 @@ export function resolveSubject(registry, id, { sets = [], variant = null, varian
   }
 
   const labels = rec.labels?.path ? { path: rec.labels.path, abs: abs(rec.labels.path), sha256: rec.labels.sha256, count: rec.labels.count ?? null } : null;
-  // named SAM forms: this run's --set masks, else the record's receipt when it has one (sam.receipt)
-  const recordReceipt = rec.sam?.receipt ?? rec.inputs?.namedForms?.receipt ?? null;
-  const receipt = all.get('masks') ?? recordReceipt;
-  if (all.has('masks') && all.get('masks') !== recordReceipt) say('named forms (SAM receipt)', all.get('masks'), recordReceipt ?? 'none');
-  // with neither, the painter's own rule: a receipt beside the source, SOURCE.named-sam.json, when there is one
-  const masks = receipt ? { receipt: path.resolve(all.has('masks') ? process.cwd() : registry.base, receipt), beside: false }
-    : { receipt: abs(rec.source.path) + '.named-sam.json', beside: true };
+  // named SAM forms, in this order: --set masks=<receipt.json> (none: no forms), then <forms folder>/<id>/receipt.json
+  // when it is there (checkInputs looks), then none
+  const asked = all.get('masks') ?? null;
+  const masks = asked === 'none' ? { receipt: null, from: 'off' }
+    : asked ? { receipt: path.resolve(asked), from: 'set' }
+      : { receipt: path.join(formsDir ?? formsPath(registry), rec.id, 'receipt.json'), from: 'folder' };
+  if (asked) say('named forms', asked === 'none' ? 'none (turned off)' : asked, 'the reviewed receipt in the named-forms folder');
 
   return {
     id: rec.id, name: rec.name ?? rec.id, variant: variantName, variantWhy: variant?.why ?? null, registry: registry.file, use: rec.use ?? null,
     source: { path: rec.source.path, abs: abs(rec.source.path), sha256: rec.source.sha256, px: rec.source.px ?? null },
-    sheet, drawing, studies, labels, masks, deviations,
+    sheet, drawing, studies, labels, masks, deviations, studySeed: rec.studySeed?.chosen ?? null,
     options: optionPairs([...(rec.options?.common ?? []), ...(rec.options?.line ?? []), ...(rec.options?.paper ?? [])]),
     otherSets: [...all].filter(([k]) => !isSubjectKey(k)),
   };
@@ -116,13 +121,16 @@ export function checkInputs(spec, { hash = sha256, exists = fs.existsSync, readJ
   spec.drawing.files.forEach(f => check('drawing file', f));
   spec.studies.forEach((s, i) => check(`study ${i + 1}`, s));
   if (spec.labels) check('labels', spec.labels);
-  if (spec.masks?.beside && !exists(spec.masks.receipt)) spec.masks = null;
-  const m = spec.masks;
+  // no receipt in the folder: no named forms, said in the run's block; a receipt that was asked for must exist
+  if (spec.masks && (spec.masks.from === 'off' || (spec.masks.from === 'folder' && !exists(spec.masks.receipt)))) spec.masks = { ...spec.masks, none: spec.masks.from === 'off' ? 'turned off by --set masks=none' : `no receipt at ${spec.masks.receipt}`, receipt: null };
+  const m = spec.masks?.receipt ? spec.masks : null;
   if (m) {
     if (!exists(m.receipt)) faults.push(`missing named-forms receipt: ${m.receipt}`);
     else {
       const r = readJson(m.receipt);
       m.mask = path.resolve(path.dirname(m.receipt), r.mask?.path ?? '');
+      m.review = path.join(path.dirname(m.receipt), 'review.jpg'); if (!exists(m.review)) m.review = null;
+      m.labels = r.labels?.path ? path.resolve(path.dirname(m.receipt), r.labels.path) : null;
       m.forms = (r.forms ?? []).map(f => ({ id: f.id, name: f.name, kind: f.kind }));
       if (r.schema !== 'named-sam-v1') faults.push(`named forms: ${m.receipt} is not a named-sam-v1 receipt`);
       else if (!exists(m.mask)) faults.push(`missing named-forms mask: ${m.mask}`);

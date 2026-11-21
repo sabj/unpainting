@@ -7,14 +7,15 @@ export const USAGE = `usage: npm run paint -- <subject[,subject...]> plan|paint 
 
   plan                  the wash plan only, on the CPU (minutes)
   paint                 the whole painting, on the GPU
-  --author a[,b...]     who writes the wash plan: auto (the code planner, the control) or a model key of
-                        bench/models.json. Several authors paint side by side. Default auto.
+  --author a[,b...]     who writes the wash plan: auto (the code planner, the control), a model key of
+                        tools/paint/authors.json or bench/models.json, or script:FILE.json (a kept script).
+                        Several authors make a grid, subjects down and authors across. Default auto.
   --studies locked|author
                         locked: the author gets the registered studies as they are (default).
-                        author: the author may also brief and review its own studies (open tools).
+                        author: the author first briefs its own studies; the local image model makes them.
   --set key=value       one setting for this run, repeatable. drawing=<stem>, width=<cells>, sheetmm=<mm>,
-                        medium=ink|graphite, masks=<receipt.json>, floors=6,4,2, study2.clusters=20 (a wash-plan
-                        setting of the second study), heapmb=<MB>; any other key is a paint-plate option.
+                        masks=<receipt.json>|none, floors=6,4,2, study2.clusters=20 (a
+                        wash-plan setting of the second study), heapmb=<MB>; any other key is a paint-plate option.
   --out <dir>           where the run is written (default work/paint/<time>-<subjects>-<mode>)
   --dry-run             print what would run and stop
   --no-open             do not open the sheet in Preview
