@@ -202,3 +202,23 @@ test('the block-in shape count, the colour groups and their join distance are se
   assert.ok(few.summary.shapes < dflt.summary.shapes, `${few.summary.shapes} with @shapes=4`);
   assert.ok(coarse.summary.clusters < dflt.summary.clusters && coarse.summary.shapes < dflt.summary.shapes, `${coarse.summary.clusters} colours, ${coarse.summary.shapes} shapes with @clusters=4@join=30`);
 });
+
+// --- no dabs ---
+// the wall of wallStudy with a pink patch (14 x 12 mm) of the wall's own value in it
+function patchStudy() {
+  const st = wallStudy();
+  for (let i = 0; i < st.w * st.h; i++) { const x = (i % st.w) / 2, y = ((i / st.w) | 0) / 2; if (x >= 56 && x < 70 && y >= 58 && y < 70) st.rgb.set([232, 185, 175], i * 3); }
+  return st;
+}
+
+test('no dabs: nothing is dropped into a wash that the study does not show; a small shape of another hue in a family is laid as its own shape', () => {
+  const p = planWith(patchStudy());
+  assert.equal(p.summary.charges, 0);
+  assert.equal(p.instructions.filter(q => q.stage === 2).length, 0, p.instructions.filter(q => q.stage === 2).map(q => q.thing).join(' | '));
+  assert.ok(p.instructions.every(q => !/dropped in|dropped into/.test(q.thing)));
+  // the patch: one wash of its own, over the dry under-wash, about its own size, pinker than the wall
+  const patch = p.instructions.filter(q => /over the under-wash/.test(q.thing) && q.areaMm2 > 120 && q.areaMm2 < 260 && q.colour[0] - q.colour[2] > 40 && q.colour[1] < 195);
+  assert.equal(patch.length, 1, p.instructions.map(q => `${q.thing} ${q.areaMm2} ${q.colour}`).join(' | '));
+  assert.equal(patch[0].move, 'wet on dry');
+  assert.ok(patch[0].strokes.length >= 1 && patch[0].outline.length >= 1);
+});
