@@ -16,6 +16,21 @@
       "water_ml": 1.2,
       "note": "1 in (25.4 mm) wash flat, synthetic. Holds about 1 ml; one load lays a band across a quarter sheet."
     },
+    "round24": {
+      "width_mm": 17.0,
+      "water_ml": 0.85,
+      "note": "Round #24: belly about 16-18 mm in makers' size charts. A large round holds more than a flat of its width (the belly is a reservoir); about 0.85 ml released per load, between the 1 in flat's and the #20's. The widest brush inside a face, a figure or an animal (study-washes.mjs READ.formbrush)."
+    },
+    "round20": {
+      "width_mm": 13.0,
+      "water_ml": 0.55,
+      "note": "Round #20: belly about 12-14 mm. About 0.55 ml released per load."
+    },
+    "round16": {
+      "width_mm": 10.0,
+      "water_ml": 0.35,
+      "note": "Round #16: belly about 9.5-10.5 mm. About 0.35 ml released per load (twice a #12's, as its belly's section is about twice as large)."
+    },
     "round12": {
       "width_mm": 7.0,
       "water_ml": 0.18,

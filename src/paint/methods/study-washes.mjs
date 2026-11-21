@@ -26,6 +26,7 @@ import { kmeans, roundMask, dilate } from './study-shapes.mjs';
 import { monoAt } from './mono-mix.mjs';
 import { touchesFrom } from './touch-layer.mjs';
 import { namedForms, formCoverage } from './named-forms.mjs';
+import { brushCeilingMm, kitUnder } from './form-brush.mjs';
 
 /** The plan's grid cell (mm). */
 const PLAN_MM = 0.25;
@@ -39,8 +40,11 @@ const PLAN_MM = 0.25;
  * shapes: the block-in (the first study) has at most this many shapes; the smallest join the neighbour nearest in colour
  *   (0: no limit). It was a fixed 48, which made a face one shape.
  * leastMm2: the least shape (mm2) of a study that names none (FILE without :MIN). The least size is a size on paper; it
- *   does not grow with the sheet (it was also held to 0.08% of the sheet, 77 mm2 on a 380 mm sheet). */
-export const READ = Object.freeze({ clusters: 16, join: 10, shapes: 160, leastMm2: 6 });
+ *   does not grow with the sheet (it was also held to 0.08% of the sheet, 77 mm2 on a 380 mm sheet).
+ * formbrush (on the first study; it holds for the plan): the widest wash brush (mm) inside named forms painted with rounds
+ *   (form-brush.mjs: a face, an eye, an animal, fur, a figure, hair, clothing). The mop and the flat are for a sky, water,
+ *   the ground, a building, a background and paper in no named form. Without named forms it does nothing. */
+export const READ = Object.freeze({ clusters: 16, join: 10, shapes: 160, leastMm2: 6, formbrush: 17 });
 const CLUSTERS = READ.clusters, CLUSTER_JOIN = READ.join;
 /** The planted-pattern copy test of this reading (19-20 Nov 2026; no drawing; copied with the spread of the same measure
  * against patterns not planted, and stable against two studies of the clean piece that differ only in seed): */
@@ -377,7 +381,7 @@ export function planStudyWashes({ k, w, h, studies, flat = false, density = null
   };
   // each part filled in lanes (or one pull down its spine) of a brush sized to that part, the parts top down
   const fillParts = (parts, growMm, kitMm = washKitMm) => {
-    const top = l => Math.min(...l.flatMap(o => o.points.map(p => p[1]))), fills = [...parts].sort((a, b) => top(a) - top(b)).map(l => laneFill(l, { kitMm, growMm, keepOut, spine: kitMm === washKitMm }));
+    const top = l => Math.min(...l.flatMap(o => o.points.map(p => p[1]))), fills = [...parts].sort((a, b) => top(a) - top(b)).map(l => laneFill(l, { kitMm: kitMm === washKitMm ? kitFor(l) : kitMm, growMm, keepOut, spine: kitMm === washKitMm }));
     const area = fills.reduce((a, f) => a + f.areaMm2, 0) || 1;
     return { strokes: fills.flatMap(f => f.strokes), brushMm: Math.max(0, ...fills.map(f => f.brushMm)), depthMm: Math.max(0, ...fills.map(f => f.depthMm)), uncovered: fills.reduce((a, f) => a + f.uncovered * f.areaMm2, 0) / area };
   };
@@ -426,6 +430,10 @@ export function planStudyWashes({ k, w, h, studies, flat = false, density = null
   const STAGE = ['', 'first wash', 'charge', 'wash over', 'accent'];
   const underMix = cells => { const u = new Array(k).fill(0); for (const q of cells) for (let j = 0; j < k; j++) u[j] += laid[j][q] / cells.length; return u; };
   const cellsIn = loops => { const m = loopsMask(loops, pw, ph, mmX), out = []; for (let q = 0; q < pn; q++) if (m[q]) out.push(q); return out; };
+  // the wash kit for a part: every wash brush, or inside a named form painted with rounds only those up to its ceiling
+  // (a part that spans the form's boundary takes the smaller ceiling)
+  const formBrushMm = studies[0].read?.formbrush ?? READ.formbrush;
+  const kitFor = loops => (named ? kitUnder(washKitMm, brushCeilingMm(cellsIn(loops), named, formBrushMm)) : washKitMm);
   let keepOut = [];
   const reserve = new Uint8Array(pn);
   // a colour moved cooler at the same L*: b* toward blue by SHADOW_COOL, a* a little toward violet (Lab against the paper)
@@ -458,7 +466,7 @@ export function planStudyWashes({ k, w, h, studies, flat = false, density = null
     const mix = (amounts ?? valueMix(colour, u, base)).map(v => v * scale), strength = mix.reduce((a, v) => a + v, 0);
     if (!(strength > 1e-6)) return null;
     if (stage !== 2) { const a0 = filmLab(u, pigments, paperCol), a1 = filmLab(u.map((v, j) => v + mix[j]), pigments, paperCol); if (Math.hypot(a0[0] - a1[0], 0.5 * (a0[1] - a1[1]), 0.5 * (a0[2] - a1[2])) < VISIBLE_STEP) return null; }
-    const fill = strokes ? { strokes, brushMm: Math.max(...strokes.map(s => 2 * s.radiusMm)), depthMm: 0, uncovered: 0 } : parts ? fillParts(parts, growMm, kit) : laneFill(loops, { kitMm: kit, growMm, keepOut });
+    const fill = strokes ? { strokes, brushMm: Math.max(...strokes.map(s => 2 * s.radiusMm)), depthMm: 0, uncovered: 0 } : parts ? fillParts(parts, growMm, kit) : laneFill(loops, { kitMm: kit === washKitMm ? kitFor(loops) : kit, growMm, keepOut });
     // the edge strokes go first: the outline cut, then the fill inside it
     if (edge?.length) fill.strokes = [...edge.map(st => ({ ...st, edge: true })), ...fill.strokes];
     onMix?.(mix);

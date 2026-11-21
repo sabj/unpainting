@@ -150,8 +150,8 @@ test('a near-monochrome subject: every mix is its own paint, and one cluster of 
 });
 
 // --- named forms (a SAM id map of the source with each form's name and kind) ---
-// the left half of the sheet a face, the right half sky; a strip at the bottom in no form
-const halves = (w, h) => ({ width: w, height: h, ids: Uint8Array.from({ length: w * h }, (_, i) => (((i / w) | 0) >= 0.9 * h ? 0 : i % w < w / 2 ? 1 : 2)), names: ['a face', 'the sky'], kinds: ['face', 'sky'], provenance: { schema: 'named-sam-v1' } });
+// the left half of the sheet the ground, the right half sky (kinds with no brush ceiling); a strip at the bottom in no form
+const halves = (w, h) => ({ width: w, height: h, ids: Uint8Array.from({ length: w * h }, (_, i) => (((i / w) | 0) >= 0.9 * h ? 0 : i % w < w / 2 ? 1 : 2)), names: ['the ground', 'the sky'], kinds: ['ground', 'sky'], provenance: { schema: 'named-sam-v1' } });
 function planWith(st, extra = {}, read = null, minMm2 = null) {
   const log = console.log; console.log = () => {};
   try { return planStudyWashes({ k: pigments.length, w: st.w, h: st.h, studies: [{ rgb: st.rgb, file: 'test', ...(read ? { read } : {}), ...(minMm2 ? { minMm2 } : {}) }], paperRGB: PAPER, pigments, sheetWidthMm: 160, washBrushMm: 5, washKitMm: [38, 25.4, 7, 5], ...extra }); } finally { console.log = log; }
@@ -163,9 +163,9 @@ test('named forms: every wash records the forms it lies in, with their kinds; wi
   assert.deepEqual(JSON.parse(JSON.stringify(planWith(st, { thingMasks: null }).instructions)), JSON.parse(JSON.stringify(plain.instructions)));
   // the same washes and strokes with masks; each also names its forms
   assert.deepEqual(JSON.parse(JSON.stringify(named.instructions.map(({ forms, ...q }) => q))), JSON.parse(JSON.stringify(plain.instructions)));
-  assert.deepEqual(named.summary.namedForms.forms.map(f => [f.id, f.name, f.kind]), [[1, 'a face', 'face'], [2, 'the sky', 'sky']]);
+  assert.deepEqual(named.summary.namedForms.forms.map(f => [f.id, f.name, f.kind]), [[1, 'the ground', 'ground'], [2, 'the sky', 'sky']]);
   // the under-wash of the wall spans both halves; the window (x 100 to 115 of 160 mm) lies in the sky half only
-  assert.deepEqual(named.instructions[0].forms.map(f => f.kind).sort(), ['face', 'sky']);
+  assert.deepEqual(named.instructions[0].forms.map(f => f.kind).sort(), ['ground', 'sky']);
   const windowWash = named.instructions.find(q => q.forms.length === 1 && q.forms[0].share > 0.95 && q.areaMm2 < 600);
   assert.equal(windowWash.forms[0].name, 'the sky');
 });
@@ -221,4 +221,34 @@ test('no dabs: nothing is dropped into a wash that the study does not show; a sm
   assert.equal(patch.length, 1, p.instructions.map(q => `${q.thing} ${q.areaMm2} ${q.colour}`).join(' | '));
   assert.equal(patch[0].move, 'wet on dry');
   assert.ok(patch[0].strokes.length >= 1 && patch[0].outline.length >= 1);
+});
+
+// --- the brush ceiling by named form ---
+// a face 100 x 70 mm of one tan on the left of a 300 x 200 mm sheet, a blue sky 120 x 170 mm on the right
+function faceAndSky() {
+  const w = 600, h = 400, rgb = new Uint8ClampedArray(w * h * 3).fill(255);
+  for (let i = 0; i < w * h; i++) { const x = (i % w) / 2, y = ((i / w) | 0) / 2; if (x >= 20 && x < 120 && y >= 40 && y < 110) rgb.set([225, 190, 160], i * 3); if (x >= 160 && x < 280 && y >= 15 && y < 185) rgb.set([170, 200, 235], i * 3); }
+  return { w, h, rgb };
+}
+const KIT = [38, 25.4, 17, 13, 10, 7, 5];
+function planFace(masks, read = null) {
+  const st = faceAndSky(), log = console.log; console.log = () => {};
+  const thingMasks = masks ? { width: st.w, height: st.h, ids: Uint8Array.from({ length: st.w * st.h }, (_, i) => (i % st.w < 280 ? 1 : 2)), names: ['a face', 'the sky'], kinds: [masks, 'sky'] } : null;
+  try { return planStudyWashes({ k: pigments.length, w: st.w, h: st.h, studies: [{ rgb: st.rgb, file: 'face', minMm2: 6, ...(read ? { read } : {}) }], paperRGB: PAPER, pigments, sheetWidthMm: 300, washBrushMm: 5, washKitMm: KIT, thingMasks }); } finally { console.log = log; }
+}
+const widest = q => Math.max(...q.strokes.map(s => 2 * s.radiusMm));
+const inForm = (p, kind) => p.instructions.filter(q => q.forms?.[0]?.kind === kind && q.forms[0].share > 0.9);
+
+test('the brush ceiling: inside a face no wash brush is wider than 17 mm; the sky keeps the mop or the flat; without masks the old choice stands', () => {
+  const plain = planFace(null), named = planFace('face');
+  // without masks the 100 x 70 mm face is laid with a wide brush, as before
+  assert.ok(Math.max(...plain.instructions.filter(q => q.colour[0] > q.colour[2]).map(widest)) > 17);
+  const face = inForm(named, 'face'), sky = inForm(named, 'sky');
+  assert.ok(face.length >= 1 && sky.length >= 1);
+  assert.ok(face.every(q => widest(q) <= 17 + 1e-6), face.map(widest).join(' '));
+  assert.ok(Math.max(...face.map(widest)) >= 10, 'a big round, not the smallest brush');
+  assert.ok(Math.max(...sky.map(widest)) > 17, sky.map(widest).join(' '));
+  // the ceiling is a setting; a form that is not a round kind has none
+  assert.ok(inForm(planFace('face', { formbrush: 10 }), 'face').every(q => widest(q) <= 10 + 1e-6));
+  assert.ok(Math.max(...inForm(planFace('ground'), 'ground').map(widest)) > 17);
 });

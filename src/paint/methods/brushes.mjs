@@ -12,7 +12,7 @@ export function loadPhysical({ root, opt, num, W2, H2 = W2 }) {
   const mmPerCell = opt('sheetmm', '') !== '' ? num('sheetmm', sh.width_mm) / W2 : fit, mm = mmPerCell * W2;
   const B = name => cfg.brushes[name];
   const half = name => B(name).width_mm / 2 / mmPerCell;
-  const washSet = ['rigger', 'round4', 'round8', 'round12', 'flat1in', 'mop'].filter(k => B(k));
+  const washSet = ['rigger', 'round4', 'round8', 'round12', 'round16', 'round20', 'round24', 'flat1in', 'mop'].filter(k => B(k));
   // the smallest real brush that reaches r cells
   const pick = r => washSet.find(k => half(k) >= r * 0.999) ?? washSet[washSet.length - 1];
   const uptake = tech => cfg.uptake_ml_per_cm2[tech] ?? cfg.uptake_ml_per_cm2['wet on dry'];
