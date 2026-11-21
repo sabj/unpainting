@@ -6,6 +6,8 @@ import path from 'node:path';
 import sharp from 'sharp';
 
 const MOST_ASPECT = 0.02;
+/** The settings a study of the wash plan takes after its file, as @name=value. */
+export const STUDY_SETTINGS = Object.freeze(['clusters', 'join', 'shapes', 'round', 'keep', 'hue']);
 
 /** The study at w x h, sRGB: {rgb, file, registered}. */
 export async function loadStudy(file, w, h) {
@@ -27,9 +29,9 @@ export async function loadStudies(spec, root, w, h) {
   if (!list.length) throw Error('--washplan: no study named');
   const studies = [];
   for (const item of list) {
-    // "@name=value" after a study tunes how it is read (clusters, join, round, keep, hue): see study-washes.mjs READ
+    // "@name=value" after a study sets how it is read: clusters, join, shapes (study-washes.mjs READ), round, keep, hue
     const [head, ...tune] = item.split('@'), read = {};
-    for (const t of tune) { const [k, v] = t.split('='); if (!['clusters', 'join', 'round', 'keep', 'hue'].includes(k) || !(Number(v) >= 0)) throw Error(`--washplan: unknown study setting @${t}`); read[k] = Number(v); }
+    for (const t of tune) { const [k, v] = t.split('='); if (!STUDY_SETTINGS.includes(k) || !(Number(v) >= 0)) throw Error(`--washplan: unknown study setting @${t}`); read[k] = Number(v); }
     const m = /^(.*?)(?::(\d+(?:\.\d+)?))?(?::(glaze))?$/.exec(head), st = await loadStudy(path.resolve(root, m[1]), w, h);
     studies.push({ ...st, minMm2: m[2] != null ? Number(m[2]) : null, mode: m[3] ?? 'add', read });
   }

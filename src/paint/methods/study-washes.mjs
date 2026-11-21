@@ -2,8 +2,8 @@
 // shapes of clean colour, lights left as paper), not from the subject. The subject is not read here at all; the caller
 // uses it only to register the study to the sheet and to score the plate afterwards.
 //
-// 1. Shapes: the study's colours clustered in Lab, each cluster's connected parts a shape; a part under SLIVER_SHARE of
-//    the sheet joins the neighbour it borders most, until none is left. A near-white shape is bare paper. Each shape has
+// 1. Shapes: the study's colours clustered in Lab, each cluster's connected parts a shape; a part under the study's least
+//    size (mm2: FILE:MIN in the wash plan) joins the neighbour it borders most, until none is left. A near-white shape is bare paper. Each shape has
 //    ONE colour (its cluster's), and so one mix from the palette.
 // 2. Order, as a painter works (books/RULES.md A1, A2, A11): lightest and largest first. A darker shape lying on or
 //    beside a lighter one of like hue is a second, smaller wash over that one once it is dry: the lighter wash is
@@ -29,17 +29,22 @@ import { namedForms, formCoverage } from './named-forms.mjs';
 
 /** The plan's grid cell (mm). */
 const PLAN_MM = 0.25;
-/** Colour clusters asked for, and clusters nearer than this (Lab) are one. Coarse, so a faint (3 L*) change in the study cannot move a
- * cell between clusters: at 14 and 12 the planted 3.4 mm pattern reached the plate through the study (copied +0.11 against a null of
- * 0.07); at 8 and 18 it does not (-0.03 against 0.08), and the Yale study keeps its windows, arch, gate, foliage and cast shadows. */
-const CLUSTERS = 16, CLUSTER_JOIN = 10;
+/** The settings of a study's reading, each a default that a wash plan may change for one study with @name=value after
+ * its file (tools/painter/study-load.mjs): FILE:MIN@clusters=24@join=8@shapes=120.
+ * clusters, join: colour clusters asked for, and clusters nearer than `join` (Lab) are one. Coarser (16 and 10, the values
+ *   until 21 Nov 2026) a faint change in the study cannot move a cell between clusters, but close colours run together (a
+ *   dog's tongue and its harness were one shape); the finer default keeps them apart.
+ * shapes: the block-in (the first study) has at most this many shapes; the smallest join the neighbour nearest in colour
+ *   (0: no limit). It was a fixed 48, which made a face one shape.
+ * leastMm2: the least shape (mm2) of a study that names none (FILE without :MIN). The least size is a size on paper; it
+ *   does not grow with the sheet (it was also held to 0.08% of the sheet, 77 mm2 on a 380 mm sheet). */
+export const READ = Object.freeze({ clusters: 32, join: 6, shapes: 160, leastMm2: 6 });
+const CLUSTERS = READ.clusters, CLUSTER_JOIN = READ.join;
 /** The planted-pattern copy test of this reading (19-20 Nov 2026; no drawing; copied with the spread of the same measure
  * against patterns not planted, and stable against two studies of the clean piece that differ only in seed): */
-const COPY_TEST = 'copy test of this reading, laid as at 02db12b0 (under-washes, joined shadows, cut darks), 20 Nov 2026: mini 1 (RunPod studies) flat copied -0.00/-0.06 at 1.8/3.4 mm (null max 0.08/0.08), d1 +0.02/-0.05 (0.10/0.08), d2 +0.03/-0.04 (0.05/0.08), stable 0.85 to 0.90 against a seed floor of 0.47 to 0.52; mini 2 (local studies) flat -0.05/-0.02 (0.07/0.16), d1 -0.04/+0.02 (0.13/0.14), d2 -0.04/+0.02 (0.13/0.14), stable 0.61 to 0.73 against a seed floor of 0.65 to 0.74; every copy within its null; no copy above +0.03';
+const COPY_TEST = 'NOT rerun for the reading as it is now (finer colours, more block-in shapes, least size in mm2 only: 21 Nov 2026); the last copy test, at 16 colours joined under 10, 48 shapes, laid as at 02db12b0 (under-washes, joined shadows, cut darks), 20 Nov 2026: mini 1 (RunPod studies) flat copied -0.00/-0.06 at 1.8/3.4 mm (null max 0.08/0.08), d1 +0.02/-0.05 (0.10/0.08), d2 +0.03/-0.04 (0.05/0.08), stable 0.85 to 0.90 against a seed floor of 0.47 to 0.52; mini 2 (local studies) flat -0.05/-0.02 (0.07/0.16), d1 -0.04/+0.02 (0.13/0.14), d2 -0.04/+0.02 (0.13/0.14), stable 0.61 to 0.73 against a seed floor of 0.65 to 0.74; every copy within its null; no copy above +0.03';
 /** Two regions each over this share of the sheet are never merged into one (a roof and its wall stay two shapes). */
 const BIG = 0.02;
-/** A part smaller than this share of the sheet is a sliver and joins a neighbour. */
-const SLIVER_SHARE = 0.0008;
 /** A small shape this much darker (L*) than the neighbour it would be merged into is kept. */
 const KEEP_DARK = 25;
 /** ... or this far from it in hue and chroma (a*b*, at least this chromatic itself): a warm accent in a pale wall. */
@@ -305,8 +310,6 @@ const RESERVE_L = 92, RESERVE_C = 12, RESERVE_LEAST_MM2 = 2, RESERVE_MOST_MM2 = 
 /** A family shape is dropped into its wet under-wash when its value is within this (L*) of the family's and its hue at least
  * this far off (a*b*), and it is at least this big (mm2); with rounds of these widths (mm). */
 const CHARGE_CLOSE_L = 16, CHARGE_HUE = 4, CHARGE_LEAST_MM2 = 6, CHARGE_KIT = [2, 3.5, 6, 10, 14];
-/** The block-in (the first layer) has at most this many shapes. */
-const FIRST_MOST = 48;
 /** Washes err light: a wash (not a dark) aims this share of the way from the study's value to the paper's. The study is a
  * poster of the subject, flatter and denser than its washes; in watercolour the paper carries the light. */
 const ERR_LIGHT = 0;
@@ -610,7 +613,7 @@ export function planStudyWashes({ k, w, h, studies, flat = false, density = null
   const stepsAfter = (what, own, colour, studyLayer = 1) => { const st = monoSteps(own, MONO_STEP_LEAST); if (!st) return colour; st.steps.forEach((x, k) => deferredSteps.push({ k, what: `${what}: value step ${k + 2}`, cells: x.cells, colour: withL(colour, x.L), studyLayer })); return withL(colour, st.firstL); };
 
   // --- layer 1: the block-in ---
-  const L1 = studies[0], R1 = L1.read ?? {}, first = studyShapes(grids[0], pw, ph, paperCol, { sliverCells: Math.max(SLIVER_SHARE * pn, (L1.minMm2 ?? 0) / cellMm2), most: FIRST_MOST, ...R1 });
+  const L1 = studies[0], R1 = L1.read ?? {}, first = studyShapes(grids[0], pw, ph, paperCol, { sliverCells: Math.max(1, (L1.minMm2 ?? READ.leastMm2) / cellMm2), most: R1.shapes ?? READ.shapes, ...R1 });
   const { label, shapes, clusters } = first;
   const parent = flat ? shapes.map(() => -1) : nestParents(shapes);
   const kids = shapes.map(() => []); parent.forEach((p, i) => { if (p >= 0) kids[p].push(i); });

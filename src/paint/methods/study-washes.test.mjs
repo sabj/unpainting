@@ -28,7 +28,8 @@ function plan(st) {
 }
 
 test('the study\'s flat shapes: three painted, the white left as paper, each one mix', () => {
-  const p = plan(study({ rim: true }));
+  // (the rim, 8 mm2, is under the study's least size of 12 mm2 and joins a neighbour)
+  const p = planWith(study({ rim: true }), {}, null, 12);
   assert.equal(p.summary.shapes - p.summary.paperShapes, 3, JSON.stringify(p.summary));
   assert.ok(p.summary.reservedShare > 0.35, 'the paper round the wall');
   // the wall one wash; the shadow and the door each built by two or more glazes
@@ -151,9 +152,9 @@ test('a near-monochrome subject: every mix is its own paint, and one cluster of 
 // --- named forms (a SAM id map of the source with each form's name and kind) ---
 // the left half of the sheet a face, the right half sky; a strip at the bottom in no form
 const halves = (w, h) => ({ width: w, height: h, ids: Uint8Array.from({ length: w * h }, (_, i) => (((i / w) | 0) >= 0.9 * h ? 0 : i % w < w / 2 ? 1 : 2)), names: ['a face', 'the sky'], kinds: ['face', 'sky'], provenance: { schema: 'named-sam-v1' } });
-function planWith(st, extra = {}, read = null) {
+function planWith(st, extra = {}, read = null, minMm2 = null) {
   const log = console.log; console.log = () => {};
-  try { return planStudyWashes({ k: pigments.length, w: st.w, h: st.h, studies: [{ rgb: st.rgb, file: 'test', ...(read ? { read } : {}) }], paperRGB: PAPER, pigments, sheetWidthMm: 160, washBrushMm: 5, washKitMm: [38, 25.4, 7, 5], ...extra }); } finally { console.log = log; }
+  try { return planStudyWashes({ k: pigments.length, w: st.w, h: st.h, studies: [{ rgb: st.rgb, file: 'test', ...(read ? { read } : {}), ...(minMm2 ? { minMm2 } : {}) }], paperRGB: PAPER, pigments, sheetWidthMm: 160, washBrushMm: 5, washKitMm: [38, 25.4, 7, 5], ...extra }); } finally { console.log = log; }
 }
 
 test('named forms: every wash records the forms it lies in, with their kinds; without masks the plan is exactly as before', () => {
@@ -167,4 +168,37 @@ test('named forms: every wash records the forms it lies in, with their kinds; wi
   assert.deepEqual(named.instructions[0].forms.map(f => f.kind).sort(), ['face', 'sky']);
   const windowWash = named.instructions.find(q => q.forms.length === 1 && q.forms[0].share > 0.95 && q.areaMm2 < 600);
   assert.equal(windowWash.forms[0].name, 'the sky');
+});
+
+// --- the limits are settings (READ; a wash plan changes one with @name=value after a study) ---
+// a 300 x 200 mm sheet at 0.5 mm cells: a tan field with a 4 x 4 mm square of a slightly darker tan in it (16 mm2:
+// neither dark nor of another hue, so only its size keeps it), and twelve patches of
+// twelve slightly different tans
+function fieldStudy() {
+  const w = 600, h = 400, rgb = new Uint8ClampedArray(w * h * 3);
+  for (let i = 0; i < w * h; i++) {
+    const x = (i % w) / 2, y = ((i / w) | 0) / 2; let c = [225, 200, 160];
+    const px = Math.floor((x - 20) / 22), py = Math.floor((y - 100) / 40);
+    if (x >= 20 && px < 12 && py >= 0 && py < 1 && (x - 20) % 22 < 16 && (y - 100) % 40 < 30) c = [215 - 9 * px, 180 - 7 * px, 150 - 8 * px];
+    if (x >= 150 && x < 154 && y >= 40 && y < 44) c = [196, 172, 134];
+    rgb.set(c, i * 3);
+  }
+  return { w, h, rgb };
+}
+const planField = (read, minMm2 = 6) => { const st = fieldStudy(), log = console.log; console.log = () => {}; try { return planStudyWashes({ k: pigments.length, w: st.w, h: st.h, studies: [{ rgb: st.rgb, file: 'field', minMm2, ...(read ? { read } : {}) }], paperRGB: PAPER, pigments, sheetWidthMm: 300, washBrushMm: 5, washKitMm: [38, 25.4, 7, 5] }); } finally { console.log = log; } };
+
+test('the least shape is the wash plan\'s mm2 and does not grow with the sheet: a 16 mm2 shape is kept on a 300 mm sheet', () => {
+  // (0.08% of this sheet is 48 mm2: the square was a sliver under the old sheet-relative floor)
+  const small = p => p.instructions.filter(q => q.areaMm2 > 8 && q.areaMm2 < 40);
+  assert.ok(small(planField(null, 6)).length >= 1, 'kept at a least size of 6 mm2');
+  assert.equal(small(planField(null, 40)).length, 0, 'joined to the field at a least size of 40 mm2');
+});
+
+test('the block-in shape count, the colour groups and their join distance are settings with defaults', async () => {
+  const { READ } = await import('./study-washes.mjs');
+  assert.deepEqual([READ.shapes, READ.clusters, READ.join, READ.leastMm2], [160, 32, 6, 6]);
+  const dflt = planField(null), few = planField({ shapes: 4 }), coarse = planField({ clusters: 4, join: 30 });
+  assert.ok(dflt.summary.shapes >= 8, `${dflt.summary.shapes} shapes by default`);
+  assert.ok(few.summary.shapes < dflt.summary.shapes, `${few.summary.shapes} with @shapes=4`);
+  assert.ok(coarse.summary.clusters < dflt.summary.clusters && coarse.summary.shapes < dflt.summary.shapes, `${coarse.summary.clusters} colours, ${coarse.summary.shapes} shapes with @clusters=4@join=30`);
 });
