@@ -13,7 +13,6 @@ import { channelDensity, unmix } from './pigments.mjs';
 import { renderLayers } from '../media/km.mjs';
 import { labPlanes, deltaE2000 } from '../eval/colour.mjs';
 import { guardForcedBox, guardNote } from './paint-guard.mjs';
-import { boxNeeds } from './palette-needs.mjs';
 
 /** Share of the sample a hue cluster needs before a named box is extended for it. */
 const EXPLICIT_MIN_SHARE = 0.02;
@@ -123,7 +122,7 @@ export function coverKeyHues(sample, colours, paints, { max = 6, library = BOX, 
  * recovered lean palette; a monochrome lean palette is returned unchanged.
  * @returns { palette, note }
  */
-export function widePalette(px, w, h, paperRGB, lean, { weight = 1, gain = 0.5, min = 3, max = 6, K = 8, minShare = 0.005, minChroma = 8, keys = null, add = null, guard = null, extend = true, needs = {} } = {}) {
+export function widePalette(px, w, h, paperRGB, lean, { weight = 1, gain = 0.5, min = 3, max = 6, K = 8, minShare = 0.005, minChroma = 8, keys = null, add = null, guard = null, extend = true } = {}) {
   if (!keys && (lean.monochrome || lean.pigments.length < 2)) return { palette: lean, note: `palette wide: the picture is one fluid (chroma ${lean.chroma.toFixed(3)}), kept ${lean.pigments.length} (lean)` };
   const sample = sampleSource(px, w, h, paperRGB, { stride: 3 });
   const colours = localColours(sample, { K, minChroma, minShare });
@@ -145,27 +144,31 @@ export function widePalette(px, w, h, paperRGB, lean, { weight = 1, gain = 0.5, 
   const unreached = keys && extend ? keyHueCoverage(sample, colours, named, reach).hues.filter(r => r.loss > 1e-6) : [];
   const covered = keys && !extend ? { paints: named, added: [], coverage: null } : keys ? coverKeyHues(sample, colours, named, { max: named.length + 2, ...reach }) : coverKeyHues(sample, colours, chosen.paints, { max });
   const extra = (add || []).map(k => BOX.find(p => p.key === k) ?? (() => { throw new Error(`--paintsadd: no box paint ${k} (${BOX.map(p => p.key).join(', ')})`); })()).filter(p => !covered.paints.some(q => q.key === p.key));
-  // What the fit does not ask for (palette-needs.mjs): the earths for a picture that is mostly muted warm, with a blue
-  // to grey them only when it has cool colours; a dark paint for a picture with a mass of darks; and no blue in a
-  // picture with no cool colour. `needs`: its settings. A named box (--paints) is left as it is.
-  const needed = !keys ? boxNeeds(sample, colours, [...covered.paints, ...extra], { cover: ps => coverKeyHues(sample, colours, ps, { max }).paints, ...needs }) : null;
-  const paints = needed ? needed.paints : [...covered.paints, ...extra], changed = covered.added.length || extra.length || needed?.added.length || needed?.dropped.length || (guarded && guarded.decision.action !== 'kept');
+  // A watercolourist's earths: a picture whose local colours are mostly muted warm (stone, sand, wood, old paper) is
+  // painted with raw sienna and burnt sienna and greyed with ultramarine, not mixed from a clean yellow, a rose and a blue,
+  // whose near-complementary greys dry dull and mauve
+  const earths = !keys ? earthPans(colours).filter(p => ![...covered.paints, ...extra].some(q => q.key === p.key)) : [];
+  extra.push(...earths);
+  const paints = [...covered.paints, ...extra], changed = covered.added.length || extra.length || (guarded && guarded.decision.action !== 'kept');
   const e = changed ? score(paints) : chosen.e, trail = changed ? [...chosen.trail, e] : chosen.trail;
   const n = w * h, chroma = chromaOf(channelDensity(px, n, paperRGB), n);
   const loc = localError(sample, colours, paints);
   const palette = { pigments: paints.map(p => boxPigment(p)), ink: 0, chroma, paintChroma: chroma, inkApart: 0, monochrome: false, wide: true, box: { keys: paints.map(p => p.key), sampleError: e, trail } };
   if (guarded) palette.box.guard = guarded.decision;
-  // recorded, and said in the log, when the box was changed for it
-  const acted = needed && (needed.added.length || needed.dropped.length);
-  if (acted) palette.box.needs = { added: needed.added, dropped: needed.dropped, painted: needed.shares.painted, dark: needed.shares.dark, earth: needed.shares.earth, cool: needed.shares.cool };
   if (covered.added.length || covered.coverage?.loss > 1e-6) palette.hueCoverage = covered.coverage;
   const cols = colours.map((r, q) => `${r.grey ? 'greys ' : ''}h ${r.h.toFixed(0)} C ${r.C.toFixed(0)} ${(100 * r.share).toFixed(1)}% off ${loc.per[q].toFixed(1)}`).join('; ');
   const forNote = keys && covered.added.length ? `; added ${covered.added.join(', ')} for hue ${unreached.map(r => `${r.h.toFixed(0)} C ${r.C.toFixed(0)} (${(100 * r.share).toFixed(1)}%, painted C ${r.fittedChroma.toFixed(0)})`).join(', ')}, which the named pans ${named.map(p => p.key).join(', ')} cannot reach` : '';
   const coverageNote = forNote + (palette.hueCoverage ? `; key hues ${covered.coverage.loss < 1e-6 ? 'covered' : `gap ${covered.coverage.loss.toFixed(1)} at palette limit`}${covered.added.length && !keys ? `, added ${covered.added.join(', ')}` : ''}` : '');
   const guardLine = guarded ? `\n${guardNote(guarded.decision)}` : '';
-  const pct = v => `${(100 * v).toFixed(1)}%`;
-  const needLine = acted ? `\npalette needs: ${pct(needed.shares.painted)} of the sheet is painted; of that, darks ${pct(needed.shares.dark)}, muted warm ${pct(needed.shares.earth)}, cool colours ${pct(needed.shares.cool)}; ${needed.notes.join('; ')}` : '';
-  return { palette, note: `palette wide: ${paints.length} box paints (${paints.map(p => p.name).join(', ')}), sheet and local error ${trail.map(v => v.toFixed(2)).join(' to ')}; ${colours.length} local colours: ${cols}${coverageNote}${guardLine}${needLine}` };
+  return { palette, note: `palette wide: ${paints.length} box paints (${paints.map(p => p.name).join(', ')}), sheet and local error ${trail.map(v => v.toFixed(2)).join(' to ')}; ${colours.length} local colours: ${cols}${coverageNote}${guardLine}` };
+}
+
+/** Muted warm local colours: hue (Lab degrees) and chroma between these; their share of the sample that brings in the earths. */
+const EARTH_HUE = [45, 90], EARTH_C = [4, 32], EARTH_SHARE = 0.2;
+/** The earth pans for a picture whose local colours are mostly muted warm (raw sienna, burnt sienna, ultramarine), or none. */
+function earthPans(colours) {
+  const share = colours.filter(r => r.h >= EARTH_HUE[0] && r.h <= EARTH_HUE[1] && r.C >= EARTH_C[0] && r.C <= EARTH_C[1]).reduce((a, r) => a + r.share, 0);
+  return share >= EARTH_SHARE ? ['rawsienna', 'sienna', 'ultramarine'].map(k => BOX.find(p => p.key === k)) : [];
 }
 
 /**

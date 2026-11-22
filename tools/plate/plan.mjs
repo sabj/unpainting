@@ -37,7 +37,7 @@ const { JSONL, argv0, argv, PIPELINE, opt, num, DRAWING_STAGE_INTENT, optTrack, 
   root, out, INK_RECIPE, DRAWING_REGISTRATION, RUN_CACHE, holdInk, VALUE_CONFIG, 
   phaseMark, PX_SOURCE, PX_RAW, TARGET_GUARD, w, h, n, lum, paperRGB, CODE_HASH, 
   PALETTE_FROM_FILE, paletteFitStarted } = ctx;
-const PALETTE = (await cachedStep({ ...RUN_CACHE, name: 'palette', code: codeHash(root,[],{dependencies:['src/crop/palettepick.mjs','src/crop/palettewide.mjs','src/crop/paint-guard.mjs','src/crop/palette-needs.mjs']}), track: optTrack, inputs: { px: ctx.px, w, h, paperRGB, from: PALETTE_FROM_FILE } }, async () => {
+const PALETTE = (await cachedStep({ ...RUN_CACHE, name: 'palette', code: codeHash(root,[],{dependencies:['src/crop/palettepick.mjs','src/crop/palettewide.mjs','src/crop/paint-guard.mjs']}), track: optTrack, inputs: { px: ctx.px, w, h, paperRGB, from: PALETTE_FROM_FILE } }, async () => {
   const from = opt('palettefrom', '');
   let source = ctx.px, sw = w, sh_ = h;
   if (from) {
@@ -63,10 +63,7 @@ const PALETTE = (await cachedStep({ ...RUN_CACHE, name: 'palette', code: codeHas
   // --paintsextend 0: keep a named --paints box as it is. Default 1: it gains pans only for a large hue cluster it cannot reach.
   // --palettewide 1: box paints chosen to reach the picture's local colours (src/crop/palettewide.mjs)
   if (num('palettewide', 0) > 0) {
-    const wide = widePalette(source, sw, sh_, paperRGB, palette, { weight: num('pwweight', 1), gain: num('pwgain', 0.5), min: num('pwmin', 3), max: num('pwmax', 6), K: num('pwcolours', 8), keys: opt('paints', '') ? opt('paints', '').split(',') : null, add: opt('paintsadd', '') ? opt('paintsadd', '').split(',') : null, extend: num('paintsextend', 1) > 0, guard: paintGuardOptions(opt, num),
-      // --paintdarkshare, --paintdarkl, --paintearthshare, --paintcoolshare: what brings a dark paint, the earths and a blue into a fitted box
-      // (src/crop/palette-needs.mjs): darks (under L* 35) on 0.15 of the painted cells, muted warm colours on 0.2, cool colours on 0.01
-      needs: { darkShare: num('paintdarkshare', 0.15), darkL: num('paintdarkl', 35), earthShare: num('paintearthshare', 0.2), coolShare: num('paintcoolshare', 0.01) } });
+    const wide = widePalette(source, sw, sh_, paperRGB, palette, { weight: num('pwweight', 1), gain: num('pwgain', 0.5), min: num('pwmin', 3), max: num('pwmax', 6), K: num('pwcolours', 8), keys: opt('paints', '') ? opt('paints', '').split(',') : null, add: opt('paintsadd', '') ? opt('paintsadd', '').split(',') : null, extend: num('paintsextend', 1) > 0, guard: paintGuardOptions(opt, num) });
     console.log(wide.note);
     return wide.palette;
   }
