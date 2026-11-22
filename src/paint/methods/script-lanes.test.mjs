@@ -50,6 +50,19 @@ test('two seeds are two hands: the same wash is laid visibly differently; the sa
   assert.ok(Math.abs(heading(a[0]) - heading(a.at(-1)) - (heading(b[0]) - heading(b.at(-1)))) > 1, 'they turn differently');
 });
 
+test('a part too short for lanes across it is laid along its own length: a band of shadow is strokes along the band, not a row of dashes', () => {
+  // a band 60 mm long and 7 mm thick, slanting; the passage's direction is straight down, across it
+  const band = [[20, 20], [80, 40], [78, 47], [18, 27]];
+  const s = sweeps([band], { widthMm: 5, deg: 90, rng: handOf('a') });
+  const long = s.map(st => st.points.slice(1).map((p, k) => Math.hypot(p[0] - st.points[k][0], p[1] - st.points[k][1])).reduce((x, y) => x + y, 0));
+  assert.ok(s.length <= 3 && Math.max(...long) > 45, `${s.length} strokes, the longest ${Math.max(...long).toFixed(0)} mm`);
+  // a ruler keeps the passage's direction only where the lanes are long enough: the same band at hand 0 is still laid along itself
+  assert.ok(sweeps([band], { widthMm: 5, deg: 90, rng: handOf('a'), hand: 0 }).length <= 3);
+  // a region long enough along the direction keeps it
+  const tall = lanesOf(sweeps([[[10, 10], [40, 10], [40, 100], [10, 100]]], { widthMm: 5, deg: 90, rng: handOf('a'), hand: 0 }), 1);
+  assert.ok(tall.length >= 4 && tall.every(l => Math.abs(Math.abs(heading(l)) - 90) < 1));
+});
+
 test('the load: full after a dip, thinner until the next, about the mix on average; the seed and the amount reach a script\'s washes', () => {
   const s = sweeps([field], { widthMm: 6, deg: 0, rng: handOf('a') }), c = s.map(st => st.charge);
   assert.ok(Math.abs(c.reduce((a, v) => a + v, 0) / c.length - 1) < 0.08, `mean charge ${(c.reduce((a, v) => a + v, 0) / c.length).toFixed(3)}`);

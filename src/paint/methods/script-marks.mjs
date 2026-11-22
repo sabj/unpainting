@@ -210,19 +210,36 @@ export function written(points, { widthMm, rng }) {
  *   never more than `bowMost` brush widths; ownBow: each lane's own bulge, in brush widths.
  * swell: the pressure rises and falls along a stroke by this share. perLoad: lanes laid back and forth before the brush
  *   is lifted and recharged, from this many to this many.
+ * short: a region whose lanes along the passage's direction would be shorter than this many brush widths, and which is
+ *   clearly longer another way, is laid along its own length instead (a band of shadow under a rail is one or two strokes
+ *   along the band, not a row of dashes across it).
  */
-export const LANE_HAND = Object.freeze({ lap: [0.3, 0.55], tilt: 2.5, fan: 7, bow: 0.05, bowMost: 0.7, ownBow: 0.1, swell: 0.1, perLoad: [2, 4] });
+export const LANE_HAND = Object.freeze({ lap: [0.3, 0.55], tilt: 2.5, fan: 7, bow: 0.05, bowMost: 0.7, ownBow: 0.1, swell: 0.1, perLoad: [2, 4], short: 2.5, longer: 1.4 });
+
+/** The extent of one outline along a direction (degrees). */
+const extentAlong = (P, deg) => { const a = deg * Math.PI / 180, c = Math.cos(a), s = Math.sin(a); let lo = Infinity, hi = -Infinity; for (const [x, y] of P) { const t = x * c + y * s; lo = Math.min(lo, t); hi = Math.max(hi, t); } return hi - lo; };
 
 /**
  * A wash: overlapping strokes across the region along `deg`, a brush of `widthMm`, as a hand lays them (LANE_HAND): the
  * lanes unevenly lapped, each turned a little its own way and all turning steadily across the wash, bowed along the arm's
  * arc, the pressure swelling along them, running from the region's edge (or a light's) to its edge and a little past or
  * short of it; two to four lanes laid back and forth as one stroke before the brush is lifted and recharged; from the
- * top down. Each stroke carries a charge factor: full after a recharge, thinning along the load. `hand` (default 1) is the amount of all of it; the same
+ * top down. Each stroke carries a charge factor: full after a recharge, thinning along the load. A part of the region
+ * too short for lanes along `deg` is laid along its own length. `hand` (default 1) is the amount of all of it; the same
  * `rng` gives the same wash, another seed another hand.
  */
 export function sweeps(polys, { widthMm, deg = 0, pressure = 0.8, perLoad = null, lights = [], rng, hand = 1 }) {
-  return lanes(polys, { widthMm, deg, pressure, perLoad, lights, rng, hand });
+  const H = LANE_HAND, own = [], rest = [];
+  for (const P of polys) {
+    // a lane's usual length in this part: its area over its extent across the lanes
+    const area = areaOf([P]), ax = axisOf([P]).deg, along = area / Math.max(1e-6, extentAlong(P, deg + 90)), length = area / Math.max(1e-6, extentAlong(P, ax + 90));
+    (along < H.short * widthMm && length >= H.longer * along ? own : rest).push({ P, deg: ax });
+  }
+  if (!own.length) return lanes(polys, { widthMm, deg, pressure, perLoad, lights, rng, hand });
+  // the main region first, then each short part along its own length, top down
+  const top = P => Math.min(...P.map(q => q[1]));
+  return [...(rest.length ? lanes(rest.map(q => q.P), { widthMm, deg, pressure, perLoad, lights, rng, hand }) : []),
+    ...own.sort((p, q) => top(p.P) - top(q.P)).flatMap(q => lanes([q.P], { widthMm, deg: q.deg, pressure, perLoad, lights, rng, hand }))];
 }
 
 function lanes(polys, { widthMm, deg, pressure, perLoad, lights, rng, hand }) {
