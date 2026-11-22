@@ -267,3 +267,14 @@ test('a soft named form is begun with one pale base wash laid into clean water; 
   assert.ok(planWith(st).instructions.every(q => !/base wash/.test(q.thing)));
   assert.ok(planWith(st, { thingMasks: face }, { formbase: 0 }).instructions.some(q => /under-wash/.test(q.thing)));
 });
+
+test('the base wash of a dark form is a mid-tone, and the darks go over it', () => {
+  // a near-black animal 100 x 70 mm with a lighter grey patch under 8% of it
+  const w = 320, h = 200, rgb = new Uint8ClampedArray(w * h * 3).fill(255);
+  for (let i = 0; i < w * h; i++) { const x = (i % w) / 2, y = ((i / w) | 0) / 2; if (x >= 20 && x < 120 && y >= 15 && y < 85) rgb.set(x >= 30 && x < 42 && y >= 30 && y < 40 ? [120, 130, 150] : [36, 44, 60], i * 3); }
+  const p = planWith({ w, h, rgb }, { thingMasks: { width: w, height: h, ids: new Uint8Array(w * h).fill(1), names: ['a dog'], kinds: ['fur'] } });
+  const base = p.instructions[0], L = q => labOf(q.colour, 0, PAPER)[0];
+  assert.match(base.thing, /^base wash of a dog/);
+  assert.ok(L(base) >= 58 && L(base) <= 62, `${L(base)}`);
+  assert.ok(p.instructions.slice(1).some(q => L(q) < 45), 'the darks are laid over it');
+});

@@ -315,6 +315,8 @@ const MONO_STEP_L = 8, MONO_FIRST = 0.7, MONO_CUTS = [0.4, 0.12], MONO_STEP_LEAS
 const TOUCH_KIT = [0.8, 1.4, 2.4, 4, 6.5, 10];
 /** Reserved lights from the finest study: at least this light (L*) and no more chromatic than this, in parts of at least this (mm2). */
 const RESERVE_L = 92, RESERVE_C = 12, RESERVE_LEAST_MM2 = 2, RESERVE_MOST_MM2 = 25;
+/** A named form's base wash is never darker than this (L*): the mid-tone under black fur. */
+const BASE_DARKEST_L = 60;
 /** Washes err light: a wash (not a dark) aims this share of the way from the study's value to the paper's. The study is a
  * poster of the subject, flatter and denser than its washes; in watercolour the paper carries the light. */
 const ERR_LIGHT = 0;
@@ -653,7 +655,10 @@ export function planStudyWashes({ k, w, h, studies, flat = false, density = null
   for (const b of bases) {
     const m = new Uint8Array(pn); for (const q of b.cells) m[q] = 1;
     const parts = partLoops(m, roundFirst, paperMask); if (!parts.length) continue;
-    const made = wash(1, `base wash of ${b.name} [${b.kind}]: one pale wash over the whole form, into clean water`, parts.flat(), shapes[b.light].colour, { own: b.cells, parts, move: 'wet on wet', grade: false });
+    // (never darker than a mid-tone: a black dog's lightest fur shape is near black, and laid whole at that value it leaves
+    // nothing for the darks to do; its fur is a mid-tone wash with the darks over it)
+    const Lb = labOf(shapes[b.light].colour, 0, valueRef)[0], baseColour = Lb < BASE_DARKEST_L ? withL(shapes[b.light].colour, BASE_DARKEST_L) : shapes[b.light].colour;
+    const made = wash(1, `base wash of ${b.name} [${b.kind}]: one pale wash over the whole form, into clean water`, parts.flat(), baseColour, { own: b.cells, parts, move: 'wet on wet', grade: false });
     if (made) { layer(1, [made]); formBaseCount++; }
   }
   for (const r of roots) {
