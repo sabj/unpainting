@@ -6,7 +6,7 @@ The painting toolkit given to models, task instructions (briefs), technique guid
 - [targets/](targets/): the five distributed targets, Ships, Mittens, Trumbull, Hills and France, with their coarse maps.
 - [naive/BRIEF.md](naive/BRIEF.md): the brief for round V1. [skill/BRIEF.md](skill/BRIEF.md) adds a closing "Skills" section for V2 and V3.
 - [skill/skills/](skill/skills/): the technique guides for rounds V2 and V3. The runner copies these into `.agents/skills/` and creates `.claude/skills` as a relative symlink to `../.agents/skills`. Current repo skills live in [.agents/skills/](../../.agents/skills/).
-- [kit/kit.mjs](kit/kit.mjs): the toolkit's brush, pen, palette, stroke budget and saved stage images.
+- [kit/kit.mjs](kit/kit.mjs): the toolkit's brush, pen, palette, stroke budget and saved stage images. It paints on the GPU or stops: if another of your processes still holds the GPU, `kit.open` says which and paints nothing, and it uses the CPU only when you ask for it by name (`kit.open(task, { gpu: false })`).
 - [runners/oss_loop.py](runners/oss_loop.py): the tool loop for open models. Claude and Codex models run in their own CLIs; see [runners.mjs](../scripts/runners.mjs).
 
 ## Prompt
