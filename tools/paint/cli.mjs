@@ -23,7 +23,7 @@ import { lookSets, lookFault, lookSizeNote, LOOK_JOBS, HEAVY_JOBS } from './look
 import { DEFAULT_LOOKS, DEFAULT_MINUTES, safeRead, writeSession, sessionServer, finalChoice, sessionCall, readTranscript, reachedOutside, ownFolderOf, ownPictures, runSession } from './session.mjs';
 import { qwenRoute, studyRequestPrompt, parseStudyRequests, writeStudyRequest, makeStudies, withAuthorStudies } from './studies.mjs';
 import { readSelfReview, returnPrompt } from './self-review.mjs';
-import { checkSessionFolder, linesOfKept } from './kept-session.mjs';
+import { checkSessionFolder, drawingOfKept } from './kept-session.mjs';
 import { codeState } from '../../src/paint/code-state.mjs';
 import { scanOptions } from '../../src/paint/option-ledger.mjs';
 
@@ -53,6 +53,7 @@ try {
   authors = req.authors.map(a => authorOf(a, ownAuthors, models)).map(a => (a.cli && !['script', 'edit', 'choice'].includes(a.cli) ? { ...a, work: req.work, brief: req.work === 'reply' ? briefName(BRIEF_FILE) : null } : a));
   if (req.work === 'session') for (const a of authors) if (a.work) sessionCall(a, { prompt: '', cwd: '' });
   if (req.from && !fs.existsSync(req.from)) throw new Error(`--from ${req.from}: no such folder`);
+  if (req.lines && !authors.some(a => a.cli === 'script' || a.cli === 'edit')) throw new Error('--lines names the drawing of a kept script or plan edit (--author script:FILE or edit:FILE); a session, a kept choice and the code planner carry their own');
   if (req.studies === 'author') {
     // open tools: the author's own studies are made by the local image model; every piece of that route must be here
     qwen = qwenRoute(registry.base);
@@ -427,20 +428,22 @@ async function oneRun(r) {
   const { spec, record, authorFull: author } = r;
   fs.mkdirSync(record.out, { recursive: true });
   try {
+    // a kept script or plan edit: the drawing it is painted with is its session's, or the one asked for by name; never unasked
+    const keptKind = author.cli === 'edit' ? 'plan' : author.cli === 'script' ? 'script' : null, drawn = keptKind ? drawingOfKept(author.file, keptKind, req.lines) : null;
+    if (drawn) { record.author.drawingBy = drawn.said; say(r, `its drawing: ${drawn.said}`); }
     if (author.key === 'auto') {
       const got = await paintOnce(r, dirty => buildCommand(spec, { mode: req.mode, out: record.plate, known, dirty, segEnv }), record.plate, path.join(record.out, 'run.log'));
       record.failure = got.failure; record.results = got.results;
-    } else if ((author.cli === 'edit' || author.cli === 'script') && linesOfKept(author.file, author.cli === 'edit' ? 'plan' : 'script')) {
-      // a kept script or plan edit that lies in the folder of a session which chose its own drawing lines: painted with
-      // those lines, as the session's choice is (kept-session.mjs refuses it when the lines file is missing or the file
-      // is not what the session handed over; it is never painted with the standard drawing in their place)
-      const kind = author.cli === 'edit' ? 'plan' : 'script', tied = linesOfKept(author.file, kind), read = f => JSON.parse(fs.readFileSync(f, 'utf8'));
+    } else if (drawn?.linesFile) {
+      // a kept script or plan edit with a choice of lines (its session's, or one named with --lines): painted with those
+      // lines, as a session's choice is (kept-session.mjs refuses it when the lines file is missing or the file is not
+      // what its session handed over; it is never painted with the standard drawing in their place)
+      const kind = keptKind, tied = drawn, read = f => JSON.parse(fs.readFileSync(f, 'utf8'));
       fs.mkdirSync(path.join(record.out, 'author'), { recursive: true });
       const choice = readChoice({ kind, [kind]: kind === 'script' ? 'script.json' : 'plan-edit.json', lines: tied.lines });
       choice.tools.linesEdit = read(tied.linesFile);
       const fin = { choice, script: kind === 'script' ? readScript(author.file, { sheetWidthMm: spec.sheet.widthMm }).script : null, edit: kind === 'plan' ? read(author.file) : null, submitted: { kind, what: tied.what } };
       Object.assign(record.author, { chose: tied.what, linesFrom: { session: tied.run, file: tied.linesFile } });
-      say(r, `this ${kind === 'script' ? 'script' : 'plan edit'} was handed over by a session with its own drawing lines (${tied.linesFile}): painted with them`);
       await paintChoice(r, fin);
     } else if (author.cli === 'edit') {
       // a kept edit of the code planner's plan (plan-to-edit.json of a plan, as written or changed): no model is called

@@ -4,7 +4,7 @@ import { parseArgs } from './args.mjs';
 
 test('one subject and a mode, with the defaults', () => {
   const r = parseArgs(['kasha-watercolor', 'plan']);
-  assert.deepEqual(r, { subjects: [{ id: 'kasha-watercolor', variant: null }], mode: 'plan', authors: ['auto'], studies: 'locked', work: 'session', looks: null, minutes: null, from: null, sets: [], jobs: null, out: null, dryRun: false, open: true });
+  assert.deepEqual(r, { subjects: [{ id: 'kasha-watercolor', variant: null }], mode: 'plan', authors: ['auto'], studies: 'locked', work: 'session', looks: null, minutes: null, from: null, lines: null, sets: [], jobs: null, out: null, dryRun: false, open: true });
 });
 
 test('several subjects, authors, settings and a variant', () => {

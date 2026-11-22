@@ -218,7 +218,7 @@ async function main() {
   console.log(`step back: ${got.error ?? (got.kept ? 'the author keeps its script' : `revised: ${got.diff.changed.length} passages changed, ${got.diff.added.length} added, ${got.diff.removed.length} removed`)}; ${got.seconds} s${got.tokens ? `, ${got.tokens} tokens` : ''}`);
   for (const c of got.changed ?? []) console.log(`  - ${c}`);
   if (got.kept || noPlan) return;
-  const done = spawnSync('npm', ['run', 'paint', '--', run.subject.id, 'plan', '--author', `script:${got.revisedFile}`, '--out', path.join(out, 'revised'), '--no-open'], { cwd: ROOT, stdio: 'inherit' });
+  const done = spawnSync('npm', ['run', 'paint', '--', run.subject.id, 'plan', '--author', `script:${got.revisedFile}`, '--lines', 'standard', '--out', path.join(out, 'revised'), '--no-open'], { cwd: ROOT, stdio: 'inherit' });
   if (done.status !== 0) { console.error('step back: the revised script did not plan; the first script stands'); process.exit(1); }
 }
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) await main();

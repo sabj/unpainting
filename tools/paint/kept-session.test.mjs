@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { neededOfSession, checkSessionFolder, sessionOfFile, linesOfKept } from './kept-session.mjs';
+import { neededOfSession, checkSessionFolder, sessionOfFile, linesOfKept, drawingOfKept } from './kept-session.mjs';
 
 /** A kept session folder as a run leaves it: run.json, author/S.commands.txt, the model's folder, the kept copy of its choice. */
 function session({ kind = 'script', lines = 'my-lines.json', reusedFrom = null } = {}) {
@@ -65,4 +65,22 @@ test('a kept file of no session, or of a session that chose no lines, is painted
   const plain = session({ lines: null });
   assert.equal(linesOfKept(path.join(plain, 'author', 'script.json'), 'script'), null);
   assert.equal(linesOfKept(path.join(plain, 'author', 'folder', 'script-look3.json'), 'script'), null);
+});
+
+test('the drawing of a kept script is never implicit: its session\'s, or the one named with --lines; a file of no session is refused without', () => {
+  const run = session(), dir = fs.mkdtempSync(path.join(os.tmpdir(), 'kept-copied-')), copied = path.join(dir, 'script.json');
+  // the script copied out of its session's folder (the gap of 22 Nov): nothing says which drawing it had
+  fs.copyFileSync(path.join(run, 'author', 'script.json'), copied);
+  assert.throws(() => drawingOfKept(copied, 'script'), /lies in no session's folder, so nothing says which drawing this script was handed over with: name it, --lines standard .* or --lines FILE\.json .*never given the standard drawing unasked/);
+  assert.throws(() => drawingOfKept(copied, 'plan'), /which drawing this plan edit was handed over with/);
+  const std = drawingOfKept(copied, 'script', 'standard'); assert.equal(std.standard, true); assert.match(std.said, /asked for by name \(--lines standard\)$/); assert.equal(std.linesFile, undefined);
+  const lines = path.join(run, 'author', 'folder', 'my-lines.json'), named = drawingOfKept(copied, 'script', lines);
+  assert.equal(named.linesFile, lines); assert.equal(named.lines, 'lines.json'); assert.match(named.what, /^own script with a choice of lines named on the command line$/);
+  assert.throws(() => drawingOfKept(copied, 'script', path.join(dir, 'none.json')), /--lines .*none\.json: no such file/);
+  // in its session's folder: the session's lines without being asked; standard only by name, and the record says what was set aside
+  assert.equal(drawingOfKept(path.join(run, 'author', 'script.json'), 'script').linesFile, lines);
+  assert.match(drawingOfKept(path.join(run, 'author', 'script.json'), 'script', 'standard').said, /NOT the lines its session chose \(my-lines\.json\)/);
+  // a session that chose no lines handed over the standard drawing: said, not asked
+  const plain = session({ lines: null }), got = drawingOfKept(path.join(plain, 'author', 'script.json'), 'script');
+  assert.equal(got.standard, true); assert.match(got.said, /its session .* chose no lines of its own/);
 });

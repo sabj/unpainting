@@ -206,6 +206,9 @@ pictures, is called once, read-only (`claude --allowedTools Read`, `codex exec -
 --sandbox`), and answers with a whole painting script ([painting-script.md](painting-script.md)). A refused answer,
 or a script the painter cannot plan, goes back to the model once with the reason. After that the failure is the
 result. `--author script:FILE.json` paints a kept script; its column is named for the model that wrote it.
+The drawing of a kept script or plan edit is never chosen for it unasked: a file in its session's run folder is
+painted with the lines that session handed over (or refused, when they are missing); a file anywhere else needs
+`--lines standard` (the registered drawing, whole) or `--lines FILE.json` (a choice of lines), and is refused without.
 `node tools/paint/step-back.mjs <run folder>` gives such a script one look at its compiled plan and one revision.
 
 `--studies author` (open tools) lets a model brief its own block-in studies before it writes: it answers with up to

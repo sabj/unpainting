@@ -1,6 +1,6 @@
 // The command line of `npm run paint`:
 //   npm run paint -- <subject[,subject...]> plan|paint [--author auto|<model key>[,...]] [--studies locked|author]
-//                    [--work session|reply] [--looks N] [--minutes N] [--from <dir>]
+//                    [--work session|reply] [--looks N] [--minutes N] [--from <dir>] [--lines FILE.json|standard]
 //                    [--set key=value ...] [--jobs N] [--out <dir>] [--dry-run] [--no-open]
 // Nothing here touches a file: it turns the words into one request object, or throws with the usage.
 
@@ -21,6 +21,11 @@ export const USAGE = `usage: npm run paint -- <subject[,subject...]> plan|paint 
   --minutes N           minutes of its own time a session may take; waiting for the tools is not counted (default 85)
   --from <dir>          paint what the sessions of an earlier run handed over (its --out folder), calling no model:
                         plan first, look, then paint the same choices.
+  --lines FILE.json|standard
+                        the drawing of a kept script or plan edit (--author script:FILE, edit:FILE) that lies in
+                        no session's folder: a choice of lines as a session writes it, or the word standard for
+                        the registered drawing, whole. Such a file is refused without it: the drawing is never
+                        chosen for it unasked. A file in its session's folder takes that session's lines.
   --studies locked|author
                         locked: the author gets the registered studies as they are (default).
                         author: the author first briefs its own studies; the local image model makes them
@@ -39,7 +44,7 @@ export const USAGE = `usage: npm run paint -- <subject[,subject...]> plan|paint 
 A subject may name a variant kept in tools/paint/variants.json: h36:approved.
 "all" is every registered subject not already named: all, or a,b,all to paint a and b first.`;
 
-const VALUED = new Set(['--author', '--studies', '--set', '--out', '--jobs', '--work', '--looks', '--minutes', '--from']);
+const VALUED = new Set(['--author', '--studies', '--set', '--out', '--jobs', '--work', '--looks', '--minutes', '--from', '--lines']);
 const FLAGS = new Set(['--dry-run', '--no-open']);
 
 /** {subjects: [{id, variant}], mode, authors, studies, work, looks, minutes, from, sets: [[key, value]], jobs, out, dryRun, open}. Throws on anything unknown. */
@@ -83,7 +88,7 @@ export function parseArgs(argv) {
   if (new Set(keys).size !== keys.length) throw new Error('a --set key is given twice');
   const jobs = given['--jobs'] === undefined ? null : Number(given['--jobs']);
   if (jobs !== null && !(Number.isInteger(jobs) && jobs >= 1 && jobs <= 16)) throw new Error('--jobs: a whole number of paintings at once, 1 to 16');
-  return { subjects, mode, authors, studies, work, looks, minutes, from: given['--from'] ?? null, sets, jobs, out: given['--out'] ?? null, dryRun: flags.has('--dry-run'), open: !flags.has('--no-open') };
+  return { subjects, mode, authors, studies, work, looks, minutes, from: given['--from'] ?? null, lines: given['--lines'] ?? null, sets, jobs, out: given['--out'] ?? null, dryRun: flags.has('--dry-run'), open: !flags.has('--no-open') };
 }
 
 function list(s) { return s.split(',').map(x => x.trim()).filter(Boolean); }

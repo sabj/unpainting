@@ -55,3 +55,22 @@ export function linesOfKept(file, kind) {
   if (!fs.existsSync(linesFile)) throw new Error(`${file} was handed over with its session's own drawing lines, and the lines file is missing: ${places.join(' (nor ')}${places.length > 1 ? ')' : ''}. It is not painted with the standard drawing in their place; restore the file, or ${again}`);
   return { run, lines, linesFile, what: submitted.what };
 }
+
+/**
+ * The drawing a kept script or plan edit is painted with: never chosen for it unasked. `asked` is --lines: a lines
+ * file, the word 'standard', or null. {standard: true, said} for the registered drawing whole, or {lines, linesFile,
+ * what, run, said} for a choice of lines. In order: what was asked for by name; else what the file's session handed
+ * over (its lines, or none); else, for a file in no session's folder, a refusal that says how to name it.
+ */
+export function drawingOfKept(file, kind, asked = null) {
+  const word = kind === 'script' ? 'script' : 'plan edit', s = sessionOfFile(file), own = s?.submitted.tools?.lines ?? null;
+  if (asked === 'standard') return { standard: true, said: `the standard drawing, whole, asked for by name (--lines standard)${own ? `; NOT the lines its session chose (${own})` : ''}` };
+  if (asked) {
+    const linesFile = path.resolve(asked);
+    if (!fs.existsSync(linesFile)) throw new Error(`--lines ${asked}: no such file (a choice of lines as a session writes it, or the word standard)`);
+    return { lines: 'lines.json', linesFile, what: `${kind === 'script' ? 'own script' : 'edited plan'} with a choice of lines named on the command line`, run: null, said: `the lines named on the command line (${linesFile})` };
+  }
+  if (!s) throw new Error(`${file} lies in no session's folder, so nothing says which drawing this ${word} was handed over with: name it, --lines standard (the registered drawing, whole) or --lines FILE.json (its choice of lines). A ${word} is never given the standard drawing unasked`);
+  const tied = linesOfKept(file, kind);
+  return tied ? { ...tied, said: `the drawing lines its session handed over (${tied.linesFile})` } : { standard: true, said: `the standard drawing, whole: its session (${s.run}) chose no lines of its own` };
+}
