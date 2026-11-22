@@ -16,7 +16,7 @@ export const USAGE = `usage: npm run paint -- <subject[,subject...]> plan|paint 
   --set key=value       one setting for this run, repeatable. drawing=<stem>, width=<cells>, sheetmm=<mm>,
                         masks=<receipt.json>|none, floors=6,4,2, study2.clusters=20 (a
                         wash-plan setting of the second study), heapmb=<MB>; any other key is a paint-plate option.
-  --jobs N              GPU paintings at once (default 2; four is the measured best on this machine). Paintings
+  --jobs N              GPU paintings at once (default 2; 6 on an otherwise idle M5 Max: docs/running.md). Paintings
                         started elsewhere count; a queue waits for a free place, and a failed painting is
                         recorded in its cell while the rest go on. A running queue takes a new
                         number written into <out>/jobs.

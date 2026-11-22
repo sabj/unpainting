@@ -64,11 +64,11 @@ input is checked against its sha256 before anything starts. The code is in `tool
 
 ```sh
 npm run paint -- <subject[,subject...]> plan|paint [--author auto|<model key>[,...]] [--studies locked|author]
-                 [--set key=value ...] [--out <dir>] [--dry-run] [--no-open]
+                 [--set key=value ...] [--jobs N] [--out <dir>] [--dry-run] [--no-open]
 ```
 
-`plan` makes the wash plan only, on the CPU, in minutes. `paint` makes the whole painting on the GPU and refuses to
-start when two GPU paintings are already running. Before a run the command prints the subject, source, sheet, drawing,
+`plan` makes the wash plan only, on the CPU, in minutes. `paint` makes the whole painting on the GPU; one painting
+asked for by itself refuses to start when `--jobs` GPU paintings (default 2) are already running. Before a run the command prints the subject, source, sheet, drawing,
 studies, named forms, author, mode, every setting that differs from its default, the commit and the exact
 `paint-plate` command. Every run ends with one labelled picture, `<out>/sheet.jpg` (source, opening drawing, studies,
 named forms, wash plan, painting, and the stage strip when painted), and `<out>/run.json`. The painter's own files are
@@ -94,6 +94,34 @@ Named forms (a reviewed SAM id map with its receipt) are found in this order: `-
 `<forms folder>/<subject id>/receipt.json`, then none. The forms folder is `UNPAINT_FORMS`, else `named-forms` beside
 `SUBJECTS.json`. The receipt must name the subject's source by its sha256. The code planner reads the forms; an author
 is shown them.
+
+### A queue of paintings
+
+`all` stands for every registered subject not already named, in the list's order, so `a,b,all` paints `a` and `b`
+first and then the rest. `--jobs N` is the number of GPU paintings at once. Paintings started by anyone else on the
+machine count against the same places, and a queue waits for a free place instead of refusing. Each run reads the code
+state when its turn comes: its sheet and `run.json` carry the commit it painted with, and a checkout that is dirty by
+then gets `--allowdirty 1` and says so. A painting that fails, or whose `backend.json` does not say `backend gpu,
+fallback false`, is recorded as failed in its cell, and a subject whose pinned inputs are missing is listed as NOT RUN;
+the rest of the queue goes on and the command ends with exit 1. Writing a number into `<out>/jobs` changes the places
+of a queue that is already running.
+
+```sh
+npm run paint -- all paint --jobs 6 --out work/paint/all-r1 --no-open
+
+# source | wash plan | painting, one row a subject, and the table of numbers
+node tools/paint/contact.mjs work/paint/all-r1 work/paint/all-r1/contact.jpg --table work/paint/all-r1/table.md
+
+# one subject by several authors: the source and each painting large, stage strips under
+node tools/paint/author-sheet.mjs sheet.jpg <run folder of auto> <run folder of a model> ...
+```
+
+Measured on the M5 Max (18 cores) on 21 Nov 2026, 25 full-size paintings: none failed and none left the GPU with 4 to
+16 at once. One picture took 21 minutes with 4 places and 28 with 8 to 16, so more places still finished more
+paintings an hour; but GPU utilisation is already near 90% with three paintings in their GPU phase, and the gain is the
+CPU part of each painting (the plan and the stroke geometry) running side by side. With a batch of CPU plans on the
+same machine (load average about 50) ten paintings together laid fewer strokes a minute than four had. Use `--jobs 6`
+on an otherwise idle machine, and do not run a plan batch beside a paint queue. The default stays 2.
 
 ### A model as the author
 

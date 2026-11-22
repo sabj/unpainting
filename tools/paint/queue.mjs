@@ -2,7 +2,7 @@
 // wait for a free GPU place when other paintings (this command's or anyone's) already hold them. Pure but for the
 // clock: the process listing and the sleep are handed in.
 
-/** The most GPU paintings at once when --jobs is not given. Measured on the M5 Max, 21 Nov 2026: see docs/running.md. */
+/** The most GPU paintings at once when --jobs is not given: safe on a shared machine. Six held on an idle M5 Max (docs/running.md). */
 export const DEFAULT_JOBS = 2;
 /** CPU plans at once. */
 export const PLAN_JOBS = 3;
