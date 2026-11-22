@@ -31,7 +31,7 @@ import { editLine } from '../../src/paint/methods/plan-edit.mjs';
 import { tinyTouchWarning } from './plan-data.mjs';
 import { revertCounter, DEFAULT_REVERTS } from './reverts.mjs';
 import { readSeen, seenAsk } from './seen.mjs';
-import { DEFAULT_LOOK_UNITS, readLookAsk, regionBox, lookCost, costLine } from './look-cost.mjs';
+import { DEFAULT_LOOK_UNITS, readLookAsk, regionBox, lookCost, costLine, scriptInRegion } from './look-cost.mjs';
 
 /**
  * The benchmark's resource budget for one try (one model, one subject, one level), when the command line names none:
@@ -248,9 +248,11 @@ export function sessionServer({ dir, sheet = null, forms = [], looks: most = DEF
         region = regionBox(ask.region, { sheet: sheet ?? { widthMm: Infinity, heightMm: Infinity }, forms });
         if (region && p.choice.kind !== 'script') throw new Error('a look of a region is painted for your own script only (its passages are written in millimetres, so those in the box can be painted by themselves); the code planner\'s plan and an edited plan are painted whole, or stopped at a stage with --until');
       } catch (e) { return `REFUSED, nothing was painted and nothing was spent: ${e.message}`; }
-      cost = lookCost(got.rows ?? [], { until: ask.until, regionShare: region?.share ?? null });
+      // a region look paints the script's passages that touch the box: its cost is their share of the passages
+      if (region) { const inR = scriptInRegion(p.script, region.box); if (!inR.kept) return `REFUSED, nothing was painted and nothing was spent: no passage of your script touches the region ${region.box.join(', ')} mm`; region.passages = inR.kept; region.of = inR.of; region.passageShare = inR.kept / inR.of; }
+      cost = lookCost(got.rows ?? [], { until: ask.until, regionShare: region?.passageShare ?? null });
     }
-    const askKey = `${p.key}:${ask.until ?? ''}:${region ? region.box.join(',') : ''}`, costSaid = cost ? `${cost.cost} unit${cost.cost === 1 ? '' : 's'} (${ask.until != null ? `stopped after stage ${ask.until}: ${cost.washes} of the plan's ${cost.of} washes` : `the whole plan, ${cost.of} washes`}${region ? `; the region ${region.name ? `"${region.name}", ` : ''}${region.box.join(', ')} mm, ${Math.round(100 * region.share)}% of the sheet` : ', the whole sheet'})` : '';
+    const askKey = `${p.key}:${ask.until ?? ''}:${region ? region.box.join(',') : ''}`, costSaid = cost ? `${cost.cost} unit${cost.cost === 1 ? '' : 's'} (${ask.until != null ? `stopped after stage ${ask.until}: ${cost.washes} of the plan's ${cost.of} washes` : `the whole plan, ${cost.of} washes`}${region ? `; the region ${region.name ? `"${region.name}", ` : ''}${region.box.join(', ')} mm, which ${region.passages} of your ${region.of} passages touch` : ', the whole sheet'})` : '';
     const edited = `${editSaid}${p.tools ? ` ${p.tools.said}${got.toolFiles?.length ? ` See ${got.toolFiles.map(f => f.rel).join(', ')}.` : ''}` : ''}${warned(p.warnings)}${back.revert ? `\nThis is a return to a choice you had left: ${back.count} of ${revertsMost} allowed.` : ''}`;
     // ... and of the strokes too small for a wet bed, before anything is painted (plan-data.mjs tinyTouchWarning)
     const tiny = tinyTouchWarning(s);
@@ -267,7 +269,7 @@ export function sessionServer({ dir, sheet = null, forms = [], looks: most = DEF
     if (!seenIt) { try { seenIt = await paintLook(p.choice, p.script, { plan: id, look }, p.edit?.edit ?? null, got, { until: ask.until, region }); } catch (e) { seenIt = { ok: false, error: e.message }; } if (seenIt?.ok) painted.set(askKey, seenIt); }
     if (!seenIt?.ok) { note({ notPainted: String(seenIt?.error ?? 'no painting').slice(0, 300), plan: id, key: p.key }); return `NOT PAINTED, no look was counted: ${seenIt?.error ?? 'the painter gave no painting'}\nYour choice compiles (${what}): ${line}. Ask for the look again, or go on.\n${left()}`; }
     // the look is spent before it is delivered: whatever happens to the delivery, it stays spent
-    note({ look, cost: charge, ask: { until: ask.until, region: region ? { box: region.box, name: region.name, share: +region.share.toFixed(4) } : null }, estimate: cost, plan: id, atSeconds, at: new Date(now()).toISOString(), what, kind: p.choice.kind, settings: entry.settings, script: p.choice.script, plan: p.choice.plan ?? null, edit: er, tools: p.tools?.record ?? null, key: p.key, marked: seenIt.marked ?? null, painted: seenIt.painted ?? null });
+    note({ look, cost: charge, ask: { until: ask.until, region: region ? { box: region.box, name: region.name, sheetShare: +region.share.toFixed(4), passages: region.passages, of: region.of } : null }, estimate: cost, plan: id, atSeconds, at: new Date(now()).toISOString(), what, kind: p.choice.kind, settings: entry.settings, script: p.choice.script, plan: p.choice.plan ?? null, edit: er, tools: p.tools?.record ?? null, key: p.key, marked: seenIt.marked ?? null, painted: seenIt.painted ?? null });
     entry.look = look;
     const folder = `looks/${look}`, t = p.choice.tools, choiceText = JSON.stringify({ kind: p.choice.kind, settings: entry.settings, script: p.choice.script, plan: p.choice.plan ?? null, ...(t ? { lines: t.lines ?? undefined, forms: t.forms ?? undefined, perForm: t.perFormGiven ?? undefined, medium: t.medium ?? undefined } : {}), why: p.choice.why }, null, 1) + '\n';
     // kept outside the folder as it was shown, with the choice as it was looked at: what changed between looks is read from here

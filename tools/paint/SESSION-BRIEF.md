@@ -47,7 +47,7 @@ One thing is limited, and it is the benchmark's, not a judgment of your work: **
 the same for every model. It is `WALL_MINUTES` minutes on the clock from when you start, with the time your looks and
 plans take included, and `LOOKS_MOST` look units of rendering. A look of your whole plan on the whole sheet costs 1
 unit. A look stopped after a stage you name (`./unpaint look --until 2`) costs that stage's share of your plan's
-washes, and a look of a region (`--region`) costs the region's share of the sheet: where and when you look is yours
+washes, and a look of a region of your own script (`--region`) costs the share of its passages that touch the region: where and when you look is yours
 to choose. The cost is told before it is spent (`./unpaint plan` lists it; `./unpaint cost ...` prices any look and
 paints nothing). `./unpaint status` shows what is used, and every answer of the tools says it too. When the budget is reached you are asked to hand in what you have: no further look is painted, `./unpaint
 plan` still checks that your final choice compiles, and `GRACE_MINUTES` minutes later the session is ended. So keep

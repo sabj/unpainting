@@ -541,8 +541,9 @@ async function lookOfChoice(r, fin) {
   const forms = record.masks.mask ? await formBoxes(record.masks.mask, record.masks.forms, W) : [], given = req.region ? (r => (r.length === 4 && r.every(Number.isFinite) ? r : req.region))(req.region.split(',').map(Number)) : null;
   const region = regionBox(given, { sheet: { widthMm: W, heightMm: spec.sheet.heightMm }, forms });
   if (region && !fin.script) throw new Error('--region: a look of a region is painted for an own script only');
-  const estimate = lookCost(compiled.rows ?? [], { until: req.until, regionShare: region?.share ?? null });
-  say(r, `this look is estimated at ${estimate.cost} units (${estimate.washes} of ${estimate.of} washes${region ? `, ${Math.round(100 * region.share)}% of the sheet` : ''}); painting it`);
+  const inR = region ? scriptInRegion(fin.script, region.box) : null;
+  const estimate = lookCost(compiled.rows ?? [], { until: req.until, regionShare: inR ? inR.kept / inR.of : null });
+  say(r, `this look is estimated at ${estimate.cost} units (${estimate.washes} of ${estimate.of} washes${inR ? `; ${inR.kept} of ${inR.of} passages touch the region` : ''}); painting it`);
   const got = await paintLook(r, fin.choice, fin.script, path.join(dir, 'look-paints', '1'), { plan: 1, look: 1 }, fin.edit, compiled, { until: req.until, region });
   if (!got.ok) throw new Error(`the look was not painted: ${got.error}`);
   const out = path.join(record.out, 'look'); fs.mkdirSync(out, { recursive: true });

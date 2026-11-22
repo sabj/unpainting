@@ -10,7 +10,7 @@ test('a look costs rendering: 1 for the whole plan on the whole sheet, a stage\'
   assert.equal(lookCost(rows, { regionShare: 0.25 }).cost, 0.25); assert.equal(lookCost(rows, { until: 1, regionShare: 0.5 }).cost, 0.15);
   assert.equal(lookCost(rows, { regionShare: 0.001 }).cost, LEAST_LOOK_COST, 'no look is free: the sheet is set up and dried');
   assert.equal(lookCost([], {}).cost, 1);
-  assert.equal(costLine(rows, 4.2), ' A look of this plan costs 1 of your 4.2 units left; stopped early it costs less (--until 1: 0.3, --until 3: 0.8); a look of a region costs its share of the sheet.');
+  assert.equal(costLine(rows, 4.2), ' A look of this plan costs 1 of your 4.2 units left; stopped early it costs less (--until 1: 0.3, --until 3: 0.8); a look of a region of your own script costs the share of its passages that touch the region.');
 });
 
 test('what a look is asked of is read from its words; a region is a box in millimetres or a named form', () => {

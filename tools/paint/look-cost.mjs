@@ -1,7 +1,9 @@
 // What a look costs, in a unit that does not depend on the machine: RENDERING. One full look of the whole plan on
 // the whole sheet costs 1. A look stopped after a stage the model names costs that stage's share of the painting's
-// work, taken as the share of the plan's washes laid by then; a look of a region costs the region's share of the
-// sheet (and both together, their product). Why washes and not strokes: measured on three real looks of one script
+// work, taken as the share of the plan's washes laid by then; a look of a region costs the share of the script's
+// passages that touch the region and so are painted (and both together, their product). A region is not priced by
+// its area: measured (22 Nov, the same script), a box of a quarter of the sheet touched 42 of the 46 passages and
+// its look took 0.71 of the full look's time; the passages' share says 0.91, the area's 0.26. Why washes and not strokes: measured on three real looks of one script
 // (22 Nov, Mittens close-up, 46 washes, 525 strokes, half size, one machine), a look stopped after stage 1 took 0.36
 // of the full look's time and after stage 3 took 0.68; the share of washes says 0.28 and 0.76, the share of strokes
 // 0.34 and 0.94: the late stages are few strokes but many sittings, each with its own drying. The cost is computed from the plan, before anything is painted, and told to the
@@ -41,7 +43,7 @@ export function regionBox(region, { sheet, forms = [] }) {
 
 /**
  * The cost of a look in units, from the plan as compiled. `rows`: the plan's washes in painting order, each {stage}
- * (plan-data.mjs planRows); `until`: a stage or null; `regionShare`: the region's share of the sheet or null.
+ * (plan-data.mjs planRows); `until`: a stage or null; `regionShare`: the share of the script's passages painted in a region look, or null.
  * {cost, washShare, regionShare, washes, of, stages: [{stage, cost}] (what stopping after each stage would cost)}.
  */
 export function lookCost(rows, { until = null, regionShare = null } = {}) {
@@ -55,7 +57,7 @@ export function lookCost(rows, { until = null, regionShare = null } = {}) {
 /** The costs of a plan's looks in one line, for the answer of a plan: told before anything is spent. */
 export function costLine(rows, left) {
   const c = lookCost(rows);
-  return ` A look of this plan costs ${c.cost} of your ${left} units left${c.stages.length > 1 ? `; stopped early it costs less (${c.stages.slice(0, -1).map(s => `--until ${s.stage}: ${s.cost}`).join(', ')})` : ''}; a look of a region costs its share of the sheet.`;
+  return ` A look of this plan costs ${c.cost} of your ${left} units left${c.stages.length > 1 ? `; stopped early it costs less (${c.stages.slice(0, -1).map(s => `--until ${s.stage}: ${s.cost}`).join(', ')})` : ''}; a look of a region of your own script costs the share of its passages that touch the region.`;
 }
 
 /** A script with only the passages that touch a box (mm), and those they are laid into. {script, kept, of}. */
