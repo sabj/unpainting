@@ -206,7 +206,7 @@ const pencilDraw=(target,gs,pigment,options)=>{
  // --washplan script:FILE.json: the washes are a painting script written by an author (script-washes.mjs,
  // docs/painting-script.md): passages in painting order, each laid in whole strokes; no study is read
  const SCRIPT=WASH_PLAN.startsWith('script:')?JSON.parse(fs.readFileSync(path.resolve(root,WASH_PLAN.slice(7)),'utf8')):null;
- if(SCRIPT)valueOptions.touchLeastMm2=TOUCH_LEAST_MM2;
+ if(SCRIPT){valueOptions.touchLeastMm2=TOUCH_LEAST_MM2;valueOptions.finalWidth=FINAL_W;}
  // --thingmasks RECEIPT.json (default auto: IMAGE.named-sam.json beside the source, when there is one): the source's named
  // forms (a reviewed SAM id map bound to the source by its receipt) for the study wash plan; --things names the label file
  // the receipt must match. No receipt: no named forms, and the plan is as it was without them.

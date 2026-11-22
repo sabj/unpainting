@@ -17,3 +17,8 @@ test('dabs keep their millimetres on the sheet, and a look\'s swatches are space
   // a 384-cell look at a 768-cell painting spaces by size because its final does
   assert.equal(mmSpacingDefault(768), true); assert.equal(mmSpacingDefault(384), false); assert.equal(mmSpacingDefault(540), false);
 });
+
+test('a rule in cells is a rule about the final sheet: a quarter of the cells on a half-size look, never none', async () => {
+  const { cellsOfFinal } = await import('./look-scale.mjs');
+  assert.equal(cellsOfFinal(40, 1086, 1086), 40); assert.equal(cellsOfFinal(40, 543, 1086), 10); assert.equal(cellsOfFinal(2, 100, 1000), 1);
+});

@@ -26,3 +26,11 @@ export const mmSpacingDefault = finalWidth => finalWidth > SPACING_CELLS;
 export function dabSpacingFactor({ width, finalWidth, onSheet }) {
   return (onSheet ? width : finalWidth) / SPACING_CELLS;
 }
+
+/**
+ * A count of the final sheet's cells as this sheet's cells cover the same paper: fewer on a look, never under one.
+ * (A rule in cells, such as the least footprint of a stroke laid into its own wet bed, is a rule about the final sheet.)
+ */
+export function cellsOfFinal(cells, width, finalWidth) {
+  return Math.max(1, Math.round(cells * (width / finalWidth) ** 2));
+}
