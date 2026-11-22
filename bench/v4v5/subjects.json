@@ -77,6 +77,20 @@
    "medium": "pencil",
    "width": 1086,
    "sheetmm": 281.274
+  },
+  "white-ships-full": {
+   "name": "White Ships, full size",
+   "taskStyle": "pure watercolor, no ink",
+   "medium": "pencil",
+   "width": 768,
+   "sheetmm": 198.912
+  },
+  "h36-full": {
+   "name": "Yale Rosewalk, full size",
+   "taskStyle": "loose ink-and-watercolor field sketch, ink led",
+   "medium": "pen",
+   "width": 1224,
+   "sheetmm": 317.016
   }
  }
 }
