@@ -2,7 +2,8 @@
 // The contact sheet and the table of a queue of paintings:
 //   node tools/paint/contact.mjs <queue folder> <sheet.jpg> [--first N] [--table RESULTS.md] [--height PX]
 // One row a subject, in the order the runs started: source | wash plan | painting, large enough to judge a face.
-// A run still painting, or one that failed, keeps its row with the reason in it.
+// A run that failed keeps its row with the reason in it; a run folder with no run.json yet (still painting, or
+// waiting its turn) gets a short row that says so.
 import fs from 'node:fs';
 import path from 'node:path';
 import { composeSheet, wordsImage, wrap, riskLine } from './sheet.mjs';
@@ -36,6 +37,12 @@ for (const run of runs) {
     ],
   });
 }
+const pending = fs.readdirSync(dir, { withFileTypes: true }).filter(e => e.isDirectory() && !fs.existsSync(path.join(dir, e.name, 'run.json'))).map(e => e.name);
+if (first === Infinity) for (const name of pending) {
+  const started = fs.existsSync(path.join(dir, name, 'run.log'));
+  rows.push({ label: `${name} · ${started ? 'RUNNING' : 'WAITING ITS TURN'} when this sheet was made`, height: 90, panels: [{ title: '', captions: [], image: await wordsImage([started ? 'RUNNING' : 'NOT STARTED'], 700, 90) }] });
+}
 const done = await composeSheet({ header: [`${runs.length} paintings from ${dir}: source | wash plan | painting`, 'author auto (the code planner) unless a row says otherwise · full registered size · named forms resolved from the named-forms folder · target guard gentle'], rows, file, quality: 86 });
 console.log(`contact sheet: ${done.file} (${done.width} x ${done.height})`);
+if (pending.length && first === Infinity) console.log(`not finished: ${pending.join(', ')}`);
 if (table) { fs.writeFileSync(table, resultsTable(results) + '\n'); console.log(`table: ${table}`); }
