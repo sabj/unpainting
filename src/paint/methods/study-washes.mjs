@@ -125,6 +125,11 @@ function parts(lab, w, h) {
  * whites): the first reading's colours stand (`centres`), every other cell keeps the colour it had, and only the re-read
  * `cells` (a mask) may open colours of their own. Without this a pale sky read into the block-in moved every cluster a
  * little and the whole sheet's shapes with them.
+ * With `forms` too (not decided by either author; read by Codex Astra, 22 Nov, sound with these limits): a form given
+ * colours of its own is read again whole from the grid as it then is, so a re-read cell inside it takes one of the
+ * form's own colours and the form's other cells may change colour with it; outside such forms a cell that was not
+ * re-read starts from the colour it had, though the joins after may still move a shape. The `centres` returned are the
+ * study's own colours to start a second reading from, not the table the shapes' `cluster` numbers index.
  */
 function studyShapes(rgb, pw, ph, paperRGB, { sliverCells, most = 0, clusters: K = CLUSTERS, join: J = CLUSTER_JOIN, keep: KD = KEEP_DARK, hue: HK = KEEP_HUE, forms = null, again = null }) {
   const pn = pw * ph, L = new Float32Array(pn), A = new Float32Array(pn), B = new Float32Array(pn);
