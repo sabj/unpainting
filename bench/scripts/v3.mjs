@@ -13,7 +13,11 @@ import { thumb, stageStrip } from './images.mjs';
 import { makeWorktree, keepScripts, runTurn, minutes } from './pipeline/harness.mjs';
 
 const V3 = path.join(BENCH, 'v3');
-const ATTEMPT_MIN = 32;   // each attempt is stopped after 32 minutes of wall time (the brief says 30)
+// Each attempt is stopped after 32 minutes of wall time (the brief says 30): the old round's limit, set for its small
+// sheets. BENCH_V3_ATTEMPT_MIN states another ("time scaled to the sheet": a drying takes longer on a full-size sheet);
+// the brief and the prompts then say that limit less two minutes, and the run record keeps it (settings.sessionCapMin).
+const ATTEMPT_MIN = Math.max(10, Math.min(240, Number(process.env.BENCH_V3_ATTEMPT_MIN) || 32)), SAID_MIN = ATTEMPT_MIN - 2;
+const sayLimit = t => (SAID_MIN === 30 ? t : t.replaceAll('About 30 minutes', `About ${SAID_MIN} minutes`).replaceAll('about 30 minutes', `about ${SAID_MIN} minutes`).replaceAll('after 30 minutes', `after ${SAID_MIN} minutes`).replaceAll('stopped at 30', `stopped at ${SAID_MIN}`));
 
 const fill = (t, vals) => Object.entries(vals).reduce((s, [k, v]) => s.replaceAll(`{${k}}`, String(v)), t);
 
@@ -25,7 +29,7 @@ function seed({ ws, crop, spec, view, tries, dry }) {
   for (const c of loadCrops()) if (c.distributed) fs.copyFileSync(path.join(V2, c.coarseFile), path.join(b, 'tasks', `${c.task}-coarse.json`));
   fs.cpSync(path.join(V2, 'skill', 'skills'), path.join(b, 'skills'), { recursive: true });
   const p = readJson(path.join(V3, 'prompts.json'));
-  fs.writeFileSync(path.join(b, 'BRIEF.md'), fill(fs.readFileSync(path.join(V3, 'BRIEF.md'), 'utf8'), {
+  fs.writeFileSync(path.join(b, 'BRIEF.md'), fill(sayLimit(fs.readFileSync(path.join(V3, 'BRIEF.md'), 'utf8')), {
     CROP: crop, SIZE: `${spec.width} x ${spec.height}`, STYLE: spec.style, TARGET: view,
     ATTEMPTS: fill(tries === 2 ? p.attemptsExact : p.attemptsUpTo, { TRIES: tries }),
   }));
@@ -94,7 +98,7 @@ async function session({ model, crop, spec, tries, rawTry, dry }) {
       a.rejections = 0;
       attempts.push(a);
       if (!dry && !sessionId && !thread && model.runner !== 'together') { console.error('bench:run: no session id; the session cannot be resumed, so it stops here'); break; }
-      prompt = fill(p.next, { PREV: n, N: n + 1, OF: tries === 2 ? tries : `up to ${tries}`, STROKES: a.stats?.strokes ?? 'no', MIN: a.min }) + (tries === 2 ? '' : p.done);
+      prompt = fill(sayLimit(p.next), { PREV: n, N: n + 1, OF: tries === 2 ? tries : `up to ${tries}`, STROKES: a.stats?.strokes ?? 'no', MIN: a.min }) + (tries === 2 ? '' : p.done);
       // Attach the comparison when supported; otherwise the runner opens it from disk.
       image = ['codex', 'muse', 'agy'].includes(model.runner) ? path.join(ws, 'bench', 'attempts', `a${n}`, 'compare.png') : model.runner === 'together' ? view : null;
       if (image && !fs.existsSync(image)) image = null;
@@ -148,7 +152,7 @@ export async function runV3({ round, model, tries, crops, dry, outRoot, force })
       schema: RUN_SCHEMA, benchmark: 'unpaint-bench', protocol: 'v2', round: round.id, ...VERSION_STAMP,
       painter: { key: model.key, name: model.name, id: model.id, effort: model.effort, runner: model.runner },
       planner: null, evaluators: { scoreJudges: [], progressionJudges: [] }, try: n,
-      settings: { mode: 'gentle', strokeBudget: BUDGET.strokes, minutesPerCrop: 30, sessionCapMin: ATTEMPT_MIN, lookBudget: null, crops, learnsBetweenTries: true, attemptsPerSession: tries },
+      settings: { mode: 'gentle', strokeBudget: BUDGET.strokes, minutesPerCrop: SAID_MIN, sessionCapMin: ATTEMPT_MIN, lookBudget: null, crops, learnsBetweenTries: true, attemptsPerSession: tries },
       session: { minutes: +min.toFixed(1), tokens: tokens || null, costUSD: null, exitCode: null, killedAtCap: killed },
       guard: { blockedImageReads: violations, kitRejections: 0, auditHits: hits },
       crops: cropsOut, ...(Object.keys(notes).length ? { notPainted: notes } : {}),
