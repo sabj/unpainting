@@ -3,7 +3,7 @@
 // that form's kind. The map is geometry and names only; no colour of the subject is read here.
 
 /** The kinds a form may have (the label file's `kind`); anything else, or none, is 'other'. */
-export const FORM_KINDS = Object.freeze(['face', 'eye', 'fur', 'sky', 'animal', 'figure', 'clothing', 'foliage', 'ground', 'water', 'hair', 'shadow', 'building', 'boat', 'other']);
+const FORM_KINDS = Object.freeze(['face', 'eye', 'fur', 'sky', 'animal', 'figure', 'clothing', 'foliage', 'ground', 'water', 'hair', 'shadow', 'building', 'boat', 'other']);
 
 /** The mask's ids on a width x height grid, read at each cell's centre (ids are never interpolated: that would invent forms at their boundaries). */
 export function formGrid(mask, width, height) {
