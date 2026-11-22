@@ -14,6 +14,7 @@ import {setTextureVariety} from '../../src/paint/techniques/shaped-marks.mjs';
 import {removePlannedInk} from '../../src/crop/ink-free.mjs';
 import {availableParallelism} from 'node:os';
 import {DEFAULT_SHEET_MM} from '../../src/media/sheet-size.mjs';
+import {finalWidthOf, mmSpacingDefault, dabSpacingFactor} from '../../src/paint/methods/look-scale.mjs';
 import {nativeBodyCadence} from '../painter/native-body-cadence.mjs';
 import {nativePaintMode, nativeUploadPolicy} from '../painter/native-paint-mode.mjs';
 import {measurePaper as physicalMeasurePaper} from '../../src/paint/methods/wetdry.mjs';
@@ -289,10 +290,14 @@ const SEGMENTS_RECORD = await prepareSegments({ image: path.resolve(root, opt('i
 // Every painter brush is a section brush (painter-brush.mjs), whose sizes are physical: no density scaling or hair cap.
 const createBrush = o => { const b = painterBrushOptions(o); return createBrushRaw(isSection(b) ? b : gpuHairCap(scaleBrushForDensity(b, { renderWidth: w * num('scale', 1) }))); };
 // --mmspacing 0|1: space brush dabs by sheet size, not cells, so marks match at any resolution. Default 1 above 540 px.
-const MM_SPACING_ON = () => { try { return num('mmspacing', w > 540 ? 1 : 0) > 0; } catch { return false; } };
-const dabSpacing = o => { if (!MM_SPACING_ON()) return o; const f = w / 540; return { ...(o ?? {}), spacing: (o?.spacing ?? 0.7) * f }; };
-const physicalStroke = (b, t, p, o) => physicalStrokeRaw(b, t, p, dabSpacing(o));
-const candidateContact = (b, t, p, o) => candidateContactRaw(b, t, p, dabSpacing(o));
+// --finalwidth n: the cells across of the painting this one is a look at (src/paint/methods/look-scale.mjs); its own by default.
+const FINAL_W = finalWidthOf(w, opt('finalwidth', '') === '' ? null : num('finalwidth', w));
+if (FINAL_W !== w) console.log(`look: this sheet of ${w} cells is a look at a painting of ${FINAL_W}; its swatches are laid as that painting's are`);
+const MM_SPACING_ON = () => { try { return num('mmspacing', mmSpacingDefault(FINAL_W) ? 1 : 0) > 0; } catch { return false; } };
+// (a target of fewer cells than the sheet is scrap: a swatch)
+const dabSpacing = (o, t) => { if (!MM_SPACING_ON()) return o; const f = dabSpacingFactor({ width: w, finalWidth: FINAL_W, onSheet: !t || t.w >= w }); return { ...(o ?? {}), spacing: (o?.spacing ?? 0.7) * f }; };
+const physicalStroke = (b, t, p, o) => physicalStrokeRaw(b, t, p, dabSpacing(o, t));
+const candidateContact = (b, t, p, o) => candidateContactRaw(b, t, p, dabSpacing(o, t));
 function gpuHairCap(o) {
   let K; try { K = ctx.SHEET_PIGS.length; } catch { K = 16; }
   if (!(w > 540) || process.env.HAIR_CAP === '0' || !(o?.bristles > 0)) return o;
@@ -360,7 +365,7 @@ Object.assign(ctx, { LINE_SOURCE, RUN_METHODS, MEDIUM_DECISION, SUBJECT_MEDIUM, 
   CODE_STATE, INK_RECIPE, DRAWING_REGISTRATION, RUN_CACHE, holdInk, FAST_BODY_ENABLED, 
   FAST_BODY_SPACING, BODY_CADENCE_RECORD, VALUE_CONFIG, VALUE_COUNTS, 
   SOFT_WET_MM, WASH_SESSION, WALL_PHASES, 
-  phaseMark, srcMeta, PX_SOURCE, PX_RAW, TARGET_GUARD, paintingLook, STEP_BACKS, w, h, n, SEGMENTS_RECORD, createBrush, 
+  phaseMark, srcMeta, PX_SOURCE, PX_RAW, TARGET_GUARD, paintingLook, STEP_BACKS, w, h, n, FINAL_W, SEGMENTS_RECORD, createBrush, 
   physicalStroke, candidateContact, ANCHORS, lum, TONE_MODE, SHEET_TONE, CALIBRATED_PLAN, PAPER_RULE, paperRGB, 
   WASH_SPLAT_SETTINGS, planContentHashes, CODE_HASH, PALETTE_FROM_FILE, paletteFitStarted, SOURCE_SCALE });
 }

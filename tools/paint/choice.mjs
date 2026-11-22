@@ -43,7 +43,7 @@ export const FORM_SETTINGS = Object.freeze([
 ]);
 
 /** Settings a session may not change: the locked inputs, the guard, and what the harness sets itself. */
-const LOCKED = new Set(['drawing', 'drawingorder', 'drawinglast', 'drawinglastmin', 'drawinglastlogic', 'width', 'sheetmm', 'masks', 'heapmb', 'targetguard', 'notargetlooks', 'valueplan', 'plan', 'seed', 'mode', 'video', 'runcache', 'canarystop', 'brushes', 'valuemaps', 'marks']);
+const LOCKED = new Set(['drawing', 'drawingorder', 'drawinglast', 'drawinglastmin', 'drawinglastlogic', 'width', 'finalwidth', 'sheetmm', 'masks', 'heapmb', 'targetguard', 'notargetlooks', 'valueplan', 'plan', 'seed', 'mode', 'video', 'runcache', 'canarystop', 'brushes', 'valuemaps', 'marks']);
 const NAME = /^[a-z][a-z0-9]*(\.[a-z]+)?$/;
 
 /** The settings with this subject's present values: [{set, now, meaning}], `set` being the key a choice writes. */

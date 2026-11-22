@@ -19,9 +19,14 @@ export function lookCells(cells, kind) {
   return kind === 'plan' ? cells : Math.max(LEAST_CELLS, Math.round(cells * LOOK_SHARE));
 }
 
-/** The run's --set list for a look's painting: the same, with the cells across of the look. */
+/**
+ * The run's --set list for a look's painting: the same, with the cells across of the look and, when the look is smaller
+ * than the painting, the painting's own cells (finalwidth: the painter then reckons what it reckons from the cells
+ * across, its swatches first, as the final painting will; src/paint/methods/look-scale.mjs).
+ */
 export function lookSets(sets, cells, kind) {
-  return [...sets.filter(([k]) => k !== 'width'), ['width', String(lookCells(cells, kind))]];
+  const small = lookCells(cells, kind);
+  return [...sets.filter(([k]) => k !== 'width' && k !== 'finalwidth'), ['width', String(small)], ...(small < cells ? [['finalwidth', String(cells)]] : [])];
 }
 
 /**
