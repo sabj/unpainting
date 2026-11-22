@@ -151,8 +151,8 @@ function asLibraryMark(kind, st, widthMm, { seed, bend = 0, load = 0.75, rng = n
 }
 
 /** The strokes of one passage (mm), from its kind, brush and handling; no picture read. */
-export function passageStrokes(p, brushes, seed = 0, sheetLights = []) {
-  const st = placedStrokes(p, brushes, seed, sheetLights), kind = p.handling?.mark;
+export function passageStrokes(p, brushes, seed = 0, sheetLights = [], { hand = 1 } = {}) {
+  const st = placedStrokes(p, brushes, seed, sheetLights, hand), kind = p.handling?.mark;
   // a named mark from the shared library, unless the author wrote the pressure out (then the author's handling is laid)
   if (!kind || !MARK_KINDS[kind] || p.kind === 'wash' || Array.isArray(p.handling?.pressure)) return st;
   if (p.kind === 'lines' && p.paths?.some(P => P.length > 2)) return st;
@@ -161,7 +161,7 @@ export function passageStrokes(p, brushes, seed = 0, sheetLights = []) {
     bend: path === 'straight' ? 0.05 * (rng.next() < 0.5 ? -1 : 1) : path === 'curved' || path === 'flick' ? rng.range(0.4, 0.8) * (rng.next() < 0.5 ? -1 : 1) : 0, load, rng: p.kind === 'touches' || p.kind === 'strokes' ? rng : null }));
 }
 
-function placedStrokes(p, brushes, seed = 0, sheetLights = []) {
+function placedStrokes(p, brushes, seed = 0, sheetLights = [], hand = 1) {
   // the paper this passage keeps: the sheet's lights and its own reserves (shapes it is laid round, painted later)
   const lights = [...sheetLights, ...(p.reserveRegions ?? []).filter(P => P?.length >= 3)];
   const named = {}, rng = handOf(`${seed}/${p.id}`), h = { ...named, ...(p.handling ?? {}) }, ch = p.character ?? {}, polys = regionsOf(p);
@@ -177,7 +177,7 @@ function placedStrokes(p, brushes, seed = 0, sheetLights = []) {
   });
   const n = Math.max(1, Math.round(p.count ?? 1)), lengthMm = Number(h.lengthMm) || (MARK_LEN[h.mark] ? MARK_LEN[h.mark] * widthMm : p.kind === 'touches' ? 2.6 * widthMm : 4 * widthMm);
   switch (p.kind) {
-    case 'wash': return sweeps(polys, { widthMm, deg, pressure: Math.max(0.6, Math.max(...pressure)), lights, rng });
+    case 'wash': return sweeps(polys, { widthMm, deg, pressure: Math.max(0.6, Math.max(...pressure)), lights, rng, hand });
     case 'strokes': return scattered(polys, { ...style, n, widthMm, deg, lengthMm, size: ch.size, spread: ch.spread ?? 'scattered', denser: ch.denser, lights, rng });
     case 'touches': return scattered(polys, { ...style, n, widthMm, deg, lengthMm, size: ch.size ?? 'varied', spread: ch.spread ?? 'clustered', denser: ch.denser, touches: true, lights, rng });
     case 'lines': return lines(p.paths, { widthMm, pressure, hold: h.hold, rng });
@@ -195,6 +195,13 @@ function moveOf(p, joins) {
   // edges run soft (a painter softens them with a damp brush; laid into damp paper they never harden)
   if (p.edges === 'lost') return { move: 'wet on wet', water: water ?? 0.75, phase: null, ownBed: true };
   return (p.stage ?? 2) === 3 ? { move: 'wet on dry', water: water ?? 0.58, phase: 'shadow' } : { move: 'wet on dry', water: water ?? 0.62, phase: null };
+}
+
+/** The lap of a wash's lanes (script-marks.mjs sweeps), the one most of its strokes' length is laid at; null for strokes that state none. */
+function lapOf(strokes) {
+  const by = new Map();
+  for (const st of strokes) { if (!Number.isFinite(st.lap)) continue; let len = 0; for (let k = 1; k < st.points.length; k++) len += Math.hypot(st.points[k][0] - st.points[k - 1][0], st.points[k][1] - st.points[k - 1][1]); by.set(st.lap, (by.get(st.lap) ?? 0) + len); }
+  return by.size ? [...by].sort((a, b) => b[1] - a[1])[0][0] : null;
 }
 
 /** The cells (w x h) a list of strokes touches: each point's footprint, r (0.25 + 0.75 p), joined along the stroke. */
@@ -216,7 +223,7 @@ export function footprint(strokes, w, h, cellMm) {
  * `script`: the parsed script; `pigments`: the painter's box (each with its `key`); `rgb`: the subject on the sheet's
  * grid, read only for the colour check written to the plan's summary.
  */
-export function planScriptWashes({ script: given, k, w, h, pigments, paperRGB = null, sheetWidthMm = 280, rgb = null, density = null, inkValue = null, seed = 0, touchLeastMm2 = TOUCH_LEAST_MM2 }) {
+export function planScriptWashes({ script: given, k, w, h, pigments, paperRGB = null, sheetWidthMm = 280, rgb = null, density = null, inkValue = null, seed = 0, hand = 1, touchLeastMm2 = TOUCH_LEAST_MM2 }) {
   const n = w * h, cellMm = sheetWidthMm / w, paperCol = paperRGB ?? [252, 251, 248], keys = pigments.map(p => p.key);
   let script = given;
   if (pigments.length !== k || k < 1) throw Error('the script wash plan needs the pigments');
@@ -297,7 +304,7 @@ export function planScriptWashes({ script: given, k, w, h, pigments, paperRGB = 
       layer: stage, break: null, load: { water: how.water, pigment: 'the mix at its strength; calibrated delivery', reload: 'existing finite instrument route' },
       edges: { hardCells: [], softCells: [], policy: p.edges ?? 'mixed' }, outline: [], strokes, softEdges: [], depthMm: 0, uncoveredShare: 0, widestBrushMm: Math.max(...strokes.map(st => 2 * st.radiusMm)),
       protectedLights: p.leave ? [p.leave] : [], failureSigns: 'Lost lights, muddy overlaps, stripes.', stop: 'after the passage', script: { passage: p.id, kind: p.kind, paper: p.paper ?? 'dry', into: p.into ?? null, wait: p.wait ?? null, underShare: under.share, underFilm: under.film, glaze: p.glaze ?? null, handling: p.handling ?? null } };
-    sh._valuePlan = intent; instructions.push({ ...intent, area, plannedPigmentMass: strength * area });
+    { const laneLap = kind === 'wash' ? lapOf(strokes) : null; if (laneLap != null) intent.laneLap = laneLap; } sh._valuePlan = intent; instructions.push({ ...intent, area, plannedPigmentMass: strength * area });
     polygons.push({ stage, thing: what, kind, colour: null, loops: (charge ? [] : regionsOf(p)).map(P => ({ points: P })) });
     strokeCount += strokes.length;
     return sh;
@@ -312,7 +319,7 @@ export function planScriptWashes({ script: given, k, w, h, pigments, paperRGB = 
     if (p.into != null && !joins) console.log(`painting script: ${p.id} is to go into ${p.into}, which is not the passage just before it (${prev?.id ?? 'none'}); laid on its own, on a dry sheet`);
     const own = moveOf({ ...p, paper: p.paper ?? (joins && wait === 'damp' ? 'damp' : 'dry') }, joins);
     if (!joins) close();
-    const strokes = passageStrokes(p, brushes, seed, lights), mix = mixOf(p.paint);
+    const strokes = passageStrokes(p, brushes, seed, lights, { hand }), mix = mixOf(p.paint);
     const sh = wash(p, stage, strokes, mix, own, { kind: p.kind, what: `${p.id}: ${p.what ?? ''}` });
     prev = p;
     const smalls = after.splice(0).map(f => f()).filter(Boolean);

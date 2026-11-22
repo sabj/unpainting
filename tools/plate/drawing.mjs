@@ -18,7 +18,7 @@ import {brushedWashPaths, sweepCover, containPaths, gradientSweepAngle, prewetAr
 import {pencilBatches, prepFade} from '../../src/paint/methods/pencil-stage.mjs';
 import {renderInkProof} from '../../src/paint/methods/ink-res.mjs';
 import {layVectors, inkForDarkness} from '../../src/paint/methods/ink-vectors.mjs';
-import {drawingBatches, drawingTimeMm} from '../../src/paint/methods/drawing-film.mjs';
+import {drawingBatches, drawingTimeMm, bigFormsFirst} from '../../src/paint/methods/drawing-film.mjs';
 import {coherent} from '../../src/media/sheet.mjs';
 import {components, removeSmall, dilate, erode} from '../../src/raster.js';
 import {gaussian} from '../../src/keyframes/density.mjs';
@@ -83,6 +83,10 @@ for (const L2 of ctx.layers) for (const sh of L2.shapes) ctx.plannedMass += sh.a
 const FILM_MASS = new WeakMap(); for (const L2 of ctx.layers) for (const sh of L2.shapes) FILM_MASS.set(sh, sh.amount * sh.area);
 const FILM_FRAMES = Math.max(1, Math.round(num('frames', 40)));
 const DRAWING_FILM_FRAMES = Math.max(1, Math.round(num('drawingfilm', 0.2) * FILM_FRAMES));
+// --drawingorder forms|file (default forms): the order the drawing's strokes are laid in on film. forms: big forms first,
+// detail last, over the whole sheet (drawing-film.mjs bigFormsFirst); file: the file's own order (form by form).
+const DRAWING_ORDER = opt('drawingorder', 'forms');
+if (!['forms', 'file'].includes(DRAWING_ORDER)) throw new Error(`--drawingorder: forms or file, not ${DRAWING_ORDER}`);
 ctx.filmPass = 0;
 // under --smalllights the fluid goes on the small lights too, whether or not the big lights were worth masking
 // (--lightresist 0, a probe: the plan and the brush leave the lights out, and nothing seals them)
@@ -193,8 +197,8 @@ function vectorFile(key = 'drawingfile') {
   const f = (base.endsWith('-lines.json') ? base.slice(0, -'-lines.json'.length) : base) + '-vectors.json';
   return fs.existsSync(f) ? f : null;
 }
-// With the film on, the drawing is laid and filmed as a hand draws it: in the file's own order (big forms first, detail
-// last), a few strokes to a frame at equal shares of the hand's time (drawing-film.mjs). --drawingfilm s (default 0.2):
+// With the film on, the drawing is laid and filmed as a hand draws it: big forms first, detail last (--drawingorder),
+// a few strokes to a frame at equal shares of the hand's time (drawing-film.mjs). --drawingfilm s (default 0.2):
 // the opening drawing's frames as a share of the washes' --frames; a closing pen is filmed at the same pace. What is
 // laid is the same as in one step. Without the film the drawing is one step, as before.
 async function layExactVectors(file, { closing = false } = {}) {
@@ -220,7 +224,7 @@ async function layExactVectors(file, { closing = false } = {}) {
   let filmed = 0;
   const inBatches = async (strokes, lay, step) => {
     const sum = { strokes: 0, cells: 0, fills: 0, widened: 0 };
-    const batches = FRAME_POLICY.film ? drawingBatches(strokes, pace * drawingTimeMm(strokes)) : [{ strokes, done: 1 }];
+    const batches = FRAME_POLICY.film ? drawingBatches(DRAWING_ORDER === 'forms' ? bigFormsFirst(strokes) : strokes, pace * drawingTimeMm(strokes), { given: DRAWING_ORDER === 'forms' }) : [{ strokes, done: 1 }];
     for (const b of batches) {
       const q = lay(b.strokes); for (const k of Object.keys(sum)) sum[k] += q[k] ?? 0;
       if (FRAME_POLICY.film) { ctx.STAGE = { stage: closing ? 'ink' : 'drawing', step, batch: ++filmed, of: filmedOf, strokes: sum.strokes, laying: true }; await shoot(); }

@@ -5,7 +5,8 @@
 //
 // tools/paint-plate.mjs lays one swatch per stock technique (wet on dry, wet on wet, glazed, dry brush). A passage whose
 // instrument is the stock one of its name takes that swatch's reading. A passage that carries its own load or pass
-// count (a value plan's glaze is laid at the plan's water in one pass) gets a swatch of its own, laid once and kept.
+// count (a value plan's glaze is laid at the plan's water in one pass), or states how far its lanes lap (`lap`, a share
+// of the brush's width: a painting script's wash), gets a swatch of its own, laid once and kept.
 // Nothing here reads the sheet or the target.
 
 // what a swatch's delivery depends on in a technique
@@ -16,7 +17,8 @@ export function instrumentKey(T) {
   if (!T || typeof T.name !== 'string' || !T.name) throw new TypeError('instrument calibration: a technique needs a name');
   for (const f of FIELDS) if (!Number.isFinite(T[f])) throw new TypeError(`instrument calibration: ${T.name} has no finite ${f} (${T[f]})`);
   if (!Number.isInteger(T.passes) || T.passes < 1) throw new RangeError(`instrument calibration: ${T.name} needs a whole number of passes, got ${T.passes}`);
-  return [T.name, ...FIELDS.map(f => T[f]), T.intoWet ? 'into wet' : 'on dry'].join('|');
+  // (a wash that states how far its lanes lap is tried in lanes lapped so: another lap, another swatch)
+  return [T.name, ...FIELDS.map(f => T[f]), T.intoWet ? 'into wet' : 'on dry', ...(Number.isFinite(T.lap) ? [`lap ${(+T.lap).toFixed(2)}`] : [])].join('|');
 }
 
 /**
@@ -48,7 +50,7 @@ export function createInstrumentCal({ stock, measure, measureMark = null, markKe
       if (!own.has(key)) {
         own.set(key, check(key, measure(T)));
         const s = stock[T.name], differs = s ? [...FIELDS, 'intoWet'].filter(f => (f === 'intoWet' ? !!T[f] !== !!s.technique[f] : T[f] !== s.technique[f])) : [];
-        log(`  ${T.name} at ${s ? differs.map(f => `${f} ${T[f]}`).join(', ') : `water ${T.water}, passes ${T.passes}`}: its own swatch charges ${own.get(key).cal.toFixed(2)}x${s ? ` (the stock ${T.name} swatch, ${differs.map(f => `${f} ${s.technique[f]}`).join(', ')}: ${s.cal.toFixed(2)}x)` : ' (no stock swatch of that name)'}`);
+        log(`  ${T.name} at ${[...(s ? differs.map(f => `${f} ${T[f]}`) : [`water ${T.water}, passes ${T.passes}`]), ...(Number.isFinite(T.lap) ? [`lanes lapped by ${T.lap} of the brush`] : [])].join(', ')}: its own swatch charges ${own.get(key).cal.toFixed(2)}x${s ? ` (the stock ${T.name} swatch, ${differs.map(f => `${f} ${s.technique[f]}`).join(', ')}: ${s.cal.toFixed(2)}x)` : ' (no stock swatch of that name)'}`);
       }
       return { ...own.get(key), key, stock: false };
     },

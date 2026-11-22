@@ -1,4 +1,5 @@
-// A touch too small for a wet bed (tiny-touch.mjs), from the two paintings it stopped.
+// A touch too small for a wet bed (tiny-touch.mjs), from the two paintings it stopped (the fixture's `about` says what
+// each case is under the lanes as they are laid now).
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -51,10 +52,11 @@ for (const c of fixture.cases) {
     const { got, lines } = plan(c.script);
     const tiny = got.summary.tinyTouches ?? [];
     assert.ok(tiny.length >= 1, 'the plan lists its tiny touches');
-    // the stroke that failed: its footprint's box in sheet cells, from the painter's error
-    const [x0, y0, x1, y1] = c.failed.boundsCells.map(v => v * CELL);
-    const hit = tiny.find(t => t.atMm[0] > x0 - 2 && t.atMm[0] < x1 + 2 && t.atMm[1] > y0 - 2 && t.atMm[1] < y1 + 2);
-    assert.ok(hit, `the failing stroke at ${x0.toFixed(1)}, ${y0.toFixed(1)} mm is among ${JSON.stringify(tiny.map(t => t.atMm))}`);
+    // the stroke too small for a wet bed that this passage has under the lanes as they are laid now (the fixture's
+    // `stroke`; the strokes of the paintings that stopped are no longer made, see the fixture's `about`)
+    const [sx, sy] = c.stroke.atMm;
+    const hit = tiny.find(t => Math.hypot(t.atMm[0] - sx, t.atMm[1] - sy) < 2);
+    assert.ok(hit, `the tiny stroke at ${sx}, ${sy} mm is among ${JSON.stringify(tiny.map(t => t.atMm))}`);
     assert.equal(hit.passage, id); assert.ok(hit.mm2 < TOUCH_LEAST_MM2 && hit.lengthMm < 1.5 && hit.brushMm >= 13, JSON.stringify(hit));
     assert.ok(lines.some(l => l.startsWith(`PAINTING SCRIPT, TINY TOUCH: passage ${id} `)), 'said in the log, in capitals');
     // no stroke left in a passage laid into its own wet bed is a tiny touch: they went with the small strokes, laid dry
@@ -68,6 +70,18 @@ for (const c of fixture.cases) {
     assert.equal(all.instructions.reduce((a, q) => a + q.strokes.length, 0), got.instructions.reduce((a, q) => a + q.strokes.length, 0));
   });
 }
+
+test('the passage that stopped the L2 painting is now laid along each part\'s own length: no stroke too small for a wet bed, and none dropped', () => {
+  // (flank3: four small slanting parts swept across at -29 degrees left a lane stub of 6 cells, which no wet bed could be
+  // made for; each part is now a stroke or two along itself, script-marks.mjs sweeps)
+  const c = fixture.alongItsLength, { got } = plan(c.script);
+  assert.match(c.failed.error, /6 cells in its footprint/);
+  assert.equal(got.summary.tinyTouches, undefined); assert.deepEqual(got.summary.smallStrokesLaidDry ?? [], []);
+  assert.ok(got.instructions.length === 1 && got.instructions[0].move === 'wet on wet' && got.instructions[0].strokes.length >= 4);
+  for (const st of got.instructions[0].strokes) assert.ok(!(predictedTouchMm2(st, CELL) < TOUCH_LEAST_MM2), 'a tiny touch among its strokes');
+  // every part is still painted: a stroke starts in or beside each of the passage's four regions
+  for (const R of c.script.passages[0].regions) { const cx = R.reduce((a, q) => a + q[0], 0) / R.length, cy = R.reduce((a, q) => a + q[1], 0) / R.length; assert.ok(got.instructions[0].strokes.some(st => st.points.some(q => Math.hypot(q[0] - cx, q[1] - cy) < 12)), `the part about ${cx.toFixed(0)}, ${cy.toFixed(0)} mm is laid`); }
+});
 
 test('a script with no tiny touch plans exactly as before: the same instructions, and no new key in its summary', () => {
   const script = { ...fixture.cases[0].script, passages: [{ id: 'wall', what: 'a broad wash', stage: 1, kind: 'wash', region: [[40, 40], [160, 40], [160, 120], [40, 120]], paint: { pigments: { ochre: 1 }, dilution: 'pale' }, brush: 'round20', paper: 'wet', handling: { direction: 0 } }] };

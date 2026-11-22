@@ -201,46 +201,103 @@ export function written(points, { widthMm, rng }) {
 }
 
 /**
- * A wash: overlapping strokes across the region along `deg`, a brush of `widthMm`; the lanes irregularly spaced (half to
- * four-fifths of the brush apart), each tilted a little its own way, wavering, running from the region's edge (or a
- * light's) to its edge and a little past or short of it; up to three lanes laid back and forth as one stroke before the
- * brush is lifted and recharged; from the top down. Each stroke carries a charge factor: full after a recharge, thinning
- * along the load.
+ * The hand in a wash's lanes, at amount 1 (`hand` scales the turning, bowing, swelling and the unevenness of the lap; 0 is
+ * a ruler: straight parallel lanes at one lap).
+ * lap: each lane overlaps the one before by this share of the width the brush really lays at the lane's pressure (a
+ *   round lays r (0.25 + 0.75 p) to each side), so lanes run into one wash and are never bars with paper between them.
+ * tilt: each lane's own turn (degrees, sd). fan: the lanes turn steadily from the first to the last, as a wrist pivots
+ *   (degrees, sd of the whole turn). bow: the arm's arc, one for the whole wash: a lane's bulge as a share of its length,
+ *   never more than `bowMost` brush widths; ownBow: each lane's own bulge, in brush widths.
+ * swell: the pressure rises and falls along a stroke by this share. perLoad: lanes laid back and forth before the brush
+ *   is lifted and recharged, from this many to this many.
+ * short: a region whose lanes along the passage's direction would be shorter than this many brush widths, and which is
+ *   clearly longer another way, is laid along its own length instead (a band of shadow under a rail is one or two strokes
+ *   along the band, not a row of dashes across it).
  */
-export function sweeps(polys, { widthMm, deg = 0, pressure = 0.8, perLoad = 3, lights = [], rng }) {
-  const r = widthMm / 2, a = deg * Math.PI / 180, ux = Math.cos(a), uy = Math.sin(a), vx = -uy, vy = ux;
+export const LANE_HAND = Object.freeze({ lap: [0.3, 0.55], tilt: 2.5, fan: 7, bow: 0.05, bowMost: 0.7, ownBow: 0.1, swell: 0.1, perLoad: [2, 4], short: 2.5, longer: 1.4 });
+
+/** The extent of one outline along a direction (degrees). */
+const extentAlong = (P, deg) => { const a = deg * Math.PI / 180, c = Math.cos(a), s = Math.sin(a); let lo = Infinity, hi = -Infinity; for (const [x, y] of P) { const t = x * c + y * s; lo = Math.min(lo, t); hi = Math.max(hi, t); } return hi - lo; };
+
+/**
+ * A wash: overlapping strokes across the region along `deg`, a brush of `widthMm`, as a hand lays them (LANE_HAND): the
+ * lanes unevenly lapped, each turned a little its own way and all turning steadily across the wash, bowed along the arm's
+ * arc, the pressure swelling along them, running from the region's edge (or a light's) to its edge and a little past or
+ * short of it; two to four lanes laid back and forth as one stroke before the brush is lifted and recharged; from the
+ * top down. Each stroke carries a charge factor: full after a recharge, thinning along the load. A part of the region
+ * too short for lanes along `deg` is laid along its own length. `hand` (default 1) is the amount of all of it; the same
+ * `rng` gives the same wash, another seed another hand.
+ */
+export function sweeps(polys, { widthMm, deg = 0, pressure = 0.8, perLoad = null, lights = [], rng, hand = 1 }) {
+  const H = LANE_HAND, own = [], rest = [];
+  for (const P of polys) {
+    // a lane's usual length in this part: its area over its extent across the lanes
+    const area = areaOf([P]), ax = axisOf([P]).deg, along = area / Math.max(1e-6, extentAlong(P, deg + 90)), length = area / Math.max(1e-6, extentAlong(P, ax + 90));
+    (along < H.short * widthMm && length >= H.longer * along ? own : rest).push({ P, deg: ax });
+  }
+  if (!own.length) return lanes(polys, { widthMm, deg, pressure, perLoad, lights, rng, hand });
+  // the main region first, then each short part along its own length, top down
+  const top = P => Math.min(...P.map(q => q[1]));
+  return [...(rest.length ? lanes(rest.map(q => q.P), { widthMm, deg, pressure, perLoad, lights, rng, hand }) : []),
+    ...own.sort((p, q) => top(p.P) - top(q.P)).flatMap(q => lanes([q.P], { widthMm, deg: q.deg, pressure, perLoad, lights, rng, hand }))];
+}
+
+function lanes(polys, { widthMm, deg, pressure, perLoad, lights, rng, hand }) {
+  const H = LANE_HAND, r = widthMm / 2, a = deg * Math.PI / 180, ux = Math.cos(a), uy = Math.sin(a), vx = -uy, vy = ux;
   const V = ([x, y]) => x * vx + y * vy, U = ([x, y]) => x * ux + y * uy;
   let v0 = Infinity, v1 = -Infinity, u0 = Infinity, u1 = -Infinity; for (const P of polys) for (const q of P) { v0 = Math.min(v0, V(q)); v1 = Math.max(v1, V(q)); u0 = Math.min(u0, U(q)); u1 = Math.max(u1, U(q)); }
-  const runs = []; let v = v0 + rng.range(0.3, 0.5) * widthMm, i = 0;
+  // the width the brush lays at the lane's pressure, and the lap's range about its middle
+  const laid = widthMm * (0.25 + 0.75 * Math.min(1, pressure)), lapMid = (H.lap[0] + H.lap[1]) / 2, lapHalf = hand * (H.lap[1] - H.lap[0]) / 2;
+  const fan = rng.normal() * H.fan * hand, arc = rng.range(-1, 1) * H.bow * hand;
+  const runs = [], steps = []; let v = v0 + rng.range(0.3, 0.5) * laid, i = 0;
   while (v < v1) {
-    const tilt = rng.normal() * 2.5, um = (u0 + u1) / 2, cx = um * ux + v * vx, cy = um * uy + v * vy;
+    const tilt = fan * ((v - v0) / Math.max(1e-6, v1 - v0) - 0.5) + rng.normal() * H.tilt * hand, um = (u0 + u1) / 2, cx = um * ux + v * vx, cy = um * uy + v * vy;
     // a lane runs a little past the region's edge, but stops short of a light by a hand's varying margin (a light is worked
     // round, its edge ragged, never cut cell-exact)
     for (const run of runsOn(polys, lights, cx, cy, deg + tilt)) { const [t0, t1] = run; if (t1 - t0 >= Math.min(2, 0.6 * widthMm)) runs.push({ i, cx, cy, d: deg + tilt, t0: run.lightStart ? t0 + r * rng.range(0.3, 0.9) : t0 - r * rng.range(-0.25, 0.6), t1: run.lightEnd ? t1 - r * rng.range(0.3, 0.9) : t1 + r * rng.range(-0.25, 0.6) }); }
     // the last lane is carried down to the region's far edge (the bead is taken to the bottom)
-    const was = v; v += widthMm * rng.range(0.45, 0.7); i++;
-    if (v >= v1 && was < v1 - 0.45 * widthMm) v = v1 - 0.35 * widthMm;
+    const was = v; v += laid * (1 - rng.range(lapMid - lapHalf, lapMid + lapHalf)); i++;
+    if (v >= v1 && was < v1 - 0.45 * laid) v = v1 - 0.35 * laid;
+    if (v < v1) steps.push(v - was);
   }
   const centre = q => { const t = (q.t0 + q.t1) / 2, d = q.d * Math.PI / 180; return [q.cx + Math.cos(d) * t, q.cy + Math.sin(d) * t]; };
   runs.sort((p, q) => p.i - q.i || p.t0 - q.t0);
-  if (runs.length > 1 && centre(runs[0])[1] > centre(runs.at(-1))[1]) runs.reverse();
-  const strokes = []; let cur = null, inLoad = 0, back = false, last = null;
+  // level lanes from the top down; upright lanes from the left to the right (their middles are at one height, and which
+  // was "higher" came down to the lanes' small tilts: the same wash began at the left with one seed and the right with another)
+  const first = centre(runs[0] ?? { cx: 0, cy: 0, d: 0, t0: 0, t1: 0 }), final = centre(runs.at(-1) ?? { cx: 0, cy: 0, d: 0, t0: 0, t1: 0 }), level = Math.abs(vy) >= Math.abs(vx);
+  if (runs.length > 1 && (level ? first[1] > final[1] : first[0] > final[0])) runs.reverse();
+  const strokes = []; let cur = null, inLoad = 0, back = false, last = null, most = 3;
   const lane = (q, rev) => {
-    const len = q.t1 - q.t0, m = Math.max(3, Math.ceil(len / Math.max(1.5, r * 0.8))), d = q.d * Math.PI / 180, wob = rng.range(-0.08, 0.08) * widthMm, pts = [];
-    for (let j = 0; j <= m; j++) { const t = j / m, s = q.t0 + len * (rev ? 1 - t : t), o = wob * Math.sin(Math.PI * t); pts.push([q.cx + Math.cos(d) * s - Math.sin(d) * o, q.cy + Math.sin(d) * s + Math.cos(d) * o]); }
+    // the arm's arc (the same way for every lane of the wash, whichever way the lane is drawn) and the lane's own bulge
+    const len = q.t1 - q.t0, m = Math.max(3, Math.ceil(len / Math.max(1.5, r * 0.8))), d = q.d * Math.PI / 180, pts = [];
+    const bulge = Math.max(-H.bowMost, Math.min(H.bowMost, arc * len / widthMm)) * widthMm + rng.range(-1, 1) * H.ownBow * hand * widthMm;
+    for (let j = 0; j <= m; j++) { const t = j / m, f = rev ? 1 - t : t, s = q.t0 + len * f, o = bulge * Math.sin(Math.PI * f); pts.push([q.cx + Math.cos(d) * s - Math.sin(d) * o, q.cy + Math.sin(d) * s + Math.cos(d) * o]); }
     return pts;
   };
   for (const q of runs) {
-    const joins = cur && inLoad < perLoad && last && Math.abs(q.i - last.i) === 1 && Math.min(q.t1, last.t1) - Math.max(q.t0, last.t0) > 0.5 * Math.min(q.t1 - q.t0, last.t1 - last.t0);
-    if (!joins) { if (cur) strokes.push(cur); cur = { pts: [] }; inLoad = 0; back = rng.next() < 0.5; }
+    const joins = cur && inLoad < most && last && Math.abs(q.i - last.i) === 1 && Math.min(q.t1, last.t1) - Math.max(q.t0, last.t0) > 0.5 * Math.min(q.t1 - q.t0, last.t1 - last.t0);
+    if (!joins) { if (cur) strokes.push(cur); cur = { pts: [] }; inLoad = 0; back = rng.next() < 0.5; most = perLoad ?? Math.round(rng.range(H.perLoad[0] - 0.49, H.perLoad[1] + 0.49)); }
     cur.pts.push(...lane(q, back)); back = !back; inLoad++; last = q;
   }
   if (cur) strokes.push(cur);
-  return strokes.map((s, k) => {
-    const L = s.pts.length, out = s.pts.map(([x, y], j) => { const t = L > 1 ? j / (L - 1) : 0.5, land = Math.min(1, t * L / 2.5), lift = Math.min(1, (1 - t) * L / 2); return pt(x, y, pressure * (0.55 + 0.45 * Math.min(land, lift)) * rng.range(0.93, 1.07)); });
-    return { kind: 'sweep', radiusMm: round3(r), points: out, charge: round3(1.12 - 0.12 * (k % 3)) };
+  // how far the lanes lap, as a share of the brush's whole width, to the nearest LAP_STEP: the scrap swatch that sets this
+  // wash's charge is laid in lanes lapped the same (a tuft levels with the wet film it finds, so what lapped lanes
+  // leave is not the sum of what each would leave alone; charged from a swatch lapped by a third, lanes lapped by
+  // more than half left 0.83 of the planned pigment where the looser lanes before them left 0.91)
+  const lap = steps.length ? +Math.max(0, Math.min(0.8, Math.round((1 - steps.reduce((x, y) => x + y, 0) / steps.length / widthMm) / LAP_STEP) * LAP_STEP)).toFixed(2) : null;
+  // the load: full after the brush is dipped, thinner on each stroke until it is dipped again, after two strokes or three
+  let sinceDip = 0, dipAfter = 0, fresh = 1.12;
+  return strokes.map(s => {
+    if (sinceDip >= dipAfter) { sinceDip = 0; dipAfter = rng.next() < 0.5 ? 2 : 3; fresh = 1.12 + 0.05 * hand * rng.range(-1, 1); }
+    const charge = fresh - 0.115 * sinceDip++;
+    const L = s.pts.length, turns = rng.range(0.5, 1.5), phase = rng.range(0, 2 * Math.PI);
+    const out = s.pts.map(([x, y], j) => { const t = L > 1 ? j / (L - 1) : 0.5, land = Math.min(1, t * L / 2.5), lift = Math.min(1, (1 - t) * L / 2); return pt(x, y, pressure * (0.55 + 0.45 * Math.min(land, lift)) * (1 + H.swell * hand * Math.sin(2 * Math.PI * turns * t + phase)) * rng.range(0.95, 1.05)); });
+    return { kind: 'sweep', radiusMm: round3(r), points: out, charge: round3(charge), ...(lap == null ? {} : { lap }) };
   });
 }
+
+/** The steps a wash's lap is told to the swatch in (shares of the brush's width): each step is a swatch of its own. */
+const LAP_STEP = 0.1;
 
 /** One dab of a charge, dropped at (x, y). */
 export function chargeDab(x, y, { widthMm, rng, pressure = 0.85 }) {

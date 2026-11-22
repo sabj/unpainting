@@ -212,7 +212,9 @@ const pencilDraw=(target,gs,pigment,options)=>{
  // the receipt must match. No receipt: no named forms, and the plan is as it was without them.
  const thingMasks=await studyThingMasks({root,source:opt('image'),maskOption:opt('thingmasks','auto'),labelsOption:opt('things','auto'),blockIn:Boolean(WASH_PLAN&&!SCRIPT)});
  if(thingMasks){valueOptions.thingMasks=thingMasks;console.log(`named forms: ${thingMasks.names.length} forms from a named-sam-v1 receipt (${thingMasks.names.map((n,i)=>`${n}${thingMasks.kinds[i]?` [${thingMasks.kinds[i]}]`:''}`).join(', ')})`);}
- if(SCRIPT){valueOptions.script=SCRIPT;const paper=estimatePaper(valueOptions.rgb,w,h,valueOptions.density);valueOptions.inkValue=targetValueMap(paper?Float32Array.from(valueOptions.density,v=>Math.max(0,v-paper.density)):valueOptions.density);}
+ // --seed: the hand of a script's washes (another seed, another hand); --handlanes a (default 1): how much of a hand is
+ // in a wash's lanes (script-marks.mjs LANE_HAND: their turning, bowing, swelling and uneven lap; 0 is a ruler)
+ if(SCRIPT){valueOptions.script=SCRIPT;valueOptions.seed=Math.round(num('seed',0));valueOptions.hand=Math.max(0,num('handlanes',1));const paper=estimatePaper(valueOptions.rgb,w,h,valueOptions.density);valueOptions.inkValue=targetValueMap(paper?Float32Array.from(valueOptions.density,v=>Math.max(0,v-paper.density)):valueOptions.density);}
  if(WASH_PLAN&&!SCRIPT){Object.assign(valueOptions,await loadStudies(WASH_PLAN,root,w,h));
   // a near-monochrome subject is mixed from its own one or two paints, read from it at a coarse scale as the palette is (mono-mix.mjs)
   valueOptions.mono=valueOptions.flat?null:monoPaints(ctx.px,w,h,PIGS,paperRGB);if(valueOptions.mono)console.log(valueOptions.mono.note);
@@ -702,7 +704,8 @@ const scrapSwatches = (techniques, drySwatch, { damp = false } = {}) => {
   // finds, so what a wash holds depends on how its sweeps overlap, and one wide sweep over the scrap read 0.6 of what
   // the plan's overlapping rounds lay. Its lanes are the plan's own brush at the plan's overlap, and the swatch is
   // charged for that overlap as a passage is (paint.mjs, sh._cover).
-  const layout = () => {
+  // `lap`: how far the swatch's lanes lap, as a share of the brush's width; the plan's own lap unless a wash states its own
+  const layout = (lap = null) => {
     const mask = swatchMask(), { width: SW, height: SH } = SWATCH;
     if (section) {
       // The swatch is at least sixteen brush widths across: on a fine sheet fifty cells were 13 mm, two lanes of a 7 mm
@@ -710,7 +713,7 @@ const scrapSwatches = (techniques, drySwatch, { damp = false } = {}) => {
       // millimetre at any cell size).
       const sheetMm = PAPER_OPTS.mmPerCell ?? 0, brush = swatchBrush(), mm = sheetMm > 0 ? Math.max(sheetMm, 32 * brush.radius * sheetMm / (SWATCH.x1 - SWATCH.x0)) : 0;
       const radius = mm > 0 ? brush.radius * sheetMm / mm : brush.radius, flat = brush.flat;
-      const paths = swatchLanes(radius, { overlap: flat ? FLAT_OVERLAP : LANE_OVERLAP }), cover = sweepCover(paths, mask, SW, SH);
+      const paths = swatchLanes(radius, { overlap: lap ?? (flat ? FLAT_OVERLAP : LANE_OVERLAP) }), cover = sweepCover(paths, mask, SW, SH);
       const under = opt('undercover', '1') !== '0' ? 1 / Math.max(num('underfloor', 0.4), Math.min(1, cover)) : 1;
       return { mask, paths, bedPaths: washPaths(mask, SW, SH, { pad: 1.5, minRadius: 1, minLength: 3 }), flat, under: under / Math.max(1, cover) / Math.max(1, footprintSpread(paths, mask, SW, SH)),
         paperOptions: mm > 0 ? { ...PAPER_OPTS, seed: 5, mmPerCell: mm, ...(PAPER_OPTS.coldPress ? { coldPress: { ...PAPER_OPTS.coldPress, mmPerCell: mm } } : {}) } : null };
@@ -730,7 +733,9 @@ const scrapSwatches = (techniques, drySwatch, { damp = false } = {}) => {
     const under = opt('calpipe', '0') !== '0' && opt('undercover', '1') !== '0' ? 1 / Math.max(num('underfloor', 0.4), Math.min(1, sweepCover(paths, mask, SW, SH))) : 1;
     return { mask, paths, under, flat: true };
   };
-  const square = layout();
+  // (a wash that states the lap of its lanes, T.lap, is tried in lanes lapped so: only the section brush's swatch is laid in lanes)
+  const plainSquare = layout(), lapped = new Map(), squareOf = T => { if (!section || !Number.isFinite(T?.lap)) return plainSquare; if (!lapped.has(T.lap)) lapped.set(T.lap, layout(T.lap)); return lapped.get(T.lap); };
+  const square = plainSquare;
   const paintOpts = (r, T) => ({ flat: square.flat, radius: r, bristles: Math.max(12, Math.ceil(r * 2)), capacity: 100, belly: 12, feed: 0.4, give: 0.9, free: num('washfree', 0.4), film: 0.25, splay: WASH_FLAT_SPLAY, stiffness: 8, wetMix: MIX(T), bridge: washBridge(T, T.bridge), bridgeSoft: T.bridgeSoft, seed: 11 });
   // ... and its bed is wetted as the sheet wets one (tools/painter/wet-bed-prep.mjs): a clean brush made like the swatch's
   // painting brush, its own load metered or not, a thirsty pickup and the wait, not one sweep of a full generic brush
@@ -743,11 +748,11 @@ const scrapSwatches = (techniques, drySwatch, { damp = false } = {}) => {
   // The scrap is the sheet's own paper (its millimetres a cell and its tooth), with another seed: the section brush's
   // load and transfer are in millimetres, so a scrap with no physical scale ran it at the reference 0.26 mm a cell and
   // calibrated a 64-cell picture's 2.3 mm cells as if they were a tenth the size (forms carried 162% of the plan).
-  const envOf = () => { const { under, flat: _flat, paperOptions, ...lanes } = square; return { ...lanes, pigment: PIGS[0], physics: O, paperOptions: paperOptions ?? { ...PAPER_OPTS, seed: 5 }, charge: want * num('strength', 2.2) * under, upright: UPRIGHT, water: WET, dip, stroke, step, dry: drySwatch, settle,
+  const envOf = (square = plainSquare) => { const { under, flat: _flat, paperOptions, ...lanes } = square; return { ...lanes, pigment: PIGS[0], physics: O, paperOptions: paperOptions ?? { ...PAPER_OPTS, seed: 5 }, charge: want * num('strength', 2.2) * under, upright: UPRIGHT, water: WET, dip, stroke, step, dry: drySwatch, settle,
     waterBrush: r => createBrush({ flat: true, radius: r, bristles: Math.max(12, Math.ceil(r * 2)), capacity: 100, belly: 12, feed: 0.4, give: 0.9, free: 0.4, film: 0.25, seed: 5 }),
     paintBrush: (r, T) => createBrush(paintOpts(r, T)), prepareBed }; };
   return techniques.map(T => {
-    const env = envOf();
+    const env = envOf(squareOf(T));
     if (damp) {
       const scrap = dampScrap({ pigment: env.pigment, paperOptions: env.paperOptions, wait: dampWait,
         lay: under => scrapDelivery(DAMP_WASH(), { ...env, charge: env.charge * CAL['wet on wet'], scrap: under, channel: DAMP_CHANNEL.under, finish: false }) });
