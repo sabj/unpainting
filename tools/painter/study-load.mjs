@@ -4,10 +4,13 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import sharp from 'sharp';
+import { FORM_READ } from '../../src/paint/methods/form-read.mjs';
 
 const MOST_ASPECT = 0.02;
 /** The settings a study of the wash plan takes after its file, as @name=value. */
-export const STUDY_SETTINGS = Object.freeze(['clusters', 'join', 'shapes', 'formbrush', 'formbase', 'round', 'keep', 'hue']);
+export const STUDY_SETTINGS = Object.freeze(['clusters', 'join', 'shapes', 'formbrush', 'formbase', 'whites', 'round', 'keep', 'hue', 'lay', 'largest', 'lightest']);
+/** ... and for one named form of the run, as @name#FORM=value (src/paint/methods/form-read.mjs). */
+const FORM_SETTINGS = Object.freeze([...new Set([...FORM_READ.first, ...FORM_READ.later])]);
 
 /** The study at w x h, sRGB: {rgb, file, registered}. */
 export async function loadStudy(file, w, h) {
@@ -29,11 +32,16 @@ export async function loadStudies(spec, root, w, h) {
   if (!list.length) throw Error('--washplan: no study named');
   const studies = [];
   for (const item of list) {
-    // "@name=value" after a study sets how it is read: clusters, join, shapes, formbrush, formbase (study-washes.mjs READ), round, keep, hue
-    const [head, ...tune] = item.split('@'), read = {};
-    for (const t of tune) { const [k, v] = t.split('='); if (!STUDY_SETTINGS.includes(k) || !(Number(v) >= 0)) throw Error(`--washplan: unknown study setting @${t}`); read[k] = Number(v); }
+    // "@name=value" after a study sets how it is read: clusters, join, shapes, formbrush, formbase, whites (study-washes.mjs READ), round, keep, hue
+    // and "@name#FORM=value" sets it inside one named form of the run (FORM: its number): {forms: {FORM: {name: value}}}
+    const [head, ...tune] = item.split('@'), read = {}, forms = {};
+    for (const t of tune) {
+      const [k, v] = t.split('='), [name, form] = k.split('#');
+      if (form != null) { if (!/^[1-9][0-9]{0,2}$/.test(form) || !FORM_SETTINGS.includes(name) || !(Number(v) >= 0)) throw Error(`--washplan: unknown study setting for a form @${t}`); (forms[form] ??= {})[name] = Number(v); continue; }
+      if (!STUDY_SETTINGS.includes(k) || !(Number(v) >= 0)) throw Error(`--washplan: unknown study setting @${t}`); read[k] = Number(v);
+    }
     const m = /^(.*?)(?::(\d+(?:\.\d+)?))?(?::(glaze))?$/.exec(head), st = await loadStudy(path.resolve(root, m[1]), w, h);
-    studies.push({ ...st, minMm2: m[2] != null ? Number(m[2]) : null, mode: m[3] ?? 'add', read });
+    studies.push({ ...st, minMm2: m[2] != null ? Number(m[2]) : null, mode: m[3] ?? 'add', read, ...(Object.keys(forms).length ? { forms } : {}) });
   }
   return { studies, flat };
 }

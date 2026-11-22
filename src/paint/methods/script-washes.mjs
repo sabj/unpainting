@@ -22,6 +22,8 @@ export const DILUTION_L = Object.freeze({ 'very pale': 88, pale: 79, medium: 66,
 const LOAD = Object.freeze({ flooded: 0.88, loaded: 0.68, damp: 0.42, dry: 0.22 });
 const KINDS = new Set(['wash', 'strokes', 'touches', 'lines']);
 const PAPERS = new Set(['dry', 'damp', 'wet']);
+import { TOUCH_LEAST_MM2, predictedTouchMm2 } from './tiny-touch.mjs';
+
 /** A stroke laid into its own wet bed covers at least this many sheet cells (study-washes.mjs WET_LEAST_CELLS). */
 const WET_LEAST_CELLS = 40;
 /** A charge's brush when the script names none (mm). */
@@ -221,7 +223,7 @@ export function footprint(strokes, w, h, cellMm) {
  * `script`: the parsed script; `pigments`: the painter's box (each with its `key`); `rgb`: the subject on the sheet's
  * grid, read only for the colour check written to the plan's summary.
  */
-export function planScriptWashes({ script: given, k, w, h, pigments, paperRGB = null, sheetWidthMm = 280, rgb = null, density = null, inkValue = null, seed = 0, hand = 1 }) {
+export function planScriptWashes({ script: given, k, w, h, pigments, paperRGB = null, sheetWidthMm = 280, rgb = null, density = null, inkValue = null, seed = 0, hand = 1, touchLeastMm2 = TOUCH_LEAST_MM2 }) {
   const n = w * h, cellMm = sheetWidthMm / w, paperCol = paperRGB ?? [252, 251, 248], keys = pigments.map(p => p.key);
   let script = given;
   if (pigments.length !== k || k < 1) throw Error('the script wash plan needs the pigments');
@@ -235,7 +237,7 @@ export function planScriptWashes({ script: given, k, w, h, pigments, paperRGB = 
   const wetLaid = new Float32Array(n);
   const layers = [], instructions = [], mixes = [], polygons = [], checks = [];
   let session = null, strokeCount = 0, charges = 0, label = 0;
-  const dropped = [], laidDry = [], after = [];
+  const dropped = [], laidDry = [], after = [], tinyTouches = [];
   // the plan's own colour over a passage's cells once its whole wet session is laid (it, its charges and the passages
   // laid into it: they dry together, and the plate is measured when the sheet is next dry): the film of everything
   // planned there so far, on this paper, as sRGB and then Lab against white (what the plate is measured against)
@@ -255,20 +257,32 @@ export function planScriptWashes({ script: given, k, w, h, pigments, paperRGB = 
   };
   // one wash of the plan: its strokes, its mix, its move; the cells its strokes touch are its passage (for the ledger and
   // the wet and dry checks, never a clip)
-  const wash = (p, stage, strokes0, mix, how, { kind, what, charge = false }) => {
+  const wash = (p, stage, strokes0, mix, how, { kind, what, charge = false, smalls = false }) => {
     // a stroke that lands on no cell of the sheet (a lane run past the edge) cannot be laid: it is reported, with its
     // passage, never dropped quietly. A stroke too small for its own wet bed to be judged (under WET_LEAST_CELLS, as the
     // study plan) is still laid: on the paper as it is, after the passage's other strokes, and reported
     const cellsOf = st => { const m = footprint([st], w, h, cellMm); let c = 0; for (let i = 0; i < n && c < WET_LEAST_CELLS; i++) c += m[i]; return c; };
     const counts = strokes0.map(cellsOf), offSheet = strokes0.filter((_, q) => counts[q] === 0);
-    const small = how.move === 'wet on wet' ? strokes0.filter((_, q) => counts[q] > 0 && counts[q] < WET_LEAST_CELLS) : [];
-    const strokes = strokes0.filter((_, q) => counts[q] >= (how.move === 'wet on wet' ? WET_LEAST_CELLS : 1));
+    // A stroke much shorter than its brush is wide touches only the brush's tip, far less than the footprint drawn for
+    // it (tiny-touch.mjs): under touchLeastMm2 it is a tiny touch. It is told here, before anything is painted, and is
+    // never given a wet bed: in a passage laid into its own bed it joins the small strokes laid on the paper as it is.
+    const touch = smalls ? strokes0.map(() => Infinity) : strokes0.map((st, q) => (counts[q] > 0 ? predictedTouchMm2(st, cellMm) : Infinity));
+    const tiny = strokes0.map((_, q) => touch[q] < touchLeastMm2);
+    const small = how.move === 'wet on wet' ? strokes0.filter((_, q) => counts[q] > 0 && (counts[q] < WET_LEAST_CELLS || tiny[q])) : [];
+    const strokes = strokes0.filter((_, q) => counts[q] >= (how.move === 'wet on wet' ? WET_LEAST_CELLS : 1) && !(how.move === 'wet on wet' && tiny[q]));
+    const lengthMm = st => st.points.reduce((a, pt, i) => a + (i ? Math.hypot(pt[0] - st.points[i - 1][0], pt[1] - st.points[i - 1][1]) : 0), 0);
+    strokes0.forEach((st, q) => {
+      if (!tiny[q]) return;
+      const t = { passage: p.id, kind, move: how.move, mm2: +touch[q].toFixed(2), leastMm2: touchLeastMm2, lengthMm: +lengthMm(st).toFixed(2), brushMm: +(2 * st.radiusMm).toFixed(1), atMm: st.points[0].slice(0, 2).map(v => +v.toFixed(1)) };
+      tinyTouches.push(t);
+      console.log(`PAINTING SCRIPT, TINY TOUCH: passage ${p.id} (${kind}): a stroke ${t.lengthMm} mm long with a ${t.brushMm} mm brush at (${t.atMm.join(', ')}) mm will touch about ${t.mm2} mm2 (under ${touchLeastMm2} mm2): the brush lands on its tip and lifts. It is laid as a plain touch with no wet bed; lengthen it, use a smaller brush, or drop it`);
+    });
     const where = st => `(${st.points[0][0].toFixed(1)}, ${st.points[0][1].toFixed(1)}) mm`;
     for (const st of offSheet) { dropped.push({ passage: p.id, kind, reason: 'lands on no cell of the sheet', at: st.points[0].slice(0, 2) }); console.log(`PAINTING SCRIPT, STROKE NOT LAID: passage ${p.id} (${kind}), a stroke from ${where(st)}: it lands on no cell of the sheet`); }
     if (small.length) {
-      console.log(`painting script: passage ${p.id} (${kind}), ${small.length} stroke${small.length > 1 ? 's' : ''} under ${WET_LEAST_CELLS} cells (from ${small.slice(0, 4).map(where).join('; ')}${small.length > 4 ? '; ...' : ''}): too small for a wet bed, laid on the paper as it is`);
+      console.log(`painting script: passage ${p.id} (${kind}), ${small.length} stroke${small.length > 1 ? 's' : ''} under ${WET_LEAST_CELLS} cells or a tiny touch (from ${small.slice(0, 4).map(where).join('; ')}${small.length > 4 ? '; ...' : ''}): too small for a wet bed, laid on the paper as it is`);
       laidDry.push({ passage: p.id, kind, strokes: small.length });
-      after.push(() => wash({ ...p, id: `${p.id}-small` }, stage, small, mix, { move: 'wet on dry', water: how.water, phase: how.phase }, { kind, what: `${what} (its small strokes)`, charge }));
+      after.push(() => wash({ ...p, id: `${p.id}-small` }, stage, small, mix, { move: 'wet on dry', water: how.water, phase: how.phase }, { kind, what: `${what} (its small strokes)`, charge, smalls: true }));
     }
     if (!strokes.length) { if (!small.length) console.log(`PAINTING SCRIPT, NOTHING LAID: passage ${p.id} (${kind}) has no stroke that touches the sheet (${strokes0.length} placed); skipped`); return null; }
     const ids = footprint(strokes, w, h, cellMm), box = { x0: w, y0: h, x1: -1, y1: -1 }; let area = 0;
@@ -334,7 +348,7 @@ export function planScriptWashes({ script: given, k, w, h, pigments, paperRGB = 
   }
   const covered = laid[0].map((_, i) => (laid.some(L => L[i] > 0) ? 1 : 0)).reduce((a, v) => a + v, 0);
   const summary = { source: 'painting script', author: script.author ?? null, passages: passages.length, sessions: layers.length, washes: instructions.filter(q => q.kind !== 'charge').length, charges, stages: new Set(layers.map(l => l.value)).size, plannedStrokes: strokeCount, paintedShare: covered / n,
-    kinds: passages.reduce((a, p) => ({ ...a, [p.kind]: (a[p.kind] ?? 0) + 1 }), {}), papers: passages.reduce((a, p) => ({ ...a, [p.paper ?? 'dry']: (a[p.paper ?? 'dry'] ?? 0) + 1 }), {}), lights: lights.length, strokesNotLaid: dropped, smallStrokesLaidDry: laidDry, colourCheck: checks,
+    kinds: passages.reduce((a, p) => ({ ...a, [p.kind]: (a[p.kind] ?? 0) + 1 }), {}), papers: passages.reduce((a, p) => ({ ...a, [p.paper ?? 'dry']: (a[p.paper ?? 'dry'] ?? 0) + 1 }), {}), lights: lights.length, strokesNotLaid: dropped, smallStrokesLaidDry: laidDry, ...(tinyTouches.length ? { tinyTouches } : {}), colourCheck: checks,
     colourCheckMedianDE: checks.length ? [...checks].sort((a, b) => a.dE - b.dE)[checks.length >> 1].dE : null };
   console.log(`script washes: ${passages.length} passages by ${script.author ?? 'an unnamed author'} in ${layers.length} wet sessions; ${strokeCount} strokes, ${charges} charges; kinds ${JSON.stringify(summary.kinds)}; paper ${JSON.stringify(summary.papers)}; ${lights.length} lights kept; painted ${(100 * summary.paintedShare).toFixed(0)}% of the sheet; colour against the subject's mean over each passage, median dE ${summary.colourCheckMedianDE}`);
   const regions = { source: 'painting script', labels, regions: Array.from({ length: label }, (_, i) => ({ id: i + 1, colour: null, paper: false, parent: null, share: 0 })) };

@@ -15,12 +15,13 @@ const LIGHT_SHARE = 0.08;
  * wash takes. A shape belongs to a base when more than half of its cells lie in that form's cells.
  * @param named namedForms() of the plan grid, or null (no bases)
  * @param label plan cell -> shape; shapes: [{cells, lab, paper}]; paperMask: 1 where paper is kept
+ * @param on the soft kinds get a base wash; per(formId): that form's own say (1 a base wash whatever its kind, 0 none), or null
  */
-export function formBases(named, label, shapes, paperMask, cellMm2) {
+export function formBases(named, label, shapes, paperMask, cellMm2, { on = true, per = null } = {}) {
   const baseOf = new Int32Array(shapes.length).fill(-1), bases = [];
   if (!named) return { bases, baseOf };
-  const byForm = new Map();
-  for (let q = 0; q < label.length; q++) { const id = named.ids[q]; if (!id || paperMask[q] || shapes[label[q]].paper || !SOFT_KINDS.includes(named.forms[id - 1].kind)) continue; if (!byForm.has(id)) byForm.set(id, []); byForm.get(id).push(q); }
+  const byForm = new Map(), wants = named.forms.map(f => { const own = per?.(f.id); return own != null ? own > 0 : on && SOFT_KINDS.includes(f.kind); });
+  for (let q = 0; q < label.length; q++) { const id = named.ids[q]; if (!id || paperMask[q] || shapes[label[q]].paper || !wants[id - 1]) continue; if (!byForm.has(id)) byForm.set(id, []); byForm.get(id).push(q); }
   const inBase = shapes.map(() => new Map());
   for (const [id, cells] of [...byForm].sort((a, b) => a[0] - b[0])) {
     if (cells.length * cellMm2 < BASE_LEAST_MM2) continue;

@@ -14,7 +14,7 @@ function folder({ looks = 2, minutes = 85 } = {}) {
   const dir = tmp(); fs.mkdirSync(path.join(dir, 'inputs')); fs.writeFileSync(path.join(dir, 'inputs/source.png'), PNG); fs.writeFileSync(path.join(dir, 'inputs/study-2.png'), PNG);
   const out = writeSession({ dir, packet: { files: ['inputs/source.png', 'inputs/study-2.png'], brief: 'HOW TO WRITE A SCRIPT' }, sheet: { widthMm: 280, heightMm: 186.7 }, medium: 'pencil (graphite)',
     auto: { picture: PNG, washesText: 'AUTO WASHES', plan: { summary: { washes: 3 }, washes: [] }, toEdit: { format: 'plan-edit 1', of: 'abc', washes: [] } }, settings: [{ set: 'floors', now: '6,4,2', meaning: 'the least shape' }], forms: [{ id: 2, name: 'cat face', kind: 'face', boxMm: [1, 2, 3, 4] }], formsIds: path.join(dir, 'inputs/source.png'),
-    looks, minutes, briefFile: path.join(HERE, 'SESSION-BRIEF.md'), readmeFile: path.join(HERE, 'SESSION-README.md') });
+    looks, minutes, briefFile: path.join(HERE, 'SESSION-BRIEF.md'), readmeFile: path.join(HERE, 'SESSION-README.md'), drawing: { listing: { format: 'lines 1', strokes: [] }, picture: PNG } });
   return { dir, ledger: path.join(tmp(), 'looks.jsonl'), ...out };
 }
 const compiled = n => ({ ok: true, summary: { shapes: 10, washes: 20 + n, strokes: 100, widestBrushMm: 17 }, rows: [{ n: 1 }], numbersText: 'NUMBERS', picture: PNG, marked: { forms: 1, washes: 0 } });
@@ -311,5 +311,34 @@ test('the model\'s own time: not the wait for a place to start, nor a compile, n
     assert.equal(server.ownSeconds(), 180, 'nor the compile and the half hour of the look\'s painting'); assert.equal(server.over(), false);
     const rec = await server.stop(); assert.equal(rec.waitSeconds, (9 + 9 + 30) * 60); assert.equal(rec.ownSeconds, 180); assert.equal(rec.plans.at(-1).edit.notes.length, 1); assert.equal(rec.looks[0].edit.notes.length, 1);
     clock += 83 * 60000; assert.equal(server.over(), true, 'its own 85 minutes end it');
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('a choice with lines, forms and settings per form: its files are read and checked, what they do is said and recorded, and its pictures are put in mine/', async () => {
+  const { dir, ledger } = folder({ looks: 2 }); let seen = null, checked = 0;
+  try {
+    const record = { lines: { file: 'my-lines.json', strokes: 10, before: 6, after: 1, dropped: 3 }, forms: { file: 'my-forms.json', forms: 3, merged: 1 }, perForm: [{ form: 'face', id: 1, study: 3, setting: 'lay', value: 1 }] };
+    const checkTools = t => { checked++; if (t.linesEdit?.rules?.[0]?.do === 'erase') throw new Error('lines edit, rule 1: "do" is "before", "after" or "drop"'); return { record, said: 'Your lines: 6 before the washes, 1 after, 3 dropped.' }; };
+    const server = sessionServer({ dir, ledger, looks: 2, minutes: 85, checkScript: s => s, checkTools, look: async () => ({ ok: true, picture: PNG, numbersText: 'NUMBERS', marked: { forms: 0, washes: 0 }, painted: { cells: 100 } }),
+      compile: async choice => { seen = choice.tools; return { ...compiled(1), toolFiles: [{ rel: 'mine/drawing.png', data: PNG }, { rel: 'mine/forms.json', data: '[]\n' }] }; } });
+    assert.ok(fs.existsSync(path.join(dir, 'drawing/lines.json')) && fs.existsSync(path.join(dir, 'drawing/all-lines.png')), 'the lines are in the folder from the start');
+    put(dir, { kind: 'settings', settings: {}, lines: 'my-lines.json', forms: 'my-forms.json', perForm: { face: { 'study3.lay': 1 } } });
+    assert.match(await ask(dir, server, 'plan'), /^REFUSED, nothing was planned: there is no file my-lines.json/);
+    fs.writeFileSync(path.join(dir, 'my-forms.json'), '{"edits": []}'); fs.writeFileSync(path.join(dir, 'my-lines.json'), '{"rules": [{"do": "erase"}]}');
+    assert.match(await ask(dir, server, 'look'), /^REFUSED, nothing was planned and no look was counted: lines edit, rule 1: "do" is/);
+    fs.writeFileSync(path.join(dir, 'my-lines.json'), '{"rules": [{"do": "drop"}]}');
+    const free = await ask(dir, server, 'plan');
+    assert.match(free, /^It compiles \(the code planner with its choice of lines, its own forms, settings per form\): .* Your lines: 6 before the washes, 1 after, 3 dropped\. See mine\/drawing\.png, mine\/forms\.json\. Nothing else is shown without a look\./);
+    assert.deepEqual(seen.linesEdit, { rules: [{ do: 'drop' }] }); assert.deepEqual(seen.formsEdit, { edits: [] }); assert.deepEqual(seen.perForm, [['face', [[3, 'lay', 1]]]]);
+    assert.ok(fs.existsSync(path.join(dir, 'mine/drawing.png'))); assert.equal(fs.readFileSync(path.join(dir, 'mine/forms.json'), 'utf8'), '[]\n');
+    assert.match(await ask(dir, server, 'look'), /^LOOK 1 of 2 \(the code planner with its choice of lines/);
+    const rec = await server.stop();
+    assert.equal(rec.plans.at(-1).tools.lines.dropped, 3); assert.equal(rec.looks[0].tools.perForm[0].form, 'face');
+    const fin = finalChoice({ present: server.present, lastGood: rec.lastGood, good: rec.good, ended: 'done' });
+    assert.deepEqual(fin.submitted.tools, { lines: 'my-lines.json', forms: 'my-forms.json', perForm: { face: { 'study3.lay': 1 } }, record }); assert.equal(fin.choice.tools.linesEdit.rules[0].do, 'drop');
+    // a choice with tools is not "nothing changed": unplanned, it is not taken
+    put(dir, { kind: 'settings', settings: {}, lines: 'my-lines.json' }); fs.writeFileSync(path.join(dir, 'my-lines.json'), '{"rules": [{"do": "after"}]}');
+    assert.match(finalChoice({ present: server.present, lastGood: null, good: new Set(), ended: 'done' }).failure, /never planned/);
+    assert.ok(checked >= 4);
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });

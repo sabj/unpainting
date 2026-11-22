@@ -16,7 +16,11 @@ What you have to work with, all of it yours to use:
 - The three studies, coarse to fine. **Study 3, the fine study, is nearly as good as the subject itself** (its shapes,
   values and colours can be trusted), and the code planner's plan uses almost none of it: nearly all its washes come
   from Study 1. What the fine study shows and the plan lacks is yours to put in.
-- The opening drawing (already on the sheet) and the named forms, as a picture and as data.
+- The drawing, line by line: which lines are drawn before the washes, which after them as closing lines over the dry
+  paint, which not at all, and how dark each is (`"lines"` beside any choice; `README.md`).
+- The named forms, as a picture and as data, and yours to change: merge, cut out with a polygon, rename, give another
+  kind (`"forms"` in a settings choice). The code planner can be set form by form (`"perForm"`): more shapes in a
+  face, fewer in a background, the fine study laid in the eyes.
 - The whole paint box (`own-script-brief.md` lists it). **The choice of paints is yours**; the code planner's own pick
   is often wrong for the subject. In your own script the paints are its `palette`; for the code planner they are the
   painter's option `paints` (box keys, comma separated), which a settings choice may name.
@@ -71,6 +75,10 @@ Your answer is the file `choice.json` as it stands when you stop. Three kinds, f
    built. A script is laid as written; the code planner is not used, and nothing of its plan is kept: every value
    and every shape is then yours to get right.
 
+Beside its kind a choice may name your lines (`"lines": "my-lines.json"`, with any kind) and, in a settings choice,
+your forms (`"forms": "my-forms.json"`) and planner settings for single forms (`"perForm": {...}`). `README.md` gives
+each format.
+
 `choice.json` starts as `{"kind": "settings", "settings": {}}`: change nothing and the painting is exactly the code
 planner's.
 
@@ -101,6 +109,14 @@ recognisable and unbroken. DRAWING_NOTE
 
 ## Before you stop
 
+- **Review your own sheet.** Take a look at your final choice and write `self-review.md`: first line
+  `# Self-review of look N` (N your last look), then the FIVE worst differences between your dried sheet and the
+  subject, numbered, each with where it is in millimetres, what differs and what you would do about it; last line
+  `Major faults remaining: none` or `Major faults remaining: <how many>`. A major fault is a form not built, a value far
+  off, a colour wrong, or an area left bare that the subject paints. **While a major fault remains and you have time,
+  go on and put it right, then look and review again.** You may hand in early only when your review of your last look
+  says none remains; a session that stops without it is sent back to work. No score is shown to you and nobody marks
+  the review: it is your own judgment.
 - `choice.json` holds your final choice, with one or two sentences of `why`.
 - You ran `./unpaint plan` on it and it compiled. A final choice that was not planned, or does not compile, is not
   painted: the last choice of yours that did compile is painted in its place, and the record says so.

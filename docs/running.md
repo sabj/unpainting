@@ -128,7 +128,9 @@ on an otherwise idle machine, and do not run a plan batch beside a paint queue. 
 
 `--author auto` is the code planner alone, the control. `--author <key>` names a model (`tools/paint/authors.json`,
 else `bench/models.json`). `--author edit:FILE.json` paints a kept edit of the code planner's plan with no model called
-(a plan's own `plate/plan-to-edit.json`, unchanged, paints the code planner's plan). Several authors make a grid: `Source | Code planner alone | <Model>, tuning the code planner`.
+(a plan's own `plate/plan-to-edit.json`, unchanged, paints the code planner's plan). `--author choice:FOLDER` paints a
+kept choice (a folder holding `choice.json` and the files it names) as a session's choice is painted, no model
+called. Several authors make a grid: `Source | Code planner alone | <Model>, tuning the code planner`.
 
 ```sh
 # plan first (CPU), look at the sheet, then paint what the same sessions handed over (no model is called again)
@@ -153,6 +155,16 @@ tools, and `choice.json`. The task is `tools/paint/SESSION-BRIEF.md`; the tools 
   did, and the record says so. For an edited plan `run.json` holds, under `author.planEdit`, the washes untouched,
   changed, moved, merged, left out and added, and `untouchedShare`, the share of the code planner's washes left as
   they were.
+- Beside its kind a choice may use three more tools (`tools/paint/session-tools.mjs`; each format is in
+  `tools/paint/SESSION-README.md`). `"lines"` (any kind): which lines of the drawing are drawn before the washes,
+  which after them over the dry paint, which not at all, and how dark each is, by rules over `drawing/lines.json`
+  (`lines-edit.mjs`). The chosen strokes are written as drawing stems of the run's own and painted through
+  `--drawingfile`, `--drawinglast` and `--drawing`; no stroke's shape changes. `"forms"` (a settings choice): named
+  forms merged, cut out by a polygon, renamed or given another kind (`forms-edit.mjs`). The reviewed id map is never
+  altered: the edit is a receipt of its own in the run folder, marked `edited` with `reviewed: false`, and the
+  run's `masks.from` says so. `"perForm"` (a settings choice): planner settings inside one named form, carried in
+  the wash plan as `@name#FORM=value` (`src/paint/methods/form-read.mjs`). `run.json` holds what was chosen under
+  `author.tools` (`lines`, `forms`, `perForm`), and each plan and look of the session records it too.
 - The boundary: the folder holds the input pictures the code planner gets (the model may compute on them) and the
   code planner's plan (its picture alone, its washes as a table and as data). A plan is drawn or measured against
   the subject only by a counted look.
@@ -212,7 +224,7 @@ Flags use `--name value`. The last repeated flag wins. The default recipe (`src/
 | `--image` | target image path | required |
 | `--drawingfile` | line-file stem: `STEM-lines.json` or `.json.gz` | none: no line |
 | `--drawinglast` | line-file stem for the closing pen | none |
-| `--washplan` | `STUDY.png[:MIN[:glaze]],...`; `script:SCRIPT.json`; `edit:EDIT.json,STUDY.png...` (`src/paint/methods/plan-edit.mjs`; the format is in `tools/paint/SESSION-README.md`) | required unless `--drawingonly 1` |
+| `--washplan` | `STUDY.png[:MIN[:glaze]][@name=value][@name#FORM=value],...` (a study setting, for the sheet or inside named form number FORM); `script:SCRIPT.json`; `edit:EDIT.json,STUDY.png...` (`src/paint/methods/plan-edit.mjs`; the format is in `tools/paint/SESSION-README.md`) | required unless `--drawingonly 1` |
 | `--drawingonly` | `0`, `1`: lay the drawing alone | `0` |
 | `--inkrecipe` | `none`, `wash` (pen and wash), `v2` | `none` |
 | `--drawing` | `first`, `last`, `both`, `none` | `first` |

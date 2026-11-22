@@ -100,7 +100,7 @@ test('a colour a little lighter than what is under it is laid as the nearest tha
   const strength = sh.mix.reduce((a, v) => a + v, 0); assert.ok(strength > 0 && strength < was.mix.reduce((a, v) => a + v, 0), 'a faint wash, not none and not the planner\'s');
   const after = filmLab(under.map((v, j) => v + sh.mix[j]), pigments, PAPER)[0]; assert.ok(after <= Lu && after > Lu - 6, `the place is a little darker than it was (${after.toFixed(1)} against ${Lu.toFixed(1)})`);
   // with no tolerance the same colour is refused; a colour far lighter is refused whatever the default
-  assert.throws(() => apply({ ...e, nearestWithin: 0 }), /is [345] L\* lighter than what is already laid under it/);
+  assert.throws(() => apply({ ...e, nearestWithin: 0 }), /is [345]\.\d L\* lighter than what is already laid under it/);
   const far = copy(); far.washes[at].colour = grey(Lu + 20); assert.throws(() => apply(far), /is (19|2[0-2]) L\* lighter .*\(A colour up to 8 L\* lighter is laid as the nearest that can be\.\)/);
   assert.equal(apply({ ...far, nearestWithin: 25 }).record.nearest, 1); assert.equal(listing.nearestWithin, NEAREST_WITHIN_L);
 });
