@@ -107,7 +107,7 @@ The study plan chooses, by its own rules, the brush for each shape, wet or dry, 
 
 - In the larger washes, a warmer and a cooler neighbour's mix are dropped in while wet. The load varies along a wash. Close values are laid against each other damp, for soft edges. A broken mass such as foliage is laid in loose dabs of a round.
 - Move names (`wet on wet`, `wet on dry`, `dry brush`, with aliases such as `wet in wet` and `glaze`) are normalised in `src/paint/techniques/passage-plan.mjs`. `src/paint/techniques/README.md` indexes the library.
-- Per-pass scrap swatch: the painter tries a loaded brush on a scrap of the same paper and charges each passage by what the swatch held (`src/paint/methods/scrap-swatch.mjs`; a wet-into-wet swatch's bed is wetted as the sheet's is, `tools/painter/wet-bed-prep.mjs`).
+- Per-pass scrap swatch: the painter tries a loaded brush on a scrap of the same paper and charges each passage by what the swatch held (`src/paint/methods/scrap-swatch.mjs`; a wet-into-wet swatch's bed is wetted as the sheet's is, `tools/painter/wet-bed-prep.mjs`). A script wash's swatch is laid in lanes lapped as the wash's own lanes are (the lanes state their lap, to a tenth of the brush; `src/paint/methods/instrument-cal.mjs`): a tuft levels with the wet film it finds, so lanes lapped further leave less than their sum, and the charge follows the lap.
 - Index of modules: [methods and techniques](techniques.md).
 
 A plan cannot yet set these per shape (`bench/v6/TASK.md`, "Not yet executable").
