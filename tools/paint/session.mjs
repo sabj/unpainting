@@ -15,6 +15,7 @@
 // nothing and is no look); the folder is never trusted (no symlink is followed, no request is echoed);
 // and the model's shell cannot read the repository, the subject list, the caches or other sessions (seatbelt).
 // What this cannot stop: a model drawing its own script's polygons with its own code. Its commands are kept.
+import { travelLine } from './hand-travel.mjs';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -193,7 +194,7 @@ export function sessionServer({ dir, looks: asked, minutes, compile, look: paint
     const edited = `${editSaid}${p.tools ? ` ${p.tools.said}${got.toolFiles?.length ? ` See ${got.toolFiles.map(f => f.rel).join(', ')}.` : ''}` : ''}`;
     // ... and of the strokes too small for a wet bed, before anything is painted (plan-data.mjs tinyTouchWarning)
     const tiny = tinyTouchWarning(s);
-    if (cmd === 'plan') return `It compiles (${what}): ${line}.${edited}${tiny} Nothing else is shown without a look.\n${left()}`;
+    if (cmd === 'plan') return `It compiles (${what}): ${line}.${travelLine(s.handTravel)}${edited}${tiny} Nothing else is shown without a look.\n${left()}`;
     // a look is the choice painted for real, small: the painter runs outside the folder. A painting that fails, or
     // does not stay on the GPU, shows nothing and is no look. The same choice looked at again is not painted again
     // (and is a look again).

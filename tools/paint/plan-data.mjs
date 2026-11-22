@@ -3,6 +3,7 @@
 // is a look, counted; the data is not). Also the pictures and numbers of a look: the dried sheet of the small real
 // painting beside the source and the middle study, the stages of that painting, and each named form measured in the
 // study, in the plan and on the dried sheet, marked both ways.
+import { handTravel } from './hand-travel.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import sharp from 'sharp';
@@ -32,14 +33,16 @@ export function planRows(valuePlan) {
   }));
 }
 
-/** The plan in a few numbers: {shapes, washes, strokes, stages, widestBrushMm, washesByStage, studies}. */
+/** The plan in a few numbers: {shapes, washes, strokes, stages, widestBrushMm, washesByStage, studies, handTravel}. */
 export function planSummary(valuePlan) {
   const s = valuePlan.summary ?? {}, passes = valuePlan.passes ?? [];
   return { shapes: s.shapes ?? null, passages: s.passages ?? null, washes: s.washes ?? passes.length, strokes: s.plannedStrokes ?? null, stages: s.stages ?? null, washesByStage: s.washesByStage ?? null,
     widestBrushMm: passes.reduce((m, p) => Math.max(m, Number(p.widestBrushMm) || 0), 0) || null, paintedShare: s.paintedShare != null ? +Number(s.paintedShare).toFixed(2) : null,
     studies: (s.layersOfStudy ?? []).map(l => ({ leastMm2: l.minMm2, shapes: l.shapes, washes: l.washes, strokes: l.strokes })),
     // strokes the plan found too small for a wet bed (src/paint/methods/tiny-touch.mjs), when it found any
-    ...(s.tinyTouches?.length ? { tinyTouches: s.tinyTouches } : {}) };
+    ...(s.tinyTouches?.length ? { tinyTouches: s.tinyTouches } : {}),
+    // how far the hand jumps between consecutive strokes of a passage (hand-travel.mjs): told to a working author
+    handTravel: handTravel(passes) };
 }
 
 /** The warning a plan check gives an author about its tiny touches (strokes so short the brush only lands on its tip), or ''. */
