@@ -20,6 +20,10 @@ import { checkScript, upgradeScript } from '../../src/paint/methods/script-washe
 const AUTHOR_MINUTES = 40;
 /** Brushes of the kit that lay no wash, and the paint the brief does not offer (black is mixed, not squeezed). */
 const NOT_WASH = new Set(['pen', 'dry']), NOT_OFFERED = new Set(['lampblack']);
+/** The most paints a script may name. The painter's sheet holds 16 pigments (src/media/gpu/stepfull.mjs: 'GpuSheet: at most 16
+ * pigments'); the drawing's ink takes one and its graphite another, so 14 are left for paint. A plan compiles with more
+ * (it is made on the CPU); the painting would then stop on the GPU, so the check refuses it before anything is made. */
+const SCRIPT_PAINTS_MOST = 14;
 /** The runner names of bench/models.json and the command each is called with here. */
 const CLI_OF_RUNNER = { claude: 'claude', codex: 'codex', agy: 'agy' };
 /** What each command needs before it can be called, by name only. */
@@ -75,6 +79,7 @@ export function fillBrief(template, { sheet, inputs, brushes, paints, forms, med
       ? 'The drawing is waterproof ink (with light pencil where the picture has no pen line) and is already on the sheet before you start. Your washes go over it; do not script it. It carries the form: your darks follow its forms and your washes run over its lines freely.'
       : 'The drawing is a light pencil lay-in and is already on the sheet before you start. Your washes go over it; do not script it. It only places the forms: the paint must carry the form, the values and the edges.')
     .replaceAll('KIT_LIST', Object.entries(brushes).filter(([k]) => !NOT_WASH.has(k)).map(([k, b]) => `${k}: ${b.width_mm}`).join(', '))
+    .replaceAll('PAINTS_MOST', String(SCRIPT_PAINTS_MOST))
     .replace('PAINT_LIST', paints.filter(p => !NOT_OFFERED.has(p.key)).map(p => `\`${p.key}\` (${p.name})`).join(', '))
     .replace('FORMS_LIST', forms?.length ? forms.map(f => `- ${f.id}. ${f.name} (${f.kind})${f.boxMm ? `: box x ${f.boxMm[0]} to ${f.boxMm[2]}, y ${f.boxMm[1]} to ${f.boxMm[3]} mm` : ''}`).join('\n') : 'No named forms were made for this subject.')
     .replace('SKILLS_TEXT', () => skills);
@@ -104,6 +109,7 @@ export function checkAuthored(given, { sheetWidthMm, keys = BOX.map(p => p.key) 
   if (!Array.isArray(script?.palette) || !script.palette.length) throw new Error('painting script: no palette');
   const unknown = script.palette.filter(k => !keys.includes(k));
   if (unknown.length) throw new Error(`painting script: palette names ${unknown.join(', ')}, not in the box (${keys.join(', ')})`);
+  if (script.palette.length > SCRIPT_PAINTS_MOST) throw new Error(`painting script: palette names ${script.palette.length} paints; the painter's sheet holds 16 pigments and the drawing's ink and graphite take two, so a script may name ${SCRIPT_PAINTS_MOST} at most: leave out the ${script.palette.length - SCRIPT_PAINTS_MOST} you need least`);
   checkScript(script, { keys: script.palette, sheetWidthMm });
   const named = (script.passages ?? []).filter(p => p.shapes || p.reserve || (Array.isArray(p.strokes) && p.strokes.some(s => s?.along != null)));
   if (named.length) throw new Error(`painting script: passages ${named.map(p => p.id).join(', ')} name study shapes by number (shapes, reserve or along); this run has no numbered shapes: write regions and points in millimetres`);

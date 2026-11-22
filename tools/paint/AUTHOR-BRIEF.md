@@ -141,7 +141,9 @@ The whole answer, the plan first:
 }
 ```
 
-`palette`: at most seven paints from these keys only: PAINT_LIST.
+`palette`: the paints you choose, from these keys only: PAINT_LIST. The painter's sheet holds 16 pigments and
+the drawing's ink and graphite take two of them, so a script may name PAINTS_MOST paints at most; a palette with more
+is refused when the script is checked.
 
 `brushes`: the brushes you use, each named as you like. `widthMm` is the loaded belly's width on the paper at full
 pressure. The painter's kit (name: width in mm) is: KIT_LIST. Choose widths from the kit or between its sizes.

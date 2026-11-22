@@ -45,7 +45,8 @@ test('the committed brief is filled: sheet, pictures, drawing medium, wash brush
   assert.match(b, /The sheet is `280` by `186.7` mm/); assert.match(b, /- `inputs\/source.png`: the SUBJECT/); assert.match(b, /light pencil lay-in/);
   assert.match(b, /\(name: width in mm\) is: mop: 38, round12: 7\./); assert.match(b, /keys only: `ochre` \(yellow ochre\)\./);
   assert.match(b, /- 2\. cat face \(face\): box x 40 to 120, y 30 to 110 mm/);
-  assert.doesNotMatch(b, /SHEET_W|SHEET_H|INPUT_LIST|KIT_LIST|PAINT_LIST|FORMS_LIST|DRAWING_NOTE|SKILLS_TEXT|lampblack|pen: 0.5/);
+  assert.doesNotMatch(b, /SHEET_W|SHEET_H|INPUT_LIST|KIT_LIST|PAINT_LIST|PAINTS_MOST|FORMS_LIST|DRAWING_NOTE|SKILLS_TEXT|lampblack|pen: 0.5/);
+  assert.match(b, /so a script may name 14 paints at most/); assert.doesNotMatch(b, /seven paints/);
   assert.match(fill('ink, ink recipe wash'), /waterproof ink/);
   assert.match(b, /"format": "painting-script 2"/); assert.match(b, /One connected base wash over the whole form/); assert.match(b, /"plan": \{/);
 });
@@ -61,6 +62,10 @@ test('a script is checked against this run, and the reason is said for its autho
   assert.throws(() => checkAuthored(script(), { sheetWidthMm: 380 }), /written for a sheet 280 mm wide, painted on 380 mm/);
   assert.throws(() => checkAuthored(script({ palette: ['ochre', 'mauve'] }), { sheetWidthMm: 280 }), /palette names mauve, not in the box/);
   assert.throws(() => checkAuthored(script({ palette: [] }), { sheetWidthMm: 280 }), /no palette/);
+  // the sheet's 16 pigments less the drawing's ink and graphite: 14 paints pass the palette check, 15 are refused in plain words
+  const box = n => ['ochre', 'ultramarine', 'sienna', 'umber', 'rawsienna', 'rose', 'cadred', 'hansa', 'cadyellow', 'cerulean', 'phthaloblue', 'phthalogreen', 'sapgreen', 'paynes', 'sepia'].slice(0, n);
+  assert.deepEqual(checkAuthored(script({ palette: box(14) }), { sheetWidthMm: 280 }).paints.length, 14);
+  assert.throws(() => checkAuthored(script({ palette: box(15) }), { sheetWidthMm: 280 }), /palette names 15 paints; the painter's sheet holds 16 pigments and the drawing's ink and graphite take two, so a script may name 14 at most/);
   assert.throws(() => checkAuthored(script({ passages: [{ ...script().passages[0], shapes: [3, 4] }] }), { sheetWidthMm: 280 }), /name study shapes by number/);
   assert.throws(() => checkAuthored(script({ passages: [{ ...script().passages[0], brush: 'mop' }] }), { sheetWidthMm: 280 }), /brush mop is not in the kit/);
   const d = tmp();
