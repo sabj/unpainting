@@ -249,7 +249,7 @@ function lanes(polys, { widthMm, deg, pressure, perLoad, lights, rng, hand }) {
   // the width the brush lays at the lane's pressure, and the lap's range about its middle
   const laid = widthMm * (0.25 + 0.75 * Math.min(1, pressure)), lapMid = (H.lap[0] + H.lap[1]) / 2, lapHalf = hand * (H.lap[1] - H.lap[0]) / 2;
   const fan = rng.normal() * H.fan * hand, arc = rng.range(-1, 1) * H.bow * hand;
-  const runs = []; let v = v0 + rng.range(0.3, 0.5) * laid, i = 0;
+  const runs = [], steps = []; let v = v0 + rng.range(0.3, 0.5) * laid, i = 0;
   while (v < v1) {
     const tilt = fan * ((v - v0) / Math.max(1e-6, v1 - v0) - 0.5) + rng.normal() * H.tilt * hand, um = (u0 + u1) / 2, cx = um * ux + v * vx, cy = um * uy + v * vy;
     // a lane runs a little past the region's edge, but stops short of a light by a hand's varying margin (a light is worked
@@ -258,6 +258,7 @@ function lanes(polys, { widthMm, deg, pressure, perLoad, lights, rng, hand }) {
     // the last lane is carried down to the region's far edge (the bead is taken to the bottom)
     const was = v; v += laid * (1 - rng.range(lapMid - lapHalf, lapMid + lapHalf)); i++;
     if (v >= v1 && was < v1 - 0.45 * laid) v = v1 - 0.35 * laid;
+    if (v < v1) steps.push(v - was);
   }
   const centre = q => { const t = (q.t0 + q.t1) / 2, d = q.d * Math.PI / 180; return [q.cx + Math.cos(d) * t, q.cy + Math.sin(d) * t]; };
   runs.sort((p, q) => p.i - q.i || p.t0 - q.t0);
@@ -279,6 +280,11 @@ function lanes(polys, { widthMm, deg, pressure, perLoad, lights, rng, hand }) {
     cur.pts.push(...lane(q, back)); back = !back; inLoad++; last = q;
   }
   if (cur) strokes.push(cur);
+  // how far the lanes lap, as a share of the brush's whole width, to the nearest LAP_STEP: the scrap swatch that sets this
+  // wash's charge is laid in lanes lapped the same (a tuft levels with the wet film it finds, so what lapped lanes
+  // leave is not the sum of what each would leave alone; charged from a swatch lapped by a third, lanes lapped by
+  // more than half left 0.83 of the planned pigment where the looser lanes before them left 0.91)
+  const lap = steps.length ? +Math.max(0, Math.min(0.8, Math.round((1 - steps.reduce((x, y) => x + y, 0) / steps.length / widthMm) / LAP_STEP) * LAP_STEP)).toFixed(2) : null;
   // the load: full after the brush is dipped, thinner on each stroke until it is dipped again, after two strokes or three
   let sinceDip = 0, dipAfter = 0, fresh = 1.12;
   return strokes.map(s => {
@@ -286,9 +292,12 @@ function lanes(polys, { widthMm, deg, pressure, perLoad, lights, rng, hand }) {
     const charge = fresh - 0.115 * sinceDip++;
     const L = s.pts.length, turns = rng.range(0.5, 1.5), phase = rng.range(0, 2 * Math.PI);
     const out = s.pts.map(([x, y], j) => { const t = L > 1 ? j / (L - 1) : 0.5, land = Math.min(1, t * L / 2.5), lift = Math.min(1, (1 - t) * L / 2); return pt(x, y, pressure * (0.55 + 0.45 * Math.min(land, lift)) * (1 + H.swell * hand * Math.sin(2 * Math.PI * turns * t + phase)) * rng.range(0.95, 1.05)); });
-    return { kind: 'sweep', radiusMm: round3(r), points: out, charge: round3(charge) };
+    return { kind: 'sweep', radiusMm: round3(r), points: out, charge: round3(charge), ...(lap == null ? {} : { lap }) };
   });
 }
+
+/** The steps a wash's lap is told to the swatch in (shares of the brush's width): each step is a swatch of its own. */
+const LAP_STEP = 0.1;
 
 /** One dab of a charge, dropped at (x, y). */
 export function chargeDab(x, y, { widthMm, rng, pressure = 0.85 }) {

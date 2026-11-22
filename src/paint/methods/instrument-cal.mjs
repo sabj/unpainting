@@ -5,7 +5,8 @@
 //
 // tools/paint-plate.mjs lays one swatch per stock technique (wet on dry, wet on wet, glazed, dry brush). A passage whose
 // instrument is the stock one of its name takes that swatch's reading. A passage that carries its own load or pass
-// count (a value plan's glaze is laid at the plan's water in one pass) gets a swatch of its own, laid once and kept.
+// count (a value plan's glaze is laid at the plan's water in one pass), or states how far its lanes lap (`lap`, a share
+// of the brush's width: a painting script's wash), gets a swatch of its own, laid once and kept.
 // Nothing here reads the sheet or the target.
 
 // what a swatch's delivery depends on in a technique
@@ -16,7 +17,8 @@ export function instrumentKey(T) {
   if (!T || typeof T.name !== 'string' || !T.name) throw new TypeError('instrument calibration: a technique needs a name');
   for (const f of FIELDS) if (!Number.isFinite(T[f])) throw new TypeError(`instrument calibration: ${T.name} has no finite ${f} (${T[f]})`);
   if (!Number.isInteger(T.passes) || T.passes < 1) throw new RangeError(`instrument calibration: ${T.name} needs a whole number of passes, got ${T.passes}`);
-  return [T.name, ...FIELDS.map(f => T[f]), T.intoWet ? 'into wet' : 'on dry'].join('|');
+  // (a wash that states how far its lanes lap is tried in lanes lapped so: another lap, another swatch)
+  return [T.name, ...FIELDS.map(f => T[f]), T.intoWet ? 'into wet' : 'on dry', ...(Number.isFinite(T.lap) ? [`lap ${(+T.lap).toFixed(2)}`] : [])].join('|');
 }
 
 /**

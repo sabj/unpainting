@@ -73,7 +73,22 @@ test('the load: full after a dip, thinner until the next, about the mix on avera
   const script = { format: 'painting-script 2', subject: 't', author: 'test', sheet: { widthMm: 160, heightMm: 110 }, palette: keys, brushes: { mop: { shape: 'round', widthMm: 12 } },
     passages: [{ id: 'p1', what: 'sky', stage: 1, kind: 'wash', region: field, paint: { pigments: { ultramarine: 1 }, dilution: 'pale' }, brush: 'mop', paper: 'dry', handling: { direction: 0 } }] };
   const plan = (seed, hand) => { const log = console.log; console.log = () => {}; try { return planScriptWashes({ script, k: 2, w: 320, h: 220, pigments, sheetWidthMm: 160, seed, hand }).instructions[0].strokes; } finally { console.log = log; } };
+  { const log = console.log; console.log = () => {}; try { const ins = planScriptWashes({ script, k: 2, w: 320, h: 220, pigments, sheetWidthMm: 160 }).instructions[0]; assert.ok([0.5, 0.6].includes(ins.laneLap), `the plan carries the wash's lap: ${ins.laneLap}`); } finally { console.log = log; } }
   assert.deepEqual(plan(0, 1), plan(0, 1));
   assert.notDeepEqual(plan(0, 1), plan(1, 1));
   assert.ok(spread(lanesOf(plan(0, 0)).map(heading)) < 0.01 && spread(lanesOf(plan(0, 1)).map(heading)) > 0.5);
+});
+
+test('a wash\'s lanes state how far they lap, in tenths of the brush, and the plan and the technique carry it to the swatch', async () => {
+  const W = 10, s = sweeps([field], { widthMm: W, deg: 0, pressure: 0.7, rng: handOf('a') });
+  // laid 7.75 mm wide at this pressure and lapped by 30 to 55% of that: the lanes are about 4.5 mm apart, 0.55 of the brush lapped
+  assert.ok(s.every(st => st.lap === s[0].lap) && [0.5, 0.6].includes(s[0].lap), `${s[0].lap}`);
+  assert.equal(sweeps([field], { widthMm: W, deg: 0, pressure: 0.7, rng: handOf('a'), hand: 0 })[0].lap, 0.6);
+  // one lane has no lap to state
+  assert.equal(sweeps([[[10, 10], [80, 10], [80, 14], [10, 14]]], { widthMm: W, deg: 0, rng: handOf('a') })[0].lap, undefined);
+  const { valueTechnique } = await import('./value-shared.mjs'), { instrumentKey } = await import('./instrument-cal.mjs');
+  const T = valueTechnique({ move: 'wet on wet', load: { water: 0.88 }, laneLap: 0.6 }), plain = valueTechnique({ move: 'wet on wet', load: { water: 0.88 } });
+  assert.equal(T.lap, 0.6); assert.equal(plain.lap, undefined);
+  assert.match(instrumentKey(T), /\|lap 0\.60$/); assert.doesNotMatch(instrumentKey(plain), /lap/);
+  assert.notEqual(instrumentKey(T), instrumentKey({ ...T, lap: 0.5 }));
 });

@@ -195,6 +195,13 @@ function moveOf(p, joins) {
   return (p.stage ?? 2) === 3 ? { move: 'wet on dry', water: water ?? 0.58, phase: 'shadow' } : { move: 'wet on dry', water: water ?? 0.62, phase: null };
 }
 
+/** The lap of a wash's lanes (script-marks.mjs sweeps), the one most of its strokes' length is laid at; null for strokes that state none. */
+function lapOf(strokes) {
+  const by = new Map();
+  for (const st of strokes) { if (!Number.isFinite(st.lap)) continue; let len = 0; for (let k = 1; k < st.points.length; k++) len += Math.hypot(st.points[k][0] - st.points[k - 1][0], st.points[k][1] - st.points[k - 1][1]); by.set(st.lap, (by.get(st.lap) ?? 0) + len); }
+  return by.size ? [...by].sort((a, b) => b[1] - a[1])[0][0] : null;
+}
+
 /** The cells (w x h) a list of strokes touches: each point's footprint, r (0.25 + 0.75 p), joined along the stroke. */
 export function footprint(strokes, w, h, cellMm) {
   const m = new Uint8Array(w * h);
@@ -283,7 +290,7 @@ export function planScriptWashes({ script: given, k, w, h, pigments, paperRGB = 
       layer: stage, break: null, load: { water: how.water, pigment: 'the mix at its strength; calibrated delivery', reload: 'existing finite instrument route' },
       edges: { hardCells: [], softCells: [], policy: p.edges ?? 'mixed' }, outline: [], strokes, softEdges: [], depthMm: 0, uncoveredShare: 0, widestBrushMm: Math.max(...strokes.map(st => 2 * st.radiusMm)),
       protectedLights: p.leave ? [p.leave] : [], failureSigns: 'Lost lights, muddy overlaps, stripes.', stop: 'after the passage', script: { passage: p.id, kind: p.kind, paper: p.paper ?? 'dry', into: p.into ?? null, wait: p.wait ?? null, underShare: under.share, underFilm: under.film, glaze: p.glaze ?? null, handling: p.handling ?? null } };
-    sh._valuePlan = intent; instructions.push({ ...intent, area, plannedPigmentMass: strength * area });
+    { const laneLap = kind === 'wash' ? lapOf(strokes) : null; if (laneLap != null) intent.laneLap = laneLap; } sh._valuePlan = intent; instructions.push({ ...intent, area, plannedPigmentMass: strength * area });
     polygons.push({ stage, thing: what, kind, colour: null, loops: (charge ? [] : regionsOf(p)).map(P => ({ points: P })) });
     strokeCount += strokes.length;
     return sh;
