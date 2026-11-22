@@ -50,7 +50,7 @@ export function createInstrumentCal({ stock, measure, measureMark = null, markKe
       if (!own.has(key)) {
         own.set(key, check(key, measure(T)));
         const s = stock[T.name], differs = s ? [...FIELDS, 'intoWet'].filter(f => (f === 'intoWet' ? !!T[f] !== !!s.technique[f] : T[f] !== s.technique[f])) : [];
-        log(`  ${T.name} at ${s ? differs.map(f => `${f} ${T[f]}`).join(', ') : `water ${T.water}, passes ${T.passes}`}: its own swatch charges ${own.get(key).cal.toFixed(2)}x${s ? ` (the stock ${T.name} swatch, ${differs.map(f => `${f} ${s.technique[f]}`).join(', ')}: ${s.cal.toFixed(2)}x)` : ' (no stock swatch of that name)'}`);
+        log(`  ${T.name} at ${[...(s ? differs.map(f => `${f} ${T[f]}`) : [`water ${T.water}, passes ${T.passes}`]), ...(Number.isFinite(T.lap) ? [`lanes lapped by ${T.lap} of the brush`] : [])].join(', ')}: its own swatch charges ${own.get(key).cal.toFixed(2)}x${s ? ` (the stock ${T.name} swatch, ${differs.map(f => `${f} ${s.technique[f]}`).join(', ')}: ${s.cal.toFixed(2)}x)` : ' (no stock swatch of that name)'}`);
       }
       return { ...own.get(key), key, stock: false };
     },
