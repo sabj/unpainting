@@ -36,9 +36,9 @@ test('the committed brief is filled: sheet, pictures, drawing medium, wash brush
   assert.match(b, /The sheet is `280` by `186.7` mm/); assert.match(b, /- `inputs\/source.png`: the SUBJECT/); assert.match(b, /light pencil lay-in/);
   assert.match(b, /\(name: width in mm\) is: mop: 38, round12: 7\./); assert.match(b, /keys only: `ochre` \(yellow ochre\)\./);
   assert.match(b, /- 2\. cat face \(face\): box x 40 to 120, y 30 to 110 mm/);
-  assert.doesNotMatch(b, /SHEET_W|SHEET_H|INPUT_LIST|KIT_LIST|PAINT_LIST|FORMS_LIST|DRAWING_NOTE|lampblack|pen: 0.5/);
+  assert.doesNotMatch(b, /SHEET_W|SHEET_H|INPUT_LIST|KIT_LIST|PAINT_LIST|FORMS_LIST|DRAWING_NOTE|SKILLS_TEXT|lampblack|pen: 0.5/);
   assert.match(fill('ink, ink recipe wash'), /waterproof ink/);
-  assert.match(b, /"format": "painting-script 2"/); assert.match(b, /A rich mass is built from 4 to 6 pale glazes/);
+  assert.match(b, /"format": "painting-script 2"/); assert.match(b, /One pale connected base wash over the whole form/); assert.match(b, /"plan": \{/);
 });
 
 test('the script is found in a reply with words or a fence round it', () => {

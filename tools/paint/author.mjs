@@ -38,16 +38,23 @@ export const needsOf = cli => NEEDS[cli] ?? 'an unknown command';
 export const authorLabel = a => (a.key === 'auto' ? 'auto (code planner)' : a.cli === 'script' ? a.name : `${a.name}${a.effort ? `, ${a.effort} effort` : ''}`);
 
 /** The brief with this run's sheet, inputs, kit, paints and named forms written in. */
-export function fillBrief(template, { sheet, inputs, brushes, paints, forms, medium }) {
+export function fillBrief(template, { sheet, inputs, brushes, paints, forms, medium, skills = '' }) {
   const ink = /^ink/.test(medium);
   return template.replaceAll('SHEET_W', String(sheet.widthMm)).replaceAll('SHEET_H', String(sheet.heightMm))
     .replace('INPUT_LIST', inputs.map(i => `- \`${i.file}\`: ${i.what}`).join('\n'))
     .replace('DRAWING_NOTE', ink
       ? 'The drawing is waterproof ink (with light pencil where the picture has no pen line) and is already on the sheet before you start. Your washes go over it; do not script it. It carries the form: your darks follow its forms and your washes run over its lines freely.'
       : 'The drawing is a light pencil lay-in and is already on the sheet before you start. Your washes go over it; do not script it. It only places the forms: the paint must carry the form, the values and the edges.')
-    .replace('KIT_LIST', Object.entries(brushes).filter(([k]) => !NOT_WASH.has(k)).map(([k, b]) => `${k}: ${b.width_mm}`).join(', '))
+    .replaceAll('KIT_LIST', Object.entries(brushes).filter(([k]) => !NOT_WASH.has(k)).map(([k, b]) => `${k}: ${b.width_mm}`).join(', '))
     .replace('PAINT_LIST', paints.filter(p => !NOT_OFFERED.has(p.key)).map(p => `\`${p.key}\` (${p.name})`).join(', '))
-    .replace('FORMS_LIST', forms?.length ? forms.map(f => `- ${f.id}. ${f.name} (${f.kind})${f.boxMm ? `: box x ${f.boxMm[0]} to ${f.boxMm[2]}, y ${f.boxMm[1]} to ${f.boxMm[3]} mm` : ''}`).join('\n') : 'No named forms were made for this subject.');
+    .replace('FORMS_LIST', forms?.length ? forms.map(f => `- ${f.id}. ${f.name} (${f.kind})${f.boxMm ? `: box x ${f.boxMm[0]} to ${f.boxMm[2]}, y ${f.boxMm[1]} to ${f.boxMm[3]} mm` : ''}`).join('\n') : 'No named forms were made for this subject.')
+    .replace('SKILLS_TEXT', () => skills);
+}
+
+/** The project skills a plan follows, as text for the brief: each file without its front matter, under its path. */
+const SKILL_FILES = ['painting-planner/SKILL.md', 'watercolor-technique/SKILL.md', 'watercolor-technique/references/fur-and-faces.md', 'watercolor-technique/references/trees-and-skies.md', 'watercolor-technique/references/dry-brush-and-detail.md'];
+export function skillsText(root) {
+  return SKILL_FILES.map(f => `### Skill file ${f}\n\n${fs.readFileSync(path.join(root, '.agents/skills', f), 'utf8').replace(/^---\n[\s\S]*?\n---\n/, '').replace(/\]\([^)]*\)/g, ']').trim()}`).join('\n\n');
 }
 
 /** The first JSON object in a reply that has the key `key` (a model may wrap its answer in words or a code fence). */
@@ -125,7 +132,8 @@ export async function preparePacket({ dir, root, run, drawingPng, briefFile }) {
     await put('forms.png', 'the NAMED FORMS: each named form of the subject as one flat colour (the FORMS list names them)', run.masks.formsPng);
   }
   const brushes = JSON.parse(fs.readFileSync(path.join(root, 'src/paint/brushes.json'), 'utf8')).brushes;
-  const brief = fillBrief(fs.readFileSync(briefFile, 'utf8'), { sheet: run.sheet, inputs, brushes, paints: BOX, forms, medium: run.drawing.medium });
+  const template = fs.readFileSync(briefFile, 'utf8');
+  const brief = fillBrief(template, { sheet: run.sheet, inputs, brushes, paints: BOX, forms, medium: run.drawing.medium, skills: template.includes('SKILLS_TEXT') ? skillsText(root) : '' });
   const prompt = `${brief}\nThe pictures are files in the current directory (${inputs.map(i => `\`${i.file}\``).join(', ')}). Open and look at each before answering. Write the script now. Answer with the JSON object only.`;
   const leak = [os.homedir(), os.userInfo().username].find(w => w && prompt.includes(w));
   if (leak) throw new Error('author: the prompt would carry a path or name of this machine; it is not sent');
