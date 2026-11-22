@@ -12,7 +12,7 @@ Paint each target as a person with a brush and pen would, using only the simulat
 - About 15 minutes per painting, stated in the brief.
 - The session is stopped after 85 minutes (5,100 s), so a model must finish each painting before the next.
 - Open models also stop at a $2.40 spend cap.
-- One GPU job at a time. The toolkit takes the GPU when it is free and runs on the CPU otherwise.
+- One GPU job at a time, and the GPU or nothing: when another of the session's processes holds the GPU, or the GPU cannot be used, `kit.open` stops and names what holds it. It paints on the CPU only when asked by name (`kit.open(task, { gpu: false })`). Until 22 November 2026 it took the CPU silently when the GPU was busy.
 
 ## Materials
 

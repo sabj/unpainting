@@ -15,11 +15,15 @@
 // Stroke log: every counted stroke is also written, in order, to out/<task>/strokes.jsonl.gz (see bench/docs/run-format.md).
 //   Logging only reads; it never changes what is painted. BENCH_NO_STROKELOG=1 turns it off (used by the equivalence test).
 // Stage frames are saved automatically at 10%, 25%, 50%, 75% and 100% of your strokes; kit.frame(name) adds your own.
+// One painting at a time, on the GPU: if another of your processes still holds the GPU, or the GPU cannot be used, kit.open
+//   STOPS and names what holds it; it never paints on the CPU by itself. Ask for the CPU by name if you want it (far
+//   slower): kit.open(task, { gpu: false }).
 import './guard.mjs';
 import fs from 'node:fs';
 import zlib from 'node:zlib';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { execFileSync } from 'node:child_process';
 import sharp from 'sharp';
 import { makePaper } from '../src/media/paper.mjs';
 import * as S from '../src/media/sheet.mjs';
@@ -80,8 +84,9 @@ function takeGpuLock() {
   try { fs.mkdirSync(LOCK); } catch {
     let pid = 0; try { pid = +fs.readFileSync(path.join(LOCK, 'pid'), 'utf8'); } catch {}
     let alive = false; try { if (pid) { process.kill(pid, 0); alive = true; } } catch {}
-    if (alive) return false;
-    fs.rmSync(LOCK, { recursive: true, force: true }); try { fs.mkdirSync(LOCK); } catch { return false; }
+    // held: who holds it, so the caller can say so (the process's own command line, as ps gives it)
+    if (alive) { let command = ''; try { command = execFileSync('ps', ['-o', 'command=', '-p', String(pid)], { encoding: 'utf8' }).trim().slice(0, 200); } catch {} return { pid, command }; }
+    fs.rmSync(LOCK, { recursive: true, force: true }); try { fs.mkdirSync(LOCK); } catch { return { pid: 0, command: 'another painting took it at the same moment' }; }
   }
   fs.writeFileSync(path.join(LOCK, 'pid'), String(process.pid));
   const release = () => { try { if (+fs.readFileSync(path.join(LOCK, 'pid'), 'utf8') === process.pid) fs.rmSync(LOCK, { recursive: true, force: true }); } catch {} };
@@ -112,11 +117,19 @@ export async function open(task, { seed = +(process.env.BENCH_SEED || 1), gpu = 
   const out = path.join(HERE, 'out', task); fs.rmSync(out, { recursive: true, force: true }); fs.mkdirSync(path.join(out, 'snaps'), { recursive: true }); fs.mkdirSync(path.join(out, 'frames'), { recursive: true });
   fs.appendFileSync(path.join(HERE, 'out', 'kitlog.jsonl'), JSON.stringify({ ev: 'open', task, t: Date.now() }) + '\n');
   const O = { ...S.DEFAULTS };
-  const useGpu = gpu && !process.env.BENCH_CPU && takeGpuLock(); // BENCH_CPU=1 forces the CPU backend (for replaying recorded scripts)
-  if (!useGpu) await S.setThreads(threads);
+  // The GPU, or a stop: a painting never falls back to the CPU by itself (no silent fallbacks). The CPU is used only when
+  // it is asked for by name: kit.open(task, { gpu: false }), or BENCH_CPU=1 (for replaying recorded scripts).
+  const useGpu = gpu !== false && !process.env.BENCH_CPU;
+  if (useGpu) {
+    const held = takeGpuLock();
+    if (held !== true) reject(`the GPU is held by another painting of this session: process ${held.pid}${held.command ? ` (${held.command})` : ''}. One painting runs at a time. Nothing was painted: wait for that process to end or stop it, then run again. To paint on the CPU on purpose (far slower), open with kit.open('${task}', { gpu: false })`);
+  } else await S.setThreads(threads);
   const pigments = BOX.map(p => boxPigment(p));
   const sheet = S.createSheet(makePaper(W, H, { seed, scale: 1, toothScale: 0.2, coldPress: { mmPerCell: MM } }), pigments);
-  if (useGpu) attachGpu(sheet, O, { mode: 'auto', log: () => {} });
+  if (useGpu) {
+    try { attachGpu(sheet, O, { mode: 'on', log: () => {} }); } catch (e) { reject(`the GPU could not be used (${String(e.message).slice(0, 200)}). Nothing was painted. Run again; to paint on the CPU on purpose (far slower), open with kit.open('${task}', { gpu: false })`); }
+    if (!sheet._gpu) reject(`the GPU could not be used (no GPU sheet was attached). Nothing was painted. Run again; to paint on the CPU on purpose (far slower), open with kit.open('${task}', { gpu: false })`);
+  }
   const log = process.env.BENCH_NO_STROKELOG ? null : [];
   st = { log, logWritten: false, seed, task, out, sheet, pigments, W, H, strokes: 0, pen: 0, small: 0, short: 0, dots: 0, frames: 0, snaps: [], t0: Date.now(), backend: sheet._gpu ? 'gpu' : 'cpu', paperRGB: [240, 237, 228], pending: Promise.resolve() };
   logLine({ ev: 'open', protocol: PROTOCOL, task, seed, W, H, mmPerCell: MM, paper: { toothScale: 0.2, coldPress: true }, backend: st.backend, t0: st.t0 });
