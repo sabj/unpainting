@@ -51,7 +51,7 @@ test('filming every stage at a different --frames leaves the painting byte-ident
   ]);
   assert.equal(a, 0, fs.readFileSync(path.join(work, 'off.log'), 'utf8').slice(-800));
   assert.equal(b, 0, fs.readFileSync(path.join(work, 'on.log'), 'utf8').slice(-800));
-  const frames = d => fs.readdirSync(d).filter(f => /^f\d{4}\.jpg$/.test(f)).length;
+  const frames = d => fs.readdirSync(d).filter(f => /^f\d{4}\.(jpg|webp|png)$/.test(f)).length;
   assert.ok(frames(on) > frames(off), `capture on kept ${frames(on)} frames, off ${frames(off)}`);
   const feedback = f => fs.readFileSync(f, 'utf8').split('\n').find(l => l.startsWith('feedback:'));
   assert.equal(feedback(path.join(work, 'on.log')), feedback(path.join(work, 'off.log')));

@@ -271,7 +271,7 @@ if(PEN_STATE_GATE) fs.writeFileSync(path.join(out,'pen-state-audit.json'),JSON.s
 if(ctx.sheet._layerStoragePolicy)compactLowerLayers(ctx.sheet,ctx.sheet._layerStoragePolicy());
 fs.writeFileSync(path.join(out, 'backend.json'), JSON.stringify({ ...PAINTER, ...GPU_INFO, layerStorage:{main:layerStorageStats(ctx.sheet),...(INKRES?{fine:layerStorageStats(INKRES.fine)}:{})}, gpuStats: gpuStats(ctx.sheet), performanceOptions: { opticalThreads: ctx.opticalThreads, trackedTransfers: SPEED_TRANSFERS, edgePingPong: process.env.GPU_EDGE_PINGPONG === '1', fusedWetScanRequested: process.env.GPU_FUSE_WETSCAN === '1', pressureSolver: PRESSURE_SOLVER } }, null, 1));
 console.log(backendLine(GPU_INFO)); // the backend this painting was made on, again at the end (details in backend.json)
-fs.writeFileSync(path.join(out, 'frames.json'), JSON.stringify({ ...PAINTER, width: OUT_W, height: OUT_H, presentation: { framePolicy: FRAME_POLICY.all ? 'all' : 'checkpoints', checkpoints: [10,25,50,75,100], video: Boolean(OUTPUT_VIDEO), requestedTimeline: TIMELINE, retimed: Boolean(RETIMED) }, ...(RETIMED ? { timeline: { target: RETIMED.target.code, fallback: RETIMED.target.fallback, milestones: RETIMED.target.milestones } } : {}), frames: num('phaselabels', 0) > 0 ? labelFrames(placed, RETIMED?.target.milestones ?? null) : placed }, null, 1));
+fs.writeFileSync(path.join(out, 'frames.json'), JSON.stringify({ ...PAINTER, width: OUT_W, height: OUT_H, presentation: { framePolicy: FRAME_POLICY.all ? 'all' : 'checkpoints', checkpoints: [10,25,50,75,100], video: Boolean(OUTPUT_VIDEO), frameFormat: ctx.FRAME_FORMAT === 'jpg' ? 'jpeg (quality 88)' : `${ctx.FRAME_FORMAT} (lossless)`, requestedTimeline: TIMELINE, retimed: Boolean(RETIMED) }, ...(RETIMED ? { timeline: { target: RETIMED.target.code, fallback: RETIMED.target.fallback, milestones: RETIMED.target.milestones } } : {}), frames: num('phaselabels', 0) > 0 ? labelFrames(placed, RETIMED?.target.milestones ?? null) : placed }, null, 1));
 // The plan as a picture, through the sheet's optics, to tell a bad plan from one the brushes failed to carry out.
 {
   const layer = PIGS.map(() => new Float32Array(n));
@@ -286,7 +286,7 @@ phaseMark('finish');
 if (OUTPUT_VIDEO) {
   // re-timed, each frame is held for its share of the same running time, and the film is resampled to the frame rate
   const fps = num('fps', 12);
-  let input = ['-framerate', String(fps), '-i', path.join(out, 'f%04d.jpg')], vf = 'pad=ceil(iw/2)*2:ceil(ih/2)*2';
+  let input = ['-framerate', String(fps), '-i', path.join(out, `f%04d.${ctx.FRAME_FORMAT}`)], vf = 'pad=ceil(iw/2)*2:ceil(ih/2)*2';
   if (RETIMED) {
     const list = path.join(out, 'timeline.txt');
     fs.writeFileSync(list, concatList(FRAMES.map(f => f.src), RETIMED.positions, FRAMES.length / fps));
