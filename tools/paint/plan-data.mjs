@@ -41,6 +41,8 @@ export function planSummary(valuePlan) {
     studies: (s.layersOfStudy ?? []).map(l => ({ leastMm2: l.minMm2, shapes: l.shapes, washes: l.washes, strokes: l.strokes })),
     // strokes the plan found too small for a wet bed (src/paint/methods/tiny-touch.mjs), when it found any
     ...(s.tinyTouches?.length ? { tinyTouches: s.tinyTouches } : {}),
+    // how often the sheet is left to dry: the wet sittings of the plan (consecutive washes of one layer are one sitting)
+    dryings: passes.reduce((n, p, i) => n + (i === 0 || p.layer !== passes[i - 1].layer ? 1 : 0), 0),
     // how far the hand jumps between consecutive strokes of a passage (hand-travel.mjs): told to a working author
     handTravel: handTravel(passes) };
 }

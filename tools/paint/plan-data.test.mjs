@@ -13,7 +13,7 @@ test('a plan is read as rows of washes with a box and the forms covered, and no 
   const rows = planRows(plan);
   assert.deepEqual(rows[0], { n: 1, id: 'light/s1/m5/first-wash', stage: 1, kind: 'first wash', what: 'under-wash of study shape 3', rgb: [235, 154, 93], areaMm2: 12293, brushMm: 38, strokes: 2, move: 'wet on dry', boxMm: [10, 21, 90, 70], forms: [{ name: 'cat face', kind: 'face', share: 0.92 }] });
   assert.equal(rows[1].boxMm, null); assert.doesNotMatch(JSON.stringify(rows), /points|outline/);
-  assert.deepEqual(planSummary(plan), { shapes: 12, passages: null, washes: 2, strokes: 9, stages: 2, washesByStage: [1, 1], widestBrushMm: 38, paintedShare: 0.57, studies: [{ leastMm2: 6, shapes: 12, washes: 2, strokes: 9 }], handTravel: { jumps: 1, medianMm: 89.4, worstMm: 89.4, worstIn: 'under-wash of study shape 3' } });
+  assert.deepEqual(planSummary(plan), { shapes: 12, passages: null, washes: 2, strokes: 9, stages: 2, washesByStage: [1, 1], widestBrushMm: 38, paintedShare: 0.57, studies: [{ leastMm2: 6, shapes: 12, washes: 2, strokes: 9 }], dryings: 1, handTravel: { jumps: 1, medianMm: 89.4, worstMm: 89.4, worstIn: 'under-wash of study shape 3' } });
 });
 
 test('the table marks a wide brush in a face and a wash that lays nothing, and the numbers say both ways', () => {

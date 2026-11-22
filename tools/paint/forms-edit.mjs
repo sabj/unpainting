@@ -40,7 +40,6 @@ export function checkFormsEdit(edit, forms, sheet) {
   if (!edit || typeof edit !== 'object' || Array.isArray(edit)) throw new Error(`${at}: one JSON object, {"format": "${FORMS_EDIT_FORMAT}", "edits": [...]}`);
   if (edit.format !== FORMS_EDIT_FORMAT) throw new Error(`${at}: "format" is "${FORMS_EDIT_FORMAT}"`);
   if (!Array.isArray(edit.edits) || !edit.edits.length) throw new Error(`${at}: "edits" lists what to change, in order; with none, leave "forms" out of choice.json`);
-  if (edit.edits.length > 60) throw new Error(`${at}: at most 60 edits`);
   const names = new Set(forms.map(f => f.name)), out = [];
   const has = (n, who) => { if (typeof n !== 'string' || !names.has(n)) throw new Error(`${who}: there is no form "${n}" (the forms now: ${[...names].join(', ') || 'none'})`); return n; };
   const fresh = (n, who, but = []) => { if (typeof n !== 'string' || !NAME.test(n)) throw new Error(`${who}: a form's name is plain words, up to 40 letters`); if (names.has(n) && !but.includes(n)) throw new Error(`${who}: there is already a form "${n}"`); return n; };

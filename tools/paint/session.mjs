@@ -1,11 +1,16 @@
 // A model author as a working session, not one reply. The model gets a folder of its own outside the repository (the
 // locked inputs, the code planner's plan of the subject, the planner's settings, a README of its tools), a shell in
-// that folder, and a budget of its own minutes. It may plan as often as it likes; LOOKING is counted and capped
-// (bench/v4v5/README.md: looks are stepping back, not search). A look is a real painting of its present choice: the
-// painter run small on the GPU through drying (look.mjs), shown as the dried sheet beside the source and the middle
-// study, with the stages of the painting and each named form measured on the dried sheet. What it leaves in
-// choice.json is painted (choice.mjs): the code planner tuned, its plan edited, or its own script; nothing changed
-// is exactly the code planner.
+// that folder, and the benchmark's resource budget for one try: a number of looks and of minutes on the wall clock,
+// the same for every model and told at the start. Nothing else caps its work: what it uses is measured (usage.mjs).
+// A look is a real painting of its present choice: the painter run small on the GPU through drying (look.mjs), shown
+// as the dried sheet beside the source and the middle study, with the stages of the painting and each named form
+// measured on the dried sheet. What it leaves in choice.json is painted (choice.mjs): the code planner tuned, its
+// plan edited, or its own script; nothing changed is exactly the code planner.
+//
+// What is refused: a file that cannot be read, a request the painter cannot lay (too many paints, a brush not in the
+// kit), anything that reaches outside the folder or measures against the subject, and going back to an earlier
+// choice more often than allowed (reverts.mjs). A choice that may spoil the painting is laid as written and the
+// answer lists it as a warning: a model's mistake reaches the sheet as a mistake.
 //
 // The model's commands are request files this module answers (./unpaint plan|look|status|wait): the planner itself
 // runs here, outside the model's folder. The boundary: the folder holds the input pictures the code planner gets and
@@ -24,11 +29,18 @@ import { readChoice, choiceKind, choiceKey } from './choice.mjs';
 import { needsOf } from './author.mjs';
 import { editLine } from '../../src/paint/methods/plan-edit.mjs';
 import { tinyTouchWarning } from './plan-data.mjs';
+import { revertCounter, DEFAULT_REVERTS } from './reverts.mjs';
+import { readSeen, seenAsk } from './seen.mjs';
 
-/** Looks (each a small real painting of the present choice), and minutes of the model's own time, when the command line names neither. */
-export const DEFAULT_LOOKS = 0, DEFAULT_MINUTES = 85;
-/** Looks in the hard mode of bench/docs/anti-cheat.md (--looks 100); the default, 0, is gentle mode: no limit, every look recorded. */
-export const HARD_LOOKS = 100;
+/**
+ * The benchmark's resource budget for one try (one model, one subject, one level), when the command line names none:
+ * looks (each a small real painting of the present choice) and minutes on the wall clock, looks and planning included.
+ * It is set by whoever runs the benchmark, told to the model at the start, and is not a judgment of the work: a
+ * session that reaches it is asked to hand in what it has and the run says so. Nothing else caps a session.
+ */
+export const DEFAULT_LOOKS = 100, DEFAULT_WALL_MINUTES = 60;
+/** Minutes a session has to hand in once the wall-clock budget is reached, before its command is ended. */
+export const DEFAULT_GRACE_MINUTES = 10;
 /** Seconds ./unpaint waits before it says "still working". */
 const WAIT_SECONDS = 50;
 
@@ -92,22 +104,23 @@ const fill = (text, v) => Object.entries(v).reduce((t, [k, x]) => t.replaceAll(k
  * `settings` settingsList(); `forms` [{id, name, kind, boxMm}] with `formsIds` the id map's file, or null.
  * Returns {prompt, files}. Nothing of this machine's paths goes into any file of the folder.
  */
-export function writeSession({ dir, packet, sheet, medium, auto, settings, forms = null, formsIds = null, looks, minutes, briefFile, readmeFile, previous = null, drawing = null }) {
+export function writeSession({ dir, packet, sheet, medium, auto, settings, forms = null, formsIds = null, looks, wallMinutes, graceMinutes = DEFAULT_GRACE_MINUTES, reverts = DEFAULT_REVERTS, briefFile, readmeFile, handed = [], drawing = null }) {
   const mk = d => fs.mkdirSync(path.join(dir, d), { recursive: true });
   for (const d of ['auto', 'plans', 'looks', '.requests']) mk(d);
   const put = (f, text) => fs.writeFileSync(path.join(dir, f), text);
-  const ink = /^ink/.test(medium), v = { SHEET_W: sheet.widthMm, SHEET_H: sheet.heightMm, MINUTES: minutes,
-    LOOKS_LINE: looks > 0 ? `You have ${looks} looks. Each is counted before it is shown and kept on record.` : 'Look as often as you like, as a painter steps back. Each look paints your plan for real. Every look is recorded (when, of what, and what you changed after it); there is no limit on them.',
-    LOOKS_LIMIT: looks > 0 ? `${looks} looks; each is counted before it is shown` : 'no limit; every look is recorded',
-    DRAWING_NOTE: ink ? 'The drawing (waterproof ink) is already on the sheet and carries the form; the washes go over it.' : 'The drawing (light pencil) is already on the sheet and only places the forms; the paint must carry form, value and edge.',
+  const ink = /^ink/.test(medium), v = { SHEET_W: sheet.widthMm, SHEET_H: sheet.heightMm, WALL_MINUTES: wallMinutes, GRACE_MINUTES: graceMinutes, LOOKS_MOST: looks, REVERTS_MOST: reverts,
+    DRAWING_NOTE: ink ? 'As prepared, the drawing is waterproof ink laid before the washes; it carries the form and the washes go over it.' : 'As prepared, the drawing is light pencil laid before the washes; it only places the forms, and the paint carries form, value and edge.',
     INPUT_LIST: packet.files.map(f => `- \`${f}\`: ${f.includes('source') ? 'the SUBJECT, the picture to paint' : f.includes('drawing') ? 'the opening DRAWING, already on the sheet before any wash' : f.includes('forms') ? 'the NAMED FORMS, each one flat colour' : `block-in STUDY ${/study-(\d)/.exec(f)?.[1]}: the subject simplified to flat shapes (1 the broad shapes, 2 the middle study, 3 details and accents); the code planner reads its washes from these`}`).join('\n') };
   let prompt = fill(fs.readFileSync(briefFile, 'utf8'), v);
-  // a later try of the same model on the same subject: its own previous painting and a teacher's words on it, never a number
-  if (previous) {
-    mk('previous');
-    for (const f of previous.files) { const to = path.join(dir, 'previous', f.name); fs.mkdirSync(path.dirname(to), { recursive: true }); fs.copyFileSync(f.from, to); }
-    prompt += `\n## This is try ${previous.tryNumber} of ${previous.tries}\n\nYou have painted this subject before. \`previous/\` holds your own last try: ${previous.files.map(f => `\`previous/${f.name}\` (${f.what})`).join(', ')}. Open them first. The painting there is the real sheet as it dried at full size; the teacher's words are a watercolour teacher's faults with it, in plain sentences. Keep what worked, put right what the teacher faults and what you see yourself, and hand over a better painting. You may start from what you handed over last time (copy it out of \`previous/\`) or start again.\n`;
+  // what the session is handed beside the subject's inputs (a later try: its own previous try; level 4: the automatic
+  // painter's painting): each a folder of plain files and a paragraph of the task; never a number
+  const pictures = [];
+  for (const h of handed) {
+    mk(h.folder);
+    for (const f of h.files) { const to = path.join(dir, h.folder, f.name); fs.mkdirSync(path.dirname(to), { recursive: true }); fs.copyFileSync(f.from, to); if (f.picture) pictures.push(`${h.folder}/${f.name}`); }
+    prompt += `\n## ${h.title}\n\n${h.words}\n\n${h.files.map(f => `- \`${h.folder}/${f.name}\`: ${f.what}`).join('\n')}\n`;
   }
+  if (pictures.length) prompt += `\n${seenAsk(pictures)}\n`;
   put('TASK.md', prompt); put('README.md', fill(fs.readFileSync(readmeFile, 'utf8'), v));
   put('own-script-brief.md', packet.brief);
   put('choice.json', JSON.stringify({ kind: 'settings', settings: {}, why: '' }, null, 1) + '\n');
@@ -121,7 +134,7 @@ export function writeSession({ dir, packet, sheet, medium, auto, settings, forms
   for (const f of ['TASK.md', 'README.md', 'own-script-brief.md', 'auto/settings.json', 'auto/plan.json', 'auto/plan-to-edit.json', 'auto/washes.txt', 'inputs/forms.json', 'drawing/lines.json']) {
     if (fs.existsSync(path.join(dir, f)) && leak.some(w => fs.readFileSync(path.join(dir, f), 'utf8').includes(w))) throw new Error(`session: ${f} would carry a path or name of this machine; the session is not started`);
   }
-  return { prompt };
+  return { prompt, pictures };
 }
 
 /** The looks already written in a run's ledger (one JSON line a look). The ledger lies outside the model's folder. */
@@ -142,19 +155,38 @@ export function ledgerLooks(ledger) {
  * to the folder is still spent, and a server started again for the same run goes on from the count already there.
  * `keep`: a folder outside the model's folder where each look is kept as it was shown (keep/N/: the choice and its
  * script or edited plan as looked at, the dried sheet, the stages, the numbers). The time a request waits on this
- * side (the planner, a look's painting) is not the model's own. start() begins polling; stop() ends it and returns
- * the record.
+ * side (the planner, a look's painting) is not the model's own, and is measured apart. start() begins polling; stop()
+ * ends it and returns the record.
+ * The budget (`looks`, `wallMinutes`, `graceMinutes`) is the benchmark's, for its machines, the same for every model:
+ * the wall clock runs from begin(), looks and planning included. When the looks are used a look is not painted; when
+ * the minutes are used no look is painted, a plan still is (so the hand-in can be checked), and every answer asks the
+ * session to hand in; `graceMinutes` later over() is true and the command is ended. Nothing else stops a session.
+ * `reverts`: returns to an earlier choice allowed (reverts.mjs); `startKey`: the fingerprint of the choice the session
+ * starts from. `pictures`: handed pictures that each need a line in seen.md before the first plan (seen.mjs).
  */
-export function sessionServer({ dir, looks: asked, minutes, compile, look: paintLook, keep = null, checkScript, checkPlan = null, checkTools = null, ledger, now = Date.now, everyMs = 400 }) {
-  // no limit on looks (gentle mode) when the number asked is 0 or not given
-  const most = asked > 0 ? asked : Infinity, ofMost = most === Infinity ? '' : ` of ${most}`;
-  const plans = [], cache = new Map(), painted = new Map(), requests = [], good = new Set(), seen = new Map();
-  let t0 = now(), waitMs = 0, busy = false, timer = null, lastGood = null, n = 0, pending = null, lastEnd = t0;
+export function sessionServer({ dir, looks: most = DEFAULT_LOOKS, wallMinutes = DEFAULT_WALL_MINUTES, graceMinutes = DEFAULT_GRACE_MINUTES, reverts: revertsMost = DEFAULT_REVERTS, startKey = null, pictures = [], compile, look: paintLook, keep = null, checkScript, checkPlan = null, checkTools = null, ledger, now = Date.now, everyMs = 400 }) {
+  if (!(most >= 1) || !(wallMinutes > 0)) throw new Error('session: the budget is a number of looks (1 or more) and of wall minutes');
+  const ofMost = ` of ${most}`;
+  const plans = [], cache = new Map(), painted = new Map(), requests = [], good = new Set(), seen = new Map(), reverts = revertCounter(revertsMost, startKey);
+  let t0 = now(), waitMs = 0, busy = false, timer = null, lastGood = null, n = 0, pending = null, lastEnd = t0, reached = null, warningsGiven = 0, described = null;
   const note = entry => { const fd = fs.openSync(ledger, 'a'); try { fs.writeSync(fd, JSON.stringify(entry) + '\n'); fs.fsyncSync(fd); } finally { fs.closeSync(fd); } };
   const used = () => ledgerLooks(ledger).length;
   // the model's own time: the clock less every stretch a request of its was waiting on this side (a stretch counted once)
   const ownSeconds = () => Math.round((now() - t0 - waitMs - (pending == null ? 0 : now() - pending)) / 1000);
-  const left = () => { const u = used(); return `Time: ${Math.round(ownSeconds() / 60)} of ${minutes} minutes of your own time used. Looks: ${most === Infinity ? `${u} taken (no limit; each is recorded)` : `${u} of ${most} used, ${Math.max(0, most - u)} left`}. Plans made: ${plans.length}.`; };
+  const wallSeconds = () => Math.round((now() - t0) / 1000), wallUp = () => wallSeconds() >= wallMinutes * 60;
+  // the budget is reached once, by whichever comes first; it is recorded with when, and said in every answer after
+  const reach = what => { if (!reached) { reached = { what, atWallMinutes: +(wallSeconds() / 60).toFixed(1), looks: used() }; note({ budgetReached: reached }); } };
+  const HAND_IN = 'Hand in what you have now: leave choice.json as your final choice (./unpaint plan still checks that it compiles), write your last message, and stop.';
+  const left = () => { const u = used(), r = reverts.record(); if (wallUp()) reach(`${wallMinutes} minutes of wall time`);
+    return `Budget of this try (the benchmark's, the same for every model): ${Math.round(wallSeconds() / 60)} of ${wallMinutes} minutes used on the clock (looks and planning included; ${Math.round(ownSeconds() / 60)} of them your own work), ${u} of ${most} looks, ${r.count} of ${r.allowed} returns to an earlier choice. Plans made: ${plans.length}.${reached ? `\nTHE BENCHMARK'S RESOURCE BUDGET IS REACHED (${reached.what}). ${HAND_IN}${/wall/.test(reached.what) ? ` The session is ended ${graceMinutes} minutes after the budget was reached.` : ''}` : ''}`; };
+  /** The handed pictures each described in seen.md, or the words that ask for it. */
+  const seenFault = () => {
+    if (!pictures.length || described?.ok) return null;
+    let text = null; try { text = safeRead(dir, 'seen.md'); } catch { /* not written yet */ }
+    described = readSeen(text, pictures);
+    return described.ok ? null : `REFUSED, nothing was planned: ${described.missing.length} of the pictures you were handed have no line in seen.md yet (${described.missing.join(', ')}). ${seenAsk(pictures)}`;
+  };
+  const warned = list => { if (!list?.length) return ''; warningsGiven += list.length; return `\nWARNINGS (${list.length}; each is laid as you wrote it, and is yours to heed or ignore):\n${list.slice(0, 80).map(x => `- ${x}`).join('\n')}\n`; };
 
   /** The folder's present choice, checked: {choice, script, scriptText, key}. Throws with the reason. */
   function present() {
@@ -170,20 +202,30 @@ export function sessionServer({ dir, looks: asked, minutes, compile, look: paint
       const t = choice.tools; if (t.lines) t.linesEdit = safeJson(dir, t.lines).value; if (t.forms) t.formsEdit = safeJson(dir, t.forms).value;
       tools = checkTools(t);
     }
-    return { choice, script, edit, text, tools, key: choiceKey(choice, text) };
+    // what the choice was warned of: its own form (choice.mjs), and its tools (session-tools.mjs)
+    const warnings = [...(choice.warnings ?? []), ...(tools?.warnings ?? [])];
+    const drawn = choice.tools && (choice.tools.lines || choice.tools.medium) ? choice.sets.map(([k]) => k).filter(k => ['drawingorder', 'drawinglast', 'drawinglastmin', 'outlinemedium'].includes(k)) : [];
+    if (drawn.length) warnings.push(`your settings name ${drawn.join(', ')}, and your choice also names lines or a medium of your own: the drawing follows your lines and medium, and those settings are not used`);
+    return { choice, script, edit, text, tools, warnings, key: choiceKey(choice, text) };
   }
 
   async function answer(cmd) {
     if (cmd === 'status') return left();
-    if (cmd === 'look' && used() >= most) return `REFUSED: all ${most} looks are used. You may still revise once for what your last look showed, and run ./unpaint plan to check that it compiles.\n${left()}`;
+    if (wallUp()) reach(`${wallMinutes} minutes of wall time`);
+    if (cmd === 'look' && used() >= most) reach(`${most} looks`);
+    if (cmd === 'look' && reached) return `NOT PAINTED, no look was counted: the benchmark's resource budget for this try is reached (${reached.what}). This is the benchmark's limit on its machines, not a judgment of your work.\n${left()}`;
+    const unseen = seenFault(); if (unseen) return unseen;
     let p; try { p = present(); } catch (e) { return `REFUSED, nothing was planned${cmd === 'look' ? ' and no look was counted' : ''}: ${e.message}`; }
-    const id = ++n, what = choiceKind(p.choice), atSeconds = ownSeconds();
+    // a return to a choice the session had left is counted; past the allowed number it is refused (reverts.mjs)
+    const back = reverts.see(p.key, ownSeconds());
+    if (back.refused) return `REFUSED, nothing was planned${cmd === 'look' ? ' and no look was counted' : ''}: this choice is one you planned before and then left, and you have gone back to an earlier choice ${back.count} times, the most this benchmark allows (${revertsMost}). Going back again and again to keep only what a look liked is the one thing a session may not do. Go on from your present work: change it, do not undo it.\n${left()}`;
+    const id = ++n, what = choiceKind(p.choice), atSeconds = ownSeconds(), t1 = now();
     let got = cache.get(p.key);
     if (!got) { try { got = await compile(p.choice, p.script, id, p.edit?.edit ?? null); } catch (e) { got = { ok: false, error: e.message }; } cache.set(p.key, got); }
-    const entry = { n: id, atSeconds, what, kind: p.choice.kind, settings: Object.fromEntries(p.choice.sets), script: p.choice.script, plan: p.choice.plan ?? null, edit: p.edit?.record ?? null, tools: p.tools?.record ?? null, why: p.choice.why, key: p.key, ok: got.ok, error: got.ok ? null : got.error, washes: got.summary?.washes ?? null, strokes: got.summary?.strokes ?? null, look: null };
+    const entry = { n: id, atSeconds, atWallSeconds: wallSeconds(), seconds: got.seconds ?? Math.round((now() - t1) / 1000), revert: back.revert, what, kind: p.choice.kind, settings: Object.fromEntries(p.choice.sets), script: p.choice.script, plan: p.choice.plan ?? null, edit: p.edit?.record ?? null, tools: p.tools?.record ?? null, why: p.choice.why, key: p.key, ok: got.ok, error: got.ok ? null : got.error, washes: got.summary?.washes ?? null, strokes: got.summary?.strokes ?? null, look: null };
     plans.push(entry);
     if (!got.ok) return `REFUSED by the planner${cmd === 'look' ? ', no look was counted' : ''}: ${got.error}`;
-    good.add(p.key); lastGood = { choice: p.choice, script: p.script, edit: p.edit, tools: p.tools, key: p.key, plan: id };
+    good.add(p.key); lastGood = { choice: p.choice, script: p.script, edit: p.edit, tools: p.tools, warnings: p.warnings, key: p.key, plan: id };
     // what the choice's tools made of the given drawing and forms, as pictures and data of the author's own (mine/)
     for (const f of got.toolFiles ?? []) safeWrite(dir, f.rel, f.data);
     const s = got.summary, line = `${s.passages != null ? `${s.passages} passages, ` : s.shapes != null ? `${s.shapes} shapes, ` : ''}${s.washes} washes, ${s.strokes ?? '?'} strokes, widest wash brush ${s.widestBrushMm ?? '?'} mm${s.washesByStage ? `, washes by stage ${s.washesByStage.join('/')}` : ''}`;
@@ -191,7 +233,8 @@ export function sessionServer({ dir, looks: asked, minutes, compile, look: paint
     // (the painter's own count of the edit when it applied one: it holds the notes of what was laid the nearest way)
     const er = got.editRecord ?? p.edit?.record ?? null; if (er) entry.edit = er;
     const editSaid = er ? ` Your edit: ${editLine(er)}.${er.notes.length ? `\n${er.notes.length} note${er.notes.length > 1 ? 's' : ''} on it (each was laid the nearest way that can be; change it if that is not what you want):\n${er.notes.slice(0, 60).map(x => `- ${x}`).join('\n')}\n` : ''}` : '';
-    const edited = `${editSaid}${p.tools ? ` ${p.tools.said}${got.toolFiles?.length ? ` See ${got.toolFiles.map(f => f.rel).join(', ')}.` : ''}` : ''}`;
+    entry.warnings = p.warnings.length ? p.warnings : undefined;
+    const edited = `${editSaid}${p.tools ? ` ${p.tools.said}${got.toolFiles?.length ? ` See ${got.toolFiles.map(f => f.rel).join(', ')}.` : ''}` : ''}${warned(p.warnings)}${back.revert ? `\nThis is a return to a choice you had left: ${back.count} of ${revertsMost} allowed.` : ''}`;
     // ... and of the strokes too small for a wet bed, before anything is painted (plan-data.mjs tinyTouchWarning)
     const tiny = tinyTouchWarning(s);
     if (cmd === 'plan') return `It compiles (${what}): ${line}.${travelLine(s.handTravel)}${edited}${tiny} Nothing else is shown without a look.\n${left()}`;
@@ -205,7 +248,7 @@ export function sessionServer({ dir, looks: asked, minutes, compile, look: paint
     // the look is spent before it is delivered: whatever happens to the delivery, it stays spent
     note({ look, plan: id, atSeconds, at: new Date(now()).toISOString(), what, kind: p.choice.kind, settings: entry.settings, script: p.choice.script, plan: p.choice.plan ?? null, edit: er, tools: p.tools?.record ?? null, key: p.key, marked: seenIt.marked ?? null, painted: seenIt.painted ?? null });
     entry.look = look;
-    const folder = `looks/${look}`, t = p.choice.tools, choiceText = JSON.stringify({ kind: p.choice.kind, settings: entry.settings, script: p.choice.script, plan: p.choice.plan ?? null, ...(t ? { lines: t.lines ?? undefined, forms: t.forms ?? undefined, perForm: t.perFormGiven ?? undefined } : {}), why: p.choice.why }, null, 1) + '\n';
+    const folder = `looks/${look}`, t = p.choice.tools, choiceText = JSON.stringify({ kind: p.choice.kind, settings: entry.settings, script: p.choice.script, plan: p.choice.plan ?? null, ...(t ? { lines: t.lines ?? undefined, forms: t.forms ?? undefined, perForm: t.perFormGiven ?? undefined, medium: t.medium ?? undefined } : {}), why: p.choice.why }, null, 1) + '\n';
     // kept outside the folder as it was shown, with the choice as it was looked at: what changed between looks is read from here
     if (keep) {
       try {
@@ -243,11 +286,17 @@ export function sessionServer({ dir, looks: asked, minutes, compile, look: paint
   }
 
   return {
-    start() { timer = setInterval(() => { tick().catch(() => {}); }, everyMs); }, tick, ownSeconds, present, looksTaken: used,
-    /** The model's command starts now: its own time is counted from here (not from when this side was made ready). */
-    begin() { t0 = now(); waitMs = 0; lastEnd = Math.max(lastEnd, t0); },
-    over: () => ownSeconds() >= minutes * 60,
-    async stop() { if (timer) clearInterval(timer); while (busy) await new Promise(r => setTimeout(r, 50)); return { looks: ledgerLooks(ledger), plans, requests, ownSeconds: ownSeconds(), waitSeconds: Math.round(waitMs / 1000), lastGood, good }; },
+    start() { timer = setInterval(() => { tick().catch(() => {}); }, everyMs); }, tick, ownSeconds, wallSeconds, present, looksTaken: used,
+    /** The model's command starts now: the clock runs from here (not from when this side was made ready). */
+    begin() { t0 = now(); waitMs = 0; lastEnd = Math.max(lastEnd, t0); reached = null; },
+    /** The wall-clock budget and the minutes to hand in are both used: the command is ended. */
+    over: () => { if (wallUp()) reach(`${wallMinutes} minutes of wall time`); return wallSeconds() >= (wallMinutes + graceMinutes) * 60; },
+    /** Whether handing over this choice would be a return to an earlier choice past the allowed number. */
+    barred: key => reverts.barred(key),
+    async stop() { if (timer) clearInterval(timer); while (busy) await new Promise(r => setTimeout(r, 50));
+      // the pictures as described when the session ended (a session that never planned is read here)
+      if (pictures.length && !described?.ok) { let text = null; try { text = safeRead(dir, 'seen.md'); } catch { /* none */ } described = readSeen(text, pictures); }
+      return { looks: ledgerLooks(ledger), plans, requests, ownSeconds: ownSeconds(), wallSeconds: wallSeconds(), waitSeconds: Math.round(waitMs / 1000), lastGood, good, budgetReached: reached, reverts: reverts.record(), warningsGiven, pictures: pictures.length ? { handed: pictures, said: described.said, missing: described.missing } : null }; },
   };
 }
 
@@ -255,17 +304,20 @@ export function sessionServer({ dir, looks: asked, minutes, compile, look: paint
  * What is painted when the session has ended: the folder's choice when it is sound and the planner compiled it in
  * this session (`good` holds the keys of the choices that did; a choice that changes nothing is the code planner's
  * plan, which compiled before the session began); else the last choice that compiled, with the reason; else nothing
- * (a failed run). `ended` is 'done' or 'time limit'.
+ * (a failed run). `ended` is 'done' or 'budget reached'. `barred(key)`: the hand-in would be a return past the allowed number.
  * {choice, script, submitted: {kind, what, settings, script, why, from, note}} or {failure}.
  */
-export function finalChoice({ present, lastGood, good = new Set(), ended }) {
+export function finalChoice({ present, lastGood, good = new Set(), ended, barred = () => false }) {
   const say = (c, from, note) => ({ kind: c.choice.kind, what: choiceKind(c.choice), settings: Object.fromEntries(c.choice.sets), script: c.choice.script, plan: c.choice.plan ?? null, edit: c.edit?.record ?? null,
-    ...(c.choice.tools ? { tools: { lines: c.choice.tools.lines, forms: c.choice.tools.forms, perForm: c.choice.tools.perFormGiven, record: c.tools?.record ?? null } } : {}), why: c.choice.why, from, note });
-  const cut = ended === 'done' ? null : 'the session ran out of time';
+    ...(c.choice.tools ? { tools: { lines: c.choice.tools.lines, forms: c.choice.tools.forms, perForm: c.choice.tools.perFormGiven, ...(c.choice.tools.medium ? { medium: c.choice.tools.medium } : {}), record: c.tools?.record ?? null } } : {}), ...(c.warnings?.length ? { warnings: c.warnings } : {}), why: c.choice.why, from, note });
+  const cut = ended === 'done' ? null : 'the session reached the benchmark\'s resource budget and was ended';
   let p = null, why = null;
   try { p = present(); } catch (e) { why = e.message; }
+  // the one hard rule: a hand-in that goes back to an earlier choice past the allowed number is not taken
+  if (p && barred(p.key)) { why = 'it goes back to an earlier choice, and the session had already gone back as often as this benchmark allows'; p = null; }
   if (p && (good.has(p.key) || (p.choice.kind === 'settings' && !p.choice.sets.length && !p.choice.tools))) return { choice: p.choice, script: p.script, edit: p.edit?.edit ?? null, submitted: say(p, 'choice.json as the session left it', cut) };
   if (p) why = 'it was never planned, so it is not known to compile';
+  else if (!why) why = 'it could not be read';
   if (lastGood) return { choice: lastGood.choice, script: lastGood.script, edit: lastGood.edit?.edit ?? null, submitted: say(lastGood, `the last choice that compiled (plan ${lastGood.plan})`, `the final choice.json was not taken: ${why}${cut ? `; ${cut}` : ''}`) };
   return { failure: `the session's final choice.json was not taken and no earlier choice had compiled: ${why}` };
 }
@@ -330,12 +382,13 @@ export function sessionCall(author, { prompt, cwd, deny = [], images = [], home 
 const kindOfCommand = c => { const m = /(?:^|[\s;&|/])unpaint\s+(status|plan|look|wait)\b/.exec(c); return m ? `unpaint ${m[1]}` : 'shell'; };
 
 /**
- * A session's transcript read: {text (its last message), tokens, costUSD, calls: {kind: count}, commands: [shell
+ * A session's transcript read: {text (its last message), tokens, tokensIn, tokensOut (null where the command does not
+ * report them apart), costUSD (the command's own report, or null), calls: {kind: count}, commands: [shell
  * commands in order]}. claude: stream-json lines; codex: --json lines; agy: stream-json lines (a step_update for each
  * step as it starts and ends, the tool's parameters in it, and one result).
  */
 export function readTranscript(cli, out) {
-  const calls = {}, commands = []; let text = '', tokens = null, costUSD = null;
+  const calls = {}, commands = []; let text = '', tokens = null, costUSD = null, tokensIn = null, tokensOut = null;
   const count = k => { calls[k] = (calls[k] ?? 0) + 1; };
   const steps = new Set(), said = new Map();
   for (const l of out.split('\n')) {
@@ -360,7 +413,9 @@ export function readTranscript(cli, out) {
         if (b.name === 'Bash') { const c = String(b.input?.command ?? ''); commands.push(c); count(kindOfCommand(c)); }
         else { count(b.name === 'Read' ? 'read file' : ['Write', 'Edit'].includes(b.name) ? 'write file' : b.name); const f = b.input?.file_path ?? b.input?.path; if (f) commands.push(`${b.name} ${f}`); }
       }
-      if (d.type === 'result') { const u = d.usage ?? {}; if (d.result) text = String(d.result); tokens = ['input_tokens', 'cache_creation_input_tokens', 'cache_read_input_tokens', 'output_tokens'].reduce((a, k) => a + (u[k] || 0), 0) || null; costUSD = d.total_cost_usd ?? null; }
+      if (d.type === 'result') { const u = d.usage ?? {}; if (d.result) text = String(d.result); const tin = ['input_tokens', 'cache_creation_input_tokens', 'cache_read_input_tokens'].reduce((a, k) => a + (u[k] || 0), 0);
+        // several turns of one session (a command run again in the same folder) are one cost: their results add up
+        tokensIn = (tokensIn ?? 0) + tin; tokensOut = (tokensOut ?? 0) + (u.output_tokens || 0); tokens = (tokens ?? 0) + tin + (u.output_tokens || 0); if (d.total_cost_usd != null) costUSD = (costUSD ?? 0) + d.total_cost_usd; }
     } else {
       if (d.type === 'item.completed' && d.item) {
         const it = d.item;
@@ -369,11 +424,11 @@ export function readTranscript(cli, out) {
         else if (it.type === 'file_change') count('write file');
         else if (it.type !== 'reasoning' && it.type !== 'agent_message') count(it.type);
       }
-      if (d.type === 'turn.completed' && d.usage) tokens = (tokens ?? 0) + (d.usage.input_tokens || 0) + (d.usage.output_tokens || 0);
+      if (d.type === 'turn.completed' && d.usage) { tokensIn = (tokensIn ?? 0) + (d.usage.input_tokens || 0); tokensOut = (tokensOut ?? 0) + (d.usage.output_tokens || 0); tokens = tokensIn + tokensOut; }
     }
   }
   if (cli === 'agy' && !text && said.size) text = [...said].sort((a, b) => a[0] - b[0]).at(-1)[1];
-  return { text, tokens, costUSD, calls, commands };
+  return { text, tokens: tokens || null, tokensIn: tokensIn || null, tokensOut: tokensOut || null, costUSD, calls, commands };
 }
 
 /**
@@ -397,24 +452,24 @@ export function ownFolderOf(commands) {
 /** Pictures in the session's folder that the harness did not put there (a plan drawn by other means would be one). */
 const HARNESS_PICTURES = new Set(['mine/drawing.png', 'mine/forms.png', 'mine/forms-ids.png']);
 export function ownPictures(dir) {
-  const out = [], walk = d => { for (const e of fs.readdirSync(d, { withFileTypes: true })) { const f = path.join(d, e.name), rel = path.relative(dir, f); if (e.isDirectory()) { if (!['inputs', 'auto', 'looks', 'drawing', '.requests'].includes(rel)) walk(f); } else if (/\.(png|jpe?g|gif|webp|bmp|tiff?|svg|ppm|pgm|pdf|html?)$/i.test(e.name) && !HARNESS_PICTURES.has(rel)) out.push(rel); } };
+  const out = [], walk = d => { for (const e of fs.readdirSync(d, { withFileTypes: true })) { const f = path.join(d, e.name), rel = path.relative(dir, f); if (e.isDirectory()) { if (!['inputs', 'auto', 'looks', 'drawing', 'previous', 'auto-painting', '.requests'].includes(rel)) walk(f); } else if (/\.(png|jpe?g|gif|webp|bmp|tiff?|svg|ppm|pgm|pdf|html?)$/i.test(e.name) && !HARNESS_PICTURES.has(rel)) out.push(rel); } };
   walk(dir); return out.sort();
 }
 
 /**
- * Run the session's command until it ends or `over()` says its own time is up; then it and every process it started
+ * Run the session's command until it ends or `over()` says the benchmark's budget and the minutes to hand in are used; then it and every process it started
  * are ended (SIGTERM, and SIGKILL to the group after `graceMs`). Its output goes to outFile/errFile.
- * Resolves {exit, ended: 'done' | 'time limit' | 'not started', error}.
+ * Resolves {exit, ended: 'done' | 'budget reached' | 'not started', error}.
  */
-export function runSession(call, { cwd, outFile, errFile, over, env = cleanEnv(), everyMs = 5000, wallMinutes = 180, graceMs = 10000 }) {
+export function runSession(call, { cwd, outFile, errFile, over, env = cleanEnv(), everyMs = 5000, graceMs = 10000 }) {
   return new Promise(resolve => {
     const mine = { ...env, ...call.env }; for (const k of call.unset ?? []) delete mine[k];
     let closed = false; const out = fs.openSync(outFile, 'w'), err = fs.openSync(errFile, 'w'), close = () => { if (closed) return; closed = true; fs.closeSync(out); fs.closeSync(err); };
-    let child, cut = false, killer = null; const t0 = Date.now();
+    let child, cut = false, killer = null;
     try { child = spawn(call.cmd, call.args, { cwd, env: mine, stdio: ['ignore', out, err], detached: true }); } catch (e) { close(); resolve({ exit: null, ended: 'not started', error: e.message }); return; }
     const group = sig => { try { process.kill(-child.pid, sig); } catch { try { child.kill(sig); } catch { /* gone */ } } };
-    const timer = setInterval(() => { if (!cut && (over() || Date.now() - t0 > wallMinutes * 60000)) { cut = true; group('SIGTERM'); killer = setTimeout(() => group('SIGKILL'), graceMs); } }, everyMs);
+    const timer = setInterval(() => { if (!cut && over()) { cut = true; group('SIGTERM'); killer = setTimeout(() => group('SIGKILL'), graceMs); } }, everyMs);
     child.on('error', e => { clearInterval(timer); close(); resolve({ exit: null, ended: 'not started', error: `${e.code === 'ENOENT' ? `\`${call.cmd}\` is not installed or not on PATH` : e.message} (needs ${needsOf(call.cmd)})` }); });
-    child.on('close', code => { clearInterval(timer); if (killer) clearTimeout(killer); group('SIGKILL'); close(); resolve({ exit: code, ended: cut ? 'time limit' : 'done', error: !cut && code !== 0 ? `the model's command ended with exit ${code}` : null }); });
+    child.on('close', code => { clearInterval(timer); if (killer) clearTimeout(killer); group('SIGKILL'); close(); resolve({ exit: code, ended: cut ? 'budget reached' : 'done', error: !cut && code !== 0 ? `the model's command ended with exit ${code}` : null }); });
   });
 }

@@ -3,13 +3,18 @@
 You are a master watercolour painter and teacher. You will PLAN the painting of the subject in the pictures given, the
 way the project's painting-planner skill asks (its text is at the end of this brief), and THEN write the passage script
 that carries the plan out. A simulated painter lays your script on a simulated sheet of cold-press paper: real water,
-real pigment, a real brush with a loaded belly and a point, drying in real time. The replay is watched. It must look
-like a person painting in watercolour, broad to fine and light to dark, and the finished sheet must look like that
-person's work: connected, soft where the form is soft, with darks laid late.
+real pigment, a real brush with a loaded belly and a point, drying in real time. The replay is watched. The aim is a
+sheet that reads as a person's watercolour of this subject.
 
-Earlier scripts written from the first version of this brief had strokes that followed the form well, but they were
-crude, they laid a hard dark shape per feature instead of one wash per form, and they
-ignored the brush guidance (a 38 mm mop across a cat's face). This brief exists to correct exactly that.
+**The painting is yours.** What follows about method is advice from painters and from earlier sheets, not rules: none
+of it is checked, and you may set any of it aside. A script is refused only when it cannot be read or the painter
+cannot lay it (a paint that is not in the box, more paints than the sheet holds, a brush that is not in the kit, a
+passage with no shape). Everything else is laid as you write it. You are allowed to make mistakes: a mistake reaches
+the sheet as a mistake, and you see it in a look.
+
+What earlier scripts showed, for what it is worth: strokes that followed the form well, but a hard dark shape for
+each feature where one wash for the form would have read better, and very wide brushes inside small forms (a 38 mm
+mop across a cat's face).
 
 ## What you are given
 
@@ -20,30 +25,32 @@ INPUT_LIST
 
 DRAWING_NOTE
 
-The studies run coarse to fine. They are your VALUE AND COLOUR REFERENCE: the finished sheet should be accurate to
-them, place by place. The first study
-gives the broad washes; the later ones the smaller shapes laid afterwards. Do not copy their flat hard shapes.
+The studies run coarse to fine. They are a value and colour reference you can trust place by place. The first study
+gives the broad washes; the later ones the smaller shapes laid afterwards. Their shapes are flat and hard because they
+are studies; a painting need not copy that.
 
 The named forms are a reviewed segmentation of the subject: each form is one flat colour in the forms picture, and the
-`FORMS` list at the end gives each form's name, kind and box in sheet millimetres. Plan and paint FORM BY FORM.
+`FORMS` list at the end gives each form's name, kind and box in sheet millimetres. Planning form by form is a good way in.
 
-These inputs are locked: you may not ask for other studies, masks or drawings. Open and look at every picture, and
-compare them place by place, before you write.
+The studies, the forms and the prepared drawing are what there is: other studies or masks cannot be asked for here.
+It helps to open every picture and compare them place by place before you write.
 
 ## The brushes
 
-The painter's kit today (name: belly width in mm at full pressure) is: KIT_LIST. Use these widths.
+The painter's kit today (name: belly width in mm at full pressure) is: KIT_LIST. These are the widths there are;
+a brush outside the kit cannot be laid. Which brush goes where is your choice. What painters usually do:
 
-- Sky, background, ground and water: large soft washes with the BIG brushes (the mop, the flat).
-- Inside a face, a figure, an animal, fur, hair or clothing: ROUNDS ONLY, and none wider than 17 mm. The base wash of
-  such a form is laid with the 17, 13 or 10 mm round (17 for a form wider than about 60 mm, 13 or 10 for a smaller
-  one); shapes dropped into it with the 10 or 7 mm; glazes with the 13, 10 or 7 mm; crisp marks with the 3 mm or the
-  rigger. NAME THE BRUSH on every passage, washes too: a wash with no brush is sized by the painter to a third of its
-  width, which puts the mop in a face.
+- Sky, background, ground and water: large soft washes with the big brushes (the mop, the flat).
+- Inside a face, a figure, an animal, fur, hair or clothing: rounds, seldom wider than 17 mm. A base wash with the 17,
+  13 or 10 mm round (17 for a form wider than about 60 mm); shapes dropped into it with the 10 or 7 mm; glazes with
+  the 13, 10 or 7 mm; crisp marks with the 3 mm or the rigger.
+- One thing the painter does for you unless you say otherwise: a wash that names no brush is given the kit's brush
+  nearest a third of its width, which can put the mop in a face. Name the brush if you care which it is.
 
-## How each named form is painted (the method you must plan and script)
+## One way to paint a named form (advice; yours to follow, change or ignore)
 
-For every soft named form (a face, fur, an animal, hair, a figure, clothing; and the sky or background as one form):
+For a soft named form (a face, fur, an animal, hair, a figure, clothing; and the sky or background as one form) a
+method that has worked:
 
 1. **One connected base wash over the whole form**, its lights reserved (they stay paper), hard only at the
    form's outer silhouette. Its swatch is the form's LIGHT value in the first study. One passage, `paper: "wet"`,
@@ -54,28 +61,30 @@ For every soft named form (a face, fur, an animal, hair, a figure, clothing; and
    cheek, the fall of hair or cloth).
 3. **After drying, feathered glazes** from the later studies, each smaller than the last
    (`wait: "dry"`, `edges: "lost"`), to bring the shadow side to the study's value.
-4. **Crisp marks only** in the eyes, nostrils, the mouth and the few darkest accents of the whole picture
+4. **Crisp marks** kept for the eyes, nostrils, the mouth and the few darkest accents of the whole picture
    (`paper: "dry"`, `edges: "found"`, the 3 mm round or the rigger, strokes placed point by point).
 
-Rules that hold everywhere:
+What holds physically, and what painters usually do:
 
 - **Each layer darkens what is under it**: write each swatch as that ONE layer on white paper, and check that the layers
   together reach the richest study's value at that spot.
-- **Stroke direction along the form**: `handling.direction` for a wash; for the darker shapes and glazes inside a
-  form prefer `kind: "strokes"` written point by point along the form, pressure swelling and lifting.
-- Sky and background: large soft washes (wet, lost), laid first or while a form dries; they stop at the
-  outer silhouette of a figure or animal and never cross a face. A cloud's lit top is reserved, never outlined.
-- Order over the whole sheet: (drawing, already done) then reserve the lights and lay the broad washes, then
-  mid-values and shadow glazes, then the selected darks. Darks are later than lights, always.
-- Boundaries: hard at the outer silhouette of a figure or animal against the background; soft or lost across
-  internal borders (cheek to hair, face to neck, muzzle to cheek). Never paper cut-outs.
-- Never: a hard dark shape per feature; a mix per little patch; outline-and-fill; rows, grids or even spacing;
-  thousands of specks; warm or dark blobs that belong to nothing.
+  (This one is physics: paint cannot lighten what is under it.)
+- **Stroke direction along the form** reads well: `handling.direction` for a wash; for the darker shapes and glazes
+  inside a form, `kind: "strokes"` written point by point along the form, pressure swelling and lifting.
+- Sky and background are usually large soft washes (wet, lost), laid first or while a form dries, stopping at the
+  outer silhouette of a figure or animal. A cloud's lit top is usually reserved as paper rather than outlined.
+- The usual order over the whole sheet: reserve the lights and lay the broad washes, then mid-values and shadow
+  glazes, then the selected darks. Light to dark is the common way because a dark cannot be taken back.
+- Boundaries usually read best hard at the outer silhouette of a figure or animal against the background, and soft
+  or lost across internal borders (cheek to hair, face to neck, muzzle to cheek).
+- What has tended to read badly on earlier sheets: a hard dark shape per feature; a mix per little patch;
+  outline-and-fill; rows, grids or even spacing; thousands of specks; warm or dark blobs that belong to nothing.
+  If you do one of these on purpose, that is your choice.
 
 ## What you write, in this order
 
 Answer with ONE JSON object and nothing else (no words before or after it, no code fence). Its keys come in this
-order, because you must plan before you script:
+order, plan first and script second:
 
 ### 1. `plan` (the plan, as the painting-planner skill describes it)
 
@@ -106,7 +115,7 @@ A row of `forms` (every field, in plain words and numbers):
 ```
 {
   "form": "<its name from the FORMS list, or 'background', 'sky'>", "kind": "<face, fur, animal, hair, figure, clothing, sky, ...>",
-  "appearance": "<the intended appearance and the cue in the target it must give>",
+  "appearance": "<the intended appearance and the cue in the target it is to give>",
   "values": { "lightL": <L* of its lightest painted value in the studies>, "darkL": <L* of its darkest>, "localColour": "#rrggbb" },
   "lights": "<the highlights kept free of dark paint, and where (mm)>",
   "edges": "<which edges are hard, soft, broken and lost>",
@@ -116,7 +125,7 @@ A row of `forms` (every field, in plain words and numbers):
   "moisture": "<paper moisture for each layer: wet, damp, dry>", "load": "<brush water load for each layer>",
   "pigment": "<pigment concentration for each layer: very pale, pale, medium ...>",
   "layers": [ { "passage": "<id>", "job": "base | drop | glaze | mark", "swatch": "#rrggbb" }, ... ],
-  "checkpoint": "<the stage (1 to 5) after which this form's contribution must show, and what should be seen then>"
+  "checkpoint": "<the stage (1 to 5) after which this form's contribution shows, and what is seen then>"
 }
 ```
 
@@ -180,7 +189,7 @@ A passage:
     "speed": "slow" | "medium" | "fast",
     "load": "flooded" | "loaded" | "damp" | "dry",
     "lengthMm": <one stroke's length>,
-    "look": "<what the mark should look like>"
+    "look": "<what the mark is to look like>"
   },
   "strokes": [ { "points": [[x, y, pressure], [x, y, pressure], ...] }, ... ],
   "count": <for strokes and touches given as a group: about how many>,
@@ -201,7 +210,7 @@ A passage:
   edge, the dark under a sill, a gate bar, a reflection. Make the path TURN where the stroke turns and the pressure
   SWELL where the brush presses and THIN where it lifts: a streak may land on the point, swell, drag and flick off at an
   angle; a branch thins as it goes out; a shadow edge presses hard on its found side. A group of many small touches is
-  given instead as `region`, `count` and `character`, and the painter scatters them. A form's base wash is always `kind: "wash"`, never strokes.
+  given instead as `region`, `count` and `character`, and the painter scatters them. A form's base wash is usually `kind: "wash"`.
   Write strokes in the order a hand would travel: finish one area before the next, neighbours after each other, long
   strokes before short; the replay is watched.
 - `handling.mark`: name a mark from the vocabulary of real brush marks below. The painter lays each stroke you place
@@ -269,9 +278,9 @@ A passage:
 
 ## Before you answer
 
-Go through the last line of the checklist against your script, form by form, and correct the script where it fails.
-Then look at the script as a picture: where would the brush go, in what order? If any form is a set of hard dark
-patches rather than one connected wash with soft darker shapes in it, rewrite that form.
+It is worth going through the last line of the checklist against your script, form by form. Then look at the script
+as a picture: where would the brush go, in what order? A form that is a set of hard dark patches rather than one
+connected wash with soft darker shapes in it is the commonest fault; whether to rewrite it is your call.
 
 ## FORMS
 

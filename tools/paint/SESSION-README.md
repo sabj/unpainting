@@ -27,8 +27,11 @@ INPUT_LIST
   grey before the washes, black after them), `mine/forms.png`, `mine/forms-ids.png`, `mine/forms.json` (your forms).
 - `own-script-brief.md`: the brief for writing your own painting script (the format, the kit, the paints).
 - `choice.json`: your choice. What it holds when you stop is painted.
-- `self-review.md`: yours to write before you stop (`TASK.md`, "Before you stop"): the five worst differences between
-  your last look's dried sheet and the subject, and whether a major fault remains. Without it you are sent back to work.
+- `self-review.md`: yours to write before you stop if you wish (`TASK.md`, "Before you stop"): the five worst
+  differences between your last look's dried sheet and the subject, and whether a major fault remains. It is kept
+  with the session; nothing depends on it.
+- `seen.md`: only when you were handed pictures of a finished painting (`previous/`, `auto-painting/`): one line on
+  each, written before your first plan (`TASK.md` says which).
 
 ## Commands
 
@@ -36,16 +39,17 @@ Run them from this folder. A plan takes from under a minute to several minutes o
 takes about 5 to 15 minutes (longer when the machine is busy, and as long as a full painting, half an hour or more,
 for an edited plan). A command that is still working after about 50 seconds returns with the words "still working";
 run `./unpaint wait` (again and again, as often as need be) to get its answer. Give your shell commands a timeout of
-at least 60 seconds. Waiting is not counted in your time: neither the planner's minutes nor a look's painting.
+at least 60 seconds. The clock of this try is the wall clock: the planner's minutes and a look's painting are on it.
 
 | Command | What it does | What it returns | Limit |
 |---|---|---|---|
-| `./unpaint status` | nothing | your time used and left, looks used and left, the plans made so far | none |
-| `./unpaint plan` | runs the wash planner on your present `choice.json` (and your script or edited plan, if the choice names one) | whether it compiled, or why it was refused, and its counts (shapes or passages, washes, strokes, widest brush, washes by stage, and how far the hand jumps between consecutive strokes of one passage, median and worst, in mm; for an edited plan also how many washes you left untouched, changed, moved, merged, left out and added). Nothing else: no picture and no wash data | none |
-| `./unpaint look` | the same, then PAINTS your present choice for real, small, through drying, and shows you the dried sheet | `looks/N/beside.png` (your painting as it dried, the subject, the middle study, side by side), `looks/N/stages.png` (the subject, then your sheet at 10, 25, 50, 75 and 100% of the strokes: the order of the work), `looks/N/numbers.txt` (each named form measured on the DRIED sheet against the study and against your plan, marked when it is TOO DARK or TOO PALE, and every wash), `looks/N/plan.json` (every wash as data, as in `auto/plan.json`), `looks/N/plan.png` (the plan as a diagram) | LOOKS_LIMIT |
+| `./unpaint status` | nothing | what is used of this try's budget (minutes on the clock, looks, returns to an earlier choice) and the plans made so far | none |
+| `./unpaint plan` | runs the wash planner on your present `choice.json` (and your script or edited plan, if the choice names one) | whether it compiled, or why it was refused, and its counts (shapes or passages, washes, strokes, widest brush, washes by stage, and how far the hand jumps between consecutive strokes of one passage, median and worst, in mm; for an edited plan also how many washes you left untouched, changed, moved, merged, left out and added), and every WARNING on your choice (each is laid as you wrote it; heed or ignore it). Nothing else: no picture and no wash data | none |
+| `./unpaint look` | the same, then PAINTS your present choice for real, small, through drying, and shows you the dried sheet | `looks/N/beside.png` (your painting as it dried, the subject, the middle study, side by side), `looks/N/stages.png` (the subject, then your sheet at 10, 25, 50, 75 and 100% of the strokes: the order of the work), `looks/N/numbers.txt` (each named form measured on the DRIED sheet against the study and against your plan, marked when it is TOO DARK or TOO PALE, and every wash), `looks/N/plan.json` (every wash as data, as in `auto/plan.json`), `looks/N/plan.png` (the plan as a diagram) | LOOKS_MOST looks in this try (the benchmark's budget) |
 | `./unpaint wait` | waits for the answer of the command that said "still working" | that answer | none |
 
-A choice the planner refuses costs no look. A painting that fails on this side costs no look either: the answer
+A choice the planner refuses costs no look. A choice that is exactly one you planned before and then left is a
+return to an earlier choice: it is counted, and past REVERTS_MOST of them it is refused (`TASK.md` says why). A painting that fails on this side costs no look either: the answer
 says NOT PAINTED, and you may ask again. A look at a choice you have already looked at still costs a look.
 
 What a look's painting is, exactly:
@@ -64,8 +68,10 @@ What a look's painting is, exactly:
 |---|---|---|
 | The wash planner | a settings choice (`auto/settings.json` lists each setting, its present value and meaning) | for each study: how many colours it is read into (`studyN.clusters`), how near colours join (`studyN.join`); the least shape each study lays (`floors`); for the block-in: the most shapes (`study1.shapes`), corner rounding (`study1.round`), the widest brush inside a face, figure or animal (`study1.formbrush`), the pale base wash of each soft form (`study1.formbase`) |
 | The paint box | `"paints": "ochre,sienna,..."` in a settings choice; `palette` in your own script | which paints the picture is mixed from (`own-script-brief.md` lists the box) |
-| The drawing's medium | `"outlinemedium": "graphite"`, `"ink"` or `"auto"` in a settings choice | pencil or waterproof ink for the opening drawing |
-| The drawing's lines | `"lines": "my-lines.json"` beside any kind of choice (below) | which lines are drawn before the washes, which after them over the dry paint, which not at all, and how dark each is: by named form, by kind of line, by length, width or darkness, or one by one |
+| The drawing's medium | `"medium": "pencil"`, `"pen"` or `"none"` beside any kind of choice (below) | what the drawing is drawn in, whatever the subject seems to be drawn in: pencil, waterproof pen, or no drawing |
+| The drawing's lines | `"lines": "my-lines.json"` beside any kind of choice (below) | which prepared lines are drawn before the washes, which after them over the dry paint, which not at all, and how dark each is: by named form, by kind of line, by length, width or darkness, or one by one |
+| Lines of your own | `"own"` in that same file (below) | new lines, drawn where you put them point by point: pen or pencil, their width and darkness, before or after the washes |
+| When the drawing is laid | `"drawingorder"` (`first`, `both`, `last`, `none`) and `"drawinglast..."` in a settings choice | used when you name no lines or medium of your own; with lines or a medium of your own the order follows them |
 | The named forms | `"forms": "my-forms.json"` in a settings choice (below) | merge forms, cut a new form out with a polygon, rename a form, change its kind (face, fur, sky...): the planner then treats it as that kind |
 | The planner, form by form | `"perForm": {"cat face": {...}}` in a settings choice (below) | inside one named form: how many colours and shapes the block-in has there, its least shape, its widest brush, its base wash, and how much of each later study is laid there |
 | The plan, wash by wash | an edited plan (below) | each wash's colour, strength, brush, direction, edge (hard, wet on wet, beside damp), its place in the order and its wet sitting; leave out, merge, add your own passages |
@@ -74,44 +80,66 @@ What a look's painting is, exactly:
 | The compile check | `./unpaint plan` | whether the planner takes your choice, and its counts |
 | Your shell | any command in this folder | measure the input pictures, compute positions and colours, write and check your files, keep notes |
 
-Given and fixed in this session: the three studies, the lines the drawing has (you choose among them and weight
-them; you cannot draw new ones here), the sheet size, and the painter's guard. You cannot ask for new studies here.
-Forms you change are recorded as yours, not as the reviewed ones.
+Given and fixed in this session: the three studies, the sheet size, the painter's guard and its seed. New studies
+cannot be asked for here. Forms you change are recorded as yours, not as the reviewed ones.
 
-## Choosing the drawing's lines
+**What is refused and what is only warned of.** A file that cannot be read, a request the painter cannot lay (more
+paints than the sheet holds, a brush that is not in the kit, a wash with no cells), and a locked setting are refused,
+with the reason. A choice that may spoil the painting is NOT refused: it is laid as you wrote it and the answer lists
+it under WARNINGS (a weight or a strength far outside the usual, pencil over dry paint, a rule that matches nothing, a
+colour lighter than what is under it, a per-form setting outside its usual range). A warning is information. Ignore
+it if you meant what you wrote; the result shows in your next look.
 
-`drawing/lines.json` lists every line: `id`, `part` (outline, inner, small, texture, hatch, tone, fill), `phase`,
-`object`, `tagged` (`ink`: a drawn pen line; `layin`: a pale contour that places a form; `drop`: hatching, tone or
-texture the drawing's maker would leave out), `dark` (0 to 1), `lengthMm`, `widthMm`, `boxMm`, and `form` (the named
-form most of it lies in, or `none`). Every line starts as the painter lays it today: before the washes, at its own
-darkness, the `drop` ones too. Write your rules to a file and name it in `choice.json` beside your kind of choice:
-`{"kind": "settings", "settings": {}, "lines": "my-lines.json"}`.
+## The drawing: its medium, its lines, and lines of your own
+
+**The medium.** `"medium"` beside any kind of choice: `"pencil"` (every drawn line in graphite), `"pen"` (every drawn
+line in waterproof ink) or `"none"` (none of the prepared lines is drawn; lines of your own still are). Leave it out
+and the drawing is as prepared; `drawing/lines.json` says at its top which that is. Example:
+`{"kind": "script", "script": "script.json", "medium": "pen", "lines": "my-lines.json"}`.
+
+**The prepared lines.** `drawing/lines.json` lists every line: `id`, `part` (outline, inner, small, texture, hatch,
+tone, fill), `phase`, `object`, `tagged` (`ink`: a drawn pen line; `layin`: a pale contour that places a form; `drop`:
+hatching, tone or texture the drawing's maker would leave out), `dark` (0 to 1), `lengthMm`, `widthMm`, `boxMm`, and
+`form` (the named form most of it lies in, or `none`). Every line starts as the painter lays it today: before the
+washes, at its own darkness, the `drop` ones too. Write your rules to a file and name it in `choice.json` beside your
+kind of choice: `{"kind": "settings", "settings": {}, "lines": "my-lines.json"}`.
 
 ```json
-{ "format": "lines-edit 1", "rules": [
-  { "where": { "tagged": "drop" }, "do": "drop" },
-  { "where": { "form": ["left eye", "right eye"], "part": "outline" }, "do": "after", "weight": 1.5 },
-  { "where": { "lengthBelowMm": 4, "darkBelow": 0.2 }, "do": "drop" },
-  { "where": { "ids": [212, 213] }, "weight": 0.5 } ] }
+{ "format": "lines-edit 1",
+  "rules": [
+    { "where": { "tagged": "drop" }, "do": "drop" },
+    { "where": { "form": ["left eye", "right eye"], "part": "outline" }, "do": "after", "weight": 1.5 },
+    { "where": { "lengthBelowMm": 4, "darkBelow": 0.2 }, "do": "drop" },
+    { "where": { "ids": [212, 213] }, "weight": 0.5 } ],
+  "own": [
+    { "points": [[120, 88], [131, 84], [142, 86]], "medium": "pen", "widthMm": 0.5, "dark": 0.9, "when": "after" },
+    { "points": [[60, 200], [95, 214]], "medium": "pencil", "widthMm": 0.3, "dark": 0.4, "when": "before" } ] }
 ```
 
 Rules are applied in order and a later rule wins. `where` holds conditions that must all be true: `ids`, `object`,
 `form`, `part`, `phase`, `tagged` (one value or a list), `darkAbove`, `darkBelow`, `lengthAboveMm`, `lengthBelowMm`,
 `widthAboveMm`, `widthBelowMm`; `{}` is every line. `do` is `before` (drawn before the first wash), `after` (drawn
 over the dry washes when the painting is done: a closing line) or `drop` (not drawn). `weight` multiplies the line's
-darkness (0.1 to 4; a line never goes past black). A line's shape and width are not changed.
-`after` is for an INK drawing only, and for its lines tagged `ink`: `drawing/lines.json` says at its top whether this
-drawing is one (`linesAfterTheWashes`). With your own choice of an ink drawing's lines the ink is set before the
-washes (`inkfast` 1, as for your own script), unless your settings say otherwise. The painter lays a pencil drawing before the washes and nowhere else, so on a
-pencil drawing `after` is refused; darken a pencil line with a `weight` above 1 instead. `./unpaint plan` checks the rules and counts what they do;
-`mine/drawing.png` shows the result. The lines themselves show in a look's dried sheet.
+darkness (usually 0.1 to 4; a line never goes past black). A prepared line's shape and width are not changed: for a
+different line, drop it and draw your own. There is no limit on the number of rules.
 
-What the lines tool cannot do yet:
+**Lines of your own.** `own` lists lines you draw yourself; a file may hold `own` alone, `rules` alone, or both. Each
+is a path of two or more `points` in sheet millimetres, drawn at an even `widthMm` (a pen or pencil draws about 0.2 to
+1 mm; default 0.4) and `dark` (0 to 1; default 0.7), in `medium` `"pen"` or `"pencil"` (default pencil), `when`
+`"before"` the washes or `"after"` them (default before). They are drawn after the prepared lines of the same time,
+in the order you list them. There is no limit on how many. Pen and pencil may be mixed on one sheet.
 
-- Closing lines on a pencil drawing. The painter draws pencil before the washes only, so `"do": "after"` is refused
-  there. To make a pencil line count more, give it a `weight` above 1, or paint the dark yourself as a passage.
-- Change a line's width or shape, or draw a new line. A line is as wide as the drawing has it; `weight` changes its
-  darkness only. A thicker or a new line is a passage of your own (`lines` or `strokes` in a script or an edited plan).
+What to know:
+
+- Ink set before the washes stays put under them; pencil is pale and the washes cover it. Pen over dry washes is the
+  crisp closing line. Pencil over dry washes is laid too, but it sits grey on top of the paint and hardly shows over
+  a dark wash: the answer warns you, and it is drawn if you leave it.
+- Choosing `"pen"` for a drawing prepared in pencil lays its lines in ink as dark as they are drawn, hatching and
+  texture included (they are tagged `drop`); the answer warns you. Drop or pale them if that is not what you want.
+- With lines or a medium of your own on a pen drawing the ink is set before the washes (`inkfast` 1, as for your own
+  script), unless your settings say otherwise.
+- `./unpaint plan` checks the file, counts what it does and lists its warnings; `mine/drawing.png` shows the result
+  (grey: before the washes; black: after them). The lines themselves show in a look's dried sheet.
 
 ## Your own named forms
 
@@ -166,8 +194,7 @@ form (by the form's name, yours if you edited the forms):
 
 **How long a check takes.** `./unpaint plan` on your own script answers in about a minute. An edited plan is slower
 the first time it is planned in a session (it can take ten minutes while the machine is busy); after that an edit is
-checked in about a minute, and every fault of the edit is reported in one answer (below). The waiting is not counted
-in your time.
+checked in about a minute, and every fault of the edit is reported in one answer (below).
 
 `cp auto/plan-to-edit.json my-plan.json`, change `my-plan.json`, and write
 `{"kind": "plan", "plan": "my-plan.json", "why": "..."}` into `choice.json`. Keep `format` and `of` as they are.
@@ -186,7 +213,7 @@ cells, the same paint, the same strokes. What you may change:
 | Change | How | What happens |
 |---|---|---|
 | its colour | `"colour": [r, g, b]` | what the place is to read as once the wash is down. The paint is mixed for you, over what is under it by then, to that colour's value |
-| its strength | `"strength": 0.6` (0.05 to 4) | the same paint, that many times as much: under 1 paler, over 1 darker |
+| its strength | `"strength": 0.6` (usually 0.05 to 4; outside that it is laid as written, with a warning) | the same paint, that many times as much: under 1 paler, over 1 darker |
 | its brush | `"brushMm"`: one of `brushesMm` | the wash is laid again in lanes of that brush over the same cells (a wash `laidIn` touches cannot be) |
 | its direction | `"direction"`: degrees, 0 the lanes run left to right, 90 top to bottom | laid again in lanes along that direction. `null`: the planner's own, along the shape |
 | its edge | `"lay"`: `"wet on dry"` (hard edges), `"wet on wet"` (into clean water: soft all round), `"beside damp"` (against the entry just before it in the same session while that is damp: a soft join between the two) | the same cells and paint, laid that way |
@@ -203,12 +230,11 @@ What to know before you edit:
 - A wash laid again (brush, direction, merge) is laid evenly, without the planner's cut edge or its load varied
   along the wash.
 - Watercolour only darkens: a wash cannot make its place lighter than what is laid under it by then. A `colour`
-  up to `nearestWithin` L* lighter than what is under it (8 as the file comes; it is yours to change, 0 to 40) is
-  laid as the nearest that can be, a faint wash of your colour, and the answer says so in a note. A colour lighter
-  than that is refused, with the washes that lie under it and the lightest colour that would be accepted there. To
-  make a place lighter, pale or leave out what is under it.
-- `./unpaint plan` checks the file and costs nothing. It reports EVERY fault of the edit at once, each with its
-  wash and what would be accepted, so correct them all before you plan again; and it lists as notes what it laid
+  lighter than what is under it is not refused: it is laid as the nearest that can be, a faint wash of your colour
+  that lightens nothing, and the answer says so (as a WARNING when it is more than `nearestWithin` L* lighter, 8 as
+  the file comes, with the washes that lie under it). To make a place lighter, pale or leave out what is under it.
+- `./unpaint plan` checks the file and costs no look. It reports EVERY fault of the edit at once (what cannot be
+  read or laid), each with its wash and what would be accepted; and it lists as notes and warnings what it laid
   the nearest way (a colour, a brush too wide for its wash, strokes too small for water). After the first plan of the
   session an edit is checked in about a minute. Brush, direction and soft edges show in a look's dried sheet, not in
   the plan's diagram.

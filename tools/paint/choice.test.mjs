@@ -60,8 +60,19 @@ test('beside its kind a choice may name its lines, its forms and settings for si
   assert.throws(() => readChoice({ kind: 'plan', plan: 'p.json', perForm: { face: { 'study1.clusters': 8 } } }), /an edited plan is an edit of the plan made from the forms as given/);
   assert.throws(() => readChoice({ kind: 'settings', lines: '../l.json' }), /"lines" names its file in this folder/);
   assert.throws(() => readChoice({ kind: 'settings', perForm: { face: { 'study2.clusters': 8 } } }), /"study2.clusters" is not a setting of a form/); assert.throws(() => readChoice({ kind: 'settings', perForm: { face: { 'study1.lay': 0 } } }), /not a setting of a form/);
-  assert.throws(() => readChoice({ kind: 'settings', perForm: { face: { 'study1.clusters': 900 } } }), /a number from 2 to 64/); assert.throws(() => readChoice({ kind: 'settings', perForm: { face: {} } }), /an object of setting: number/);
-  for (const k of ['drawingorder', 'drawinglast']) assert.throws(() => readChoice({ kind: 'settings', settings: { [k]: 'x' } }), /is locked/, k);
+  assert.match(readChoice({ kind: 'settings', perForm: { face: { 'study1.clusters': 900 } } }).warnings[0], /"study1\.clusters" is 900, outside the usual 2 to 64; it is given to the planner as you wrote it/); assert.throws(() => readChoice({ kind: 'settings', perForm: { face: { 'study1.clusters': 'many' } } }), /is a number \(usually 2 to 64\)/); assert.throws(() => readChoice({ kind: 'settings', perForm: { face: {} } }), /an object of setting: number/);
+  // when the drawing is laid is the author's to set; the drawing file itself, the sheet, the guard and the seed stay locked
+  for (const k of ['drawingorder', 'drawinglast', 'drawinglastmin', 'drawinglastlogic']) assert.deepEqual(readChoice({ kind: 'settings', settings: { [k]: 'last' } }).sets, [[k, 'last']], k);
+  for (const k of ['drawing', 'seed', 'targetguard', 'masks']) assert.throws(() => readChoice({ kind: 'settings', settings: { [k]: 'x' } }), /is locked/, k);
   const l = settingsList(spec), by = Object.fromEntries(l.map(x => [x.set, x]));
   assert.equal(by['study3.lay'].now, 1); assert.equal(by['study2.largest'].now, 15); assert.equal(by['study3.lightest'].now, 40); assert.equal(by['study1.lay'], undefined, 'a later study\'s setting is not listed for the block-in');
+});
+
+test('the medium of the drawing is chosen with any kind of choice: pencil, pen or none', () => {
+  for (const [given, what] of [[{ kind: 'script', script: 's.json', medium: 'pen' }, 'own script with the drawing in pen'], [{ kind: 'plan', plan: 'p.json', medium: 'none' }, 'edited plan with the drawing left out'], [{ kind: 'settings', medium: 'pencil' }, 'the code planner with the drawing in pencil']]) {
+    const c = readChoice(given); assert.equal(c.tools.medium, given.medium); assert.equal(choiceKind(c), what); assert.deepEqual(c.warnings, []);
+  }
+  assert.throws(() => readChoice({ kind: 'settings', medium: 'charcoal' }), /"medium" is the drawing's medium, one of pencil, pen, none/);
+  assert.notEqual(choiceKey(readChoice({ kind: 'settings', medium: 'pen' })), choiceKey(readChoice({ kind: 'settings', medium: 'pencil' })), 'another medium is another choice');
+  assert.equal(readChoice({ kind: 'settings', settings: {} }).tools, undefined);
 });

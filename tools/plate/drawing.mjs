@@ -235,14 +235,18 @@ async function layExactVectors(file, { closing = false } = {}) {
   // its own darkness; the ink goes over it (from 3e27d30c). Laid exact: this painter has no paper tooth for vector strokes.
   // (the closing pen lays only the ink: the lay-in belongs to the opening drawing, under the washes)
   const graphiteMarked = !pencil && doc.strokes.some(q => q.medium === 'graphite');
-  const layin = !closing && graphiteMarked && GRAPHITE_AT != null && GRAPHITE ? doc.strokes.filter(q => q.medium === 'graphite' && !q.wash) : [];
+  // (an author's closing file that holds pencil says so, pencilAfterWashes: that pencil is laid over the dry washes, and a
+  // sheet without graphite stops the run rather than leave the lines out)
+  const pencilOver = closing && doc.pencilAfterWashes === true && graphiteMarked;
+  if (pencilOver && !(GRAPHITE_AT != null && GRAPHITE)) throw new Error(`ink vectors: ${path.basename(file)} draws pencil over the dry washes but this run has no graphite on the sheet`);
+  const layin = (!closing || pencilOver) && graphiteMarked && GRAPHITE_AT != null && GRAPHITE ? doc.strokes.filter(q => q.medium === 'graphite' && !q.wash) : [];
   if (layin.length) {
     const gp = ctx.sheet.pigments[GRAPHITE_AT], gDark = t => { const c = renderLayers([[Float32Array.of(t)]], [gp], white, 1, 1); return 1 - (c[0] + c[1] + c[2]) / 765; };
     if (!ctx.sheet.D[GRAPHITE_AT]) throw new Error('ink vectors: the pencil lay-in has no graphite layer on the sheet');
     coherent(ctx.sheet);
     const g = await inBatches(layin, sub => { coherent(ctx.sheet); const q = layVectors({ ...doc, strokes: sub }, ctx.sheet.D[GRAPHITE_AT], W2, H2, sheetMm / W2, inkForDarkness(gDark), { fill }); layersChanged(ctx.sheet); ctx.sheet._gpu?.cpuWroteAll?.(); return q; }, 'pencil lay-in');
     ctx.drawnCount += g.strokes;
-    console.log(`pencil lay-in: ${g.strokes} graphite strokes laid before the ink, ${g.cells} cells`);
+    console.log(`pencil lay-in: ${g.strokes} graphite strokes laid ${pencilOver ? 'over the dry washes' : 'before the ink'}, ${g.cells} cells`);
   }
   const r = await inBatches(graphiteMarked ? doc.strokes.filter(q => q.medium !== 'graphite') : doc.strokes, sub => {
     if (!fineSheet) coherent(sheet);

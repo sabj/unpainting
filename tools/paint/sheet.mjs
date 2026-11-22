@@ -122,7 +122,7 @@ export function sessionLine(a) {
   const set = Object.entries(sub?.settings ?? {}).map(([k, v]) => `${k}=${v}`);
   const e = a.planEdit ?? sub?.edit;
   const did = !sub ? 'handed over nothing' : sub.kind === 'plan' ? (e ? (e.unchanged ? 'edited nothing: this is the code planner\'s plan' : `edited the code planner's plan: ${e.untouched} of its ${e.auto} washes untouched (${Math.round(100 * e.untouchedShare)}%), ${e.changed} changed, ${e.moved} moved, ${e.mergedFrom} merged into ${e.merged}, ${e.dropped} left out, ${e.added} of its own added`) : 'edited the code planner\'s plan') : sub.kind === 'script' ? `wrote its own script${a.passages ? ` (${a.passages} passages)` : ''}` : set.length ? `changed ${set.length} planner setting${set.length > 1 ? 's' : ''}: ${set.join(', ')}` : 'changed nothing: this is the code planner\'s plan';
-  return `${did} · ${s.looks.length}${s.looksMost > 0 ? ` of ${s.looksMost}` : ''} looks · ${Math.round(s.ownMinutes)} of ${s.minutesMost} min · ${s.toolCallsTotal} tool calls${s.ended === 'time limit' ? ' · STOPPED BY THE CLOCK' : ''}${sub?.note ? ` · ${sub.note}` : ''}${s.reusedFrom ? ' · from its earlier session' : ''}`;
+  return `${did} · ${s.looks.length} looks · ${s.wallMinutes != null ? `${Math.round(s.wallMinutes)} min on the clock, ` : ''}${Math.round(s.ownMinutes)} min its own${s.budgetReached ? ` · REACHED THE BUDGET (${s.budgetReached.what})` : ''} · ${s.toolCallsTotal} tool calls${sub?.note ? ` · ${sub.note}` : ''}${s.reusedFrom ? ' · from its earlier session' : ''}`;
 }
 /** Words wrapped to lines of about `chars` letters. */
 export function wrap(text, chars, most = 9) {
