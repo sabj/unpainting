@@ -32,6 +32,9 @@ export function buildCommand(spec, { mode, out, known, script = null, edit = nul
   }
   if (mode === 'plan') { opts.set('gpu', 'off'); opts.set('valuepreviewonly', '1'); } else opts.set('gpu', 'on');
   if (script) { opts.set('paints', script.paints.join(',')); opts.set('paintsextend', '0'); }
+  // a script's first washes are broad and wet: over a pen drawing they lift ink that still rewets (the painter stops: "the
+  // first wash moved N% of the pen's ink"), so a script is laid over ink that was set first, as pen and wash is done
+  if (script && !opts.has('inkfast')) opts.set('inkfast', '1');
   const masksRead = Boolean(spec.masks?.receipt && !script && known?.has('thingmasks'));
   const argv = [...opts].flatMap(([k, v]) => [`--${k}`, v]);
   argv.push('--washplan', script ? `script:${script.file}` : `${edit ? `edit:${edit.file},` : ''}${washPlanOf(spec.studies)}`, '--drawingfile', spec.drawing.abs);
