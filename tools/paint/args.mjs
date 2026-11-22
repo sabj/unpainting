@@ -1,6 +1,6 @@
 // The command line of `npm run paint`:
 //   npm run paint -- <subject[,subject...]> plan|paint|prepare|look [--author auto|<model key>[,...]] [--studies locked|author]
-//                    [--work session|reply] [--level L2|L3|L4] [--try N] [--previous <dir>] [--critique FILE]
+//                    [--work session|reply] [--level L2|L3|L4] [--retries N] [--try N] [--previous <dir>]
 //                    [--looks N] [--wallminutes N] [--graceminutes N] [--reverts N] [--from <dir>] [--lines FILE.json|standard]
 //                    [--set key=value ...] [--jobs N] [--out <dir>] [--dry-run] [--no-open]
 // Nothing here touches a file: it turns the words into one request object, or throws with the usage.
@@ -23,12 +23,11 @@ export const USAGE = `usage: npm run paint -- <subject[,subject...]> plan|paint|
                         an edited plan or its own script. Its work is measured (usage.json), not capped.
                         reply: one read-only reply holding a whole script (the earlier route).
   --level L2|L3|L4      what a session is handed (default L2). L2: the subject's prepared inputs and the code
-                        planner's plan, one go. L3: a retry from the model's own L2 result (--previous, --critique).
+                        planner's plan, one go. L3: a retry from the model's own L2 result (--previous).
                         L4: a retry from its L3 result with many resources: the code's finished painting, replay
                         and arrows, and the studies' flat shapes and the plan's wash geometry as data
   --retries N           retries at a level (L3, L4; default 1), and --try N which of them this is (default 1)
   --previous <dir>      the run folder of the result this retry starts from (its finished full-size painting)
-  --critique FILE       a teacher's words on that painting, as plain text; never a score
   --looks U             the benchmark's resource budget, rendering: how much a try may spend on looks, in units
                         (default 5). A full look of the whole plan on the whole sheet costs 1; a look stopped at
                         a stage costs that stage's share of the strokes; a look of a region its share of the
@@ -65,11 +64,11 @@ export const USAGE = `usage: npm run paint -- <subject[,subject...]> plan|paint|
 A subject may name a variant kept in tools/paint/variants.json: h36:approved.
 "all" is every registered subject not already named: all, or a,b,all to paint a and b first.`;
 
-const VALUED = new Set(['--author', '--studies', '--set', '--out', '--jobs', '--work', '--looks', '--wallminutes', '--graceminutes', '--reverts', '--level', '--try', '--retries', '--until', '--region', '--previous', '--critique', '--from', '--lines']);
+const VALUED = new Set(['--author', '--studies', '--set', '--out', '--jobs', '--work', '--looks', '--wallminutes', '--graceminutes', '--reverts', '--level', '--try', '--retries', '--until', '--region', '--previous', '--from', '--lines']);
 const FLAGS = new Set(['--dry-run', '--no-open']);
 
 /**
- * {subjects: [{id, variant}], mode, prepare, authors, studies, work, level, tryNumber, previous, critique, looks,
+ * {subjects: [{id, variant}], mode, prepare, authors, studies, work, level, tryNumber, previous, looks,
  * wallMinutes, graceMinutes, reverts, retries, look, until, region, from, sets: [[key, value]], jobs, out, dryRun, open}. `prepare`: the word was
  * prepare; `mode` is then plan (the plan alone) or paint (level 4: the painting too). Throws on anything unknown.
  */
@@ -84,6 +83,7 @@ export function parseArgs(argv) {
       if (a === '--set') given[a].push(v); else if (a in given) throw new Error(`${a} is given twice`); else given[a] = v;
       continue;
     }
+    if (a === '--critique') throw new Error('--critique is gone: no critique, score or verdict is handed to a model at any level; before a retry it judges its own previous painting');
     if (a === '--minutes') throw new Error('--minutes is gone: a session\'s own minutes are measured, not capped. The benchmark\'s time budget for one try is --wallminutes (default 60)');
     if (a.startsWith('--')) throw new Error(`unknown option ${a}`);
     words.push(a);
@@ -99,7 +99,7 @@ export function parseArgs(argv) {
   if (prepare && (authors.length !== 1 || authors[0] !== 'auto')) throw new Error('prepare makes the automatic plan (and painting): it takes no --author');
   if (look && (authors.length !== 1 || !authors[0].startsWith('choice:'))) throw new Error('look paints one look of a kept choice, small, as a session\'s look is painted: give --author choice:<folder holding choice.json>');
   if (!look && (given['--until'] !== undefined || given['--region'] !== undefined)) throw new Error('--until and --region belong to the word look');
-  if (prepare) for (const f of ['--from', '--previous', '--critique', '--try', '--out']) if (given[f] !== undefined) throw new Error(`prepare takes no ${f}`);
+  if (prepare) for (const f of ['--from', '--previous', '--try', '--out']) if (given[f] !== undefined) throw new Error(`prepare takes no ${f}`);
   for (const [what, l] of [['subject', subjects.map(s => `${s.id}:${s.variant}`)], ['author', authors]]) {
     if (!l.length) throw new Error(`no ${what} named`);
     if (new Set(l).size !== l.length) throw new Error(`a ${what} is named twice`);
@@ -124,7 +124,7 @@ export function parseArgs(argv) {
   if (new Set(keys).size !== keys.length) throw new Error('a --set key is given twice');
   const jobs = given['--jobs'] === undefined ? null : Number(given['--jobs']);
   if (jobs !== null && !(Number.isInteger(jobs) && jobs >= 1 && jobs <= 16)) throw new Error('--jobs: a whole number of paintings at once, 1 to 16');
-  return { subjects, mode, prepare, look, until, region: given['--region'] ?? null, authors, studies, work, level, tryNumber, retries, previous: given['--previous'] ?? null, critique: given['--critique'] ?? null, looks, wallMinutes, graceMinutes, reverts, from: given['--from'] ?? null, lines: given['--lines'] ?? null, sets, jobs, out: given['--out'] ?? null, dryRun: flags.has('--dry-run'), open: !flags.has('--no-open') };
+  return { subjects, mode, prepare, look, until, region: given['--region'] ?? null, authors, studies, work, level, tryNumber, retries, previous: given['--previous'] ?? null, looks, wallMinutes, graceMinutes, reverts, from: given['--from'] ?? null, lines: given['--lines'] ?? null, sets, jobs, out: given['--out'] ?? null, dryRun: flags.has('--dry-run'), open: !flags.has('--no-open') };
 }
 
 function list(s) { return s.split(',').map(x => x.trim()).filter(Boolean); }

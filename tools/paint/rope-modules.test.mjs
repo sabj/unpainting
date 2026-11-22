@@ -6,7 +6,7 @@ import path from 'node:path';
 import sharp from 'sharp';
 import { revertCounter, DEFAULT_REVERTS } from './reverts.mjs';
 import { readSeen, seenAsk, logReads, LEAST_SAID } from './seen.mjs';
-import { LEVELS, levelOf, handedAt } from './levels.mjs';
+import { LEVELS, levelOf, handedAt, DEFAULT_RETRIES } from './levels.mjs';
 import { usageOf, usageLine } from './usage.mjs';
 import { handedOverRecord, checkHandedOver, checkChoice, filesOf } from './parity.mjs';
 import { preparedRoot, preparedKey, prepareCommand, readPrepared, writePrepared } from './prepared.mjs';
@@ -36,26 +36,29 @@ test('handed pictures: a line each in seen.md; what a command\'s log can show of
   assert.deepEqual(logReads('codex', ['sips -g pixelWidth previous/final-beside-subject.jpg'], files), { [files[0]]: null, [files[1]]: null }, 'codex\'s log cannot show a picture being read: null, never a guess');
 });
 
-test('a level is a named setting: what each hands over, and a command line that disagrees with it is refused', () => {
-  assert.deepEqual(Object.keys(LEVELS), ['L2', 'L3', 'L4']); assert.throws(() => levelOf('L9'), /one of L2, L3, L4/);
-  assert.deepEqual(handedAt(levelOf('L2'), {}), { previous: false, auto: false });
-  assert.deepEqual(handedAt(levelOf('L3'), { tryNumber: 1 }), { previous: false, auto: false });
-  assert.deepEqual(handedAt(levelOf('L3'), { tryNumber: 7, previous: 'run', critique: 'w.txt' }), { previous: true, auto: false }, 'no number of tries is the most; L3 does not get the automatic painting');
-  assert.deepEqual(handedAt(levelOf('L4'), { tryNumber: 1 }), { previous: false, auto: true }); assert.deepEqual(handedAt(levelOf('L4'), { tryNumber: 2, previous: 'run', critique: 'w.txt' }), { previous: true, auto: true });
-  assert.throws(() => handedAt(levelOf('L2'), { tryNumber: 2 }), /L2 is one try/); assert.throws(() => handedAt(levelOf('L3'), { tryNumber: 2 }), /a try after the first is handed its previous try/);
-  assert.throws(() => handedAt(levelOf('L3'), { tryNumber: 2, previous: 'run' }), /--previous needs --critique/); assert.throws(() => handedAt(levelOf('L3'), { tryNumber: 1, previous: 'run', critique: 'w' }), /this is try 2 or later/);
+test('a level is a named setting: L2 one go, L3 a retry from the L2 result, L4 a retry from the L3 result with many resources; no critique at any level', () => {
+  assert.deepEqual(Object.keys(LEVELS), ['L2', 'L3', 'L4']); assert.throws(() => levelOf('L9'), /one of L2, L3, L4/); assert.equal(DEFAULT_RETRIES, 1);
+  assert.deepEqual(handedAt(levelOf('L2'), {}), { previous: false, auto: false, shapes: false });
+  assert.deepEqual(handedAt(levelOf('L3'), { previous: 'l2-run' }), { previous: true, auto: false, shapes: false }, 'L3 gets its own previous painting and nothing of the code\'s');
+  assert.deepEqual(handedAt(levelOf('L4'), { previous: 'l3-run' }), { previous: true, auto: true, shapes: true });
+  assert.deepEqual(handedAt(levelOf('L3'), { tryNumber: 3, retries: 3, previous: 'run' }), { previous: true, auto: false, shapes: false }, 'the number of retries is a setting');
+  assert.throws(() => handedAt(levelOf('L2'), { previous: 'run' }), /L2 is one go from the prepared inputs/); assert.throws(() => handedAt(levelOf('L2'), { tryNumber: 2 }), /L2 is one go/);
+  assert.throws(() => handedAt(levelOf('L3'), {}), /L3 is a retry: it starts from the model's own L2 result\. Name that run's folder with --previous/); assert.throws(() => handedAt(levelOf('L4'), {}), /starts from the model's own L3 result/);
+  assert.throws(() => handedAt(levelOf('L3'), { tryNumber: 2, previous: 'run' }), /try 2: this benchmark gives 1 retry at a level \(--retries sets it\)/);
+  assert.ok(Object.values(LEVELS).every(l => !/critique|score|verdict/i.test(JSON.stringify(Object.keys(l)))));
 });
 
 test('usage: what a session cost, measured; the budget and whether it was reached; the final\'s minutes beside it', () => {
   const session = { ended: 'reached the benchmark\'s resource budget', wallMinutes: 70.2, ownMinutes: 18.5, waitMinutes: 51.7, budgetReached: { what: '60 minutes of wall time', atWallMinutes: 60, looks: 4 }, toolCallsTotal: 81, toolCalls: { shell: 60, 'unpaint look': 4 },
-    looks: [{ painted: { seconds: 420 } }, { painted: { seconds: 480 } }, { painted: { seconds: 300 } }, { painted: {} }], plans: [{ ok: true, seconds: 60 }, { ok: false, seconds: 30 }], selfReviews: [{ written: true }], reverts: { count: 2, allowed: 20, refused: 0 }, warningsGiven: 5, pictures: { handed: ['a.jpg', 'b.jpg'], said: { 'a.jpg': 'x' } } };
+    lookUnits: { spent: 2.3, budget: 5 }, assessment: { asked: true, written: true, text: 'the ear is lost' }, looks: [{ look: 1, cost: 0.3, ask: { until: 1, region: null }, painted: { seconds: 420 } }, { painted: { seconds: 480 } }, { painted: { seconds: 300 } }, { painted: {} }], plans: [{ ok: true, seconds: 60 }, { ok: false, seconds: 30 }], selfReviews: [{ written: true }], reverts: { count: 2, allowed: 20, refused: 0 }, warningsGiven: 5, pictures: { handed: ['a.jpg', 'b.jpg'], said: { 'a.jpg': 'x' } } };
   const u = usageOf({ subject: 'mittens:', author: { key: 'opus', name: 'Opus', id: 'm', cli: 'claude', tokens: 1500, tokensIn: 1200, tokensOut: 300, costUSD: 4.25 }, level: 'L4', tryNumber: 2, budget: { looks: 100, wallMinutes: 60, graceMinutes: 10, reverts: 20 }, session,
     final: { seconds: 2400, backend: 'gpu', failure: null }, plan: { washes: 40, strokes: 900, dryings: 6, passages: 31 }, prepared: { plan: true, painting: true, from: 'p' }, commit: 'abc' });
-  assert.deepEqual(u.session, { ended: 'reached the benchmark\'s resource budget', wallMinutes: 70.2, ownMinutes: 18.5, waitMinutes: 51.7, looks: 4, plans: 2, plansRefused: 1, toolCalls: 81, toolCallsByKind: { shell: 60, 'unpaint look': 4 }, selfReviews: 1, reverts: { count: 2, allowed: 20, refused: 0 }, warningsGiven: 5, picturesHanded: ['a.jpg', 'b.jpg'], picturesDescribed: 1 });
+  const { looksEach, ...rest } = u.session; assert.deepEqual(looksEach[0], { look: 1, cost: 0.3, until: 1, region: null, machineSeconds: 420 });
+  assert.deepEqual(rest, { ended: 'reached the benchmark\'s resource budget', wallMinutes: 70.2, ownMinutes: 18.5, waitMinutes: 51.7, looks: 4, lookUnits: { spent: 2.3, budget: 5 }, plans: 2, plansRefused: 1, toolCalls: 81, toolCallsByKind: { shell: 60, 'unpaint look': 4 }, selfReviews: 1, assessmentWritten: true, reverts: { count: 2, allowed: 20, refused: 0 }, warningsGiven: 5, picturesHanded: ['a.jpg', 'b.jpg'], picturesDescribed: 1 });
   assert.deepEqual(u.model, { tokensIn: 1200, tokensOut: 300, tokens: 1500, costUSD: 4.25, costFrom: 'reported by the command' });
   assert.deepEqual([u.machine.lookGpuMinutes, u.machine.lookPaintings, u.machine.planCpuMinutes, u.machine.finalGpuMinutes], [20, 3, 1.5, 40]); assert.deepEqual(u.work, { washes: 40, strokes: 900, dryings: 6, passages: 31 });
   assert.equal(u.budget.reached.what, '60 minutes of wall time'); assert.match(u.budget.note, /Recorded, not a failure/); assert.equal(u.prepared.plan, true); assert.deepEqual([u.level, u.try], ['L4', 2]);
-  assert.match(usageLine(u), /4 looks \(20 GPU min\), 2 plans, 70.2 wall min \(18.5 its own\), 81 tool calls, 1500 tokens, \$4.25, 2 returns to an earlier choice; final 40 GPU min; REACHED THE BENCHMARK'S RESOURCE BUDGET/);
+  assert.match(usageLine(u), /4 looks for 2\.3 of 5 look units \(20 GPU min\), 2 plans, 70.2 wall min \(18.5 its own\), 81 tool calls, 1500 tokens, \$4.25, 2 returns to an earlier choice; final 40 GPU min; REACHED THE BENCHMARK'S RESOURCE BUDGET/);
   const quiet = usageOf({ subject: 's', author: { key: 'astra', name: 'Astra' }, level: 'L2', tryNumber: 1, budget: {}, session: { ended: 'done' } });
   assert.equal(quiet.budget.reached, null); assert.equal(quiet.model.costFrom, 'not reported by this command'); assert.equal(quiet.machine.finalGpuMinutes, null);
 });

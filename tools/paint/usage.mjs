@@ -17,15 +17,15 @@ export function usageOf({ subject, author, level, tryNumber, budget, session, fi
     budget: { ...budget, reached: session.budgetReached ?? null, note: session.budgetReached ? `reached the benchmark's resource budget (${session.budgetReached.what}); the session was asked to hand in what it had. Recorded, not a failure` : null },
     session: {
       ended: session.ended, wallMinutes: session.wallMinutes ?? null, ownMinutes: session.ownMinutes ?? null, waitMinutes: session.waitMinutes ?? null,
-      looks: looks.length, plans: plans.length, plansRefused: plans.filter(p => !p.ok).length, toolCalls: session.toolCallsTotal ?? null, toolCallsByKind: session.toolCalls ?? null,
-      selfReviews: (session.selfReviews ?? []).filter(r => r.written).length, reverts: session.reverts ?? null, warningsGiven: session.warningsGiven ?? null,
+      looks: looks.length, lookUnits: session.lookUnits ?? null, looksEach: looks.map(l => ({ look: l.look, cost: l.cost ?? 1, until: l.ask?.until ?? null, region: l.ask?.region?.box ?? null, machineSeconds: l.painted?.seconds ?? null })), plans: plans.length, plansRefused: plans.filter(p => !p.ok).length, toolCalls: session.toolCallsTotal ?? null, toolCallsByKind: session.toolCalls ?? null,
+      selfReviews: (session.selfReviews ?? []).filter(r => r.written).length, assessmentWritten: session.assessment ? session.assessment.written : null, reverts: session.reverts ?? null, warningsGiven: session.warningsGiven ?? null,
       picturesHanded: session.pictures?.handed ?? [], picturesDescribed: session.pictures ? Object.keys(session.pictures.said ?? {}).length : 0,
     },
     model: { tokensIn: author.tokensIn ?? null, tokensOut: author.tokensOut ?? null, tokens: author.tokens ?? null, costUSD: author.costUSD ?? null, costFrom: author.costUSD != null ? 'reported by the command' : 'not reported by this command' },
     machine: {
       lookGpuMinutes: minutes(lookSeconds), lookPaintings: looks.filter(l => l.painted?.seconds != null).length, planCpuMinutes: minutes(planSeconds),
       finalGpuMinutes: final?.seconds != null ? minutes(final.seconds) : null, finalBackend: final?.backend ?? null, finalFailure: final?.failure ?? null,
-      note: 'the full-size final is painted after the session and is outside its clock',
+      note: 'the full-size final is painted after the session and is outside its clock; machine seconds are recorded beside each look and never charged: looks are charged in units of rendering',
     },
     work: plan ? { washes: plan.washes ?? null, strokes: plan.strokes ?? null, dryings: plan.dryings ?? null, passages: plan.passages ?? null } : null,
     prepared: prepared ?? null,
@@ -35,5 +35,5 @@ export function usageOf({ subject, author, level, tryNumber, budget, session, fi
 /** One line of a usage record, for the log. */
 export function usageLine(u) {
   const s = u.session, m = u.model, g = u.machine;
-  return `${s.looks} looks (${g.lookGpuMinutes ?? '?'} GPU min), ${s.plans} plans, ${s.wallMinutes ?? '?'} wall min (${s.ownMinutes ?? '?'} its own), ${s.toolCalls ?? '?'} tool calls, ${m.tokens ?? '?'} tokens${m.costUSD != null ? `, $${Number(m.costUSD).toFixed(2)}` : ''}, ${s.reverts?.count ?? 0} returns to an earlier choice; final ${g.finalGpuMinutes ?? '?'} GPU min${u.budget.reached ? `; REACHED THE BENCHMARK'S RESOURCE BUDGET (${u.budget.reached.what})` : ''}`;
+  return `${s.looks} looks for ${s.lookUnits?.spent ?? '?'} of ${s.lookUnits?.budget ?? '?'} look units (${g.lookGpuMinutes ?? '?'} GPU min), ${s.plans} plans, ${s.wallMinutes ?? '?'} wall min (${s.ownMinutes ?? '?'} its own), ${s.toolCalls ?? '?'} tool calls, ${m.tokens ?? '?'} tokens${m.costUSD != null ? `, $${Number(m.costUSD).toFixed(2)}` : ''}, ${s.reverts?.count ?? 0} returns to an earlier choice; final ${g.finalGpuMinutes ?? '?'} GPU min${u.budget.reached ? `; REACHED THE BENCHMARK'S RESOURCE BUDGET (${u.budget.reached.what})` : ''}`;
 }

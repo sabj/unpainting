@@ -45,8 +45,11 @@ None of that is held against you, and no number of them is too many or too few.
 
 One thing is limited, and it is the benchmark's, not a judgment of your work: **the machines' budget for one try**,
 the same for every model. It is `WALL_MINUTES` minutes on the clock from when you start, with the time your looks and
-plans take included, and `LOOKS_MOST` looks. `./unpaint status` shows what is used, and every answer of the tools says
-it too. When the budget is reached you are asked to hand in what you have: no further look is painted, `./unpaint
+plans take included, and `LOOKS_MOST` look units of rendering. A look of your whole plan on the whole sheet costs 1
+unit. A look stopped after a stage you name (`./unpaint look --until 2`) costs that stage's share of your plan's
+strokes, and a look of a region (`--region`) costs the region's share of the sheet: where and when you look is yours
+to choose. The cost is told before it is spent (`./unpaint plan` lists it; `./unpaint cost ...` prices any look and
+paints nothing). `./unpaint status` shows what is used, and every answer of the tools says it too. When the budget is reached you are asked to hand in what you have: no further look is painted, `./unpaint
 plan` still checks that your final choice compiles, and `GRACE_MINUTES` minutes later the session is ended. So keep
 `choice.json` holding something you would hand in, from early on.
 
@@ -107,7 +110,8 @@ the dried sheet beside the subject and the middle study, the stages of the paint
 100% of the strokes, so you see the order of the work), and each named form measured on the dried sheet against the
 study and against your plan, marked when it dried TOO DARK or TOO PALE. What you see is paint, not a diagram: edges,
 brush marks, direction, how strong the pigment really lay, and your drawing as it was drawn. A look takes some
-minutes to paint (`README.md`), and those minutes are on the clock of this try.
+minutes to paint (`README.md`), and those minutes are on the clock of this try. A look need not be the whole
+painting: stopped after the first washes it shows whether the big shapes sit right before you spend on the rest.
 
 ## What a good sheet usually has (advice)
 

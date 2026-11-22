@@ -24,6 +24,9 @@ import { DEFAULT_LOOKS, DEFAULT_WALL_MINUTES, DEFAULT_GRACE_MINUTES, safeRead, w
 import { DEFAULT_REVERTS } from './reverts.mjs';
 import { levelOf, handedAt } from './levels.mjs';
 import { usageOf, usageLine } from './usage.mjs';
+import { shapesData, namesShapes, resolveNumbered } from './study-shapes.mjs';
+import { paintThroughStage, stoppedText } from './stage-look.mjs';
+import { lookCost, regionBox, scriptInRegion } from './look-cost.mjs';
 import { preparedRoot, preparedKey, prepareCommand, readPrepared, writePrepared } from './prepared.mjs';
 import { writeWorkSheets } from './work-sheets.mjs';
 import { logReads } from './seen.mjs';
@@ -60,17 +63,17 @@ let registry, specs, authors, qwen = null, level, terms = null; const refused = 
 try {
   registry = loadRegistry();
   level = levelOf(req.level);
-  if (process.env.UNPAINT_SESSION_PREVIOUS || process.env.UNPAINT_SESSION_TRY) throw new Error('UNPAINT_SESSION_PREVIOUS and UNPAINT_SESSION_TRY are gone: name the previous try on the command line (--level L3|L4 --try N --previous <its run folder> --critique FILE)');
+  if (process.env.UNPAINT_SESSION_PREVIOUS || process.env.UNPAINT_SESSION_TRY) throw new Error('UNPAINT_SESSION_PREVIOUS and UNPAINT_SESSION_TRY are gone: name the previous try on the command line (--level L3|L4 --previous <its run folder>)');
   // a model works as a session (the default) or answers in one reply; its column is named for what it does
   authors = req.authors.map(a => authorOf(a, ownAuthors, models)).map(a => (a.cli && !['script', 'edit', 'choice'].includes(a.cli) ? { ...a, work: req.work, brief: req.work === 'reply' ? briefName(BRIEF_FILE) : null } : a));
   if (req.work === 'session') for (const a of authors) if (a.work) sessionCall(a, { prompt: '', cwd: '' });
   if (req.from && !fs.existsSync(req.from)) throw new Error(`--from ${req.from}: no such folder`);
   // what a session of this level and try is handed; the level's terms and the command line must agree
   if (!req.prepare && !req.from && req.work === 'session' && authors.some(a => a.work === 'session')) {
-    terms = handedAt(level, { tryNumber: req.tryNumber, previous: req.previous, critique: req.critique });
-    for (const [flag, f] of [['--previous', req.previous], ['--critique', req.critique]]) if (f && !fs.existsSync(f)) throw new Error(`${flag} ${f}: no such ${flag === '--previous' ? 'folder' : 'file'}`);
+    terms = handedAt(level, { tryNumber: req.tryNumber, retries: req.retries, previous: req.previous });
+    if (req.previous && !fs.existsSync(req.previous)) throw new Error(`--previous ${req.previous}: no such folder`);
     if (req.previous && (authors.length !== 1 || req.subjects.length !== 1)) throw new Error('--previous names one model\'s previous try of one subject: give one subject and one author');
-  } else if (req.previous || req.critique || req.tryNumber > 1) throw new Error('--previous, --critique and --try belong to a model\'s working session (not to --from, a kept script, or the code planner)');
+  } else if (req.previous || req.tryNumber > 1) throw new Error('--previous and --try belong to a model\'s working session (not to --from, a kept script, or the code planner)');
   if (req.lines && !authors.some(a => a.cli === 'script' || a.cli === 'edit')) throw new Error('--lines names the drawing of a kept script or plan edit (--author script:FILE or edit:FILE); a session, a kept choice and the code planner carry their own');
   if (req.studies === 'author') {
     // open tools: the author's own studies are made by the local image model; every piece of that route must be here
@@ -259,12 +262,17 @@ async function compileOnce(r, choice, script, plate, edit) {
  * whoever looks. Nothing of this machine's paths is in what the model reads.
  */
 const lookedAt = new Map();
-function paintLook(r, choice, script, plate, at, edit, compiled) {
-  const key = `${r.spec.id}:${r.spec.variant ?? ''}:${choiceKey(choice, script ? JSON.stringify(script) : edit ? JSON.stringify(edit) : '')}`;
-  if (!lookedAt.has(key)) lookedAt.set(key, paintLookOnce(r, choice, script, plate, at, edit, compiled).then(got => { if (!got.ok) lookedAt.delete(key); return got; }));
+function paintLook(r, choice, script, plate, at, edit, compiled, ask = {}) {
+  const key = `${r.spec.id}:${r.spec.variant ?? ''}:${choiceKey(choice, script ? JSON.stringify(script) : edit ? JSON.stringify(edit) : '')}:${ask.until ?? ''}:${ask.region ? ask.region.box.join(',') : ''}`;
+  if (!lookedAt.has(key)) lookedAt.set(key, paintLookOnce(r, choice, script, plate, at, edit, compiled, ask).then(got => { if (!got.ok) lookedAt.delete(key); return got; }));
   return lookedAt.get(key);
 }
-async function paintLookOnce(r, choice, script, plate, at, edit, compiled) {
+async function paintLookOnce(r, choice, script, plate, at, edit, compiled, ask = {}) {
+  // a look of a region: the script's passages that touch the box, painted by themselves (look-cost.mjs)
+  const inRegion = ask.region ? scriptInRegion(script, ask.region.box) : null;
+  if (ask.region && !script) return { ok: false, error: 'a look of a region is painted for an own script only' };
+  if (inRegion && !inRegion.kept) return { ok: false, error: `no passage of the script touches the region ${ask.region.box.join(', ')} mm` };
+  if (inRegion) script = inRegion.script;
   const { spec, record } = r, scriptFile = `${plate}.script.json`, editFile = `${plate}.plan-edit.json`;
   try {
     const full = await specWith(r, choice);
@@ -272,7 +280,7 @@ async function paintLookOnce(r, choice, script, plate, at, edit, compiled) {
     fs.mkdirSync(path.dirname(plate), { recursive: true });
     if (script) fs.writeFileSync(scriptFile, JSON.stringify(script, null, 1) + '\n');
     if (edit) fs.writeFileSync(editFile, JSON.stringify(edit, null, 1) + '\n');
-    const size = lookSizeNote({ cells: small.sheet.cells, fullCells: full.sheet.cells, cellMm: small.sheet.cellMm, kind: choice.kind }), asked = Date.now(); let started = null;
+    const size = lookSizeNote({ cells: small.sheet.cells, fullCells: full.sheet.cells, cellMm: small.sheet.cellMm, kind: choice.kind }), asked = Date.now(); let started = null, stoppedAt = null;
     const done = await lookSlot(async () => {
       // the wait for a place among the machine's GPU paintings and the start are one step at a time
       const going = await lookGate(async () => {
@@ -280,11 +288,15 @@ async function paintLookOnce(r, choice, script, plate, at, edit, compiled) {
         const command = buildCommand(small, { mode: 'paint', out: plate, known, dirty: codeState(ROOT).dirty, segEnv, script: script ? { file: scriptFile, paints: script.palette } : null, edit: edit ? { file: editFile } : null });
         fs.writeFileSync(`${plate}.command.txt`, shellLine(command) + '\n'); started = Date.now();
         say(r, `look ${at.look} (plan ${at.plan}, ${choiceKind(choice)}): ${size}; started at ${new Date().toTimeString().slice(0, 8)}`);
+        // stopped after a stage the author names: the painter's own stop at that boundary, dried (stage-look.mjs)
+        if (ask.until != null) return { ended: paintThroughStage({ command, cwd: ROOT, logFile: `${plate}.log`, pauseDir: `${plate}.pause`, stage: ask.until, run: runPainter }).then(x => { stoppedAt = x.stopped; return { ...x.done, seconds: x.done?.seconds ?? Math.round((Date.now() - started) / 1000) }; }) };
         return { ended: runPainter(command, { cwd: ROOT, logFile: `${plate}.log` }) };
       });
       return going.ended;
     });
-    const results = collectResults(plate, 'paint'), fault = lookFault(done, results);
+    // a look that stopped partway has no finished painting: the sheet as it stood, dried, is the look
+    const results = collectResults(plate, 'paint'); if (stoppedAt) Object.assign(results, { state: 'finished', painting: stoppedAt.sheet });
+    const fault = stoppedAt ? (results.backend?.backend !== 'gpu' || results.backend?.fallback !== false ? `the painting did not stay on the GPU (${results.backend ? `backend ${results.backend.backend}, fallback ${results.backend.fallback}` : 'no backend record'}), so it is not shown` : null) : lookFault(done, results);
     if (fault) {
       const why = fs.readFileSync(`${plate}.log`, 'utf8').split('\n').filter(l => /(^|\s)(Error|TypeError|RangeError)\b/.test(l)).pop()?.trim().slice(0, 400);
       say(r, `look ${at.look} NOT PAINTED: ${fault}${why ? ` (${why})` : ''}`);
@@ -294,39 +306,50 @@ async function paintLookOnce(r, choice, script, plate, at, edit, compiled) {
     say(r, `look ${at.look} painted and dried in ${Math.round(done.seconds / 60)} min (${results.backend.backend}, no fallback); ${numbers.marked.forms} named forms marked`);
     return { ok: true, picture: await lookPicture({ planPreview: results.painting, run: record }), stages: results.strip ? await stagesPicture(results.strip) : null,
       planPicture: compiled.planPreview ? await planPicture({ planPreview: compiled.planPreview, run: record }) : null,
-      numbersText: numbersText(numbers, { script: Boolean(script), painted: size }), marked: numbers.marked,
-      painted: { cells: small.sheet.cells, fullCells: full.sheet.cells, size, seconds: done.seconds, waitedSeconds: Math.round((started - asked) / 1000), backend: results.backend, plate, painting: results.painting, strip: results.strip } };
+      numbersText: `${stoppedAt ? `${stoppedText(stoppedAt, ask.until)}\n\n` : ''}${numbersText(numbers, { script: Boolean(script), painted: size })}`, marked: numbers.marked, stoppedText: stoppedAt ? stoppedText(stoppedAt, ask.until) : null,
+      painted: { until: ask.until ?? null, stopped: stoppedAt ? { passesDone: stoppedAt.passesDone, passesPlanned: stoppedAt.passesPlanned, strokes: stoppedAt.strokes } : null, region: ask.region?.box ?? null, regionPassages: inRegion ? `${inRegion.kept} of ${inRegion.of} passages` : null, cells: small.sheet.cells, fullCells: full.sheet.cells, size, seconds: done.seconds, waitedSeconds: Math.round((started - asked) / 1000), backend: results.backend, plate, painting: results.painting, strip: results.strip } };
   } catch (e) { return { ok: false, error: tidy(e.message) }; }
 }
 
 /**
- * What this session is handed beside the subject's inputs, by its level and try (levels.mjs), each a folder of its
- * own with a paragraph of the task (session.mjs writeSession): a later try its own previous try (--previous: the
- * dried full-size painting beside the subject, the replay sheet, the arrows sheet, the teacher's words of --critique,
- * and what it handed over, to start from); level 4 the automatic painter's prepared painting. Never a score.
- * `made`: a folder outside the model's folder where the sheets are made. Returns the list and what the record keeps.
+ * What this session is handed beside the subject's inputs, by its level (levels.mjs), each a folder of its own with
+ * a paragraph of the task (session.mjs writeSession). A retry (L3, L4): the result it starts from (--previous: the
+ * dried full-size painting beside the subject, the replay sheet, the arrows sheet, and what was handed over, to start
+ * from). Level 4 also: the code's finished painting with its sheets, and the studies' flat shapes with the plan's
+ * wash geometry as data. Never a score, a verdict or anyone's critique: the model judges its own sheet.
+ * `made`: a folder outside the model's folder where the files are made. Returns the list.
  */
 async function handedTo(r, prepared, made) {
   const { spec, authorFull: author } = r, handed = [];
   if (terms.auto) handed.push({ folder: 'auto-painting', title: 'What the code alone made',
     words: 'This is what the code alone made of this subject: the automatic painter\'s painting from its own plan (the plan in `auto/`), dried, at full size. Improve on it, change it, or discard it and paint your own. You owe it nothing, and it is not the goal: the subject is.',
     files: prepared.painting.sheets.map(f => ({ ...f, picture: true, what: /beside/.test(f.name) ? 'the automatic painter\'s painting as it dried, at full size, on the left; the subject on the right' : /replay/.test(f.name) ? 'the replay of that painting: the sheet as the work went on, frames in order, numbered' : 'every stroke of that painting as an arrow from where the brush lands to where it lifts; first strokes blue, last strokes red' })) });
+  if (terms.shapes) {
+    const file = path.join(made, 'resources', 'shapes.json'); fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, JSON.stringify(await shapesOf(r, prepared)) + '\n');
+    handed.push({ folder: 'resources', title: 'The studies\' shapes, as data',
+      words: 'The studies\' flat shapes and the geometry of the code planner\'s washes, as data you may select from: each shape\'s number, the study it came from, its outline in sheet millimetres, its colour, its area and the named forms it lies in. In your own script a passage may name shapes by number (`"shapes": [12, 13]` for its region, `"reserve": [40]` for paper it is laid round, and in a stroke `"along": 12`); the numbers are turned into millimetres for you. Use them, cut them up, or ignore them.',
+      files: [{ from: file, name: 'shapes.json', what: 'every shape, in painting order: n, study, stage, kind, what, colour, areaMm2, boxMm, forms, polygons' }] });
+  }
   if (terms.previous) {
     const from = path.resolve(req.previous); let earlier; try { earlier = JSON.parse(fs.readFileSync(path.join(from, 'run.json'), 'utf8')); } catch { throw new Error(`--previous ${from}: no finished run there (run.json)`); }
     const sub = earlier.author?.session?.submitted;
     if (earlier.subject?.id !== spec.id || earlier.author?.key !== author.key || !sub) throw new Error(`--previous ${from}: not a session of ${author.name} on ${spec.id} that handed over a choice`);
     const sheets = await writeWorkSheets(from, path.join(made, 'previous'), { whose: 'your previous' });
-    const critique = fs.readFileSync(req.critique, 'utf8'); if (!critique.trim()) throw new Error(`--critique ${req.critique}: the file is empty`);
-    if (/\b(score|verdict|\d+(\.\d+)?\s*(\/|out of)\s*\d+)\b/i.test(critique)) throw new Error(`--critique ${req.critique}: it reads like a score or a verdict; a try is handed a teacher's words on the painting, never a number`);
-    const text = path.join(made, 'previous', 'teachers-words.txt'); fs.writeFileSync(text, critique);
     // what it handed over, whole: choice.json and every file it names (its script or edited plan, its lines, its forms)
     const folder = path.join(from, 'author', 'folder'), names = ['choice.json', sub.script, sub.plan, sub.tools?.lines, sub.tools?.forms].filter(Boolean), missing = names.filter(n => !fs.existsSync(path.join(folder, n)));
-    if (missing.length) throw new Error(`--previous ${from}: its kept folder lacks ${missing.join(', ')}; a try is handed everything its previous try handed over, or it is not started`);
-    handed.push({ folder: 'previous', title: `This is try ${req.tryNumber}`,
-      words: 'You have painted this subject before. Here is your own previous try: the painting as it really dried at full size, how it was painted, a watercolour teacher\'s words on it in plain sentences, and what you handed over. Keep what worked, put right what the teacher faults and what you see yourself. You may start from what you handed over (copy it out of `previous/submitted/`) or start again.',
-      files: [...sheets, { from: text, name: 'teachers-words.txt', what: 'a watercolour teacher\'s words on that painting' }, ...names.map(n => ({ from: path.join(folder, n), name: `submitted/${n}`, what: n === 'choice.json' ? 'the choice you handed over' : 'a file that choice names' }))] });
+    if (missing.length) throw new Error(`--previous ${from}: its kept folder lacks ${missing.join(', ')}; a retry is handed everything its previous result handed over, or it is not started`);
+    handed.push({ folder: 'previous', title: 'Your own previous painting of this subject',
+      words: 'You have painted this subject before. Here is your own previous result: the painting as it really dried at full size beside the subject, how it was painted, and what you handed over. Nobody has marked it and no critique comes with it: judge it yourself. Before you start, write `assessment.md`: what is weakest in that painting against the subject, where on the sheet, and what you will change. It is yours; nothing depends on it and it is kept with the session. You may start from what you handed over (copy it out of `previous/submitted/`) or start again.',
+      files: [...sheets, ...names.map(n => ({ from: path.join(folder, n), name: `submitted/${n}`, what: n === 'choice.json' ? 'the choice you handed over' : 'a file that choice names' }))] });
   }
   return handed;
+}
+/** Level 4's shapes data for this run: the prepared plan's washes as shapes (study-shapes.mjs), read once. */
+const shapesMade = new Map();
+function shapesOf(r, prepared) {
+  if (!shapesMade.has(r)) shapesMade.set(r, shapesData(JSON.parse(fs.readFileSync(path.join(prepared.plan, 'value-plan.json'), 'utf8')), { widthMm: r.spec.sheet.widthMm, heightMm: r.spec.sheet.heightMm }));
+  return shapesMade.get(r);
 }
 
 /**
@@ -354,7 +377,10 @@ function sessionDeny(spec) {
  */
 async function sessionRun(r) {
   const { spec, record, authorFull: author } = r, dir = path.join(record.out, 'author'), W = spec.sheet.widthMm; fs.mkdirSync(dir, { recursive: true });
-  const check = obj => checkAuthored(obj, { sheetWidthMm: W }).script;
+  // a script is checked as the painter will read it; at level 4 it may name the studies' shapes by number, and the
+  // numbers are turned into millimetres first (study-shapes.mjs). At other levels numbered shapes stay refused.
+  let numbered = null;
+  const check = obj => checkAuthored(numbered && namesShapes(obj) ? resolveNumbered(obj, numbered) : obj, { sheetWidthMm: W }).script;
   // an edited plan is checked against the code planner's plan as the painter wrote it out for editing
   const toEdit = folder => JSON.parse(fs.readFileSync(path.join(folder, 'plan-to-edit.json'), 'utf8'));
   const checkEdit = (obj, listing) => { try { return { edit: obj, record: checkPlanEdit(obj, listing).record }; } catch (e) { throw new Error(tidy(e.message)); } };
@@ -393,6 +419,7 @@ async function sessionRun(r) {
     const packet = await preparePacket({ dir, root: ROOT, run: { ...record, masks: record.masks.receipt ? { ...record.masks, formsPng: await formsImage(record.masks.mask) } : null }, drawingPng: pics.drawing, briefFile: BRIEF_FILE });
     // the code planner's plan is a prepared input: found, not made, and the session does not start without it
     const { auto, prepared, folder: preparedFolder } = await preparedPlan(r);
+    if (terms.shapes) numbered = await shapesOf(r, prepared);
     record.author.prepared = { plan: true, painting: Boolean(prepared.painting), from: preparedFolder, commit: prepared.record.commit ?? null, madeAt: prepared.record.made ?? null, planSeconds: prepared.record.plan?.seconds ?? null, paintingSeconds: prepared.record.painting?.seconds ?? null };
     say(r, `the code planner's plan was taken prepared (${preparedFolder})${prepared.painting ? ', and its full-size painting with it' : ''}: nothing of it is made on the session's clock`);
     // the model's folder: a temporary one outside the repository; it is kept in the run folder when the session ends
@@ -405,11 +432,11 @@ async function sessionRun(r) {
       const { prompt, pictures: handedPictures } = writeSession({ dir: cwd, packet, sheet: spec.sheet, medium: record.drawing.medium, auto: { picture: await planPicture({ planPreview: auto.planPreview, run: record }), washesText: washesText(auto), plan: { summary: auto.summary, washes: auto.rows }, toEdit: listing }, settings: settingsList(spec),
         forms: record.masks.mask ? await formBoxes(record.masks.mask, record.masks.forms, W) : null, formsIds: record.masks.mask ?? null, looks: looksMost, wallMinutes: wallMost, graceMinutes: graceMost, reverts: revertsMost, briefFile: path.join(HERE, 'SESSION-BRIEF.md'), readmeFile: path.join(HERE, 'SESSION-README.md'), handed,
         drawing: base.listing ? { listing: base.listing, picture: await drawingPicture(allLinesDoc(base.vectors), W) } : null });
-      if (terms.previous) record.author.previousTry = { tryNumber: req.tryNumber, from: path.resolve(req.previous), critique: path.resolve(req.critique) };
+      if (terms.previous) record.author.previousTry = { tryNumber: req.tryNumber, retries: req.retries, from: path.resolve(req.previous) };
       record.author.handed = handed.map(h => ({ folder: h.folder, files: h.files.map(f => f.name) }));
       fs.writeFileSync(path.join(dir, 'session-prompt.txt'), prompt);
-      const server = sessionServer({ dir: cwd, looks: looksMost, wallMinutes: wallMost, graceMinutes: graceMost, reverts: revertsMost, startKey: choiceKey(readChoice({ kind: 'settings', settings: {} }), ''), pictures: handedPictures, checkScript: check, checkPlan: obj => checkEdit(obj, listing), checkTools, ledger: path.join(dir, 'looks.jsonl'), keep: path.join(dir, 'looks'), compile: (choice, script, n, edit) => compileChoice(r, choice, script, path.join(dir, 'plans', String(n)), edit),
-        look: (choice, script, at, edit, compiled) => paintLook(r, choice, script, path.join(dir, 'look-paints', String(at.plan)), at, edit, compiled) });
+      const server = sessionServer({ dir: cwd, sheet: { widthMm: spec.sheet.widthMm, heightMm: spec.sheet.heightMm }, forms: record.masks.mask ? await formBoxes(record.masks.mask, record.masks.forms, W) : [], looks: looksMost, wallMinutes: wallMost, graceMinutes: graceMost, reverts: revertsMost, startKey: choiceKey(readChoice({ kind: 'settings', settings: {} }), ''), pictures: handedPictures, checkScript: check, checkPlan: obj => checkEdit(obj, listing), checkTools, ledger: path.join(dir, 'looks.jsonl'), keep: path.join(dir, 'looks'), compile: (choice, script, n, edit) => compileChoice(r, choice, script, path.join(dir, 'plans', String(n)), edit),
+        look: (choice, script, at, edit, compiled, ask) => paintLook(r, choice, script, path.join(dir, 'look-paints', `${at.plan}-${at.look}`), at, edit, compiled, ask) });
       // what nothing of the session may read: this checkout, the checkout it is a worktree of (with every worktree, cache
       // and earlier run under it), the subject list with its inputs, and whatever UNPAINT_SESSION_DENY adds (a:b:c)
       const deny = [...sessionDeny(spec), ...runs.filter(o => o !== r && o.sessionDir).map(o => o.sessionDir)];
@@ -420,7 +447,7 @@ async function sessionRun(r) {
         if (can(path.join(ROOT, 'package.json'))) throw new Error('the session\'s sandbox does not hold: a file of the repository can be read under it; the session is not started');
         if (!can(path.join(cwd, 'README.md'))) throw new Error('the session\'s sandbox cannot be started on this machine (its own folder is not readable under it); the session is not started');
       }
-      say(r, `${author.name} starts its working session (${author.cli}; level ${level.name}, try ${req.tryNumber}; the benchmark's budget for this try: ${wallMost} min on the clock, ${looksMost} looks, ${revertsMost} returns to an earlier choice${handed.length ? `; handed: ${handed.map(h => h.folder).join(', ')}` : ''}): ${call.closed}`);
+      say(r, `${author.name} starts its working session (${author.cli}; level ${level.name}, try ${req.tryNumber}; the benchmark's budget for this try: ${wallMost} min on the clock, ${looksMost} look units of rendering, ${revertsMost} returns to an earlier choice${handed.length ? `; handed: ${handed.map(h => h.folder).join(', ')}` : ''}): ${call.closed}`);
       server.start();
       // the clock starts when the model's command does: the wait for a place among the models at work is not on it
       const t0 = Date.now();
@@ -430,6 +457,9 @@ async function sessionRun(r) {
       let reviewText = null; try { reviewText = safeRead(cwd, 'self-review.md').slice(0, 20000); } catch { /* none written, or not a plain file of its folder */ }
       const review = readSelfReview(reviewText, server.looksTaken()), reviews = [{ written: Boolean(reviewText), look: review.look, differences: review.items, major: review.major, text: reviewText }];
       if (reviewText) fs.writeFileSync(path.join(dir, 'self-review.md'), reviewText);
+      // a retry's own assessment of its previous painting, written before it started: kept, never a gate
+      let assessment = null; try { assessment = safeRead(cwd, 'assessment.md').slice(0, 20000); } catch { /* none written */ }
+      if (assessment) fs.writeFileSync(path.join(dir, 'assessment.md'), assessment);
       await server.tick(); const kept = await server.stop();
       const seen = readTranscript(author.cli, fs.existsSync(path.join(dir, 'S.out.txt')) ? fs.readFileSync(path.join(dir, 'S.out.txt'), 'utf8') : '');
       fin = done.ended === 'not started' ? { failure: `the model could not be called: ${done.error}` } : finalChoice({ present: server.present, lastGood: kept.lastGood, good: kept.good, ended: done.ended, barred: server.barred });
@@ -439,6 +469,7 @@ async function sessionRun(r) {
       session = {
         ended: done.ended === 'budget reached' ? 'reached the benchmark\'s resource budget' : done.ended, exit: done.exit, error: done.ended === 'budget reached' ? null : done.error, level: level.name, tryNumber: req.tryNumber, budget, budgetReached, looksMost,
         ownMinutes: +(kept.ownSeconds / 60).toFixed(1), waitMinutes: +(kept.waitSeconds / 60).toFixed(1), wallMinutes: +((Date.now() - t0) / 60000).toFixed(1),
+        lookUnits: kept.lookUnits, assessment: terms.previous ? { asked: true, written: Boolean(assessment), text: assessment } : null,
         looks: kept.looks, selfReviews: reviews, turns: 1, plans: kept.plans.map(({ key, ...p }) => p), reverts: kept.reverts, warningsGiven: kept.warningsGiven, toolCalls: seen.calls, toolCallsTotal: Object.values(seen.calls).reduce((a, b) => a + b, 0),
         // the pictures it was handed: its own line on each (seen.md), and what its command's log shows of a read (null: that log cannot show one)
         pictures: kept.pictures ? { ...kept.pictures, logShowsRead: logReads(author.cli, seen.commands, kept.pictures.handed) } : null,
@@ -453,7 +484,7 @@ async function sessionRun(r) {
       if (fin.submitted) record.author.parity = { ...checkHandedOver(path.join(dir, 'folder'), JSON.parse(fs.readFileSync(path.join(dir, 'handed-over.json'), 'utf8'))), of: path.join(dir, 'handed-over.json') };
       // a session that named the painter, the repository or another session in a command went round its looks: it is not painted
       if (outside.length && !fin.failure) fin = { failure: `the look limit was not held: ${outside.length} of its commands name the painter or a place outside its folder (author/S.commands.txt); nothing of this session is painted`, submitted: fin.submitted };
-      say(r, `session ${session.ended === 'done' ? 'ended' : `ended (${session.ended})`}: ${session.wallMinutes} min on the clock (${session.ownMinutes} its own), ${kept.looks.length} of ${looksMost} looks, ${kept.plans.length} plans, ${session.toolCallsTotal} tool calls, ${kept.reverts.count} returns to an earlier choice, ${kept.warningsGiven} warnings given; handed over: ${fin.submitted ? `${fin.submitted.what}${fin.submitted.note ? ` (${fin.submitted.note})` : ''}` : 'nothing'}${outside.length ? `; ${outside.length} COMMANDS NAME PLACES OUTSIDE ITS FOLDER (S.commands.txt)` : ''}${pictures.length ? `; it made ${pictures.length} pictures of its own` : ''}`);
+      say(r, `session ${session.ended === 'done' ? 'ended' : `ended (${session.ended})`}: ${session.wallMinutes} min on the clock (${session.ownMinutes} its own), ${kept.looks.length} looks for ${kept.lookUnits.spent} of ${looksMost} look units, ${kept.plans.length} plans, ${session.toolCallsTotal} tool calls, ${kept.reverts.count} returns to an earlier choice, ${kept.warningsGiven} warnings given; handed over: ${fin.submitted ? `${fin.submitted.what}${fin.submitted.note ? ` (${fin.submitted.note})` : ''}` : 'nothing'}${outside.length ? `; ${outside.length} COMMANDS NAME PLACES OUTSIDE ITS FOLDER (S.commands.txt)` : ''}${pictures.length ? `; it made ${pictures.length} pictures of its own` : ''}`);
     } finally { fs.rmSync(cwd, { recursive: true, force: true }); }
   }
   record.author.session = session; record.author.label = authorLabel(record.author);
@@ -488,6 +519,33 @@ async function paintChoice(r, fin) {
   record.failure = painted.failure; record.results = painted.results;
   // the painter's own count of the edit it applied (the same rule, on the plan it built again)
   if (fin.edit) { try { record.author.planEdit = JSON.parse(fs.readFileSync(path.join(record.plate, 'plan-edit-record.json'), 'utf8')); } catch { /* the plan failed; the session's count stands */ } }
+}
+
+/**
+ * One look of a kept choice, painted for real, small, exactly as a session's look is (the word `look`): the whole
+ * plan, or stopped after a stage (--until), or a script's passages in a region (--region). No model is called. The
+ * run's folder gets look/ (the dried sheet beside the subject, the stages, the numbers) and the record says what the
+ * look was estimated to cost in units and what the machine really spent on it.
+ */
+async function lookOfChoice(r, fin) {
+  const { spec, record } = r, dir = path.join(record.out, 'author'), W = spec.sheet.widthMm;
+  const tools = await toolsOf(r, fin.choice);
+  if (tools) { record.author.tools = tools.record; say(r, `its tools: ${tools.said}`); if (tools.warnings?.length) { record.author.warnings = tools.warnings; for (const w of tools.warnings) say(r, `WARNING (laid as written): ${w}`); } }
+  const compiled = await compileChoice(r, fin.choice, fin.script, path.join(dir, 'plans', 'look'), fin.edit);
+  if (!compiled.ok) throw new Error(`the choice does not compile: ${compiled.error}`);
+  const forms = record.masks.mask ? await formBoxes(record.masks.mask, record.masks.forms, W) : [], given = req.region ? (r => (r.length === 4 && r.every(Number.isFinite) ? r : req.region))(req.region.split(',').map(Number)) : null;
+  const region = regionBox(given, { sheet: { widthMm: W, heightMm: spec.sheet.heightMm }, forms });
+  if (region && !fin.script) throw new Error('--region: a look of a region is painted for an own script only');
+  const estimate = lookCost(compiled.rows ?? [], { until: req.until, regionShare: region?.share ?? null });
+  say(r, `this look is estimated at ${estimate.cost} units (${estimate.strokes} of ${estimate.of} strokes${region ? `, ${Math.round(100 * region.share)}% of the sheet` : ''}); painting it`);
+  const got = await paintLook(r, fin.choice, fin.script, path.join(dir, 'look-paints', '1'), { plan: 1, look: 1 }, fin.edit, compiled, { until: req.until, region });
+  if (!got.ok) throw new Error(`the look was not painted: ${got.error}`);
+  const out = path.join(record.out, 'look'); fs.mkdirSync(out, { recursive: true });
+  fs.writeFileSync(path.join(out, 'beside.png'), got.picture); if (got.stages) fs.writeFileSync(path.join(out, 'stages.png'), got.stages); fs.writeFileSync(path.join(out, 'numbers.txt'), got.numbersText);
+  record.look = { until: req.until ?? null, region: region ? { box: region.box, name: region.name, share: +region.share.toFixed(4) } : null, estimate, painterSeconds: got.painted.seconds, stopped: got.painted.stopped, regionPassages: got.painted.regionPassages, cells: got.painted.cells, fullCells: got.painted.fullCells, backend: got.painted.backend, picture: path.join(out, 'beside.png'), plate: got.painted.plate };
+  fs.writeFileSync(path.join(out, 'look.json'), JSON.stringify(record.look, null, 1) + '\n');
+  record.results = collectResults(compiled.plate, 'plan'); record.plate = compiled.plate; record.seconds = got.painted.seconds;
+  say(r, `look painted and dried in ${got.painted.seconds} s on the ${got.painted.backend?.backend}: ${path.join(out, 'beside.png')}${got.painted.stopped ? `; stopped after stage ${req.until}: ${got.painted.stopped.passesDone} of ${got.painted.stopped.passesPlanned} passes` : ''}${got.painted.regionPassages ? `; ${got.painted.regionPassages} in the region` : ''}`);
 }
 
 async function oneRun(r) {
@@ -526,7 +584,7 @@ async function oneRun(r) {
       if (choice.tools) for (const [k, to] of [['lines', 'linesEdit'], ['forms', 'formsEdit']]) if (choice.tools[k]) choice.tools[to] = read(choice.tools[k]);
       const fin = { choice, script: choice.kind === 'script' ? checkAuthored(read(choice.script), { sheetWidthMm: spec.sheet.widthMm }).script : null, edit: choice.kind === 'plan' ? read(choice.plan) : null, submitted: { kind: choice.kind, what: choiceKind(choice) } };
       record.author.chose = fin.submitted.what; record.author.label = authorLabel(record.author);
-      await paintChoice(r, fin);
+      if (req.look) await lookOfChoice(r, fin); else await paintChoice(r, fin);
     } else if (author.work === 'session') {
       await sessionRun(r);
     } else {

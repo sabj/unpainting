@@ -43,14 +43,18 @@ at least 60 seconds. The clock of this try is the wall clock: the planner's minu
 
 | Command | What it does | What it returns | Limit |
 |---|---|---|---|
-| `./unpaint status` | nothing | what is used of this try's budget (minutes on the clock, looks, returns to an earlier choice) and the plans made so far | none |
+| `./unpaint status` | nothing | what is used of this try's budget (minutes on the clock, look units, returns to an earlier choice) and the plans made so far | none |
 | `./unpaint plan` | runs the wash planner on your present `choice.json` (and your script or edited plan, if the choice names one) | whether it compiled, or why it was refused, and its counts (shapes or passages, washes, strokes, widest brush, washes by stage, and how far the hand jumps between consecutive strokes of one passage, median and worst, in mm; for an edited plan also how many washes you left untouched, changed, moved, merged, left out and added), and every WARNING on your choice (each is laid as you wrote it; heed or ignore it). Nothing else: no picture and no wash data | none |
-| `./unpaint look` | the same, then PAINTS your present choice for real, small, through drying, and shows you the dried sheet | `looks/N/beside.png` (your painting as it dried, the subject, the middle study, side by side), `looks/N/stages.png` (the subject, then your sheet at 10, 25, 50, 75 and 100% of the strokes: the order of the work), `looks/N/numbers.txt` (each named form measured on the DRIED sheet against the study and against your plan, marked when it is TOO DARK or TOO PALE, and every wash), `looks/N/plan.json` (every wash as data, as in `auto/plan.json`), `looks/N/plan.png` (the plan as a diagram) | LOOKS_MOST looks in this try (the benchmark's budget) |
+| `./unpaint look` | the same, then PAINTS your present choice for real, small, through drying, and shows you the dried sheet | `looks/N/beside.png` (your painting as it dried, the subject, the middle study, side by side), `looks/N/stages.png` (the subject, then your sheet at 10, 25, 50, 75 and 100% of the strokes: the order of the work), `looks/N/numbers.txt` (each named form measured on the DRIED sheet against the study and against your plan, marked when it is TOO DARK or TOO PALE, and every wash), `looks/N/plan.json` (every wash as data, as in `auto/plan.json`), `looks/N/plan.png` (the plan as a diagram) | its cost in look units, of LOOKS_MOST for this try (the benchmark's budget) |
+| `./unpaint look --until S` | the same, stopped after stage S of your plan (1 the first washes) and dried there; nothing after it is painted | the same files; `numbers.txt` begins with what is on the paper and what is still to come | that stage's share of the plan's strokes |
+| `./unpaint look --region x0,y0,x1,y1` or `--region FORM NAME` | your own script only: paints the passages that touch that box (sheet millimetres) or that named form's box, and what they are laid into, by themselves on the sheet | the same files | the region's share of the sheet (with `--until` too: both shares multiplied) |
+| `./unpaint cost [--until S] [--region ...]` | prices that look of your present choice and paints nothing | the cost in units and what you have left | none |
 | `./unpaint wait` | waits for the answer of the command that said "still working" | that answer | none |
 
 A choice the planner refuses costs no look. A choice that is exactly one you planned before and then left is a
 return to an earlier choice: it is counted, and past REVERTS_MOST of them it is refused (`TASK.md` says why). A painting that fails on this side costs no look either: the answer
-says NOT PAINTED, and you may ask again. A look at a choice you have already looked at still costs a look.
+says NOT PAINTED, and you may ask again. The same look of a choice you have already looked at renders nothing and
+costs nothing. No look costs less than 0.05 units: the sheet is set up, drawn on and dried whatever is painted.
 
 What a look's painting is, exactly:
 
