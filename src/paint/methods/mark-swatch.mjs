@@ -87,10 +87,14 @@ export function markLayout(mark, sheetMm) {
  * Lay a mark's swatch and read it. `T`: the passage's technique (its water, passes, whether it goes into wet); `env`:
  * paths and mask (markLayout), pigment, physics, paperOptions, charge (the concentration that should lay SWATCH.want),
  * upright, water(T), paintBrush(r, T), dip, stroke, step, dry, and prepareBed/settle for a mark laid into wet (as
- * scrap-swatch.mjs). Returns {delivered, whole, coverage, covered}: the core's thickness over want (the darker half of the
- * planned footprint), the whole footprint's, the share of the footprint the mark's paint covers (cells holding at
- * least a quarter of the core's film), and the mean film over those covered cells, over want. The caller charges a passage so its
- * planned footprint holds the planned paint, reckoning the footprint as no less covered than a floor (tools/plate/sheet.mjs).
+ * scrap-swatch.mjs). Returns {mass, delivered, whole, coverage, covered}: mass is all the paint the mark laid, on its
+ * planned footprint and past it, over what the footprint was planned to hold: the caller charges a passage by it, so the
+ * sheet holds the passage's planned paint. A light touch of a wide round lays most of its paint outside the narrow
+ * footprint the plan draws for it: charged until that footprint alone held the planned film (as this was first written),
+ * a script's touches were charged 20 to 77 times over and dried 11 to 26 L* darker than planned. The others describe
+ * where the paint lies: the core's thickness over want (the darker half of the planned footprint), the whole
+ * footprint's, the share of the footprint the paint covers (cells holding at least a quarter of the core's film), and
+ * the mean film over those covered cells, over want.
  */
 export function markDelivery(T, { mask, paths, pigment, physics, paperOptions, charge, upright, water, paintBrush, dip, stroke, step, dry, prepareBed = null, settle = null, scrap: given = null, channel = 0 }) {
   if (!Number.isInteger(T.passes) || T.passes < 1) throw new RangeError(`mark swatch: ${T.name} needs a whole number of passes, got ${T.passes}`);
@@ -115,12 +119,12 @@ export function markDelivery(T, { mask, paths, pigment, physics, paperOptions, c
   return readMark(thickness(scrap)[channel], mask, want);
 }
 
-/** A dried mark swatch read over its planned footprint: see markDelivery. */
+/** A dried mark swatch read over its planned footprint, and its paint over the whole scrap: see markDelivery. */
 export function readMark(th, mask, want) {
-  const v = []; for (let i = 0; i < mask.length; i++) if (mask[i]) v.push(th[i]);
+  const v = []; let all = 0; for (let i = 0; i < mask.length; i++) { all += th[i]; if (mask[i]) v.push(th[i]); }
   if (!v.length) throw new Error('mark swatch: the mark has no footprint on the scrap');
   v.sort((a, b) => b - a);
   const half = Math.max(1, v.length >> 1), core = v.slice(0, half).reduce((a, x) => a + x, 0) / half, whole = v.reduce((a, x) => a + x, 0) / v.length;
   const lies = core > 0 ? v.filter(x => x >= 0.25 * core) : [];
-  return { delivered: core / want, whole: whole / want, coverage: lies.length / v.length, covered: lies.length ? lies.reduce((a, x) => a + x, 0) / lies.length / want : 0 };
+  return { mass: all / v.length / want, delivered: core / want, whole: whole / want, coverage: lies.length / v.length, covered: lies.length ? lies.reduce((a, x) => a + x, 0) / lies.length / want : 0 };
 }

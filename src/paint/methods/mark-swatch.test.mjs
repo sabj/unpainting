@@ -35,6 +35,15 @@ test('a swatch is read at its core: a narrow track at full film reads full, with
   for (let i = 0; i < 60; i++) th[i] = 0.3;
   const r = readMark(th, mask, 0.3);
   assert.ok(Math.abs(r.delivered - 1) < 1e-6); assert.ok(Math.abs(r.whole - 0.6) < 1e-6); assert.ok(Math.abs(r.coverage - 0.6) < 1e-6); assert.ok(Math.abs(r.covered - 1) < 1e-6, 'where the paint lies it is the full film');
+  assert.ok(Math.abs(r.mass - 0.6) < 1e-6);
+});
+
+test('a mark is charged by all the paint it lays: what runs past its planned footprint counts', () => {
+  const mask = new Uint8Array(100), th = new Float32Array(100).fill(0.03);
+  for (let i = 0; i < 10; i++) mask[i] = 1;
+  const r = readMark(th, mask, 0.3);
+  assert.ok(Math.abs(r.whole - 0.1) < 1e-6, 'a tenth of the planned film inside the footprint');
+  assert.ok(Math.abs(r.mass - 1) < 1e-5, `but the planned paint is all on the scrap: ${r.mass}`);
 });
 
 test('a mass is tried as a mass: copies stepped over one another about as deep as the passage\'s marks, keyed apart from lone marks', () => {

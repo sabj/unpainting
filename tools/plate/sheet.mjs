@@ -792,8 +792,6 @@ GRADED_CAL = CAL_RESULT.value.GRADED_CAL;
 // and passes (src/paint/methods/instrument-cal.mjs). A value plan's shadow glaze is one pass of a 0.45-water brush; the
 // stock glazed swatch is two passes at 0.58 and lays 2.5 times as much. A passage
 // laid into wet is charged the same way (chargedFromOwnSwatch).
-// --markcoverleast s: the least share of a mark's planned footprint its charge is reckoned over (see measureMark). Default 0.75.
-const MARK_COVER_LEAST = num('markcoverleast', 0.75);
 // --dampchargemost k: the most a script's passage laid into wet paint is charged, as a multiple of the same instrument's
 // charge on dry paper (damp-swatch.mjs dampCharge). Default 8.
 const DAMP_CHARGE_MOST = num('dampchargemost', 8);
@@ -805,17 +803,15 @@ const INSTRUMENT_CAL = createInstrumentCal({
   stock: Object.fromEntries(STOCK_TECHNIQUES.map(T => [T.name, { technique: T, cal: CAL[T.name], graded: GRADED_CAL[`${T.name} graded`] ?? null }])),
   // the scrap dries as the stock swatches do, without touching the painting's own wet-contact records
   measure: T => { const [{ plain, graded }] = scrapSwatches([T], (scrap, max, o, options) => physicalDry(scrap, max, o, nativeDryOptions(NATIVE_PAINT_MODE.mode, options))); return { cal: chargeFactor(plain.delivered), graded: gradedReading(graded) }; },
-  // a mark's swatch: the mark itself on the sheet's own paper, its brush a round of its width, charged as a passage
-  // of separate marks is, so that its planned footprint holds the planned paint (what the preview draws and the
-  // planned-against-laid table measures). A mark whose paint covers less than MARK_COVER_LEAST of its planned footprint
-  // (a dab shorter than its brush is wide covers 39%) is not charged up to fill the rest: where its paint lies the film
-  // is at most 1 / MARK_COVER_LEAST of the mix's. The swatch's log line gives the coverage
-  // A mark of a passage laid into wet paint (mark.damp) is tried over a damp wash; its reading carries what it filled
-  // of its footprint and what its brush took up, and instrumentOf reckons the passage's own factor from them.
-  measureMark: (T, mark) => { const r = scrapMark(T, mark), filled = r.covered * Math.max(r.coverage, MARK_COVER_LEAST); return { cal: chargeFactor(filled), filled, lift: r.lift ?? 0, delivered: r.delivered, whole: r.whole, coverage: r.coverage, covered: r.covered }; },
+  // a mark's swatch: the mark itself on the sheet's own paper, its brush a round of its width, charged as a passage of
+  // separate marks is, and read for all the paint it lays (mark-swatch.mjs readMark, mass), so the sheet holds the
+  // passage's planned paint. A mark of a passage laid into wet paint (mark.damp) is tried over a damp wash; its reading
+  // carries what its brush took up of the wash, and instrumentOf reckons the passage's own factor from both.
+  measureMark: (T, mark) => { const r = scrapMark(T, mark); return { cal: chargeFactor(r.mass), mass: r.mass, lift: r.lift ?? 0, delivered: r.delivered, whole: r.whole, coverage: r.coverage, covered: r.covered }; },
   markKey,
-  // a script's wash laid into wet paint: its lanes over a damp wash; what it laid of its own paint and what it took up of the wash
-  measureDamp: T => { const [{ plain }] = scrapSwatches([T], swatchDry, { damp: true }), dry = INSTRUMENT_CAL.of(T).cal; return { cal: dampCharge(plain.delivered, { lift: plain.lift, under: 1, dry, most: DAMP_CHARGE_MOST }).cal, delivered: plain.delivered, lift: plain.lift, dry }; },
+  // a script's wash laid into wet paint: its lanes over a damp wash; what it laid of its own paint (all of it: in a wet
+  // wash it runs past the swatch's square) and what it took up of the wash
+  measureDamp: T => { const [{ plain }] = scrapSwatches([T], swatchDry, { damp: true }), dry = INSTRUMENT_CAL.of(T).cal; return { cal: dampCharge(plain.all, { lift: plain.lift, under: 1, dry, most: DAMP_CHARGE_MOST }).cal, delivered: plain.all, lift: plain.lift, dry }; },
   log: line => console.log(line),
 });
 const ownSwatch = T => chargedFromOwnSwatch(T, { instrumentOn: true, authored: false });
@@ -832,7 +828,7 @@ const instrumentOf = (T, sh = null) => {
       const r = INSTRUMENT_CAL.ofMark(T, { ...mark, depth: sh._cover ?? 1, damp });
       if (!damp) return r;
       const dry = INSTRUMENT_CAL.ofMark(T, { ...mark, depth: sh._cover ?? 1, damp: false }).cal;
-      return { ...r, ...dampCharge(r.filled, { lift: r.lift, under, dry, most: DAMP_CHARGE_MOST }), dry, under, damp };
+      return { ...r, ...dampCharge(r.mass, { lift: r.lift, under, dry, most: DAMP_CHARGE_MOST }), dry, under, damp };
     } catch (e) { console.log(`MARK SWATCH FAILED for passage ${sh._valuePlan.script?.passage ?? sh._valuePlan.id} (${T.name}, brush ${(2 * mark.radiusMm).toFixed(1)} mm): ${e.message.slice(0, 160)}; CHARGED FROM THE WASH LANE SWATCH INSTEAD`); ctx.MARK_SWATCH_FAILURES = (ctx.MARK_SWATCH_FAILURES ?? 0) + 1; }
   }
   if (ownSwatch(T) && damp) { const r = INSTRUMENT_CAL.ofDamp(T); return { ...r, ...dampCharge(r.delivered, { lift: r.lift, under, dry: r.dry, most: DAMP_CHARGE_MOST }), under, damp }; }

@@ -99,6 +99,7 @@ test('a mark is tried over the damp wash the same way', () => {
   assert.equal(calls.length - before, L.copies);
   assert.ok(calls.slice(before).every(c => c.conc[0] === 0 && c.conc[1] > 0));
   assert.ok(Math.abs(r.covered - 1) < 1e-6 && r.coverage === 1, JSON.stringify(r));
+  assert.ok(r.mass >= 1, 'the mark\'s own paint over the whole scrap, the wash under it left out');
 });
 
 test('without a scrap given, a swatch is laid on its own one-pigment scrap as before', () => {
