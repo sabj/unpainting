@@ -7,6 +7,7 @@ import {check} from '../../src/media/checks.mjs';
 import {layIntoWetBed} from '../painter/wet-bed-wait.mjs';
 import {waitBesideDamp} from '../painter/beside-damp.mjs';
 import {prepareWetBed} from '../painter/wet-bed-prep.mjs';
+import {isTinyTouch, tinyTouchRecord, tinyTouchLine} from '../../src/paint/methods/tiny-touch.mjs';
 import {drawFineMaterial, drawOnFineSheet, fineGestures} from '../../src/paint/methods/fine-material.mjs';
 import {createDeliveryCal} from '../../src/paint/methods/delivery-cal.mjs';
 import {drawMaterial, sourceDrawingCaps} from '../../src/paint/methods/material-profiles.mjs';
@@ -103,6 +104,8 @@ const productionDip=(b,o)=>{const requested=o,prepared=productionWaterLoad(o,PRO
 
 // a clean brush made like the painting brush takes its settings, not the GPU stroke it may still have pending (b._pend)
 const brushSettings=b=>{const {_pend,...settings}=b;return settings;};
+// --touchleastmm2 a: the least area a stroke must touch to be given a wet bed, mm2 (src/paint/methods/tiny-touch.mjs). Default 1.2.
+const TOUCH_LEAST_MM2=num('touchleastmm2',1.2);
 const stroke=(b,target,points,options)=>{
  if(ctx.VALUE_ACTIVE&&target===ctx.sheet){
   // a wash plan's stroke says whether it is a round's (paint.mjs vectorPaths): a round turns with its path, a lane is swept
@@ -147,14 +150,20 @@ const stroke=(b,target,points,options)=>{
   // a stroke whose footprint holds no paintable cell (off the sheet, or wholly on kept paper) has no bed to prepare: it is
   // logged and laid as it is (it can put nothing down), never a stop
   if(paint&&ownBed&&ctx.VALUE_ACTIVE.move==='wet on wet'&&!cells.length){JSONL.append(path.join(out,'value-commands.jsonl'),JSON.stringify({kind:'empty-footprint',intent:ctx.VALUE_ACTIVE.id,note:'no paintable cell under the stroke: no wet bed prepared'})+'\n');ctx.EMPTY_FOOTPRINTS=(ctx.EMPTY_FOOTPRINTS??0)+1;if(ctx.EMPTY_FOOTPRINTS<=5)console.log(`passage ${ctx.VALUE_ACTIVE.id}: a stroke with no paintable cell under it; no wet bed prepared (logged in value-commands.jsonl)`);}
-  else if(paint&&!intoOwnWash&&ownBed&&ctx.VALUE_ACTIVE.move==='wet on wet'){
+  // a touch under --touchleastmm2 (src/paint/methods/tiny-touch.mjs: a stroke so short its brush only lands on its tip) is
+  // laid as a plain touch on the paper as it stands: no bed is prepared for it and none waited on (a bed cannot be made
+  // on a few cells: the clean brush wets the same tip). Every one is said in the log and kept in tiny-touches.json.
+  const SHEET_CELL_MM=num('sheetmm',DEFAULT_SHEET_MM)/target.w;
+  const tinyTouch=paint&&!intoOwnWash&&ownBed&&ctx.VALUE_ACTIVE.move==='wet on wet'&&isTinyTouch(cells.length,SHEET_CELL_MM,TOUCH_LEAST_MM2);
+  if(tinyTouch){const t=tinyTouchRecord({intent:ctx.VALUE_ACTIVE,cells:cells.length,cellMm:SHEET_CELL_MM,points,leastMm2:TOUCH_LEAST_MM2});(ctx.TINY_TOUCHES??=[]).push(t);console.log(tinyTouchLine(t));JSONL.append(path.join(out,'value-commands.jsonl'),JSON.stringify({kind:'tiny-touch',...t})+'\n');fs.writeFileSync(path.join(out,'tiny-touches.json'),JSON.stringify({kind:'strokes under the least area for a wet bed, laid as plain touches (src/paint/methods/tiny-touch.mjs)',leastMm2:TOUCH_LEAST_MM2,touches:ctx.TINY_TOUCHES},null,1));}
+  else if(paint&&!intoOwnWash&&ownBed&&ctx.VALUE_ACTIVE.move==='wet on wet'&&cells.length){
     const prepOpts={upright:options.upright,lift:false,spacing:options.spacing};
     const preparation=(()=>{try{return prepareWetBed({settings:brushSettings(b),bristles:b.hairs.length,seed:911+ctx.VALUE_COMMAND,pigments:SHEET_PIGS.length,target,points,prepOpts,observe:observeBed,gate:()=>measurePaper(target,getObservationCells(),SPEED_PAPER,{stats:'gate'}),advance:()=>ctx.clock('flow',()=>step(target,{...O,dt:2})),createBrush,dip,thirsty,stroke});}catch(e){e.message=`passage ${ctx.VALUE_ACTIVE.id} (value band ${ctx.VALUE_ACTIVE.valueBand}, ${(freshCells.length?freshCells:cells).length} cells in its footprint): ${e.message}`;throw e;}})();paper=preparation.paper;
     JSONL.append(path.join(out,'passage-material-preparation.jsonl'),JSON.stringify({intent:ctx.VALUE_ACTIVE.id,admission:'actual allowed paint footprint; adjacent paper inspected separately',neighbors:fastMode?null:measurePaper(target,neighbors,SPEED_PAPER),...preparation})+'\n');
   }
   // A wet stroke into a fresh wash waits for the shine to go off, then is laid; uneven paper is counted, not a stop (tools/painter/wet-bed-wait.mjs).
   let wetWaits=0;
-  if(paint&&!intoOwnWash&&cells.length&&['wet on wet','dry on wet'].includes(ctx.VALUE_ACTIVE.move)){const observeWet=()=>measurePaper(target,getObservationCells(),SPEED_PAPER,{uniform:false});({paper,wetWaits}=layIntoWetBed({paper:observeWet(),observe:observeWet,step:o=>step(target,o),O,info:{id:ctx.VALUE_ACTIVE.id,band:ctx.VALUE_ACTIVE.valueBand,cells:cells.length}}));}
+  if(paint&&!intoOwnWash&&!tinyTouch&&cells.length&&['wet on wet','dry on wet'].includes(ctx.VALUE_ACTIVE.move)){const observeWet=()=>measurePaper(target,getObservationCells(),SPEED_PAPER,{uniform:false});({paper,wetWaits}=layIntoWetBed({paper:observeWet(),observe:observeWet,step:o=>step(target,o),O,info:{id:ctx.VALUE_ACTIVE.id,band:ctx.VALUE_ACTIVE.valueBand,cells:cells.length}}));}
   const [primary,neighborPaper]=NATIVE_PAINT_MODE.mode==='fast'?[null,null]:measurePaperBatch(target,[{cells},{cells:neighbors}],SPEED_PAPER,{uniform:SPEED_UNIFORM_PAPER});
   const id='value-contact-'+(++ctx.VALUE_COMMAND),record={id,commandId:ctx.VALUE_COMMAND,intent:ctx.VALUE_ACTIVE.id,phase:ctx.VALUE_ACTIVE.phase,valueBand:ctx.VALUE_ACTIVE.valueBand,regions:ctx.VALUE_ACTIVE.regions,crossesRegions:ctx.VALUE_ACTIVE.crossesRegions,kind:paint?'pigment':'clean-water',ownWetEdge:own,paper,wetWaits,primary,neighbors:neighborPaper,brushBefore:load,geometry:points,options};
   if(!Number.isFinite(load.waterMass)||load.pigmentMass.some(v=>!Number.isFinite(v)))throw Error('value-plan nonfinite brush');
@@ -197,6 +206,7 @@ const pencilDraw=(target,gs,pigment,options)=>{
  // --washplan script:FILE.json: the washes are a painting script written by an author (script-washes.mjs,
  // docs/painting-script.md): passages in painting order, each laid in whole strokes; no study is read
  const SCRIPT=WASH_PLAN.startsWith('script:')?JSON.parse(fs.readFileSync(path.resolve(root,WASH_PLAN.slice(7)),'utf8')):null;
+ if(SCRIPT)valueOptions.touchLeastMm2=TOUCH_LEAST_MM2;
  // --thingmasks RECEIPT.json (default auto: IMAGE.named-sam.json beside the source, when there is one): the source's named
  // forms (a reviewed SAM id map bound to the source by its receipt) for the study wash plan; --things names the label file
  // the receipt must match. No receipt: no named forms, and the plan is as it was without them.
