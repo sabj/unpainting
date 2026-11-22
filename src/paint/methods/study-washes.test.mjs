@@ -310,3 +310,27 @@ test('a white of the block-in that the richer studies tint is washed in their co
   const others = pl => pl.instructions.filter(q => !blue(q)).map(q => [q.colour, q.stage]);
   assert.ok(others(off).length >= 2); assert.deepEqual(others(p), others(off));
 });
+
+test('a tinted white AND a form read into colours of its own, in one plan: the white is washed as without the form\'s setting, the form is read as without the white', () => {
+  // the sky is white in the block-in and pale blue in the richer studies (so the block-in is read a second time); the
+  // wall under it is a named form in two near tones, which its own clusters and join keep apart and the study's join merges
+  const field = [128, 150, 110], w = 320, h = 200;
+  const picture = sky => { const rgb = new Uint8ClampedArray(w * h * 3); for (let i = 0; i < w * h; i++) { const x = (i % w) / 2, y = ((i / w) | 0) / 2; rgb.set(x >= 20 && x < 140 && y >= 10 && y < 90 ? (y < 50 ? sky : x < 80 ? [236, 218, 186] : [226, 206, 172]) : field, i * 3); } return { w, h, rgb }; };
+  const blockIn = picture([255, 255, 255]), rich = picture([196, 214, 236]);
+  const masks = { width: w, height: h, ids: Uint8Array.from({ length: w * h }, (_, i) => { const x = (i % w) / 2, y = ((i / w) | 0) / 2; return x >= 20 && x < 140 && y >= 50 && y < 90 ? 1 : 0; }), names: ['a wall'], kinds: ['building'], provenance: { schema: 'named-sam-v1' } };
+  const run = ({ read = null, forms = null } = {}) => { const log = console.log; console.log = () => {}; try { return planStudyWashes({ k: pigments.length, w, h, studies: [{ rgb: blockIn.rgb, file: 'block-in', ...(read ? { read } : {}), ...(forms ? { forms } : {}) }, { rgb: rich.rgb, file: 'middle', minMm2: 4 }, { rgb: rich.rgb, file: 'fine', minMm2: 2 }], paperRGB: PAPER, pigments, sheetWidthMm: 160, washBrushMm: 5, washKitMm: [38, 25.4, 7, 5], thingMasks: masks }); } finally { console.log = log; } };
+  const own = { 1: { clusters: 6, join: 2 } };
+  const white = run(), both = run({ forms: own }), form = run({ read: { whites: 2 }, forms: own }), neither = run({ read: { whites: 2 } });
+  const blue = q => q.colour[2] > q.colour[0] + 10, inWall = q => q.forms?.[0]?.kind === 'building' && q.forms[0].share > 0.8, told = qs => qs.map(q => [q.colour, q.stage]);
+  // the white: washed, the same area, the same blue washes, with the form's setting or without
+  assert.ok(both.summary.whitesWashedMm2 > 0.9 * 120 * 40); assert.equal(both.summary.whitesWashedMm2, white.summary.whitesWashedMm2);
+  assert.ok(both.instructions.some(blue)); assert.deepEqual(told(both.instructions.filter(blue)), told(white.instructions.filter(blue)));
+  // the form: its own colours give the wall's darker half a wash of its own over the wall's wash, where the study's colours
+  // leave the wall one wash; the same washes with the white or without (the wall's wash runs a little over the sky's edge)
+  assert.equal(neither.instructions.filter(inWall).length, 1); assert.equal(form.instructions.filter(inWall).length, 2);
+  assert.deepEqual(told(both.instructions.filter(inWall)), told(form.instructions.filter(inWall)));
+  // nothing left bare by the two together, and no colour that neither reading has
+  assert.ok(both.summary.reservedShare < 0.02 && both.summary.paintedShare > 0.97, `${both.summary.reservedShare} ${both.summary.paintedShare}`);
+  const seen = new Set([...told(white.instructions), ...told(form.instructions)].map(String));
+  for (const t of told(both.instructions)) assert.ok(seen.has(String(t)), `a wash of neither reading: ${t}`);
+});
