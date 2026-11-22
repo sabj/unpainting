@@ -671,7 +671,10 @@ export function planStudyWashes({ k, w, h, studies, flat = false, density = null
   // wall, a small white), reserving only the true lights; the other shapes go over it. Lightest family first.
   const fam = new Int32Array(shapes.length).fill(-1);
   // the soft named forms begun with one base wash; a shape in one is in no family (the base is its under-wash)
-  const baseOn = (R1.formbase ?? READ.formbase) > 0, basePer = F1.ids('formbase').length ? id => F1.per(id, 'formbase', null) : null;
+  // a line-led picture (pen and wash: the drawing carries the forms) is not begun with a whole-form wash into clean water:
+  // it lifts pen ink that still rewets and lays one flat value under lights the drawing leaves as paper. There a form has
+  // a base wash only where the study's settings ask for one (@formbase, or a form's own)
+  const baseOn = (R1.formbase ?? (drawn ? 0 : READ.formbase)) > 0, basePer = F1.ids('formbase').length ? id => F1.per(id, 'formbase', null) : null;
   const { bases, baseOf } = !flat && !MONO && (baseOn || basePer) ? formBases(named, label, shapes, paperMask, cellMm2, { on: baseOn, per: basePer }) : formBases(null, label, shapes, paperMask, cellMm2);
   const roots = flat ? [] : painted.filter(i => parent[i] < 0 && baseOf[i] < 0 && shapes[i].lab[0] >= FIRST_L && share(i) >= FAMILY_LEAST).sort((a, b) => shapes[b].lab[0] - shapes[a].lab[0] || share(b) - share(a));
   for (const r of roots) for (const q of under(r)) if (fam[q] < 0 && baseOf[q] < 0) fam[q] = r;

@@ -268,6 +268,17 @@ test('a soft named form is begun with one pale base wash laid into clean water; 
   assert.ok(planWith(st, { thingMasks: face }, { formbase: 0 }).instructions.some(q => /under-wash/.test(q.thing)));
 });
 
+test('a line-led picture (pen and wash) is not begun with whole-form base washes, unless the study asks for one', () => {
+  const st = patchStudy(), face = { width: st.w, height: st.h, ids: new Uint8Array(st.w * st.h).fill(1), names: ['a face'], kinds: ['face'] };
+  const lineLed = planWith(st, { thingMasks: face, drawn: true }), washLed = planWith(st, { thingMasks: face }), noForms = planWith(st, { drawn: true });
+  assert.ok(lineLed.instructions.every(q => !/base wash/.test(q.thing)), 'no base wash over a pen drawing');
+  assert.ok(lineLed.instructions.every(q => q.move !== 'wet on wet' || !/whole form/.test(q.thing)));
+  assert.ok(washLed.instructions.some(q => /^base wash of a face/.test(q.thing)), 'a wash-led picture keeps its base wash');
+  // without the base wash the line-led plan is the plan the picture had before named forms were read
+  assert.deepEqual(lineLed.instructions.map(q => q.thing), noForms.instructions.map(q => q.thing));
+  assert.ok(planWith(st, { thingMasks: face, drawn: true }, { formbase: 1 }).instructions.some(q => /^base wash of a face/.test(q.thing)), 'asked for by the study, it is laid');
+});
+
 test('the base wash of a dark form is a mid-tone, and the darks go over it', () => {
   // a near-black animal 100 x 70 mm with a lighter grey patch under 8% of it
   const w = 320, h = 200, rgb = new Uint8ClampedArray(w * h * 3).fill(255);
