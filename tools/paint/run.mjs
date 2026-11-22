@@ -4,6 +4,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync, spawn } from 'node:child_process';
+import { FRAME_FILE } from '../../src/media/frame-file.mjs';
 
 /** The GPU paintings in a `ps -axo pid=,command=` listing: paint-plate runs that are not --gpu off. [{pid, command}] */
 export function gpuPaints(psText) {
@@ -78,7 +79,7 @@ export function collectResults(out, mode) {
   const has = f => (files.includes(f) ? path.join(out, f) : null);
   const plan = readJson(path.join(out, 'value-plan.json')), risk = readJson(path.join(out, 'cheat-risk.json'));
   const painting = has('painting.png') ?? has('painting.jpg');
-  const lastFrame = files.filter(f => /^f\d+\.jpg$/.test(f)).sort().pop();
+  const lastFrame = files.filter(f => FRAME_FILE.test(f)).sort().pop();
   const strip = fs.existsSync(path.join(out, 'stages', 'strip.jpg')) ? path.join(out, 'stages', 'strip.jpg') : null;
   const sum = plan?.summary ?? null, passes = plan?.passes ?? [], be = readJson(path.join(out, 'backend.json'));
   const widest = passes.reduce((m, p) => Math.max(m, Number(p.widestBrushMm) || 0), 0);

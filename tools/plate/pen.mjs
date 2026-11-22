@@ -1,6 +1,7 @@
 // Film frames and the plan of the pen drawing.
 // Stage 4 of 7 of tools/paint-plate.mjs. The stages run in order and share one object, ctx: see the entry file.
-import {fastPaintFrame} from '../speed/frame-policy.mjs';
+import {fastKeepsFrame} from '../speed/frame-policy.mjs';
+import {frameFormat, frameName, encodeFrame} from '../../src/media/frame-file.mjs';
 import {scaleDrawingGestures} from '../../src/paint/methods/drawing-hand.mjs';
 import {cutInDarkWash} from '../../src/paint/methods/ink-dark-skip.mjs';
 import {prepareDrawing} from '../../src/paint/methods/material-profiles.mjs';
@@ -30,9 +31,19 @@ const { opt, num, optTrack, NATIVE_PAINT_MODE, FRAME_POLICY, root, out, RUN_CACH
   DRAW_STYLE, EDGE, FINISH, SEP, STAGE_PLAN, FACE_INK, REQUESTED_DRAW_MEDIUM, STYLE_ON, STYLE_INK_DEFAULT, 
   GRAPHITE_PROFILE, OUTLINE_MEDIUM, INK, PENCIL, GRAPHITE, GRAPHITE_AT, LAYIN_ONLY, SC, W2, H2, N2, PB, paper, INKRES, 
   TARGET_DRAW_EDGE, sourceInkDrawing, drawingCapsFor, OUT_W, OUT_H, base, SHADE, TONE_STAGE, view, framer, 
-  drainFrames } = ctx;
+  drainFrames, PENDING_IO } = ctx;
 Object.assign(ctx, { planPen });
 ctx.frame = 0;
+// The film's frames are lossless (WebP, else PNG); the checkpoint frames of a painting without a film are JPEG.
+const FRAME_FORMAT = frameFormat(FRAME_POLICY.film, Boolean(sharp.format.webp?.output?.file));
+ctx.FRAME_FORMAT = FRAME_FORMAT;
+// A frame rendered on the painter's thread is written to its file. A film's lossless frames are encoded while the
+// painting goes on, a few at a time (drainFrames waits for the rest); a JPEG checkpoint is written before going on.
+const writeFrame = async (rgb, name) => {
+  if (!FRAME_POLICY.film) { await encodeFrame(sharp(rgb, { raw: { width: OUT_W, height: OUT_H, channels: 3 } }), name).toFile(path.join(out, name)); return; }
+  if (PENDING_IO.length >= 6) await Promise.all(PENDING_IO.splice(0));
+  PENDING_IO.push(encodeFrame(sharp(Buffer.from(rgb), { raw: { width: OUT_W, height: OUT_H, channels: 3 } }), name).toFile(path.join(out, name)));
+};
 // Every frame is recorded with the stage it shows: which pass of how many, which value, and what is under way.
 const FRAMES = [];
 ctx.STAGE = { stage: 'paper', pass: 0, value: 0 };
@@ -60,28 +71,25 @@ ctx.LAST_FRAME_STAGE=null;
 const shoot = async () => {
   if (ctx.RESUMING) return; // a fresh process taking over a saved painting: its frames are already on disk
   if (!FRAME_POLICY.keep(ctx.STAGE)) return;
-  // Fast films only completed paint boundaries: every fourth pass and every dried value band; all other stages survive.
+  // Fast mode: a film keeps every frame asked for, the ones inside a pass too; keeping all frames without a film keeps
+  // completed paint boundaries only (every fourth pass and every dried value band); all other stages survive.
   // (and whatever the checkpoint policy keeps: keeping every frame never keeps fewer)
-  if(FRAME_POLICY.all && NATIVE_PAINT_MODE.mode==='fast' && !fastPaintFrame(ctx.STAGE) && !FRAME_POLICY.byDefault)return;
   const stageKey=JSON.stringify(ctx.STAGE);
-  if(NATIVE_PAINT_MODE.mode==='fast' && ctx.LAST_FRAME_STAGE===stageKey)return;
+  if(NATIVE_PAINT_MODE.mode==='fast' && !fastKeepsFrame(ctx.STAGE, FRAME_POLICY, ctx.LAST_FRAME_STAGE===stageKey))return;
   ctx.LAST_FRAME_STAGE=stageKey;
   // a marker in the tape at every frame, so a replay can render at exactly the points the painter did
   if (MARKTAPE) MARKTAPE.push({ k: 'm', i: ctx.frame });
   for (const s of SNAPS.splice(0)) {
-    const name = `f${String(ctx.frame).padStart(4, '0')}.jpg`;
+    const name = frameName(ctx.frame, FRAME_FORMAT);
     if (s.id !== undefined) ctx.FRAMER.name(s.id, name);
-    else await sharp(s.buf, { raw: { width: OUT_W, height: OUT_H, channels: 3 } }).jpeg({ quality: 88 }).toFile(path.join(out, name));
+    else await writeFrame(s.buf, name);
     FRAMES.push({ src: name, ...s.stage });
     ctx.frame++;
   }
-  const name = `f${String(ctx.frame).padStart(4, '0')}.jpg`;
+  const name = frameName(ctx.frame, FRAME_FORMAT);
   const F = framer();
   if (F) F.name(F.capture(), name);
-  else {
-    const cur = INKRES ? INKRES.compose(view()) : view();
-    await sharp(cur, { raw: { width: OUT_W, height: OUT_H, channels: 3 } }).jpeg({ quality: 88 }).toFile(path.join(out, name));
-  }
+  else await writeFrame(INKRES ? INKRES.compose(view()) : view(), name);
   FRAMES.push({ src: name, ...ctx.STAGE });
   ctx.frame++;
 };

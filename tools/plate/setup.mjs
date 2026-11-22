@@ -178,7 +178,7 @@ const SOURCE_SCALE = SOURCE_FILE && sourceReadable(SOURCE_FILE) ? await (async (
 })() : null;
 if (SOURCE_SCALE) console.log(`source: ${SOURCE_SCALE.sourceWidth} x ${SOURCE_SCALE.sourceHeight} px; sheet ${SOURCE_SCALE.sheetWidth} cells wide; source scale ${+SOURCE_SCALE.sourceScale.toFixed(3)} cells a pixel, at most ${SOURCE_SCALE.allowed} (--sourcescale)`);
 // a fresh process taking over a saved painting (--resumestate) continues in the painting's own folder
-if (opt('resumestate', '')) { if (!fs.existsSync(path.join(out, 'f0000.jpg'))) throw new Error('--resumestate: ' + out + ' holds no painting to continue'); } else prepareOutputDirectory(out);
+if (opt('resumestate', '')) { if (!['jpg', 'webp', 'png'].some(e => fs.existsSync(path.join(out, `f0000.${e}`)))) throw new Error('--resumestate: ' + out + ' holds no painting to continue'); } else prepareOutputDirectory(out);
 // the commit painted from, refused when tracked files or new source files differ from it (src/paint/code-state.mjs)
 // Failed mid-painting checks stop by default. Explicit --strict 0 is diagnostic continuation;
 // its run cannot satisfy the required paper-state contract. --wetgate 1 also forces stops.
