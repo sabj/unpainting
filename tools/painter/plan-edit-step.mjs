@@ -21,7 +21,9 @@ export function planEditStep({ plan, file, out, ctx }) {
   fs.writeFileSync(path.join(out, 'plan-to-edit.json'), JSON.stringify(planListing(plan, ctx), null, 1) + '\n');
   if (!file) return plan;
   let edit; try { edit = JSON.parse(fs.readFileSync(file, 'utf8')); } catch (e) { throw Error(`--washplan edit:${file}: ${e.message}`); }
-  const { plan: edited, record } = applyPlanEdit(plan, edit, ctx);
+  // an edit that cannot be laid as asked stops the run; every fault of it is written out for its author (plan-edit-faults.json)
+  let got; try { got = applyPlanEdit(plan, edit, ctx); } catch (e) { if (e.planEditFaults) fs.writeFileSync(path.join(out, 'plan-edit-faults.json'), JSON.stringify({ faults: e.planEditFaults, message: e.message }, null, 1) + '\n'); throw e; }
+  const { plan: edited, record } = got;
   fs.writeFileSync(path.join(out, 'plan-edit-record.json'), JSON.stringify(record, null, 1) + '\n');
   console.log(`wash plan: an author's edit of the code planner's plan: ${editLine(record)}${record.notes.length ? `; ${record.notes.join('; ')}` : ''}`);
   return edited;

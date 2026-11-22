@@ -181,11 +181,15 @@ async function compileOnce(r, choice, script, plate, edit) {
     const command = buildCommand(mine, { mode: 'plan', out: plate, known, dirty: codeState(ROOT).dirty, segEnv, script: script ? { file: scriptFile, paints: script.palette } : null, edit: edit ? { file: editFile } : null });
     const done = await planSlot(() => runPainter(command, { cwd: ROOT, logFile: `${plate}.log` })), results = collectResults(plate, 'plan');
     if ((done.exit !== 0 && done.exit !== 3) || !results.planPreview || !fs.existsSync(path.join(plate, 'value-plan.json'))) {
+      // an edited plan that cannot be laid as asked: every fault of it, as the painter wrote them out, not the first alone
+      let faults = null; try { faults = JSON.parse(fs.readFileSync(path.join(plate, 'plan-edit-faults.json'), 'utf8')).message; } catch { /* another failure */ }
       const why = fs.readFileSync(`${plate}.log`, 'utf8').split('\n').filter(l => /(^|\s)(Error|TypeError|RangeError)\b/.test(l)).pop()?.trim().slice(0, 400);
-      return { ok: false, error: tidy(why ?? `the planner ended with exit ${done.exit ?? done.signal} and no plan`) };
+      return { ok: false, error: tidy(faults ? faults.slice(0, 12000) : why ?? `the planner ended with exit ${done.exit ?? done.signal} and no plan`), seconds: done.seconds };
     }
     const numbers = await planNumbers({ plate, planPreview: results.planPreview, run: record, script });
-    return { ok: true, ...numbers, planPreview: results.planPreview, seconds: done.seconds, plate };
+    // the painter's own count of an edit it applied, with its notes (a colour laid as the nearest that can be, a smaller brush)
+    let editRecord = null; if (edit) { try { editRecord = JSON.parse(fs.readFileSync(path.join(plate, 'plan-edit-record.json'), 'utf8')); } catch { /* the session's own count stands */ } }
+    return { ok: true, ...numbers, planPreview: results.planPreview, seconds: done.seconds, plate, editRecord };
   } catch (e) { return { ok: false, error: tidy(e.message) }; }
 }
 
@@ -311,7 +315,8 @@ async function sessionRun(r) {
       }
       say(r, `${author.name} starts its working session (${author.cli}; ${minutesMost} min of its own time, ${looksMost > 0 ? `${looksMost} looks` : 'looks without limit'}, each a small real painting${previousTry() ? `; try ${previousTry().tryNumber} of 3, with its previous painting and a teacher's words` : ''}): ${call.closed}`);
       server.start();
-      const t0 = Date.now(), done = await modelSlot(() => (call.serial ? agySlot : f => f())(() => runSession(call, { cwd, outFile: path.join(dir, 'S.out.txt'), errFile: path.join(dir, 'S.err.txt'), over: server.over })));
+      // the model's clock starts when its command does: the wait for a place among the models at work is not its time
+      const t0 = Date.now(), done = await modelSlot(() => (call.serial ? agySlot : f => f())(() => { server.begin(); return runSession(call, { cwd, outFile: path.join(dir, 'S.out.txt'), errFile: path.join(dir, 'S.err.txt'), over: server.over }); }));
       await server.tick(); const kept = await server.stop(), seen = readTranscript(author.cli, fs.readFileSync(path.join(dir, 'S.out.txt'), 'utf8'));
       fin = done.ended === 'not started' ? { failure: `the model could not be called: ${done.error}` } : finalChoice({ present: server.present, lastGood: kept.lastGood, good: kept.good, ended: done.ended });
       const outside = reachedOutside(seen.commands, deny, [cwd, real]), pictures = ownPictures(cwd);
