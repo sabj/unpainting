@@ -22,6 +22,7 @@ import { spawn } from 'node:child_process';
 import { readChoice, choiceKind, choiceKey } from './choice.mjs';
 import { needsOf } from './author.mjs';
 import { editLine } from '../../src/paint/methods/plan-edit.mjs';
+import { tinyTouchWarning } from './plan-data.mjs';
 
 /** Looks (each a small real painting of the present choice), and minutes of the model's own time, when the command line names neither. */
 export const DEFAULT_LOOKS = 0, DEFAULT_MINUTES = 85;
@@ -175,7 +176,9 @@ export function sessionServer({ dir, looks: asked, minutes, compile, look: paint
     const s = got.summary, line = `${s.passages != null ? `${s.passages} passages, ` : s.shapes != null ? `${s.shapes} shapes, ` : ''}${s.washes} washes, ${s.strokes ?? '?'} strokes, widest wash brush ${s.widestBrushMm ?? '?'} mm${s.washesByStage ? `, washes by stage ${s.washesByStage.join('/')}` : ''}`;
     // a free plan answers with whether it compiled and its counts: no picture, no colours, no places
     const edited = p.edit ? ` Your edit: ${editLine(p.edit.record)}.${p.edit.record.notes.map(x => ` Note: ${x}.`).join('')}` : '';
-    if (cmd === 'plan') return `It compiles (${what}): ${line}.${edited} Nothing else is shown without a look.\n${left()}`;
+    // ... and of the strokes too small for a wet bed, before anything is painted (plan-data.mjs tinyTouchWarning)
+    const tiny = tinyTouchWarning(s);
+    if (cmd === 'plan') return `It compiles (${what}): ${line}.${edited}${tiny} Nothing else is shown without a look.\n${left()}`;
     // a look is the choice painted for real, small: the painter runs outside the folder. A painting that fails, or
     // does not stay on the GPU, shows nothing and is no look. The same choice looked at again is not painted again
     // (and is a look again).

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import sharp from 'sharp';
-import { planRows, planSummary, rowsTable, numbersText, beside } from './plan-data.mjs';
+import { planRows, planSummary, rowsTable, numbersText, beside, tinyTouchWarning } from './plan-data.mjs';
 
 const plan = { summary: { shapes: 12, washes: 2, plannedStrokes: 9, stages: 2, washesByStage: [1, 1], paintedShare: 0.5712, layersOfStudy: [{ minMm2: 6, shapes: 12, washes: 2, strokes: 9 }] }, passes: [
   { id: 'light/s1/m5/first-wash', stage: 1, kind: 'first wash', thing: 'under-wash of study shape 3', colour: [235, 154, 93], areaMm2: 12292.5, widestBrushMm: 38, move: 'wet on dry',
@@ -29,4 +29,15 @@ test('pictures are set side by side at one height', async () => {
   const pic = (w, h) => sharp({ create: { width: w, height: h, channels: 3, background: '#888888' } }).png().toBuffer();
   const m = await sharp(await beside([await pic(100, 50), await pic(50, 50)], { height: 100, gap: 10 })).metadata();
   assert.deepEqual([m.width, m.height], [200 + 100 + 10, 100]);
+});
+
+test('a plan check warns an author of its tiny touches, by passage, and says nothing when there are none', () => {
+  assert.equal(tinyTouchWarning({ washes: 3 }), '');
+  const tinyTouches = [{ passage: 'flank3', kind: 'wash', move: 'wet on wet', mm2: 0.2, leastMm2: 1.2, lengthMm: 0.61, brushMm: 13, atMm: [233.6, 228.4] }];
+  const s = planSummary({ summary: { passages: 1, washes: 2, tinyTouches }, passes: [] });
+  assert.deepEqual(s.tinyTouches, tinyTouches);
+  assert.equal(planSummary({ summary: { passages: 1, washes: 2 }, passes: [] }).tinyTouches, undefined, 'no key when the plan has none');
+  const w = tinyTouchWarning(s);
+  assert.match(w, /^ WARNING, 1 tiny touch: /); assert.match(w, /In passage flank3 \(0\.61 mm with the 13 mm brush, about 0\.2 mm2\)\./);
+  assert.match(w, /no wet bed/); assert.match(w, /Lengthen it, give it a smaller brush, or drop it\.$/);
 });

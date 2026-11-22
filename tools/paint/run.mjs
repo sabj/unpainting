@@ -76,7 +76,7 @@ export function collectResults(out, mode) {
   const files = fs.existsSync(out) ? fs.readdirSync(out) : [];
   const stage = files.map(f => /-stage-(\d+)\.png$/.exec(f)).filter(Boolean).sort((a, b) => Number(b[1]) - Number(a[1]))[0];
   const has = f => (files.includes(f) ? path.join(out, f) : null);
-  const plan = readJson(path.join(out, 'value-plan.json')), risk = readJson(path.join(out, 'cheat-risk.json'));
+  const plan = readJson(path.join(out, 'value-plan.json')), risk = readJson(path.join(out, 'cheat-risk.json')), tiny = readJson(path.join(out, 'tiny-touches.json'));
   const painting = has('painting.png') ?? has('painting.jpg');
   const lastFrame = files.filter(f => /^f\d+\.jpg$/.test(f)).sort().pop();
   const strip = fs.existsSync(path.join(out, 'stages', 'strip.jpg')) ? path.join(out, 'stages', 'strip.jpg') : null;
@@ -92,6 +92,8 @@ export function collectResults(out, mode) {
       studies: (sum?.layersOfStudy ?? []).map(l => ({ study: l.study, minMm2: l.minMm2, shapes: l.shapes, washes: l.washes, strokes: l.strokes })),
     } : null,
     backend: be ? { backend: be.backend ?? null, fallback: be.fallback ?? null, adapter: be.adapter ?? null } : null,
+    // strokes too small for a wet bed (src/paint/methods/tiny-touch.mjs): those the plan told of, and those the painter laid as plain touches
+    ...(sum?.tinyTouches?.length || tiny?.touches?.length ? { tinyTouches: { leastMm2: tiny?.leastMm2 ?? sum?.tinyTouches?.[0]?.leastMm2 ?? null, planned: sum?.tinyTouches ?? [], laid: tiny?.touches ?? [] } } : {}),
     cheatRisk: risk ? { level: risk.level ?? null, risk: risk.risk ?? null, parts: risk.parts ?? null, flags: risk.flags ?? [], error: risk.error ?? null } : null,
   };
 }

@@ -37,7 +37,18 @@ export function planSummary(valuePlan) {
   const s = valuePlan.summary ?? {}, passes = valuePlan.passes ?? [];
   return { shapes: s.shapes ?? null, passages: s.passages ?? null, washes: s.washes ?? passes.length, strokes: s.plannedStrokes ?? null, stages: s.stages ?? null, washesByStage: s.washesByStage ?? null,
     widestBrushMm: passes.reduce((m, p) => Math.max(m, Number(p.widestBrushMm) || 0), 0) || null, paintedShare: s.paintedShare != null ? +Number(s.paintedShare).toFixed(2) : null,
-    studies: (s.layersOfStudy ?? []).map(l => ({ leastMm2: l.minMm2, shapes: l.shapes, washes: l.washes, strokes: l.strokes })) };
+    studies: (s.layersOfStudy ?? []).map(l => ({ leastMm2: l.minMm2, shapes: l.shapes, washes: l.washes, strokes: l.strokes })),
+    // strokes the plan found too small for a wet bed (src/paint/methods/tiny-touch.mjs), when it found any
+    ...(s.tinyTouches?.length ? { tinyTouches: s.tinyTouches } : {}) };
+}
+
+/** The warning a plan check gives an author about its tiny touches (strokes so short the brush only lands on its tip), or ''. */
+export function tinyTouchWarning(summary) {
+  const t = summary?.tinyTouches ?? [];
+  if (!t.length) return '';
+  const by = new Map(); for (const x of t) by.set(x.passage, [...(by.get(x.passage) ?? []), x]);
+  const list = [...by].map(([id, xs]) => `${id} (${xs.map(x => `${x.lengthMm} mm with the ${x.brushMm} mm brush, about ${x.mm2} mm2`).join('; ')})`).join(', ');
+  return ` WARNING, ${t.length} tiny touch${t.length > 1 ? 'es' : ''}: a stroke much shorter than its brush is wide only lands on the brush's tip (under ${t[0].leastMm2} mm2 of paper), so it is laid as a plain touch with no wet bed and will hardly show. In passage ${list}. Lengthen it, give it a smaller brush, or drop it.`;
 }
 
 /** One line a wash of the code planner's plan, a wide brush inside a living form marked. */
