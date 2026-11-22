@@ -289,3 +289,27 @@ test('an agy transcript: each tool step once, shell commands and file places kep
   assert.equal(readTranscript('agy', `${out}\n${JSON.stringify({ event: 'result', result: { status: 'SUCCESS', response: 'Final.' } })}`).text, 'Final.');
   assert.deepEqual(reachedOutside(a.commands, ['/repo']), ['read_file /repo/tools/paint-plate.mjs'], 'a file tool aimed outside is seen; what a written file holds is not a place');
 });
+
+test('the model\'s own time: not the wait for a place to start, nor a compile, nor a look\'s painting; an edit\'s faults and notes reach it whole', async () => {
+  const { dir, ledger } = folder({ looks: 0, minutes: 85 }); let clock = 1e9;
+  try {
+    const faults = 'plan edit: 2 things to correct, every one listed here; correct them all, then plan again.\n- wash 12: the colour asked for is 20 L* lighter than what is under it. Accepted here: a colour of L* 50 or darker\n- wash 40: the colour asked for is 31 L* lighter';
+    const notes = { auto: 20, untouched: 18, untouchedShare: 0.9, changed: 2, moved: 0, merged: 0, mergedFrom: 0, dropped: 0, added: 0, fields: { colour: 2 }, notes: ['wash 7: the colour asked for (L* 60) is no darker than what is laid under it (L* 58); laid as the nearest that can be'] };
+    const server = sessionServer({ dir, ledger, looks: 0, minutes: 85, now: () => clock, checkScript: s => s, checkPlan: e => ({ edit: e, record: { ...notes, notes: [] } }),
+      compile: async (choice, script, n, edit) => { clock += 9 * 60000; return edit?.bad ? { ok: false, error: faults } : { ...compiled(1), editRecord: edit ? notes : null }; },
+      look: async () => { clock += 30 * 60000; return { ok: true, picture: PNG, numbersText: 'NUMBERS', marked: { forms: 0, washes: 0 }, painted: { cells: 100 } }; } });
+    // an hour and a half passes before a place among the models is free: none of it is the model's
+    clock += 95 * 60000; assert.equal(server.over(), true, 'before its command starts the clock is not yet its own');
+    server.begin(); assert.equal(server.ownSeconds(), 0); assert.equal(server.over(), false);
+    clock += 60000; put(dir, { kind: 'plan', plan: 'my-plan.json' }); fs.writeFileSync(path.join(dir, 'my-plan.json'), '{"bad": true}');
+    const refused = await ask(dir, server, 'plan');
+    assert.match(refused, /^REFUSED by the planner: plan edit: 2 things to correct/); assert.match(refused, /\n- wash 12: .*Accepted here: a colour of L\* 50 or darker\n- wash 40: /, 'every fault, each on its line');
+    assert.equal(server.ownSeconds(), 60, 'the nine minutes of the compile are not its time');
+    clock += 120000; fs.writeFileSync(path.join(dir, 'my-plan.json'), '{"bad": false}');
+    const look = await ask(dir, server, 'look');
+    assert.match(look, /^LOOK 1 \(edited plan\)/); assert.match(look, /1 note on it \(each was laid the nearest way that can be; change it if that is not what you want\):\n- wash 7: the colour asked for \(L\* 60\) is no darker/);
+    assert.equal(server.ownSeconds(), 180, 'nor the compile and the half hour of the look\'s painting'); assert.equal(server.over(), false);
+    const rec = await server.stop(); assert.equal(rec.waitSeconds, (9 + 9 + 30) * 60); assert.equal(rec.ownSeconds, 180); assert.equal(rec.plans.at(-1).edit.notes.length, 1); assert.equal(rec.looks[0].edit.notes.length, 1);
+    clock += 83 * 60000; assert.equal(server.over(), true, 'its own 85 minutes end it');
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+});

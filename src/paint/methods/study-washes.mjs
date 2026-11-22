@@ -198,7 +198,7 @@ function studyShapes(rgb, pw, ph, paperRGB, { sliverCells, most = 0, clusters: K
 }
 
 /** sRGB of a Lab colour whose white is the paper (the inverse of labOf). */
-function labToRgb([L, a, b], paperRGB) {
+export function labToRgb([L, a, b], paperRGB) {
   const fy = (L + 16) / 116, fx = fy + a / 500, fz = fy - b / 200, inv = t => (t ** 3 > 216 / 24389 ? t ** 3 : (116 * t - 16) / (24389 / 27));
   const M = [[0.4124564, 0.3575761, 0.1804375], [0.2126729, 0.7151522, 0.0721750], [0.0193339, 0.1191920, 0.9503041]], W = M.map(r => r[0] + r[1] + r[2]);
   const X = inv(fx) * W[0], Y = inv(fy) * W[1], Z = inv(fz) * W[2];

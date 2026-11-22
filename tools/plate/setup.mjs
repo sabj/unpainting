@@ -342,7 +342,9 @@ setWashSplat(WASH_SPLAT_SETTINGS.enabled,{water:WASH_SPLAT_SETTINGS.water});
 // --runcache 0: refit the palette every run instead of reading it from work/cache (src/paint/run-cache.mjs). Default 1.
 // Sweep jobs unpack into a private /root/sweepwork/<job> tree which is removed after painting.
 // Keep pure, code-and-input-hashed planner entries beside those trees so a repeat target can reuse them on that box.
-const CACHE_ARGV = {}; for(let i=0;i<argv.length;i++)if(argv[i].startsWith('--')) { const key=argv[i],value=argv[i+1]?.startsWith('--')?true:argv[++i];if(!['--out','--pausedir','--resumestate','--resumeprefix','--allowdirty','--speedprofile','--speedcpu'].includes(key))CACHE_ARGV[key]=outputRelative(value,out); }
+// (--washplan edit:EDIT.json,STUDIES is keyed as its studies alone: the edit is applied to the plan AFTER the cached
+// steps and is no input of theirs, so an edit of a plan already made reads that plan from the cache instead of making it again)
+const CACHE_ARGV = {}; for(let i=0;i<argv.length;i++)if(argv[i].startsWith('--')) { const key=argv[i],value=argv[i+1]?.startsWith('--')?true:argv[++i];if(!['--out','--pausedir','--resumestate','--resumeprefix','--allowdirty','--speedprofile','--speedcpu'].includes(key))CACHE_ARGV[key]=outputRelative(key==='--washplan'&&typeof value==='string'?value.replace(/^edit:[^,]*,/,''):value,out); }
 const planContentHashes=()=>{const hashes={};for(const key of ['valueplan','drawingfile','drawinglast']){const f=opt(key,'');if(f)for(const suffix of ['', '-lines.json','-lines.json.gz']){const p=path.resolve(root,f+suffix);if(fs.existsSync(p)&&fs.statSync(p).isFile())hashes[key+suffix]=planFileDigest(p,out);}}return hashes;};
 const CACHE_PLAN_HASHES=planContentHashes();
 const CACHE_CONTEXT={argv:CACHE_ARGV,planHashes:CACHE_PLAN_HASHES,targetSHA256:crypto.createHash('sha256').update(fs.readFileSync(path.resolve(root,opt('image','')))).digest('hex'),mode:opt('mode','fast'),backend:'cpu'};

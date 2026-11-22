@@ -69,11 +69,10 @@ size, and the painter's guard. You cannot ask for new studies, new masks or a ne
 
 ## Editing the plan
 
-**How long a check takes, today.** `./unpaint plan` on your own script answers in about a minute. On an edited plan it
-can take ten minutes while the machine is busy, and it stops at the FIRST wash it cannot take (for instance a colour
-no darker than what lies under it), so several faults cost several long waits. The waiting is not counted in your
-time, but it is slow: choose knowing that, and check an edit carefully before you send it.
-
+**How long a check takes.** `./unpaint plan` on your own script answers in about a minute. An edited plan is slower
+the first time it is planned in a session (it can take ten minutes while the machine is busy); after that an edit is
+checked in about a minute, and every fault of the edit is reported in one answer (below). The waiting is not counted
+in your time.
 
 `cp auto/plan-to-edit.json my-plan.json`, change `my-plan.json`, and write
 `{"kind": "plan", "plan": "my-plan.json", "why": "..."}` into `choice.json`. Keep `format` and `of` as they are.
@@ -108,8 +107,16 @@ What to know before you edit:
   under-wash and the washes over it come out paler there; darken it and they come out darker.
 - A wash laid again (brush, direction, merge) is laid evenly, without the planner's cut edge or its load varied
   along the wash.
-- `./unpaint plan` checks the file and says what is wrong with it; it costs nothing. Brush, direction and soft
-  edges show in a look's dried sheet, not in the plan's diagram.
+- Watercolour only darkens: a wash cannot make its place lighter than what is laid under it by then. A `colour`
+  up to `nearestWithin` L* lighter than what is under it (8 as the file comes; it is yours to change, 0 to 40) is
+  laid as the nearest that can be, a faint wash of your colour, and the answer says so in a note. A colour lighter
+  than that is refused, with the washes that lie under it and the lightest colour that would be accepted there. To
+  make a place lighter, pale or leave out what is under it.
+- `./unpaint plan` checks the file and costs nothing. It reports EVERY fault of the edit at once, each with its
+  wash and what would be accepted, so correct them all before you plan again; and it lists as notes what it laid
+  the nearest way (a colour, a brush too wide for its wash, strokes too small for water). After the first plan of the
+  session an edit is checked in about a minute. Brush, direction and soft edges show in a look's dried sheet, not in
+  the plan's diagram.
 
 Your shell is yours: read the files, measure the input pictures (sampling a colour or a position is fair), compute,
 keep notes, write and check your script with your own code. The folder is all there is to work from: the painter, its

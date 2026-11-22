@@ -21,7 +21,10 @@ import { components } from '../../raster.js';
 import { outlineLoops } from './wash-strokes.mjs';
 import { laneFill } from './sweep-fill.mjs';
 import { roundMask } from './study-shapes.mjs';
-import { valueMix } from './value-mix.mjs';
+import { valueMix, valueRefOf } from './value-mix.mjs';
+import { mixFor, filmLab } from './puddles.mjs';
+import { labToRgb } from './study-washes.mjs';
+import { labOf } from '../../eval/colour.mjs';
 import { planScriptWashes, checkScript } from './script-washes.mjs';
 import { sweeps, handOf } from './script-marks.mjs';
 
@@ -36,9 +39,20 @@ const MERGE_CLOSE_MM = 1.2, TOL_MM = 0.4;
 const GROW_MM = 0.4;
 /** A stroke laid into its own wet bed covers at least this many sheet cells (study-washes.mjs). */
 const WET_LEAST_CELLS = 40;
+/**
+ * Watercolour only darkens: a wash cannot make its place lighter than what is laid under it. A colour asked for that
+ * is lighter than what is under it by up to this much (L*) is laid as the nearest that can be, a faint wash of the
+ * colour's own paints, and said in a note; lighter than that is refused. The edit may give its own (`nearestWithin`).
+ */
+export const NEAREST_WITHIN_L = 8;
+/** The nearest that can be: the colour's own paints laid to read this much darker (L*) than what is under them. */
+const NEAREST_STEP_L = 1.5;
 /** The fields of a kept wash an author may change. */
 const FIELDS = Object.freeze(['colour', 'strength', 'brushMm', 'direction', 'lay']);
 
+/** What is wrong with an edit, said for its author: a fault of one wash (others are still checked) or the whole list. */
+const fault = message => Object.assign(Error(message), { planEditFault: true });
+const allFaults = faults => Object.assign(Error(`plan edit: ${faults.length} thing${faults.length > 1 ? 's' : ''} to correct, ${faults.length > 1 ? 'every one listed here; correct them all, then plan again' : 'listed here'}.\n${faults.map(f => `- ${f.replace(/^plan edit, /, '')}`).join('\n')}`), { planEditFaults: faults });
 const washesOf = plan => plan.layers.flatMap((l, L) => l.shapes.map(sh => ({ sh, L, layer: l })));
 const inTouches = q => !q.outline?.length || /touches/.test(q.brush?.kind ?? '');
 const same = (a, b) => (Array.isArray(a) ? Array.isArray(b) && a.length === b.length && a.every((v, i) => Number(v) === Number(b[i])) : a === b || (a == null && b == null) || (typeof a === 'number' && Number(b) === a));
@@ -63,7 +77,7 @@ export function planListing(plan, { w, h, sheetWidthMm, kitMm }) {
       about: { what: q.thing, stage: q.stage, kind: q.kind, laidIn: inTouches(q) ? 'touches' : 'lanes', strokes: q.strokes.length, areaMm2: Math.round(q.areaMm2),
         boxMm: b ? [b.x0 * cellMm, b.y0 * cellMm, (b.x1 + 1) * cellMm, (b.y1 + 1) * cellMm].map(Math.round) : null, forms: (q.forms ?? []).filter(f => f.share >= 0.05).map(f => `${f.name} ${Math.round(100 * f.share)}%`).join(', ') || 'no named form' } };
   });
-  return { format: PLAN_EDIT_FORMAT, of: planFingerprint(plan), sheet: { widthMm: sheetWidthMm, heightMm: +(h * cellMm).toFixed(1) }, brushesMm: [...new Set(kitMm)].sort((a, b) => b - a), washes };
+  return { format: PLAN_EDIT_FORMAT, of: planFingerprint(plan), nearestWithin: NEAREST_WITHIN_L, sheet: { widthMm: sheetWidthMm, heightMm: +(h * cellMm).toFixed(1) }, brushesMm: [...new Set(kitMm)].sort((a, b) => b - a), washes };
 }
 
 /** An author's own passages as the one-passage painting scripts the script planner takes; the paint is a stand-in (the colour sets the mix). */
@@ -101,8 +115,12 @@ export function checkPlanEdit(edit, listing) {
     if (used.has(a.wash)) throw Error(`${who}: wash ${a.wash} is named twice; a wash is kept once, merged once, or left out`);
     used.add(a.wash); return a;
   };
+  // every entry is checked, and every fault is kept: the author gets them all at once
+  const faults = [];
+  if (edit.nearestWithin != null && !(Number(edit.nearestWithin) >= 0 && Number(edit.nearestWithin) <= 40)) faults.push(`${at}: "nearestWithin" is a number of L* from 0 to 40 (a colour up to that much lighter than what is under it is laid as the nearest that can be; 0 refuses every one)`);
   let group = -1, lastSession;
-  const entries = edit.washes.map((e, i) => {
+  const checked = edit.washes.map((e, i) => { try { return one(e, i); } catch (err) { faults.push(err.message); return null; } });
+  function one(e, i) {
     if (!e || typeof e !== 'object') throw Error(`${at}, entry ${i + 1}: an object`);
     const kinds = ['wash', 'merge', 'own'].filter(k => e[k] != null);
     if (kinds.length !== 1) throw Error(`${at}, entry ${i + 1}: one of "wash" (a wash of the plan, by number), "merge" (several, as one wash) or "own" (a passage of your own)`);
@@ -133,13 +151,15 @@ export function checkPlanEdit(edit, listing) {
     const lay = e.lay ?? p.lay ?? 'wet on dry'; if (!LAYS.includes(lay)) throw Error(`${who}: "lay" is one of ${LAYS.map(l => `"${l}"`).join(', ')}`);
     try { checkScript(ownScript(p, { sheet: listing.sheet, brushesMm: kit, key: 'x' }), { keys: ['x'], sheetWidthMm: listing.sheet.widthMm }); } catch (err) { throw Error(`${who}: ${err.message.replace(/^painting script(, passage [^:]*)?: /, '')}`); }
     return { type: 'own', id: p.id, passage: p, colour: p.colour.map(Number), group, lay };
-  });
+  }
+  const entries = checked.filter(Boolean);
   // a wash laid beside a damp neighbour needs that neighbour: the entry before it, in the same session
   entries.forEach((e, i) => {
     if (e.lay !== 'beside damp' || (i > 0 && entries[i - 1].group === e.group)) return;
     if (e.type === 'keep' && e.changes.lay == null) { e.lay = 'wet on dry'; e.changes.lay = 'wet on dry'; notes.push(`wash ${e.wash} was laid beside a damp neighbour that is no longer just before it in its session: it is laid on the dry sheet`); return; }
-    throw Error(`${at}, ${e.type === 'keep' ? `wash ${e.wash}` : e.type === 'merge' ? `merge of ${e.washes.join(' ')}` : `own passage ${e.id}`}: "beside damp" needs the entry just before it in the same "session"`);
+    faults.push(`${at}, ${e.type === 'keep' ? `wash ${e.wash}` : e.type === 'merge' ? `merge of ${e.washes.join(' ')}` : `own passage ${e.id}`}: "beside damp" needs the entry just before it in the same "session"; give both the same "session", or lay it "wet on dry" or "wet on wet"`);
   });
+  if (faults.length) throw allFaults(faults);
   // moved: kept washes outside the longest run that is still in the planner's order
   const kept = entries.filter(e => e.type === 'keep'), tails = [], prev = new Array(kept.length).fill(-1), endAt = [];
   kept.forEach((e, i) => { let lo = 0, hi = tails.length; while (lo < hi) { const mid = (lo + hi) >> 1; if (tails[mid] < e.at) lo = mid + 1; else hi = mid; } tails[lo] = e.at; endAt[lo] = i; prev[i] = lo ? endAt[lo - 1] : -1; });
@@ -177,19 +197,44 @@ export function applyPlanEdit(plan, edit, { w, h, k, pigments, paperRGB = null, 
   const cellsOf = sh => { const out = [], b = sh.box, f = sh.ids; if (f && b) { for (let y = b.y0; y <= b.y1; y++) for (let x = b.x0; x <= b.x1; x++) if (f[y * w + x] === sh.id) out.push(y * w + x); } else { const m = sh.mask; for (let i = 0; i < n; i++) if (m[i]) out.push(i); } return out; };
   const lay = sh => { for (const i of cellsOf(sh)) for (let j = 0; j < k; j++) laid[j][i] += sh.mix[j]; };
   const under = cells => { const u = new Array(k).fill(0); for (const i of cells) for (let j = 0; j < k; j++) u[j] += laid[j][i] / cells.length; return u; };
+  // what is laid so far, entry by entry, to name the washes under a place when a colour cannot be laid over them
+  const placed = [], faults = [], notes = [], valueRef = valueRefOf(paperCol), within = Number(edit.nearestWithin ?? NEAREST_WITHIN_L), monoOf = mono?.mono ? mono : null;
+  const underWho = cells => {
+    const at = new Set(cells), found = [];
+    for (const { label, sh } of placed) { let c = 0; for (const i of cellsOf(sh)) if (at.has(i)) c++; if (c >= 0.1 * cells.length) found.push([label, c]); }
+    return found.sort((a, b) => b[1] - a[1]).slice(0, 4).map(([label, c]) => `${label} over ${Math.round(100 * c / cells.length)}% of it`).join(', ');
+  };
+  /**
+   * The mix that brings these cells to a colour over what is laid there. Watercolour only darkens: a colour lighter
+   * than what is under it by no more than `within` (L*) is laid as the nearest that can be (a faint wash of the colour's
+   * own paints) with a note; lighter than that is a fault that says what would be accepted. Null: nothing can be laid.
+   */
   const toColour = (colour, cells, who) => {
-    const mix = valueMix(colour, under(cells), { pigments, paperCol, mono: mono?.mono ? mono : null });
-    if (!(mix.reduce((a, v) => a + v, 0) > 1e-6)) throw Error(`plan edit, ${who}: the colour asked for is no darker than what is already laid under it there, so nothing would be laid. Ask a darker colour, or leave the wash out`);
-    return mix;
+    const u = under(cells), mix = valueMix(colour, u, { pigments, paperCol, mono: monoOf });
+    if (mix.reduce((a, v) => a + v, 0) > 1e-6) return mix;
+    const Lu = filmLab(u, pigments, paperCol)[0], La = labOf(colour, 0, valueRef)[0], lighter = La - Lu, [, a, b] = labOf(colour, 0, valueRef);
+    const darkest = labToRgb([Math.max(0, Lu - NEAREST_STEP_L), a, b], valueRef).map(v => Math.max(0, Math.min(255, Math.round(v)))), below = underWho(cells);
+    if (lighter > within) throw fault(`${who}: the colour asked for, [${colour.map(Math.round).join(', ')}] (L* ${La.toFixed(0)}), is ${lighter.toFixed(0)} L* lighter than what is already laid under it there (L* ${Lu.toFixed(0)}${below ? `: ${below}` : ''}). Watercolour only darkens. Accepted here: a colour of L* ${Math.floor(Lu - NEAREST_STEP_L)} or darker (yours at that value is [${darkest.join(', ')}]); or leave this wash out; or make what is under it paler${within > 0 ? `. (A colour up to ${within} L* lighter is laid as the nearest that can be.)` : ''}`);
+    const own = mixFor(colour, pigments, paperCol), t = own.reduce((x, v) => x + v, 0);
+    if (!(t > 1e-9)) { notes.push(`${who}: the colour asked for is the paper's; over what is laid there (L* ${Lu.toFixed(0)}) nothing can be laid, so it is left out`); return null; }
+    const nearest = valueMix(darkest, u, { pigments, paperCol, mono: monoOf, given: own.map(v => v / t) });
+    notes.push(`${who}: the colour asked for (L* ${La.toFixed(0)}) is no darker than what is laid under it (L* ${Lu.toFixed(0)}); laid as the nearest that can be, a faint wash of your colour (about [${darkest.join(', ')}])`);
+    return nearest;
   };
   // a wash laid again over its outline: in lanes of one brush along the part's own length, or along a direction given
-  const relaid = (loops, brushMm, direction, key) => {
+  const relaidWith = (loops, brushMm, direction, key) => {
     if (direction != null) return sweeps(loops.map(l => l.points), { widthMm: brushMm, deg: direction, lights: [], rng: handOf(`plan-edit/${seed}/${key}`) });
     return laneFill(loops, { kitMm: [brushMm], growMm: GROW_MM }).strokes;
   };
+  // (a brush too wide to lay a stroke in the wash: the widest smaller brush of the kit that does, with a note)
+  const relaid = (loops, brushMm, direction, key) => {
+    for (const mm of [brushMm, ...listing.brushesMm.filter(v => v < brushMm)]) { const strokes = relaidWith(loops, mm, direction, key); if (strokes.length) { if (mm !== brushMm) notes.push(`${key}: a ${brushMm} mm brush lays no stroke in it; laid with the ${mm} mm brush`); return strokes; } }
+    throw fault(`${key}: no brush of the kit lays a stroke in it over these cells; leave its brush and direction as they are`);
+  };
   const how = (q, move, strokes, who) => {
+    // (strokes too small for a bed of water: the wash stays on the dry sheet, with a note)
+    if (move === 'wet on wet') { const fit = strokes.filter(st => Math.PI * st.radiusMm ** 2 / (cellMm * cellMm) >= WET_LEAST_CELLS); if (fit.length) strokes = fit; else { move = 'wet on dry'; notes.push(`${who}: its strokes are too small to be laid into water; it is laid on the dry sheet`); } }
     const wet = move !== 'wet on dry';
-    if (move === 'wet on wet') { strokes = strokes.filter(st => Math.PI * st.radiusMm ** 2 / (cellMm * cellMm) >= WET_LEAST_CELLS); if (!strokes.length) throw Error(`plan edit, ${who}: its strokes are too small to be laid into water; keep it on the dry sheet`); }
     return { move, strokes, paperBefore: wet ? 'wet: the wash or its neighbour just laid' : 'fully dry; own same-passage wet overlap allowed', baseBefore: wet ? 'wet' : 'fully dry', load: { ...q.load, water: move === 'wet on wet' ? 0.88 : 0.62 },
       edges: { ...q.edges, policy: move === 'wet on wet' ? 'soft: dropped into a wet wash' : move === 'beside damp' ? 'soft: laid against a neighbour still damp' : 'hard: the edge is where the strokes end' } };
   };
@@ -204,8 +249,8 @@ export function applyPlanEdit(plan, edit, { w, h, k, pigments, paperRGB = null, 
   };
   const changedWash = (e) => {
     const { sh } = byNum.get(e.wash), q = sh._valuePlan, c = e.changes, who = `wash ${e.wash}`, cells = cellsOf(sh);
-    let mix = c.colour ? toColour(c.colour, cells, who) : [...sh.mix]; if (c.strength) mix = mix.map(v => v * c.strength);
-    let strokes = q.strokes; if (c.brushMm != null || c.direction != null) { strokes = relaid(q.outline, c.brushMm ?? q.widestBrushMm, c.direction ?? null, who); if (!strokes.length) throw Error(`plan edit, ${who}: a ${c.brushMm ?? q.widestBrushMm} mm brush lays no stroke in it; choose a smaller brush`); }
+    let mix = c.colour ? toColour(c.colour, cells, who) : [...sh.mix]; if (!mix) return null; if (c.strength) mix = mix.map(v => v * c.strength);
+    let strokes = q.strokes; if (c.brushMm != null || c.direction != null) strokes = relaid(q.outline, c.brushMm ?? q.widestBrushMm, c.direction ?? null, who);
     const h2 = c.lay || strokes !== q.strokes ? how(q, e.lay, strokes, who) : { strokes };
     return shape(sh.ids ?? sh.mask, sh.ids ? sh.id : 1, sh.box ?? boxOf(sh.mask), sh.area, mix, sh, { ...q, ...h2, colour: c.colour ?? q.colour }, { of: [e.wash], changed: Object.keys(c) });
   };
@@ -217,15 +262,14 @@ export function applyPlanEdit(plan, edit, { w, h, k, pigments, paperRGB = null, 
     const m = roundMask(own, w, h, Math.max(1, Math.round(MERGE_CLOSE_MM / 2 / cellMm))); for (let i = 0; i < n; i++) if (own[i]) m[i] = 1;
     const cc = components(m, w, h, 4), parts = [];
     for (let id = 1; id <= cc.count; id++) { const box = { x0: w, y0: h, x1: -1, y1: -1 }; for (let i = 0; i < n; i++) if (cc.labels[i] === id) { const x = i % w, y = (i / w) | 0; if (x < box.x0) box.x0 = x; if (x > box.x1) box.x1 = x; if (y < box.y0) box.y0 = y; if (y > box.y1) box.y1 = y; } const l = outlineLoops(cc.labels, id, box, w, h, { cellMm, tolMm: TOL_MM }); if (l.length) parts.push(l); }
-    if (!parts.length) throw Error(`plan edit, ${who}: the washes hold no cells`);
+    if (!parts.length) throw fault(`${who}: the washes hold no cells`);
     const top = l => Math.min(...l.flatMap(o => o.points.map(p => p[1]))); parts.sort((a, b) => top(a) - top(b));
     const loops = parts.flat(), cells = []; for (let i = 0; i < n; i++) if (m[i]) cells.push(i);
     const brushMm = c.brushMm ?? Math.max(...members.map(sh => sh._valuePlan.widestBrushMm));
-    const strokes0 = c.direction != null ? relaid(loops, brushMm, c.direction, who) : parts.flatMap(l => relaid(l, brushMm, null, who));
-    if (!strokes0.length) throw Error(`plan edit, ${who}: a ${brushMm} mm brush lays no stroke in it; choose a smaller brush`);
+    const strokes0 = c.direction != null ? relaid(loops, brushMm, c.direction, who) : relaid(loops, brushMm, null, who);
     // the same paint in one wash (the members' paint over the joined cells), or the colour asked for over what is under
     let mix = c.colour ? toColour(c.colour, cells, who) : members[0].mix.map((_, j) => members.reduce((a, sh) => a + sh.mix[j] * sh.area, 0) / cells.length);
-    if (c.strength) mix = mix.map(v => v * c.strength);
+    if (!mix) return null; if (c.strength) mix = mix.map(v => v * c.strength);
     const q0 = members[0]._valuePlan, total = members.reduce((a, sh) => a + sh.area, 0), colour = c.colour ?? [0, 1, 2].map(ch => Math.round(members.reduce((a, sh) => a + (sh._valuePlan.colour?.[ch] ?? 0) * sh.area, 0) / total));
     const big = members.reduce((a, sh) => (sh.area > a.area ? sh : a), members[0]);
     const q = { ...q0, ...how(q0, e.lay, strokes0, who), colour, thing: `washes ${e.washes.join(' ')} of the code planner's plan, merged into one`, areaMm2: +(cells.length * cellMm * cellMm).toFixed(1), outline: loops, softEdges: [], depthMm: 0, uncoveredShare: 0, ...(big._valuePlan.forms ? { forms: big._valuePlan.forms } : {}) };
@@ -236,8 +280,9 @@ export function applyPlanEdit(plan, edit, { w, h, k, pigments, paperRGB = null, 
     // (the stand-in paint only places the strokes; the mix is made below, for the colour)
     const keyed = pigments.map((p, j) => ({ ...p, key: p.key ?? `p${j}` }));
     const sub = planScriptWashes({ script: ownScript(e.passage, { sheet: listing.sheet, brushesMm: listing.brushesMm, key: keyed[0].key }), k, w, h, pigments: keyed, paperRGB, sheetWidthMm, seed }), who = `own passage ${e.id}`;
-    const made = sub.layers.flatMap(l => l.shapes); if (!made.length) throw Error(`plan edit, ${who}: none of its strokes touches the sheet`);
+    const made = sub.layers.flatMap(l => l.shapes); if (!made.length) throw fault(`${who}: none of its strokes touches the sheet (${listing.sheet.widthMm} by ${listing.sheet.heightMm} mm); check its region`);
     const cells = [...new Set(made.flatMap(cellsOf))], mix = toColour(e.colour, cells, who);
+    if (!mix) return { value: sub.layers[0].value, order: sub.layers[0]._order, shapes: [] };
     return { value: sub.layers[0].value, order: sub.layers[0]._order, shapes: made.map(sh => { const q = sh._valuePlan; return shape(sh.ids, sh.id, sh.box, sh.area, mix, sh, { ...q, ...how(q, e.lay, q.strokes, who), colour: e.colour, phase: q.phase }, { of: [], changed: ['own'] }); }) };
   };
 
@@ -255,15 +300,28 @@ export function applyPlanEdit(plan, edit, { w, h, k, pigments, paperRGB = null, 
   let group = null;
   for (const e of entries) {
     if (e.group !== group) { close(); group = e.group; }
+    // a wash that cannot be laid as asked is a fault, kept with the rest; the planner's own wash stands in for it so
+    // that the washes after it are checked over what would really be under them
     let shapes, like, value = null, order = null;
-    if (e.type === 'keep') { const o = byNum.get(e.wash); like = o.layer; shapes = [Object.keys(e.changes).length ? changedWash(e) : o.sh]; }
-    else if (e.type === 'merge') { like = byNum.get(e.washes[0]).layer; shapes = [mergedWash(e)]; }
-    else { const o = ownWashes(e); shapes = o.shapes; value = o.value; order = o.order; }
+    const label = e.type === 'keep' ? `wash ${e.wash}` : e.type === 'merge' ? `the merge of ${e.washes.join(' ')}` : `your passage ${e.id}`;
+    try {
+      if (e.type === 'keep') { const o = byNum.get(e.wash); like = o.layer; shapes = [Object.keys(e.changes).length ? changedWash(e) : o.sh]; }
+      else if (e.type === 'merge') { like = byNum.get(e.washes[0]).layer; shapes = [mergedWash(e)]; }
+      else { const o = ownWashes(e); shapes = o.shapes; value = o.value; order = o.order; }
+    } catch (err) {
+      if (!err.planEditFault && e.type !== 'own') throw err;
+      faults.push(err.planEditFault ? err.message : `own passage ${e.id}: ${err.message.replace(/^painting script(, passage [^:]*)?: /, '')}`);
+      shapes = e.type === 'keep' ? [byNum.get(e.wash).sh] : e.type === 'merge' ? e.washes.map(v => byNum.get(v).sh) : []; like = e.type === 'own' ? null : byNum.get(e.type === 'keep' ? e.wash : e.washes[0]).layer;
+    }
+    shapes = shapes.filter(Boolean); if (!shapes.length) continue;
     if (!cur) cur = { shapes: [], from: e.type === 'keep' ? layerOfShape.get(byNum.get(e.wash).sh) : null, value: value ?? like.value, order: order ?? like._order };
     cur.shapes.push(...shapes);
-    for (const sh of shapes) lay(sh);
+    for (const sh of shapes) { lay(sh); placed.push({ label, sh }); }
   }
+  if (faults.length) throw allFaults(faults);
   close();
+  record.notes.push(...notes); record.nearest = notes.filter(x => /nearest that can be/.test(x)).length;
+  if (!layers.length) throw allFaults(['nothing is left to lay: every wash was left out']);
   const shapesNow = layers.flatMap(l => l.shapes), instructions = shapesNow.map(sh => instructionOf.get(sh._valuePlan.id) ?? { ...sh._valuePlan, area: sh.area, plannedPigmentMass: sh.amount * sh.area });
   const byStage = [0, 0, 0, 0]; for (const q of instructions) byStage[Math.min(4, Math.max(1, q.stage)) - 1]++;
   const summary = { ...plan.summary, source: 'study, edited', washes: instructions.filter(q => q.stage !== 2).length, washesByStage: byStage, stages: byStage.filter(Boolean).length, mixes: mixes.length, plannedStrokes: instructions.reduce((a, q) => a + (q.strokes?.length ?? 0), 0), edit: record };

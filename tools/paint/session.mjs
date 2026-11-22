@@ -144,8 +144,8 @@ export function ledgerLooks(ledger) {
 export function sessionServer({ dir, looks: asked, minutes, compile, look: paintLook, keep = null, checkScript, checkPlan = null, ledger, now = Date.now, everyMs = 400 }) {
   // no limit on looks (gentle mode) when the number asked is 0 or not given
   const most = asked > 0 ? asked : Infinity, ofMost = most === Infinity ? '' : ` of ${most}`;
-  const t0 = now(), plans = [], cache = new Map(), painted = new Map(), requests = [], good = new Set(), seen = new Map();
-  let waitMs = 0, busy = false, timer = null, lastGood = null, n = 0, pending = null, lastEnd = t0;
+  const plans = [], cache = new Map(), painted = new Map(), requests = [], good = new Set(), seen = new Map();
+  let t0 = now(), waitMs = 0, busy = false, timer = null, lastGood = null, n = 0, pending = null, lastEnd = t0;
   const note = entry => { const fd = fs.openSync(ledger, 'a'); try { fs.writeSync(fd, JSON.stringify(entry) + '\n'); fs.fsyncSync(fd); } finally { fs.closeSync(fd); } };
   const used = () => ledgerLooks(ledger).length;
   // the model's own time: the clock less every stretch a request of its was waiting on this side (a stretch counted once)
@@ -174,7 +174,9 @@ export function sessionServer({ dir, looks: asked, minutes, compile, look: paint
     good.add(p.key); lastGood = { choice: p.choice, script: p.script, edit: p.edit, key: p.key, plan: id };
     const s = got.summary, line = `${s.passages != null ? `${s.passages} passages, ` : s.shapes != null ? `${s.shapes} shapes, ` : ''}${s.washes} washes, ${s.strokes ?? '?'} strokes, widest wash brush ${s.widestBrushMm ?? '?'} mm${s.washesByStage ? `, washes by stage ${s.washesByStage.join('/')}` : ''}`;
     // a free plan answers with whether it compiled and its counts: no picture, no colours, no places
-    const edited = p.edit ? ` Your edit: ${editLine(p.edit.record)}.${p.edit.record.notes.map(x => ` Note: ${x}.`).join('')}` : '';
+    // (the painter's own count of the edit when it applied one: it holds the notes of what was laid the nearest way)
+    const er = got.editRecord ?? p.edit?.record ?? null; if (er) entry.edit = er;
+    const edited = er ? ` Your edit: ${editLine(er)}.${er.notes.length ? `\n${er.notes.length} note${er.notes.length > 1 ? 's' : ''} on it (each was laid the nearest way that can be; change it if that is not what you want):\n${er.notes.slice(0, 60).map(x => `- ${x}`).join('\n')}\n` : ''}` : '';
     if (cmd === 'plan') return `It compiles (${what}): ${line}.${edited} Nothing else is shown without a look.\n${left()}`;
     // a look is the choice painted for real, small: the painter runs outside the folder. A painting that fails, or
     // does not stay on the GPU, shows nothing and is no look. The same choice looked at again is not painted again
@@ -184,7 +186,7 @@ export function sessionServer({ dir, looks: asked, minutes, compile, look: paint
     if (!seenIt) { try { seenIt = await paintLook(p.choice, p.script, { plan: id, look }, p.edit?.edit ?? null, got); } catch (e) { seenIt = { ok: false, error: e.message }; } if (seenIt?.ok) painted.set(p.key, seenIt); }
     if (!seenIt?.ok) { note({ notPainted: String(seenIt?.error ?? 'no painting').slice(0, 300), plan: id, key: p.key }); return `NOT PAINTED, no look was counted: ${seenIt?.error ?? 'the painter gave no painting'}\nYour choice compiles (${what}): ${line}. Ask for the look again, or go on.\n${left()}`; }
     // the look is spent before it is delivered: whatever happens to the delivery, it stays spent
-    note({ look, plan: id, atSeconds, at: new Date(now()).toISOString(), what, kind: p.choice.kind, settings: entry.settings, script: p.choice.script, plan: p.choice.plan ?? null, edit: p.edit?.record ?? null, key: p.key, marked: seenIt.marked ?? null, painted: seenIt.painted ?? null });
+    note({ look, plan: id, atSeconds, at: new Date(now()).toISOString(), what, kind: p.choice.kind, settings: entry.settings, script: p.choice.script, plan: p.choice.plan ?? null, edit: er, key: p.key, marked: seenIt.marked ?? null, painted: seenIt.painted ?? null });
     entry.look = look;
     const folder = `looks/${look}`, choiceText = JSON.stringify({ kind: p.choice.kind, settings: entry.settings, script: p.choice.script, plan: p.choice.plan ?? null, why: p.choice.why }, null, 1) + '\n';
     // kept outside the folder as it was shown, with the choice as it was looked at: what changed between looks is read from here
@@ -224,6 +226,8 @@ export function sessionServer({ dir, looks: asked, minutes, compile, look: paint
 
   return {
     start() { timer = setInterval(() => { tick().catch(() => {}); }, everyMs); }, tick, ownSeconds, present,
+    /** The model's command starts now: its own time is counted from here (not from when this side was made ready). */
+    begin() { t0 = now(); waitMs = 0; lastEnd = Math.max(lastEnd, t0); },
     over: () => ownSeconds() >= minutes * 60,
     async stop() { if (timer) clearInterval(timer); while (busy) await new Promise(r => setTimeout(r, 50)); return { looks: ledgerLooks(ledger), plans, requests, ownSeconds: ownSeconds(), waitSeconds: Math.round(waitMs / 1000), lastGood, good }; },
   };
