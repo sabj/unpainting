@@ -4,7 +4,7 @@ import { parseArgs } from './args.mjs';
 
 test('one subject and a mode, with the defaults', () => {
   const r = parseArgs(['kasha-watercolor', 'plan']);
-  assert.deepEqual(r, { subjects: [{ id: 'kasha-watercolor', variant: null }], mode: 'plan', prepare: false, look: false, until: null, region: null, authors: ['auto'], studies: 'locked', work: 'session', level: 'L2', tryNumber: 1, retries: 1, previous: null, looks: null, wallMinutes: null, graceMinutes: null, reverts: null, from: null, lines: null, sets: [], jobs: null, out: null, dryRun: false, open: true });
+  assert.deepEqual(r, { subjects: [{ id: 'kasha-watercolor', variant: null }], mode: 'plan', prepare: false, preflight: false, look: false, until: null, region: null, authors: ['auto'], studies: 'locked', work: 'session', level: 'L2', tryNumber: 1, retries: 1, previous: null, looks: null, wallMinutes: null, graceMinutes: null, reverts: null, from: null, lines: null, sets: [], jobs: null, out: null, dryRun: false, open: true });
 });
 
 test('several subjects, authors, settings and a variant', () => {
@@ -20,7 +20,7 @@ test('what is wrong is said', () => {
   assert.throws(() => parseArgs(['all', 'paint', '--jobs', '0']), /--jobs/);
   assert.throws(() => parseArgs(['all', 'paint', '--jobs', 'two']), /--jobs/);
   assert.throws(() => parseArgs(['kasha']), /plan, paint or prepare|plan, paint, prepare or look/);
-  assert.throws(() => parseArgs(['kasha', 'render']), /plan, paint, prepare or look, not "render"/);
+  assert.throws(() => parseArgs(['kasha', 'render']), /plan, paint, prepare, look or preflight, not "render"/);
   assert.throws(() => parseArgs(['kasha', 'plan', '--fast']), /unknown option --fast/);
   assert.throws(() => parseArgs(['kasha', 'plan', '--set', 'width']), /key=value/);
   assert.throws(() => parseArgs(['kasha', 'plan', '--set', 'a=1', '--set', 'a=2']), /twice/);
@@ -36,6 +36,7 @@ test('the budget of a try, the level and its retries are settings; prepare and l
   assert.deepEqual((({ mode, prepare, level }) => [mode, prepare, level])(parseArgs(['mittens', 'prepare'])), ['plan', true, 'L2']);
   assert.deepEqual((({ mode, prepare }) => [mode, prepare])(parseArgs(['mittens', 'prepare', '--level', 'L4'])), ['paint', true], 'level 4 prepares the automatic painting too');
   assert.deepEqual((({ look, until, region, mode }) => [look, until, region, mode])(parseArgs(['mittens', 'look', '--author', 'choice:kept', '--until', '2', '--region', '10,10,90,80'])), [true, 2, '10,10,90,80', 'plan']);
+  assert.equal(parseArgs(['mittens', 'preflight', '--author', 'neon-m,hydrogen-m']).preflight, true); assert.throws(() => parseArgs(['mittens', 'preflight']), /preflight checks models through the session harness/);
   assert.throws(() => parseArgs(['mittens', 'look']), /look paints one look of a kept choice.*--author choice:/); assert.throws(() => parseArgs(['mittens', 'plan', '--until', '2']), /--until and --region belong to the word look/);
   assert.throws(() => parseArgs(['mittens', 'prepare', '--author', 'opus']), /prepare makes the automatic plan .* it takes no --author/);
   assert.throws(() => parseArgs(['mittens', 'plan', '--minutes', '85']), /--minutes is gone: a session's own minutes are measured, not capped.*--wallminutes/);

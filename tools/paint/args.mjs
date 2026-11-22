@@ -1,17 +1,20 @@
 // The command line of `npm run paint`:
-//   npm run paint -- <subject[,subject...]> plan|paint|prepare|look [--author auto|<model key>[,...]] [--studies locked|author]
+//   npm run paint -- <subject[,subject...]> plan|paint|prepare|look|preflight [--author auto|<model key>[,...]] [--studies locked|author]
 //                    [--work session|reply] [--level L2|L3|L4] [--retries N] [--try N] [--previous <dir>]
 //                    [--looks N] [--wallminutes N] [--graceminutes N] [--reverts N] [--from <dir>] [--lines FILE.json|standard]
 //                    [--set key=value ...] [--jobs N] [--out <dir>] [--dry-run] [--no-open]
 // Nothing here touches a file: it turns the words into one request object, or throws with the usage.
 
-export const USAGE = `usage: npm run paint -- <subject[,subject...]> plan|paint|prepare|look [options]
+export const USAGE = `usage: npm run paint -- <subject[,subject...]> plan|paint|prepare|look|preflight [options]
 
   plan                  the wash plan only, on the CPU (minutes)
   paint                 the whole painting, on the GPU
   look                  one look of a kept choice (--author choice:<folder>), painted for real, small, as a
                         session's look is: with --until N stopped after stage N, with --region x0,y0,x1,y1 (mm)
                         a script's passages in that box only. No model is called. Writes its cost in units
+  preflight             a two-minute check of each --author model through the session harness, before a real
+                        session: it opens a picture and says what it shows, runs ./unpaint plan once and writes a
+                        file. Nothing is painted. Prints a table and writes preflight.json
   prepare               make the subject's prepared inputs for this code, once, before any session: the code
                         planner's plan (CPU); with --level L4 also its full-size painting (GPU) and that painting's
                         sheets. A session finds them in seconds and does not start without them
@@ -90,10 +93,10 @@ export function parseArgs(argv) {
   }
   if (words.length !== 2) throw new Error('give the subject(s) and plan, paint or prepare');
   const [names, word] = words;
-  if (!['plan', 'paint', 'prepare', 'look'].includes(word)) throw new Error(`the second word is plan, paint, prepare or look, not "${word}"`);
+  if (!['plan', 'paint', 'prepare', 'look', 'preflight'].includes(word)) throw new Error(`the second word is plan, paint, prepare, look or preflight, not "${word}"`);
   const level = given['--level'] ?? 'L2';
   if (!['L2', 'L3', 'L4'].includes(level)) throw new Error('--level is L2, L3 or L4');
-  const prepare = word === 'prepare', look = word === 'look', mode = prepare ? (level === 'L4' ? 'paint' : 'plan') : look ? 'plan' : word;
+  const prepare = word === 'prepare', look = word === 'look', preflight = word === 'preflight', mode = prepare ? (level === 'L4' ? 'paint' : 'plan') : look || preflight ? 'plan' : word;
   const subjects = list(names).map(s => { const [id, variant = null, more] = s.split(':'); if (!id || more !== undefined) throw new Error(`subject "${s}": write name or name:variant`); return { id, variant }; });
   const authors = list(given['--author'] ?? 'auto');
   if (prepare && (authors.length !== 1 || authors[0] !== 'auto')) throw new Error('prepare makes the automatic plan (and painting): it takes no --author');
@@ -124,7 +127,8 @@ export function parseArgs(argv) {
   if (new Set(keys).size !== keys.length) throw new Error('a --set key is given twice');
   const jobs = given['--jobs'] === undefined ? null : Number(given['--jobs']);
   if (jobs !== null && !(Number.isInteger(jobs) && jobs >= 1 && jobs <= 16)) throw new Error('--jobs: a whole number of paintings at once, 1 to 16');
-  return { subjects, mode, prepare, look, until, region: given['--region'] ?? null, authors, studies, work, level, tryNumber, retries, previous: given['--previous'] ?? null, looks, wallMinutes, graceMinutes, reverts, from: given['--from'] ?? null, lines: given['--lines'] ?? null, sets, jobs, out: given['--out'] ?? null, dryRun: flags.has('--dry-run'), open: !flags.has('--no-open') };
+  if (preflight && (authors.includes('auto') || authors.some(a => a.includes(':')))) throw new Error('preflight checks models through the session harness: give --author <model key>[,<model key>...]');
+  return { subjects, mode, prepare, preflight, look, until, region: given['--region'] ?? null, authors, studies, work, level, tryNumber, retries, previous: given['--previous'] ?? null, looks, wallMinutes, graceMinutes, reverts, from: given['--from'] ?? null, lines: given['--lines'] ?? null, sets, jobs, out: given['--out'] ?? null, dryRun: flags.has('--dry-run'), open: !flags.has('--no-open') };
 }
 
 function list(s) { return s.split(',').map(x => x.trim()).filter(Boolean); }
