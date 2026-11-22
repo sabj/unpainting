@@ -25,7 +25,7 @@ export const USAGE = `usage: npm run paint -- <subject[,subject...]> plan|paint 
   --no-open             do not open the sheet in Preview
 
 A subject may name a variant kept in tools/paint/variants.json: h36:approved.
-"all" is every registered subject not already named: all, or mittens,beach,all to paint those two first.`;
+"all" is every registered subject not already named: all, or a,b,all to paint a and b first.`;
 
 const VALUED = new Set(['--author', '--studies', '--set', '--out', '--jobs']);
 const FLAGS = new Set(['--dry-run', '--no-open']);
