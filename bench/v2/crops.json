@@ -180,6 +180,23 @@
    "file": "targets/mittens-closeup.png",
    "coarseFile": "targets/mittens-closeup-coarse.json",
    "licence": "noncommercial project use; local branch only, not distributed"
+  },
+  {
+   "task": "mittens-closeup-full",
+   "name": "Mittens close-up, full size",
+   "width": 1086,
+   "height": 1448,
+   "coarse": {
+    "cols": 24,
+    "rows": 32
+   },
+   "style": "watercolor sketch over faint pencil, no ink: an orange cat's face, close up",
+   "medium": "pencil",
+   "source": "watercolour sketch made by an image generator from the owner's photograph",
+   "distributed": true,
+   "file": "targets/mittens-closeup-full.png",
+   "coarseFile": "targets/mittens-closeup-full-coarse.json",
+   "licence": "noncommercial project use; local branch only, not distributed"
   }
  ]
 }
