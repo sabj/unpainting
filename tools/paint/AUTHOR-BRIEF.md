@@ -63,7 +63,7 @@ Rules that hold everywhere:
   together reach the richest study's value at that spot.
 - **Stroke direction along the form**: `handling.direction` for a wash; for the darker shapes and glazes inside a
   form prefer `kind: "strokes"` written point by point along the form, pressure swelling and lifting.
-- Sky and background: one or two large soft washes (wet, lost), laid first or while a form dries; they stop at the
+- Sky and background: large soft washes (wet, lost), laid first or while a form dries; they stop at the
   outer silhouette of a figure or animal and never cross a face. A cloud's lit top is reserved, never outlined.
 - Order over the whole sheet: (drawing, already done) then reserve the lights and lay the broad washes, then
   mid-values and shadow glazes, then the selected darks. Darks are later than lights, always.
@@ -242,8 +242,6 @@ A passage:
   glaze's own swatch, lighter than the result you want.
 - `charges`: colour dropped into this passage while it is wet; one drop at each `at`.
 - `into`: only the passage IMMEDIATELY before can still be wet. Everything earlier is dry.
-
-Aim for 20 to 45 passages: one base wash and a few drops and glazes a form, then the few crisp marks.
 
 ## What the script can and cannot express (write only what is listed here; invent no fields)
 
