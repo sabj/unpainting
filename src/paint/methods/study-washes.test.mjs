@@ -1,4 +1,5 @@
 import test from 'node:test';
+import { studyShapesDoc } from './study-shapes-out.mjs';
 import assert from 'node:assert/strict';
 import { planStudyWashes, nestParents } from './study-washes.mjs';
 import { laneFill } from './sweep-fill.mjs';
@@ -37,6 +38,9 @@ test('the study\'s flat shapes: three painted, the white left as paper, each one
   assert.equal(washes.filter(q => !/glaze/.test(q.thing)).length, 1);
   assert.ok(washes.filter(q => /shadow, glaze/.test(q.thing)).length >= 2 && washes.filter(q => /glaze/.test(q.thing) && !/shadow/.test(q.thing)).length >= 2, washes.map(q => q.thing).join(' | '));
   assert.ok(p.mixes.every(m => m.mix.length === pigments.length));
+  // the shapes as read, before they become washes, come back with the plan for writing out (study-shapes-out.mjs): a label for every plan cell, a colour and a cell count for every shape
+  const r = p.studyShapes; assert.equal(r.label.length, r.pw * r.ph); assert.equal(r.shapes.length, p.summary.shapes); assert.equal(r.shapes.reduce((a, x) => a + x.cells, 0), r.pw * r.ph); assert.equal(r.shapes.filter(x => x.light).length, p.summary.paperShapes);
+  assert.equal(studyShapesDoc(r).shapes.filter(x => !x.paper && x.polygons.length).length, 3);
 });
 
 test('wash within wash: the wall is laid first and carried under its shadow; the shadow goes over it dry; the door is last', () => {
