@@ -84,3 +84,14 @@ test('named forms: --set masks first, then the named-forms folder, then none; bo
 test('record options must be pairs', () => {
   assert.throws(() => optionPairs(['--a', '1', 'b']), /pairs/);
 });
+
+test('a study setting for one named form, and when the drawing is laid, are settings of the run and are said to differ', () => {
+  const s = resolveSubject(registry(), 'dune', { sets: [['form3.study1.clusters', '24'], ['form3.study3.lay', '1'], ['form11.study1.floor', '3'], ['drawingorder', 'both'], ['drawinglast', '/run/lines/closing'], ['threads', '2']] });
+  assert.deepEqual(s.studies[0].forms, { 3: { clusters: 24 }, 11: { floor: 3 } }); assert.deepEqual(s.studies[2].forms, { 3: { lay: 1 } }); assert.equal(s.studies[1].forms, undefined);
+  assert.deepEqual(s.options.find(([k]) => k === 'drawing'), ['drawing', 'both']);
+  assert.deepEqual(s.otherSets, [['drawinglast', '/run/lines/closing'], ['threads', '2']], 'the closing drawing is a painter option; the rest is read here');
+  assert.ok(s.deviations.some(d => d.what === 'study 1 clusters in named form 3' && d.now === '24')); assert.ok(s.deviations.some(d => d.what === 'when the drawing is laid' && d.now === 'both' && d.record === 'first'));
+  assert.equal(resolveSubject(registry(), 'dune').options.some(([k]) => k === 'drawing'), false, 'nothing asked: the record\'s options as they are');
+  assert.throws(() => resolveSubject(registry(), 'dune', { sets: [['drawingorder', 'sometimes']] }), /one of first, both, last, none/);
+  assert.throws(() => resolveSubject(registry(), 'dune', { sets: [['form3.study9.clusters', '4']] }), /the subject has 3 studies/);
+});

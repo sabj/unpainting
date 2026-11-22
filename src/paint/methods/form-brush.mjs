@@ -10,12 +10,21 @@ const FORM_SPAN = 0.05;
 
 /**
  * The widest wash brush (mm) for a wash over these plan cells: `ceilingMm` when it lies in forms of the round kinds, else
- * Infinity (no named forms: Infinity, the kit as it is).
+ * Infinity (no named forms: Infinity, the kit as it is). `perForm(formId)`: a form's own ceiling (mm), whatever its
+ * kind, or null: a wash with that share of its cells in such a form takes the form's own, and the smallest holds.
  */
-export function brushCeilingMm(cells, named, ceilingMm) {
-  if (!named || !cells.length || !(ceilingMm > 0)) return Infinity;
-  let inside = 0; for (const q of cells) if (ROUND_KINDS.includes(named.kindAt(q))) inside++;
-  return inside >= FORM_SPAN * cells.length ? ceilingMm : Infinity;
+export function brushCeilingMm(cells, named, ceilingMm, perForm = null) {
+  if (!named || !cells.length) return Infinity;
+  if (!perForm) {
+    if (!(ceilingMm > 0)) return Infinity;
+    let inside = 0; for (const q of cells) if (ROUND_KINDS.includes(named.kindAt(q))) inside++;
+    return inside >= FORM_SPAN * cells.length ? ceilingMm : Infinity;
+  }
+  const own = new Map(); let inside = 0, ceiling = Infinity;
+  for (const q of cells) { const id = named.ids[q], mine = id ? perForm(id) : null; if (mine != null) own.set(id, (own.get(id) ?? 0) + 1); else if (ROUND_KINDS.includes(named.kindAt(q))) inside++; }
+  if (ceilingMm > 0 && inside >= FORM_SPAN * cells.length) ceiling = ceilingMm;
+  for (const [id, c] of own) if (c >= FORM_SPAN * cells.length) ceiling = Math.min(ceiling, perForm(id));
+  return ceiling;
 }
 
 /** The brushes of `kitMm` no wider than `ceilingMm`; the smallest alone when none is. */

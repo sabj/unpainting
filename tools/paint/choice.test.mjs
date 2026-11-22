@@ -46,3 +46,22 @@ test('the same choice has the same key, and a choice is laid over the run\'s own
   assert.deepEqual(withChoice([['threads', '2'], ['floors', '6,4,2']], a), [['threads', '2'], ['floors', '8,4,2'], ['study1.shapes', '60']]);
   assert.deepEqual(withChoice([['threads', '2']], readChoice({ kind: 'settings', settings: {} })), [['threads', '2']], 'nothing changed: the run is the code planner\'s');
 });
+
+test('beside its kind a choice may name its lines, its forms and settings for single forms', () => {
+  const c = readChoice({ kind: 'settings', settings: {}, lines: 'my-lines.json', forms: 'my-forms.json', perForm: { 'cat face': { 'study1.clusters': 24, 'study1.brush': 10, 'study3.lay': 1 }, 'left eye': { 'study3.floor': 0.5 } } });
+  assert.equal(c.tools.lines, 'my-lines.json'); assert.equal(c.tools.forms, 'my-forms.json');
+  assert.deepEqual(c.tools.perForm, [['cat face', [[1, 'clusters', 24], [1, 'formbrush', 10], [3, 'lay', 1]]], ['left eye', [[3, 'floor', 0.5]]]]);
+  assert.equal(choiceKind(c), 'the code planner with its choice of lines, its own forms, settings per form'); assert.notEqual(choiceKey(c), choiceKey(readChoice({ kind: 'settings', settings: {} })));
+  assert.equal(readChoice({ kind: 'settings', settings: {} }).tools, undefined, 'no tools: the choice is as it was');
+  assert.equal(choiceKind(readChoice({ kind: 'script', script: 's.json', lines: 'l.json' })), 'own script with its choice of lines'); assert.equal(choiceKind(readChoice({ kind: 'plan', plan: 'p.json', lines: 'l.json' })), 'edited plan with its choice of lines');
+  // the text of its lines is part of its key once the session has read it
+  const a = readChoice({ kind: 'settings', settings: {}, lines: 'l.json' }), b = readChoice({ kind: 'settings', settings: {}, lines: 'l.json' }); a.tools.linesEdit = { rules: [1] }; b.tools.linesEdit = { rules: [2] }; assert.notEqual(choiceKey(a), choiceKey(b));
+  assert.throws(() => readChoice({ kind: 'script', script: 's.json', forms: 'f.json' }), /go with kind "settings"; a script is laid as written/);
+  assert.throws(() => readChoice({ kind: 'plan', plan: 'p.json', perForm: { face: { 'study1.clusters': 8 } } }), /an edited plan is an edit of the plan made from the forms as given/);
+  assert.throws(() => readChoice({ kind: 'settings', lines: '../l.json' }), /"lines" names its file in this folder/);
+  assert.throws(() => readChoice({ kind: 'settings', perForm: { face: { 'study2.clusters': 8 } } }), /"study2.clusters" is not a setting of a form/); assert.throws(() => readChoice({ kind: 'settings', perForm: { face: { 'study1.lay': 0 } } }), /not a setting of a form/);
+  assert.throws(() => readChoice({ kind: 'settings', perForm: { face: { 'study1.clusters': 900 } } }), /a number from 2 to 64/); assert.throws(() => readChoice({ kind: 'settings', perForm: { face: {} } }), /an object of setting: number/);
+  for (const k of ['drawingorder', 'drawinglast']) assert.throws(() => readChoice({ kind: 'settings', settings: { [k]: 'x' } }), /is locked/, k);
+  const l = settingsList(spec), by = Object.fromEntries(l.map(x => [x.set, x]));
+  assert.equal(by['study3.lay'].now, 1); assert.equal(by['study2.largest'].now, 15); assert.equal(by['study3.lightest'].now, 40); assert.equal(by['study1.lay'], undefined, 'a later study\'s setting is not listed for the block-in');
+});

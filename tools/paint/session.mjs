@@ -91,7 +91,7 @@ const fill = (text, v) => Object.entries(v).reduce((t, [k, x]) => t.replaceAll(k
  * `settings` settingsList(); `forms` [{id, name, kind, boxMm}] with `formsIds` the id map's file, or null.
  * Returns {prompt, files}. Nothing of this machine's paths goes into any file of the folder.
  */
-export function writeSession({ dir, packet, sheet, medium, auto, settings, forms = null, formsIds = null, looks, minutes, briefFile, readmeFile, previous = null }) {
+export function writeSession({ dir, packet, sheet, medium, auto, settings, forms = null, formsIds = null, looks, minutes, briefFile, readmeFile, previous = null, drawing = null }) {
   const mk = d => fs.mkdirSync(path.join(dir, d), { recursive: true });
   for (const d of ['auto', 'plans', 'looks', '.requests']) mk(d);
   const put = (f, text) => fs.writeFileSync(path.join(dir, f), text);
@@ -114,8 +114,10 @@ export function writeSession({ dir, packet, sheet, medium, auto, settings, forms
   put('auto/settings.json', JSON.stringify({ note: 'Write a setting into choice.json under "settings" by its "set" name. "now" is the value the code planner\'s plan in this folder was made with.', settings }, null, 1) + '\n');
   put('auto/plan.json', JSON.stringify(auto.plan, null, 1) + '\n'); if (auto.toEdit) put('auto/plan-to-edit.json', JSON.stringify(auto.toEdit, null, 1) + '\n'); put('auto/washes.txt', auto.washesText); fs.writeFileSync(path.join(dir, 'auto/plan.png'), auto.picture);
   if (forms && formsIds) { fs.copyFileSync(formsIds, path.join(dir, 'inputs/forms-ids.png')); put('inputs/forms.json', JSON.stringify(forms.map(f => ({ id: f.id, name: f.name, kind: f.kind, boxMm: f.boxMm ?? null })), null, 1) + '\n'); }
+  // the drawing's lines, each one a row an author may choose, weight or move after the washes (lines-edit.mjs): `drawing` {listing, picture}
+  if (drawing) { mk('drawing'); put('drawing/lines.json', JSON.stringify(drawing.listing) + '\n'); if (drawing.picture) fs.writeFileSync(path.join(dir, 'drawing/all-lines.png'), drawing.picture); }
   const leak = [os.homedir(), os.userInfo().username].filter(Boolean);
-  for (const f of ['TASK.md', 'README.md', 'own-script-brief.md', 'auto/settings.json', 'auto/plan.json', 'auto/plan-to-edit.json', 'auto/washes.txt', 'inputs/forms.json']) {
+  for (const f of ['TASK.md', 'README.md', 'own-script-brief.md', 'auto/settings.json', 'auto/plan.json', 'auto/plan-to-edit.json', 'auto/washes.txt', 'inputs/forms.json', 'drawing/lines.json']) {
     if (fs.existsSync(path.join(dir, f)) && leak.some(w => fs.readFileSync(path.join(dir, f), 'utf8').includes(w))) throw new Error(`session: ${f} would carry a path or name of this machine; the session is not started`);
   }
   return { prompt };
@@ -142,7 +144,7 @@ export function ledgerLooks(ledger) {
  * side (the planner, a look's painting) is not the model's own. start() begins polling; stop() ends it and returns
  * the record.
  */
-export function sessionServer({ dir, looks: asked, minutes, compile, look: paintLook, keep = null, checkScript, checkPlan = null, ledger, now = Date.now, everyMs = 400 }) {
+export function sessionServer({ dir, looks: asked, minutes, compile, look: paintLook, keep = null, checkScript, checkPlan = null, checkTools = null, ledger, now = Date.now, everyMs = 400 }) {
   // no limit on looks (gentle mode) when the number asked is 0 or not given
   const most = asked > 0 ? asked : Infinity, ofMost = most === Infinity ? '' : ` of ${most}`;
   const plans = [], cache = new Map(), painted = new Map(), requests = [], good = new Set(), seen = new Map();
@@ -159,7 +161,15 @@ export function sessionServer({ dir, looks: asked, minutes, compile, look: paint
     if (choice.kind === 'script') { const got = safeJson(dir, choice.script); text = got.text; script = checkScript(got.value); }
     // an edited plan is checked against the code planner's plan it must be an edit of: {edit, record (what it changes, counted)}
     if (choice.kind === 'plan') { if (!checkPlan) throw new Error('an edited plan cannot be read in this session'); const got = safeJson(dir, choice.plan); text = got.text; edit = checkPlan(got.value); }
-    return { choice, script, edit, text, key: choiceKey(choice, text) };
+    // the choice's tools (its lines, its forms, settings per form): their files are read here and checked against the
+    // drawing and the forms of the run: {record (what was chosen, counted), said}
+    let tools = null;
+    if (choice.tools) {
+      if (!checkTools) throw new Error('"lines", "forms" and "perForm" cannot be read in this session');
+      const t = choice.tools; if (t.lines) t.linesEdit = safeJson(dir, t.lines).value; if (t.forms) t.formsEdit = safeJson(dir, t.forms).value;
+      tools = checkTools(t);
+    }
+    return { choice, script, edit, text, tools, key: choiceKey(choice, text) };
   }
 
   async function answer(cmd) {
@@ -169,15 +179,18 @@ export function sessionServer({ dir, looks: asked, minutes, compile, look: paint
     const id = ++n, what = choiceKind(p.choice), atSeconds = ownSeconds();
     let got = cache.get(p.key);
     if (!got) { try { got = await compile(p.choice, p.script, id, p.edit?.edit ?? null); } catch (e) { got = { ok: false, error: e.message }; } cache.set(p.key, got); }
-    const entry = { n: id, atSeconds, what, kind: p.choice.kind, settings: Object.fromEntries(p.choice.sets), script: p.choice.script, plan: p.choice.plan ?? null, edit: p.edit?.record ?? null, why: p.choice.why, key: p.key, ok: got.ok, error: got.ok ? null : got.error, washes: got.summary?.washes ?? null, strokes: got.summary?.strokes ?? null, look: null };
+    const entry = { n: id, atSeconds, what, kind: p.choice.kind, settings: Object.fromEntries(p.choice.sets), script: p.choice.script, plan: p.choice.plan ?? null, edit: p.edit?.record ?? null, tools: p.tools?.record ?? null, why: p.choice.why, key: p.key, ok: got.ok, error: got.ok ? null : got.error, washes: got.summary?.washes ?? null, strokes: got.summary?.strokes ?? null, look: null };
     plans.push(entry);
     if (!got.ok) return `REFUSED by the planner${cmd === 'look' ? ', no look was counted' : ''}: ${got.error}`;
-    good.add(p.key); lastGood = { choice: p.choice, script: p.script, edit: p.edit, key: p.key, plan: id };
+    good.add(p.key); lastGood = { choice: p.choice, script: p.script, edit: p.edit, tools: p.tools, key: p.key, plan: id };
+    // what the choice's tools made of the given drawing and forms, as pictures and data of the author's own (mine/)
+    for (const f of got.toolFiles ?? []) safeWrite(dir, f.rel, f.data);
     const s = got.summary, line = `${s.passages != null ? `${s.passages} passages, ` : s.shapes != null ? `${s.shapes} shapes, ` : ''}${s.washes} washes, ${s.strokes ?? '?'} strokes, widest wash brush ${s.widestBrushMm ?? '?'} mm${s.washesByStage ? `, washes by stage ${s.washesByStage.join('/')}` : ''}`;
     // a free plan answers with whether it compiled and its counts: no picture, no colours, no places
     // (the painter's own count of the edit when it applied one: it holds the notes of what was laid the nearest way)
     const er = got.editRecord ?? p.edit?.record ?? null; if (er) entry.edit = er;
-    const edited = er ? ` Your edit: ${editLine(er)}.${er.notes.length ? `\n${er.notes.length} note${er.notes.length > 1 ? 's' : ''} on it (each was laid the nearest way that can be; change it if that is not what you want):\n${er.notes.slice(0, 60).map(x => `- ${x}`).join('\n')}\n` : ''}` : '';
+    const editSaid = er ? ` Your edit: ${editLine(er)}.${er.notes.length ? `\n${er.notes.length} note${er.notes.length > 1 ? 's' : ''} on it (each was laid the nearest way that can be; change it if that is not what you want):\n${er.notes.slice(0, 60).map(x => `- ${x}`).join('\n')}\n` : ''}` : '';
+    const edited = `${editSaid}${p.tools ? ` ${p.tools.said}${got.toolFiles?.length ? ` See ${got.toolFiles.map(f => f.rel).join(', ')}.` : ''}` : ''}`;
     // ... and of the strokes too small for a wet bed, before anything is painted (plan-data.mjs tinyTouchWarning)
     const tiny = tinyTouchWarning(s);
     if (cmd === 'plan') return `It compiles (${what}): ${line}.${edited}${tiny} Nothing else is shown without a look.\n${left()}`;
@@ -189,14 +202,15 @@ export function sessionServer({ dir, looks: asked, minutes, compile, look: paint
     if (!seenIt) { try { seenIt = await paintLook(p.choice, p.script, { plan: id, look }, p.edit?.edit ?? null, got); } catch (e) { seenIt = { ok: false, error: e.message }; } if (seenIt?.ok) painted.set(p.key, seenIt); }
     if (!seenIt?.ok) { note({ notPainted: String(seenIt?.error ?? 'no painting').slice(0, 300), plan: id, key: p.key }); return `NOT PAINTED, no look was counted: ${seenIt?.error ?? 'the painter gave no painting'}\nYour choice compiles (${what}): ${line}. Ask for the look again, or go on.\n${left()}`; }
     // the look is spent before it is delivered: whatever happens to the delivery, it stays spent
-    note({ look, plan: id, atSeconds, at: new Date(now()).toISOString(), what, kind: p.choice.kind, settings: entry.settings, script: p.choice.script, plan: p.choice.plan ?? null, edit: er, key: p.key, marked: seenIt.marked ?? null, painted: seenIt.painted ?? null });
+    note({ look, plan: id, atSeconds, at: new Date(now()).toISOString(), what, kind: p.choice.kind, settings: entry.settings, script: p.choice.script, plan: p.choice.plan ?? null, edit: er, tools: p.tools?.record ?? null, key: p.key, marked: seenIt.marked ?? null, painted: seenIt.painted ?? null });
     entry.look = look;
-    const folder = `looks/${look}`, choiceText = JSON.stringify({ kind: p.choice.kind, settings: entry.settings, script: p.choice.script, plan: p.choice.plan ?? null, why: p.choice.why }, null, 1) + '\n';
+    const folder = `looks/${look}`, t = p.choice.tools, choiceText = JSON.stringify({ kind: p.choice.kind, settings: entry.settings, script: p.choice.script, plan: p.choice.plan ?? null, ...(t ? { lines: t.lines ?? undefined, forms: t.forms ?? undefined, perForm: t.perFormGiven ?? undefined } : {}), why: p.choice.why }, null, 1) + '\n';
     // kept outside the folder as it was shown, with the choice as it was looked at: what changed between looks is read from here
     if (keep) {
       try {
         const at = path.join(keep, String(look)); fs.mkdirSync(at, { recursive: true });
         fs.writeFileSync(path.join(at, 'choice.json'), choiceText); if (p.text) fs.writeFileSync(path.join(at, p.choice.kind === 'script' ? 'script.json' : 'plan-edit.json'), p.text);
+        if (t?.linesEdit) fs.writeFileSync(path.join(at, 'lines-edit.json'), JSON.stringify(t.linesEdit)); if (t?.formsEdit) fs.writeFileSync(path.join(at, 'forms-edit.json'), JSON.stringify(t.formsEdit));
         fs.writeFileSync(path.join(at, 'beside.png'), seenIt.picture); if (seenIt.stages) fs.writeFileSync(path.join(at, 'stages.png'), seenIt.stages); fs.writeFileSync(path.join(at, 'numbers.txt'), seenIt.numbersText);
         fs.writeFileSync(path.join(at, 'look.json'), JSON.stringify({ look, plan: id, atSeconds, what, key: p.key, marked: seenIt.marked ?? null, painted: seenIt.painted ?? null }, null, 1) + '\n');
       } catch (e) { note({ fault: `look ${look} not kept outside the folder: ${String(e.message).slice(0, 200)}` }); }
@@ -244,11 +258,12 @@ export function sessionServer({ dir, looks: asked, minutes, compile, look: paint
  * {choice, script, submitted: {kind, what, settings, script, why, from, note}} or {failure}.
  */
 export function finalChoice({ present, lastGood, good = new Set(), ended }) {
-  const say = (c, from, note) => ({ kind: c.choice.kind, what: choiceKind(c.choice), settings: Object.fromEntries(c.choice.sets), script: c.choice.script, plan: c.choice.plan ?? null, edit: c.edit?.record ?? null, why: c.choice.why, from, note });
+  const say = (c, from, note) => ({ kind: c.choice.kind, what: choiceKind(c.choice), settings: Object.fromEntries(c.choice.sets), script: c.choice.script, plan: c.choice.plan ?? null, edit: c.edit?.record ?? null,
+    ...(c.choice.tools ? { tools: { lines: c.choice.tools.lines, forms: c.choice.tools.forms, perForm: c.choice.tools.perFormGiven, record: c.tools?.record ?? null } } : {}), why: c.choice.why, from, note });
   const cut = ended === 'done' ? null : 'the session ran out of time';
   let p = null, why = null;
   try { p = present(); } catch (e) { why = e.message; }
-  if (p && (good.has(p.key) || (p.choice.kind === 'settings' && !p.choice.sets.length))) return { choice: p.choice, script: p.script, edit: p.edit?.edit ?? null, submitted: say(p, 'choice.json as the session left it', cut) };
+  if (p && (good.has(p.key) || (p.choice.kind === 'settings' && !p.choice.sets.length && !p.choice.tools))) return { choice: p.choice, script: p.script, edit: p.edit?.edit ?? null, submitted: say(p, 'choice.json as the session left it', cut) };
   if (p) why = 'it was never planned, so it is not known to compile';
   if (lastGood) return { choice: lastGood.choice, script: lastGood.script, edit: lastGood.edit?.edit ?? null, submitted: say(lastGood, `the last choice that compiled (plan ${lastGood.plan})`, `the final choice.json was not taken: ${why}${cut ? `; ${cut}` : ''}`) };
   return { failure: `the session's final choice.json was not taken and no earlier choice had compiled: ${why}` };
@@ -379,8 +394,9 @@ export function ownFolderOf(commands) {
 }
 
 /** Pictures in the session's folder that the harness did not put there (a plan drawn by other means would be one). */
+const HARNESS_PICTURES = new Set(['mine/drawing.png', 'mine/forms.png', 'mine/forms-ids.png']);
 export function ownPictures(dir) {
-  const out = [], walk = d => { for (const e of fs.readdirSync(d, { withFileTypes: true })) { const f = path.join(d, e.name), rel = path.relative(dir, f); if (e.isDirectory()) { if (!['inputs', 'auto', 'looks', '.requests'].includes(rel)) walk(f); } else if (/\.(png|jpe?g|gif|webp|bmp|tiff?|svg|ppm|pgm|pdf|html?)$/i.test(e.name)) out.push(rel); } };
+  const out = [], walk = d => { for (const e of fs.readdirSync(d, { withFileTypes: true })) { const f = path.join(d, e.name), rel = path.relative(dir, f); if (e.isDirectory()) { if (!['inputs', 'auto', 'looks', 'drawing', '.requests'].includes(rel)) walk(f); } else if (/\.(png|jpe?g|gif|webp|bmp|tiff?|svg|ppm|pgm|pdf|html?)$/i.test(e.name) && !HARNESS_PICTURES.has(rel)) out.push(rel); } };
   walk(dir); return out.sort();
 }
 
