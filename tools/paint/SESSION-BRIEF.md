@@ -101,6 +101,14 @@ recognisable and unbroken. DRAWING_NOTE
 
 ## Before you stop
 
+- **Review your own sheet.** Take a look at your final choice and write `self-review.md`: first line
+  `# Self-review of look N` (N your last look), then the FIVE worst differences between your dried sheet and the
+  subject, numbered, each with where it is in millimetres, what differs and what you would do about it; last line
+  `Major faults remaining: none` or `Major faults remaining: <how many>`. A major fault is a form not built, a value far
+  off, a colour wrong, or an area left bare that the subject paints. **While a major fault remains and you have time,
+  go on and put it right, then look and review again.** You may hand in early only when your review of your last look
+  says none remains; a session that stops without it is sent back to work. No score is shown to you and nobody marks
+  the review: it is your own judgment.
 - `choice.json` holds your final choice, with one or two sentences of `why`.
 - You ran `./unpaint plan` on it and it compiled. A final choice that was not planned, or does not compile, is not
   painted: the last choice of yours that did compile is painted in its place, and the record says so.

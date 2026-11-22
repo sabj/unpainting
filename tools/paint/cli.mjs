@@ -18,8 +18,9 @@ import { readChoice, choiceKey, choiceKind, withChoice, settingsList } from './c
 import { checkPlanEdit, editLine } from '../../src/paint/methods/plan-edit.mjs';
 import { planNumbers, numbersText, washesText, planPicture, lookPicture, stagesPicture } from './plan-data.mjs';
 import { lookSets, lookFault, lookSizeNote, LOOK_JOBS, HEAVY_JOBS } from './look.mjs';
-import { DEFAULT_LOOKS, DEFAULT_MINUTES, writeSession, sessionServer, finalChoice, sessionCall, readTranscript, reachedOutside, ownFolderOf, ownPictures, runSession } from './session.mjs';
+import { DEFAULT_LOOKS, DEFAULT_MINUTES, safeRead, writeSession, sessionServer, finalChoice, sessionCall, readTranscript, reachedOutside, ownFolderOf, ownPictures, runSession } from './session.mjs';
 import { qwenRoute, studyRequestPrompt, parseStudyRequests, writeStudyRequest, makeStudies, withAuthorStudies } from './studies.mjs';
+import { readSelfReview, returnPrompt } from './self-review.mjs';
 import { codeState } from '../../src/paint/code-state.mjs';
 import { scanOptions } from '../../src/paint/option-ledger.mjs';
 
@@ -316,13 +317,27 @@ async function sessionRun(r) {
       say(r, `${author.name} starts its working session (${author.cli}; ${minutesMost} min of its own time, ${looksMost > 0 ? `${looksMost} looks` : 'looks without limit'}, each a small real painting${previousTry() ? `; try ${previousTry().tryNumber} of 3, with its previous painting and a teacher's words` : ''}): ${call.closed}`);
       server.start();
       // the model's clock starts when its command does: the wait for a place among the models at work is not its time
-      const t0 = Date.now(), done = await modelSlot(() => (call.serial ? agySlot : f => f())(() => { server.begin(); return runSession(call, { cwd, outFile: path.join(dir, 'S.out.txt'), errFile: path.join(dir, 'S.err.txt'), over: server.over }); }));
-      await server.tick(); const kept = await server.stop(), seen = readTranscript(author.cli, fs.readFileSync(path.join(dir, 'S.out.txt'), 'utf8'));
+      const t0 = Date.now(), turnOf = (c, k) => modelSlot(() => (c.serial ? agySlot : f => f())(() => { if (k === 1) server.begin(); return runSession(c, { cwd, outFile: path.join(dir, k === 1 ? 'S.out.txt' : `S${k}.out.txt`), errFile: path.join(dir, k === 1 ? 'S.err.txt' : `S${k}.err.txt`), over: server.over }); }));
+      let done = await turnOf(call, 1); const reviews = [];
+      // the finishing step (self-review.mjs): a session that stops without a sound self-review of its last look, or with a
+      // major fault named in it, is sent back to work in the same folder while it has time; every review is kept
+      for (let turn = 1; done.ended === 'done'; turn++) {
+        await server.tick();
+        let text = null; try { text = safeRead(cwd, 'self-review.md').slice(0, 20000); } catch { /* none written, or not a plain file of its folder */ }
+        const review = readSelfReview(text, server.looksTaken()), minutesLeft = minutesMost - server.ownSeconds() / 60, back = returnPrompt(review, { minutesLeft, turn });
+        reviews.push({ afterTurn: turn, ownMinutes: +(server.ownSeconds() / 60).toFixed(1), look: review.look, differences: review.items, major: review.major, letItEnd: review.ok, why: review.why, sentBack: Boolean(back), text });
+        if (text) fs.writeFileSync(path.join(dir, `self-review-${turn}.md`), text);
+        if (!back) break;
+        say(r, `stopped at ${reviews.at(-1).ownMinutes} of ${minutesMost} min; sent back to finish (${review.why})`);
+        done = await turnOf(sessionCall(author, { prompt: back, cwd, deny, images: [] }), turn + 1);
+      }
+      await server.tick(); const kept = await server.stop(), turns = reviews.length || 1;
+      const seen = readTranscript(author.cli, Array.from({ length: turns }, (_, i) => path.join(dir, i ? `S${i + 1}.out.txt` : 'S.out.txt')).filter(f => fs.existsSync(f)).map(f => fs.readFileSync(f, 'utf8')).join('\n'));
       fin = done.ended === 'not started' ? { failure: `the model could not be called: ${done.error}` } : finalChoice({ present: server.present, lastGood: kept.lastGood, good: kept.good, ended: done.ended });
       const outside = reachedOutside(seen.commands, deny, [cwd, real]), pictures = ownPictures(cwd);
       session = {
         ended: done.ended, exit: done.exit, error: done.error, looksMost, minutesMost, ownMinutes: +(kept.ownSeconds / 60).toFixed(1), waitMinutes: +(kept.waitSeconds / 60).toFixed(1), wallMinutes: +((Date.now() - t0) / 60000).toFixed(1),
-        looks: kept.looks, plans: kept.plans.map(({ key, ...p }) => p), toolCalls: seen.calls, toolCallsTotal: Object.values(seen.calls).reduce((a, b) => a + b, 0),
+        looks: kept.looks, selfReviews: reviews, turns, plans: kept.plans.map(({ key, ...p }) => p), toolCalls: seen.calls, toolCallsTotal: Object.values(seen.calls).reduce((a, b) => a + b, 0),
         submitted: fin.submitted ?? null, lastMessage: seen.text.slice(0, 4000), routes: { closed: call.closed, commandsNamingOutside: outside, picturesItMade: pictures },
       };
       Object.assign(record.author, { seconds: kept.ownSeconds, tokens: seen.tokens, costUSD: seen.costUSD });

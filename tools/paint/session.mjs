@@ -225,7 +225,7 @@ export function sessionServer({ dir, looks: asked, minutes, compile, look: paint
   }
 
   return {
-    start() { timer = setInterval(() => { tick().catch(() => {}); }, everyMs); }, tick, ownSeconds, present,
+    start() { timer = setInterval(() => { tick().catch(() => {}); }, everyMs); }, tick, ownSeconds, present, looksTaken: used,
     /** The model's command starts now: its own time is counted from here (not from when this side was made ready). */
     begin() { t0 = now(); waitMs = 0; lastEnd = Math.max(lastEnd, t0); },
     over: () => ownSeconds() >= minutes * 60,

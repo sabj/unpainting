@@ -22,6 +22,8 @@ INPUT_LIST
 - `auto/settings.json`: the planner's settings, their present values, and what each does.
 - `own-script-brief.md`: the brief for writing your own painting script (the format, the kit, the paints).
 - `choice.json`: your choice. What it holds when you stop is painted.
+- `self-review.md`: yours to write before you stop (`TASK.md`, "Before you stop"): the five worst differences between
+  your last look's dried sheet and the subject, and whether a major fault remains. Without it you are sent back to work.
 
 ## Commands
 
