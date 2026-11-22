@@ -106,6 +106,13 @@ washes (`inkfast` 1, as for your own script), unless your settings say otherwise
 pencil drawing `after` is refused; darken a pencil line with a `weight` above 1 instead. `./unpaint plan` checks the rules and counts what they do;
 `mine/drawing.png` shows the result. The lines themselves show in a look's dried sheet.
 
+What the lines tool cannot do yet:
+
+- Closing lines on a pencil drawing. The painter draws pencil before the washes only, so `"do": "after"` is refused
+  there. To make a pencil line count more, give it a `weight` above 1, or paint the dark yourself as a passage.
+- Change a line's width or shape, or draw a new line. A line is as wide as the drawing has it; `weight` changes its
+  darkness only. A thicker or a new line is a passage of your own (`lines` or `strokes` in a script or an edited plan).
+
 ## Your own named forms
 
 The planner uses the named forms: a form of a soft kind (face, fur, animal, hair, figure, clothing, sky, water)
