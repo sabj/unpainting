@@ -23,6 +23,7 @@ const LOAD = Object.freeze({ flooded: 0.88, loaded: 0.68, damp: 0.42, dry: 0.22 
 const KINDS = new Set(['wash', 'strokes', 'touches', 'lines']);
 const PAPERS = new Set(['dry', 'damp', 'wet']);
 import { TOUCH_LEAST_MM2, predictedTouchMm2 } from './tiny-touch.mjs';
+import { finalWidthOf, cellsOfFinal } from './look-scale.mjs';
 
 /** A stroke laid into its own wet bed covers at least this many sheet cells (study-washes.mjs WET_LEAST_CELLS). */
 const WET_LEAST_CELLS = 40;
@@ -223,7 +224,9 @@ export function footprint(strokes, w, h, cellMm) {
  * `script`: the parsed script; `pigments`: the painter's box (each with its `key`); `rgb`: the subject on the sheet's
  * grid, read only for the colour check written to the plan's summary.
  */
-export function planScriptWashes({ script: given, k, w, h, pigments, paperRGB = null, sheetWidthMm = 280, rgb = null, density = null, inkValue = null, seed = 0, hand = 1, touchLeastMm2 = TOUCH_LEAST_MM2 }) {
+export function planScriptWashes({ script: given, k, w, h, pigments, paperRGB = null, sheetWidthMm = 280, rgb = null, density = null, inkValue = null, seed = 0, hand = 1, touchLeastMm2 = TOUCH_LEAST_MM2, finalWidth = null }) {
+  // (a look, look-scale.mjs: what is small is what will be small on the final sheet's cells)
+  const finalCellMm = sheetWidthMm / finalWidthOf(w, finalWidth), wetLeastCells = cellsOfFinal(WET_LEAST_CELLS, w, finalWidthOf(w, finalWidth));
   const n = w * h, cellMm = sheetWidthMm / w, paperCol = paperRGB ?? [252, 251, 248], keys = pigments.map(p => p.key);
   let script = given;
   if (pigments.length !== k || k < 1) throw Error('the script wash plan needs the pigments');
@@ -248,6 +251,12 @@ export function planScriptWashes({ script: given, k, w, h, pigments, paperRGB = 
   };
   const close = () => {
     if (!session) return;
+    // A passage's small strokes (laid wet on dry, on the paper as it is) are laid when its sitting is over. Laid straight
+    // after their passage they stood between a wash and the passage meant to go into it while damp: a stroke laid wet
+    // on dry waits for dry paper, so the painter dried the whole sheet for a touch of a few cells and the damp passage,
+    // charged for a damp wash, went onto dry paper and laid twice its paint (or not, as the touch happened to fall).
+    session.list.push(...after.splice(0).map(f => f()).filter(Boolean));
+    if (!session.list.length) { session = null; wetLaid.fill(0); return; }
     for (const sh of session.list) planColour(sh);
     const list = session.list, area = list.reduce((a, s) => a + s.area, 0), mix = new Array(k).fill(0);
     for (const s of list) s.mix.forEach((v, j) => { mix[j] += v * s.area / area; });
@@ -261,15 +270,15 @@ export function planScriptWashes({ script: given, k, w, h, pigments, paperRGB = 
     // a stroke that lands on no cell of the sheet (a lane run past the edge) cannot be laid: it is reported, with its
     // passage, never dropped quietly. A stroke too small for its own wet bed to be judged (under WET_LEAST_CELLS, as the
     // study plan) is still laid: on the paper as it is, after the passage's other strokes, and reported
-    const cellsOf = st => { const m = footprint([st], w, h, cellMm); let c = 0; for (let i = 0; i < n && c < WET_LEAST_CELLS; i++) c += m[i]; return c; };
+    const cellsOf = st => { const m = footprint([st], w, h, cellMm); let c = 0; for (let i = 0; i < n && c < wetLeastCells; i++) c += m[i]; return c; };
     const counts = strokes0.map(cellsOf), offSheet = strokes0.filter((_, q) => counts[q] === 0);
     // A stroke much shorter than its brush is wide touches only the brush's tip, far less than the footprint drawn for
     // it (tiny-touch.mjs): under touchLeastMm2 it is a tiny touch. It is told here, before anything is painted, and is
     // never given a wet bed: in a passage laid into its own bed it joins the small strokes laid on the paper as it is.
-    const touch = smalls ? strokes0.map(() => Infinity) : strokes0.map((st, q) => (counts[q] > 0 ? predictedTouchMm2(st, cellMm) : Infinity));
+    const touch = smalls ? strokes0.map(() => Infinity) : strokes0.map((st, q) => (counts[q] > 0 ? predictedTouchMm2(st, finalCellMm) : Infinity));
     const tiny = strokes0.map((_, q) => touch[q] < touchLeastMm2);
-    const small = how.move === 'wet on wet' ? strokes0.filter((_, q) => counts[q] > 0 && (counts[q] < WET_LEAST_CELLS || tiny[q])) : [];
-    const strokes = strokes0.filter((_, q) => counts[q] >= (how.move === 'wet on wet' ? WET_LEAST_CELLS : 1) && !(how.move === 'wet on wet' && tiny[q]));
+    const small = how.move === 'wet on wet' ? strokes0.filter((_, q) => counts[q] > 0 && (counts[q] < wetLeastCells || tiny[q])) : [];
+    const strokes = strokes0.filter((_, q) => counts[q] >= (how.move === 'wet on wet' ? wetLeastCells : 1) && !(how.move === 'wet on wet' && tiny[q]));
     const lengthMm = st => st.points.reduce((a, pt, i) => a + (i ? Math.hypot(pt[0] - st.points[i - 1][0], pt[1] - st.points[i - 1][1]) : 0), 0);
     strokes0.forEach((st, q) => {
       if (!tiny[q]) return;
@@ -280,7 +289,7 @@ export function planScriptWashes({ script: given, k, w, h, pigments, paperRGB = 
     const where = st => `(${st.points[0][0].toFixed(1)}, ${st.points[0][1].toFixed(1)}) mm`;
     for (const st of offSheet) { dropped.push({ passage: p.id, kind, reason: 'lands on no cell of the sheet', at: st.points[0].slice(0, 2) }); console.log(`PAINTING SCRIPT, STROKE NOT LAID: passage ${p.id} (${kind}), a stroke from ${where(st)}: it lands on no cell of the sheet`); }
     if (small.length) {
-      console.log(`painting script: passage ${p.id} (${kind}), ${small.length} stroke${small.length > 1 ? 's' : ''} under ${WET_LEAST_CELLS} cells or a tiny touch (from ${small.slice(0, 4).map(where).join('; ')}${small.length > 4 ? '; ...' : ''}): too small for a wet bed, laid on the paper as it is`);
+      console.log(`painting script: passage ${p.id} (${kind}), ${small.length} stroke${small.length > 1 ? 's' : ''} under ${wetLeastCells} cells or a tiny touch (from ${small.slice(0, 4).map(where).join('; ')}${small.length > 4 ? '; ...' : ''}): too small for a wet bed, laid on the paper as it is`);
       laidDry.push({ passage: p.id, kind, strokes: small.length });
       after.push(() => wash({ ...p, id: `${p.id}-small` }, stage, small, mix, { move: 'wet on dry', water: how.water, phase: how.phase }, { kind, what: `${what} (its small strokes)`, charge, smalls: true }));
     }
@@ -322,11 +331,10 @@ export function planScriptWashes({ script: given, k, w, h, pigments, paperRGB = 
     const strokes = passageStrokes(p, brushes, seed, lights, { hand }), mix = mixOf(p.paint);
     const sh = wash(p, stage, strokes, mix, own, { kind: p.kind, what: `${p.id}: ${p.what ?? ''}` });
     prev = p;
-    const smalls = after.splice(0).map(f => f()).filter(Boolean);
-    if (!sh && !smalls.length) continue;
+    if (!sh && !after.length) continue;
     if (!session) session = { stage, list: [], ids: [] };
     if (sh) session.list.push(sh); session.ids.push(p.id);
-    if (!sh) { session.list.push(...smalls); continue; }
+    if (!sh) continue;
     // charges: each `at` a dab of the charge's own mix, dropped into this passage while it is wet
     const rng = handOf(`${seed}/${p.id}/charges`);
     for (const [ci, c] of (p.charges ?? []).entries()) {
@@ -336,7 +344,6 @@ export function planScriptWashes({ script: given, k, w, h, pigments, paperRGB = 
       const ch = wash({ ...p, id: `${p.id}-c${ci + 1}` }, stage, cs, mixOf({ pigments: c.pigments, dilution: c.dilution ?? 'medium', swatch: c.swatch }), { move: 'wet on wet', water: 0.88, phase: PHASE[stage] }, { kind: 'charge', what: `${p.id}: charge ${ci + 1} dropped in while wet`, charge: true });
       if (ch) { session.list.push(ch); charges++; }
     }
-    session.list.push(...smalls, ...after.splice(0).map(f => f()).filter(Boolean));
     washed.push([p.id, sh]);
   }
   close();

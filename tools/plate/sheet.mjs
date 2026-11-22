@@ -87,7 +87,7 @@ export async function sheetAndBrushes(ctx) {
 const { WASH_FLAT_SPLAY, ENTRY_FILE, JSONL, opt, num, optTrack, NATIVE_PAINT_MODE, SPEED_PAPER, 
   SPEED_CONTACT, SPEED_VALUE_CACHE, SPEED_UNIFORM_PAPER, measurePaper, VALUE_CONTACT_WORK, SPEED_GPU_OPTICS, 
   SPEED_PROFILE, root, out, RUN_CACHE, VALUE_CONFIG, VALUE_COUNTS, 
-  WASH_SESSION, phaseMark, w, h, n, createBrush, physicalStroke: untracedStroke, candidateContact, TONE_MODE, 
+  WASH_SESSION, phaseMark, w, h, n, FINAL_W, createBrush, physicalStroke: untracedStroke, candidateContact, TONE_MODE, 
   SHEET_TONE, CALIBRATED_PLAN, PAPER_RULE, paperRGB, WASH_SPLAT_SETTINGS, CODE_HASH, PIGS, SMALL, 
   setClip, COLOUR_TRACE, OUTLINE, STAGE_PLAN, REQUESTED_DRAW_MEDIUM, INK_WIDTH_FLOOR_MM, INK_DAMP, 
   STYLE_INK_DEFAULT, INK_PROFILE, GRAPHITE_PROFILE, INK, GRAPHITE, SHEET_PIGS, GRAPHITE_AT } = ctx;
@@ -207,7 +207,7 @@ const pencilDraw=(target,gs,pigment,options)=>{
  // --washplan script:FILE.json: the washes are a painting script written by an author (script-washes.mjs,
  // docs/painting-script.md): passages in painting order, each laid in whole strokes; no study is read
  const SCRIPT=WASH_PLAN.startsWith('script:')?JSON.parse(fs.readFileSync(path.resolve(root,WASH_PLAN.slice(7)),'utf8')):null;
- if(SCRIPT)valueOptions.touchLeastMm2=TOUCH_LEAST_MM2;
+ if(SCRIPT){valueOptions.touchLeastMm2=TOUCH_LEAST_MM2;valueOptions.finalWidth=FINAL_W;}
  // --thingmasks RECEIPT.json (default auto: IMAGE.named-sam.json beside the source, when there is one): the source's named
  // forms (a reviewed SAM id map bound to the source by its receipt) for the study wash plan; --things names the label file
  // the receipt must match. No receipt: no named forms, and the plan is as it was without them.
@@ -714,7 +714,8 @@ const scrapSwatches = (techniques, drySwatch, { damp = false } = {}) => {
       // The swatch is at least sixteen brush widths across: on a fine sheet fifty cells were 13 mm, two lanes of a 7 mm
       // round that never got past landing on its tip. Its scrap's cells grow to fit (the brush lays the same paint a
       // millimetre at any cell size).
-      const sheetMm = PAPER_OPTS.mmPerCell ?? 0, brush = swatchBrush(), mm = sheetMm > 0 ? Math.max(sheetMm, 32 * brush.radius * sheetMm / (SWATCH.x1 - SWATCH.x0)) : 0;
+      // (a look's scrap is the final sheet's: no finer than the final's cells, look-scale.mjs)
+      const sheetMm = PAPER_OPTS.mmPerCell ?? 0, brush = swatchBrush(), mm = sheetMm > 0 ? Math.max(sheetMm * w / FINAL_W, 32 * brush.radius * sheetMm / (SWATCH.x1 - SWATCH.x0)) : 0;
       const radius = mm > 0 ? brush.radius * sheetMm / mm : brush.radius, flat = brush.flat;
       const paths = swatchLanes(radius, { overlap: lap ?? (flat ? FLAT_OVERLAP : LANE_OVERLAP) }), cover = sweepCover(paths, mask, SW, SH);
       const under = opt('undercover', '1') !== '0' ? 1 / Math.max(num('underfloor', 0.4), Math.min(1, cover)) : 1;
@@ -774,7 +775,7 @@ const dampWait = (scrap, cells) => waitBesideDamp({ observe: () => measurePaper(
 // A mark of a passage laid beside damp (mark.damp) is tried over a damp wash, laid first in lanes of a round an eighth
 // of the swatch wide.
 const scrapMark = (T, mark) => {
-  const sheetMm = PAPER_OPTS.mmPerCell ?? 0, L = markLayout(mark, sheetMm);
+  const sheetMm = PAPER_OPTS.mmPerCell ?? 0, L = markLayout(mark, sheetMm * w / FINAL_W);
   const opts = (r, T) => ({ flat: false, radius: r, bristles: Math.max(12, Math.ceil(r * 2)), capacity: 100, belly: 12, feed: 0.4, give: 0.9, free: num('washfree', 0.4), film: 0.25, splay: WASH_FLAT_SPLAY, stiffness: 8, wetMix: MIX(T), bridge: washBridge(T, T.bridge), bridgeSoft: T.bridgeSoft, seed: 11 });
   const contactOf = (scrap, pts, r, T) => { const b = createBrush(opts(r, T)); dipBrush(b, { water: WET(T), conc: [0] }); const c = candidateContact(b, scrap, pts, { upright: UPRIGHT, clip: null, neighborRadius: 0, includeTouched: false }); return c.cells.filter(i => c.primaryMask[i]); };
   // a mark laid into wet goes into a bed wider than itself (the wet passage it is laid in), wetted along the mark's path
@@ -795,7 +796,7 @@ const scrapMark = (T, mark) => {
   return { ...r, lift: liftShare(before, thicknessTotals(scrap)[DAMP_CHANNEL.under], L.mask.reduce((a, v) => a + v, 0) / ((SWATCH.x1 - SWATCH.x0) * (SWATCH.y1 - SWATCH.y0))) };
 };
 const gradedReading = g => (g ? { all: g.all, escape: g.escape, edge: g.edge } : null);
-const CAL_RESULT = await cachedStep({...RUN_CACHE,name:'calibration',enabled:RUN_CACHE.enabled,code:CODE_HASH,track:optTrack,inputs:{pigment:PIGS[0],O,PAPER_OPTS,GCHUNK,BRUSH,swatchBrush:swatchBrush(),UPRIGHT,LOADED_CONTACT,WASH_SPLAT_SETTINGS,settles:Boolean(ctx.VALUE_PLAN),physical:PB?{cfg:PB.cfg,mmPerCell:PB.mmPerCell}:null}},async () => {
+const CAL_RESULT = await cachedStep({...RUN_CACHE,name:'calibration',enabled:RUN_CACHE.enabled,code:CODE_HASH,track:optTrack,inputs:{pigment:PIGS[0],O,PAPER_OPTS,GCHUNK,BRUSH,finalWidth:FINAL_W,swatchBrush:swatchBrush(),UPRIGHT,LOADED_CONTACT,WASH_SPLAT_SETTINGS,settles:Boolean(ctx.VALUE_PLAN),physical:PB?{cfg:PB.cfg,mmPerCell:PB.mmPerCell}:null}},async () => {
   const out = {};
   for (const { technique: T, plain, graded } of scrapSwatches(STOCK_TECHNIQUES, dry)) {
     out[T.name] = chargeFactor(plain.delivered);
@@ -864,7 +865,7 @@ const instrumentOf = (T, sh = null) => {
 // every instrument the value plan names is tried on scrap before the first wash
 if (ctx.VALUE_PLAN) {
   const planned = [...new Map(ctx.layers.flatMap(l => (l.shapes ?? []).filter(sh => sh._valuePlan).map(sh => [sh, valueTechnique(sh._valuePlan)])).filter(([, T]) => ownSwatch(T)).map(([, T]) => [instrumentKey(T), T])).values()];
-  const saved = await cachedStep({...RUN_CACHE,name:'instrument-calibration',code:CODE_HASH,track:optTrack,inputs:{pigment:PIGS[0],O,PAPER_OPTS,GCHUNK,BRUSH,swatchBrush:swatchBrush(),UPRIGHT,LOADED_CONTACT,WASH_SPLAT_SETTINGS,physical:PB?{cfg:PB.cfg,mmPerCell:PB.mmPerCell}:null,stock:CAL_RESULT.value,instruments:planned.map(instrumentKey)}},async () => {
+  const saved = await cachedStep({...RUN_CACHE,name:'instrument-calibration',code:CODE_HASH,track:optTrack,inputs:{pigment:PIGS[0],O,PAPER_OPTS,GCHUNK,BRUSH,finalWidth:FINAL_W,swatchBrush:swatchBrush(),UPRIGHT,LOADED_CONTACT,WASH_SPLAT_SETTINGS,physical:PB?{cfg:PB.cfg,mmPerCell:PB.mmPerCell}:null,stock:CAL_RESULT.value,instruments:planned.map(instrumentKey)}},async () => {
     for (const T of planned) INSTRUMENT_CAL.of(T);
     return INSTRUMENT_CAL.entries();
   });
