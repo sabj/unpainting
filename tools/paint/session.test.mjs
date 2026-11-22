@@ -56,7 +56,7 @@ test('a plan answers with counts only and looks are counted: after the last look
     fs.writeFileSync(path.join(dir, 'script.json'), '{"palette": ["ochre"], "passages": [1]}');
     assert.match(await ask(dir, server, 'look'), /^LOOK 2 \(own script\), cost 1 unit/);
     fs.writeFileSync(path.join(dir, 'script.json'), '{"palette": ["ochre"], "passages": [1, 2]}');
-    assert.match(await ask(dir, server, 'look'), /^NOT PAINTED, nothing was spent: this look costs 1 unit \(the whole plan, \d+ strokes, the whole sheet\) and you have 0 of 2 units left/);
+    assert.match(await ask(dir, server, 'look'), /^NOT PAINTED, nothing was spent: this look costs 1 unit \(the whole plan, \d+ washes, the whole sheet\) and you have 0 of 2 units left/);
     assert.match(await ask(dir, server, 'plan'), /^It compiles \(own script\)/, 'planning goes on after the last look');
     assert.equal(n, 4, 'the same choice is planned once');
     const rec = await server.stop();
@@ -85,7 +85,7 @@ test('a look is spent before it is delivered, and the count outlives the server'
     // the same look again renders nothing and costs nothing; a changed choice would cost a unit that is not left
     assert.match(await ask(dir, b, 'look'), /^LOOK 3 \(nothing changed\), cost 0 units \(looked at before: nothing was rendered\), 0 of 2 left/);
     put(dir, { kind: 'settings', settings: { 'study1.shapes': 61 } });
-    assert.match(await ask(dir, b, 'look'), /^NOT PAINTED, nothing was spent: this look costs 1 unit \(the whole plan, \d+ strokes, the whole sheet\) and you have 0 of 2 units left/); await b.stop();
+    assert.match(await ask(dir, b, 'look'), /^NOT PAINTED, nothing was spent: this look costs 1 unit \(the whole plan, \d+ washes, the whole sheet\) and you have 0 of 2 units left/); await b.stop();
     assert.match(await ask(dir, mk(), 'look'), /^NOT PAINTED, nothing was spent/, 'what was spent outlives the server');
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });
@@ -113,10 +113,10 @@ test('a look is a real painting: one that fails or leaves the GPU costs no look;
     // a changed choice is painted, and costs
     fs.writeFileSync(path.join(dir, 'script.json'), '{"palette": ["ochre"], "passages": [1, 2]}');
     assert.match(await ask(dir, server, 'look'), /^LOOK 3 \(/); assert.equal(paints, 2);
-    assert.match(await ask(dir, server, 'cost'), /^This look would cost 1 unit \(the whole plan, \d+ strokes, the whole sheet\)\. You have 1 of 3 units left\. Nothing was painted and nothing was spent\. \(You have already looked at exactly this/);
+    assert.match(await ask(dir, server, 'cost'), /^This look would cost 1 unit \(the whole plan, \d+ washes, the whole sheet\)\. You have 1 of 3 units left\. Nothing was painted and nothing was spent\. \(You have already looked at exactly this/);
     fs.writeFileSync(path.join(dir, 'script.json'), '{"palette": ["ochre"], "passages": [1, 2, 3]}'); assert.match(await ask(dir, server, 'look'), /^LOOK 4 \(/); assert.equal(paints, 3);
     fs.writeFileSync(path.join(dir, 'script.json'), '{"palette": ["ochre"], "passages": [1, 2, 3, 4]}');
-    assert.match(await ask(dir, server, 'look'), /^NOT PAINTED, nothing was spent: this look costs 1 unit \(the whole plan, \d+ strokes, the whole sheet\) and you have 0 of 3 units left/); assert.equal(paints, 3, 'no painting is started for a look that cannot be paid for');
+    assert.match(await ask(dir, server, 'look'), /^NOT PAINTED, nothing was spent: this look costs 1 unit \(the whole plan, \d+ washes, the whole sheet\) and you have 0 of 3 units left/); assert.equal(paints, 3, 'no painting is started for a look that cannot be paid for');
     const rec = await server.stop();
     assert.deepEqual(rec.looks.map(l => [l.look, l.cost]), [[1, 1], [2, 0], [3, 1], [4, 1]]); assert.deepEqual(rec.lookUnits, { spent: 3, budget: 3 }); assert.equal(rec.budgetReached.what, '3 look units of rendering'); assert.equal(rec.looks[0].painted.cells, 543);
     // the free plan stays compile-only
@@ -401,11 +401,11 @@ test('a choice with lines, forms and settings per form: its files are read and c
 test('a look to a stage or of a region is priced from the plan before it is painted, charged in units, and the painter is told what to paint', async () => {
   const { dir, ledger } = folder({ looks: 2 }); const asked = [];
   try {
-    const rows = [{ stage: 1, strokes: 30 }, { stage: 3, strokes: 50 }, { stage: 4, strokes: 20 }];
+    const rows = [...Array(3).fill({ stage: 1 }), ...Array(5).fill({ stage: 3 }), ...Array(2).fill({ stage: 4 })];
     const server = sessionServer({ dir, ledger, looks: 2, wallMinutes: 60, sheet: { widthMm: 200, heightMm: 100 }, forms: [{ name: 'cat face', boxMm: [50, 0, 150, 50] }], checkScript: s => s, compile: async () => ({ ...compiled(1), rows }),
       look: async (choice, script, at, edit, got, ask) => { asked.push(ask); return { ...(await looked()), stoppedText: ask.until ? `PAINTED THROUGH STAGE ${ask.until} AND STOPPED: 2 of 5 passes are on the paper\nStill to come: stage 3` : null, painted: { cells: 100, regionPassages: ask.region ? '2 of 9 passages' : null } }; } });
     assert.match(await ask(dir, server, 'plan'), /A look of this plan costs 1 of your 2 units left; stopped early it costs less \(--until 1: 0\.3, --until 3: 0\.8\); a look of a region costs its share of the sheet\./);
-    assert.match(await ask(dir, server, 'cost --until 1'), /^This look would cost 0\.3 units \(stopped after stage 1: 30 of the plan's 100 strokes, the whole sheet\)\. You have 2 of 2 units left\. Nothing was painted and nothing was spent\./);
+    assert.match(await ask(dir, server, 'cost --until 1'), /^This look would cost 0\.3 units \(stopped after stage 1: 3 of the plan's 10 washes, the whole sheet\)\. You have 2 of 2 units left\. Nothing was painted and nothing was spent\./);
     assert.equal(ledgerLooks(ledger).length, 0);
     const first = await ask(dir, server, 'look --until 1');
     assert.match(first, /^LOOK 1 \(nothing changed\), cost 0\.3 units, 1\.7 of 2 left\. PAINTED THROUGH STAGE 1 AND STOPPED: 2 of 5 passes are on the paper\. PAINTED/); assert.deepEqual(asked[0], { until: 1, region: null });
@@ -419,6 +419,6 @@ test('a look to a stage or of a region is priced from the plan before it is pain
     assert.match(await ask(dir, server, 'look --until soon'), /^REFUSED, nothing was painted and nothing was spent: --until: the number of a stage/); assert.match(await ask(dir, server, 'look --region dog'), /there is no form "dog" with a box \(the forms: cat face\)/);
     assert.match(await ask(dir, server, 'plan --fast'), /^REFUSED: \.\/unpaint plan takes no further words/); assert.match(await ask(dir, server, 'look; rm -rf x'), /^REFUSED: a request is one of status, plan, look, cost/);
     const rec = await server.stop();
-    assert.deepEqual(rec.looks.map(l => [l.cost, l.ask.until, l.ask.region?.box ?? null]), [[0.3, 1, null], [0.2, 3, [50, 0, 150, 50]], [0.5, null, [0, 0, 100, 100]], [1, null, null]]); assert.deepEqual(rec.lookUnits, { spent: 2, budget: 2 }); assert.equal(rec.looks[0].estimate.strokes, 30);
+    assert.deepEqual(rec.looks.map(l => [l.cost, l.ask.until, l.ask.region?.box ?? null]), [[0.3, 1, null], [0.2, 3, [50, 0, 150, 50]], [0.5, null, [0, 0, 100, 100]], [1, null, null]]); assert.deepEqual(rec.lookUnits, { spent: 2, budget: 2 }); assert.equal(rec.looks[0].estimate.washes, 3);
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });

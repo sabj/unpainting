@@ -13,6 +13,7 @@ import {createDeliveryCal} from '../../src/paint/methods/delivery-cal.mjs';
 import {drawMaterial, sourceDrawingCaps} from '../../src/paint/methods/material-profiles.mjs';
 import {valueTechnique, estimatePaper, targetValueMap} from '../../src/paint/methods/value-shared.mjs';
 import {planStudyWashes} from '../../src/paint/methods/study-washes.mjs';
+import {studyShapesDoc} from '../../src/paint/methods/study-shapes-out.mjs';
 import {planScriptWashes} from '../../src/paint/methods/script-washes.mjs';
 import {monoPaints} from '../../src/paint/methods/mono-mix.mjs';
 import {loadStudies} from '../painter/study-load.mjs';
@@ -250,6 +251,8 @@ const pencilDraw=(target,gs,pigment,options)=>{
    {const pal=[[230,159,0],[86,180,233],[0,158,115],[240,228,66],[0,114,178],[213,94,0],[204,121,167],[120,120,120]],img=Buffer.alloc(n*3);for(let i=0;i<n;i++){const c=pal[field.rank[i]%pal.length];img[3*i]=c[0];img[3*i+1]=c[1];img[3*i+2]=c[2];}await sharp(img,{raw:{width:w,height:h,channels:3}}).png().toFile(path.join(out,'subject-order.png'));}
    console.log(`subject order ${so}: ${ctx.layers.length} passes; ${r.summary.map(q=>`${q.subject} ${(100*q.share).toFixed(0)}% passes ${q.first}-${q.last}`).join(', ')}`);}}
  ctx.HOLD=ctx.VALUE_PLAN.protectedCells;
+ // the block-in study's flat shapes as the planner read them, before they become washes, written out as data (study-shapes-out.mjs)
+ if(ctx.VALUE_PLAN.studyShapes)fs.writeFileSync(path.join(out,'study-shapes.json'),JSON.stringify(studyShapesDoc(ctx.VALUE_PLAN.studyShapes))+'\n');
  fs.writeFileSync(path.join(out,'value-plan.json'),JSON.stringify({stage:'executable target-value plan before physical instruments',style:ctx.VALUE_PLAN.style,target:opt('image'),caps:[.16,.32,.50,.75,1],peakDensity:ctx.VALUE_PLAN.value.peak,geometry:ctx.VALUE_PLAN.geometry,omittedReservedOrSpeckDemand:ctx.VALUE_PLAN.omittedDemand,lights:ctx.VALUE_PLAN.lightShapes,explicitLights:VALUE_CONFIG?.reserves??[],mixes:ctx.VALUE_PLAN.mixes,summary:ctx.VALUE_PLAN.summary,passes:ctx.VALUE_PLAN.instructions,drawing:'sparse structure first; lighter selective closing ink after dry gate'},null,2));
  // --valuemaps 1: the value plan as maps for diagnosis (value band per cell, colour region, reserved lights) and every
  // passage's cells in paint order, to value-maps.json.gz. Read by nothing in the painter.

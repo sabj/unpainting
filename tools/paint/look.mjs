@@ -42,3 +42,15 @@ export function lookSizeNote({ cells, fullCells, cellMm, kind }) {
   if (cells === fullCells) return `painted at the final size, ${cells} cells across`;
   return `painted small, ${cells} cells across (${cellMm} mm a cell) where the final painting has ${fullCells}: the same sheet in millimetres, coarser grain${kind === 'settings' ? '; the code planner planned again for the small sheet, so its shapes are a little broader here than they will be' : ''}`;
 }
+
+/**
+ * Why a look that stopped partway cannot be shown, or null when it can. A painter stopped at a stage writes no
+ * backend.json (that is written when a painting ends), so the backend is read from what it said when it started:
+ * `log` is its log. It is shown only when the sheet ran on the GPU and nothing in the log says it left it.
+ */
+export function stoppedLookFault(log) {
+  const line = /^sheet backend: (\S+)/m.exec(log ?? '');
+  if (!line) return 'the painter did not say which backend its sheet ran on, so the look is not shown';
+  if (line[1] !== 'gpu' || /fall(s|ing|en)? back to the CPU|fell back|backend: cpu/i.test(log)) return `the painting did not stay on the GPU (the painter's log: ${line[0]}), so it is not shown`;
+  return null;
+}

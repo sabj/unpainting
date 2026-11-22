@@ -19,7 +19,7 @@ import { authorOf, authorLabel, briefName, readScript, checkAuthored, preparePac
 import { readChoice, choiceKey, choiceKind, withChoice, settingsList } from './choice.mjs';
 import { checkPlanEdit, editLine } from '../../src/paint/methods/plan-edit.mjs';
 import { planNumbers, planSummary, numbersText, washesText, planPicture, lookPicture, stagesPicture } from './plan-data.mjs';
-import { lookSets, lookFault, lookSizeNote, LOOK_JOBS, HEAVY_JOBS } from './look.mjs';
+import { lookSets, lookFault, stoppedLookFault, lookSizeNote, LOOK_JOBS, HEAVY_JOBS } from './look.mjs';
 import { DEFAULT_LOOKS, DEFAULT_WALL_MINUTES, DEFAULT_GRACE_MINUTES, safeRead, writeSession, sessionServer, finalChoice, sessionCall, readTranscript, reachedOutside, ownFolderOf, ownPictures, runSession } from './session.mjs';
 import { DEFAULT_REVERTS } from './reverts.mjs';
 import { levelOf, handedAt } from './levels.mjs';
@@ -27,7 +27,7 @@ import { usageOf, usageLine } from './usage.mjs';
 import { shapesData, namesShapes, resolveNumbered } from './study-shapes.mjs';
 import { paintThroughStage, stoppedText } from './stage-look.mjs';
 import { lookCost, regionBox, scriptInRegion } from './look-cost.mjs';
-import { preparedRoot, preparedKey, prepareCommand, readPrepared, writePrepared, SHAPES_FILE } from './prepared.mjs';
+import { preparedRoot, preparedKey, prepareCommand, readPrepared, writePrepared, SHAPES_FILE, WASHES_FILE } from './prepared.mjs';
 import crypto from 'node:crypto';
 import { writeWorkSheets } from './work-sheets.mjs';
 import { logReads } from './seen.mjs';
@@ -298,7 +298,8 @@ async function paintLookOnce(r, choice, script, plate, at, edit, compiled, ask =
     });
     // a look that stopped partway has no finished painting: the sheet as it stood, dried, is the look
     const results = collectResults(plate, 'paint'); if (stoppedAt) Object.assign(results, { state: 'finished', painting: stoppedAt.sheet });
-    const fault = stoppedAt ? (results.backend?.backend !== 'gpu' || results.backend?.fallback !== false ? `the painting did not stay on the GPU (${results.backend ? `backend ${results.backend.backend}, fallback ${results.backend.fallback}` : 'no backend record'}), so it is not shown` : null) : lookFault(done, results);
+    const fault = stoppedAt ? stoppedLookFault(fs.readFileSync(`${plate}.log`, 'utf8')) : lookFault(done, results);
+    if (stoppedAt && !fault) results.backend = { backend: 'gpu', fallback: false, from: 'the painter\'s log at its start: a look stopped at a stage writes no backend.json' };
     if (fault) {
       const why = fs.readFileSync(`${plate}.log`, 'utf8').split('\n').filter(l => /(^|\s)(Error|TypeError|RangeError)\b/.test(l)).pop()?.trim().slice(0, 400);
       say(r, `look ${at.look} NOT PAINTED: ${fault}${why ? ` (${why})` : ''}`);
@@ -328,9 +329,9 @@ async function handedTo(r, prepared, made) {
     files: prepared.painting.sheets.map(f => ({ ...f, picture: true, what: /beside/.test(f.name) ? 'the automatic painter\'s painting as it dried, at full size, on the left; the subject on the right' : /replay/.test(f.name) ? 'the replay of that painting: the sheet as the work went on, frames in order, numbered' : 'every stroke of that painting as an arrow from where the brush lands to where it lifts; first strokes blue, last strokes red' })) });
   if (terms.shapes) {
     const file = prepared.shapes;
-    handed.push({ folder: 'resources', title: 'The studies\' shapes, as data',
-      words: 'The studies\' flat shapes and the geometry of the code planner\'s washes, as data you may select from: each shape\'s number, the study it came from, its outline in sheet millimetres, its colour, its area and the named forms it lies in. In your own script a passage may name shapes by number (`"shapes": [12, 13]` for its region, `"reserve": [40]` for paper it is laid round, and in a stroke `"along": 12`); the numbers are turned into millimetres for you. Use them, cut them up, or ignore them.',
-      files: [{ from: file, name: 'shapes.json', what: 'every shape, in painting order: n, study, stage, kind, what, colour, areaMm2, boxMm, forms, polygons' }] });
+    handed.push({ folder: 'resources', title: 'The studies\' flat shapes, as data',
+      words: 'Two sets of regions, as data you may select from. `shapes.json`: the block-in study\'s flat shapes exactly as the planner read them, before any is nested, joined or filtered into a wash: each shape\'s number, its outline in sheet millimetres, its colour, its area, whether the planner keeps it as paper, the shape it lies inside, and the named forms it lies in. `washes.json`: the code planner\'s washes as shapes (what the later studies add is among them). In your own script a passage may name the block-in\'s shapes by number (`"shapes": [12, 13]` for its region, `"reserve": [40]` for paper it is laid round, and in a stroke `"along": 12`); the numbers are turned into millimetres for you. Use them, cut them up, or ignore them.',
+      files: [{ from: file, name: 'shapes.json', what: 'the block-in study\'s flat shapes: n, colour, areaMm2, paper, inside, boxMm, forms, polygons' }, { from: prepared.washes, name: 'washes.json', what: 'the plan\'s washes as shapes, in painting order: n, study, stage, kind, what, colour, areaMm2, boxMm, forms, polygons' }] });
   }
   if (terms.previous) {
     const from = path.resolve(req.previous); let earlier; try { earlier = JSON.parse(fs.readFileSync(path.join(from, 'run.json'), 'utf8')); } catch { throw new Error(`--previous ${from}: no finished run there (run.json)`); }
@@ -541,7 +542,7 @@ async function lookOfChoice(r, fin) {
   const region = regionBox(given, { sheet: { widthMm: W, heightMm: spec.sheet.heightMm }, forms });
   if (region && !fin.script) throw new Error('--region: a look of a region is painted for an own script only');
   const estimate = lookCost(compiled.rows ?? [], { until: req.until, regionShare: region?.share ?? null });
-  say(r, `this look is estimated at ${estimate.cost} units (${estimate.strokes} of ${estimate.of} strokes${region ? `, ${Math.round(100 * region.share)}% of the sheet` : ''}); painting it`);
+  say(r, `this look is estimated at ${estimate.cost} units (${estimate.washes} of ${estimate.of} washes${region ? `, ${Math.round(100 * region.share)}% of the sheet` : ''}); painting it`);
   const got = await paintLook(r, fin.choice, fin.script, path.join(dir, 'look-paints', '1'), { plan: 1, look: 1 }, fin.edit, compiled, { until: req.until, region });
   if (!got.ok) throw new Error(`the look was not painted: ${got.error}`);
   const out = path.join(record.out, 'look'); fs.mkdirSync(out, { recursive: true });
@@ -680,9 +681,13 @@ async function prepareRun(r) {
       if (!got.ok) throw new Error(`the code planner's plan did not compile: ${got.error}`);
       out.plan = { seconds: got.seconds, made: new Date().toISOString(), washes: got.summary.washes, strokes: got.summary.strokes };
     }
-    // the studies' flat shapes as the planner read them, written out as data: the planner holds them only in memory
-    const shapes = shapesData(JSON.parse(fs.readFileSync(path.join(plan, 'value-plan.json'), 'utf8')), { widthMm: spec.sheet.widthMm, heightMm: spec.sheet.heightMm });
-    fs.writeFileSync(path.join(folder, SHAPES_FILE), JSON.stringify(shapes) + '\n'); out.shapes = { file: SHAPES_FILE, shapes: shapes.shapes.length, withOutline: shapes.shapes.filter(x => x.polygons.length).length };
+    // the block-in study's flat shapes as the planner read them, before they become washes: the painter writes them beside
+    // its plan (study-shapes.json), and they are kept here as a prepared input; the washes are a second set of their own
+    const raw = path.join(plan, 'study-shapes.json'); if (!fs.existsSync(raw)) throw new Error(`the planner wrote no study-shapes.json beside its plan (${plan}); remove that folder and prepare again`);
+    fs.copyFileSync(raw, path.join(folder, SHAPES_FILE)); const shapes = JSON.parse(fs.readFileSync(raw, 'utf8'));
+    const washes = shapesData(JSON.parse(fs.readFileSync(path.join(plan, 'value-plan.json'), 'utf8')), { widthMm: spec.sheet.widthMm, heightMm: spec.sheet.heightMm });
+    fs.writeFileSync(path.join(folder, WASHES_FILE), JSON.stringify(washes) + '\n');
+    out.shapes = { file: SHAPES_FILE, shapes: shapes.shapes.length, withOutline: shapes.shapes.filter(x => x.polygons.length).length, washesFile: WASHES_FILE, washes: washes.shapes.length };
     out.made = out.plan.made; writePrepared(folder, out);
     if (level.autoPainting) {
       if (out.painting && fs.existsSync(path.join(record.out, 'run.json'))) say(r, `the automatic painting is already prepared (${record.out})`);

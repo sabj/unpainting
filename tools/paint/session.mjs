@@ -250,7 +250,7 @@ export function sessionServer({ dir, sheet = null, forms = [], looks: most = DEF
       } catch (e) { return `REFUSED, nothing was painted and nothing was spent: ${e.message}`; }
       cost = lookCost(got.rows ?? [], { until: ask.until, regionShare: region?.share ?? null });
     }
-    const askKey = `${p.key}:${ask.until ?? ''}:${region ? region.box.join(',') : ''}`, costSaid = cost ? `${cost.cost} unit${cost.cost === 1 ? '' : 's'} (${ask.until != null ? `stopped after stage ${ask.until}: ${cost.strokes} of the plan's ${cost.of} strokes` : `the whole plan, ${cost.of} strokes`}${region ? `; the region ${region.name ? `"${region.name}", ` : ''}${region.box.join(', ')} mm, ${Math.round(100 * region.share)}% of the sheet` : ', the whole sheet'})` : '';
+    const askKey = `${p.key}:${ask.until ?? ''}:${region ? region.box.join(',') : ''}`, costSaid = cost ? `${cost.cost} unit${cost.cost === 1 ? '' : 's'} (${ask.until != null ? `stopped after stage ${ask.until}: ${cost.washes} of the plan's ${cost.of} washes` : `the whole plan, ${cost.of} washes`}${region ? `; the region ${region.name ? `"${region.name}", ` : ''}${region.box.join(', ')} mm, ${Math.round(100 * region.share)}% of the sheet` : ', the whole sheet'})` : '';
     const edited = `${editSaid}${p.tools ? ` ${p.tools.said}${got.toolFiles?.length ? ` See ${got.toolFiles.map(f => f.rel).join(', ')}.` : ''}` : ''}${warned(p.warnings)}${back.revert ? `\nThis is a return to a choice you had left: ${back.count} of ${revertsMost} allowed.` : ''}`;
     // ... and of the strokes too small for a wet bed, before anything is painted (plan-data.mjs tinyTouchWarning)
     const tiny = tinyTouchWarning(s);

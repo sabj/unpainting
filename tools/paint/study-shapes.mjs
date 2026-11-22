@@ -1,7 +1,8 @@
-// Level 4's data: the studies' flat shapes and the plan's wash geometry, as a file the model may select from and
-// name by number in its own script. Each shape is one wash of the code planner's plan as it read the studies: its
-// number (the wash's number, as in auto/washes.txt), the study it came from, its outline as polygons in sheet
-// millimetres, its colour, its area and the named forms it lies in. A script may then say `"shapes": [12, 13]`
+// Level 4's data, as files the model may select from. Two sets, each a list of shapes with a number and an outline
+// as polygons in sheet millimetres: the block-in study's flat shapes as the planner read them, before they become
+// washes (written by the painter beside its plan: src/paint/methods/study-shapes-out.mjs), and the plan's washes as
+// shapes (shapesData here: the wash's number as in auto/washes.txt, the study it came from, its colour, its area and
+// the named forms it lies in). A script may name the block-in's shapes by number: `"shapes": [12, 13]`
 // (its region is those shapes), `"reserve": [40]` (paper it is laid round) or, in a stroke, `"along": 12` (the
 // stroke runs along that shape's long axis); the numbers are turned into millimetres here, before the script is
 // checked, so the painter is handed plain regions and points as always. Pure: nothing is read or written here.

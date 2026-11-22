@@ -1,7 +1,10 @@
 // What a look costs, in a unit that does not depend on the machine: RENDERING. One full look of the whole plan on
 // the whole sheet costs 1. A look stopped after a stage the model names costs that stage's share of the painting's
-// work (the share of the plan's strokes laid by then); a look of a region costs the region's share of the sheet (and
-// both together, their product). The cost is computed from the plan, before anything is painted, and told to the
+// work, taken as the share of the plan's washes laid by then; a look of a region costs the region's share of the
+// sheet (and both together, their product). Why washes and not strokes: measured on three real looks of one script
+// (22 Nov, Mittens close-up, 46 washes, 525 strokes, half size, one machine), a look stopped after stage 1 took 0.36
+// of the full look's time and after stage 3 took 0.68; the share of washes says 0.28 and 0.76, the share of strokes
+// 0.34 and 0.94: the late stages are few strokes but many sittings, each with its own drying. The cost is computed from the plan, before anything is painted, and told to the
 // model before it is spent; a try's budget is a number of these units (default 5). Machine seconds are recorded
 // beside each look and never charged. Pure: nothing is read or written here.
 
@@ -37,16 +40,16 @@ export function regionBox(region, { sheet, forms = [] }) {
 }
 
 /**
- * The cost of a look in units, from the plan as compiled. `rows`: the plan's washes in painting order, each {stage,
- * strokes} (plan-data.mjs planRows); `until`: a stage or null; `regionShare`: the region's share of the sheet or null.
- * {cost, strokeShare, regionShare, strokes, of, stages: [{stage, cost}] (what stopping after each stage would cost)}.
+ * The cost of a look in units, from the plan as compiled. `rows`: the plan's washes in painting order, each {stage}
+ * (plan-data.mjs planRows); `until`: a stage or null; `regionShare`: the region's share of the sheet or null.
+ * {cost, washShare, regionShare, washes, of, stages: [{stage, cost}] (what stopping after each stage would cost)}.
  */
 export function lookCost(rows, { until = null, regionShare = null } = {}) {
-  const total = rows.reduce((a, r) => a + (r.strokes || 0), 0), stages = [...new Set(rows.map(r => Number(r.stage) || 0))].sort((a, b) => a - b);
-  const upTo = s => rows.filter(r => (Number(r.stage) || 0) <= s).reduce((a, r) => a + (r.strokes || 0), 0);
+  const total = rows.length, stages = [...new Set(rows.map(r => Number(r.stage) || 0))].sort((a, b) => a - b);
+  const upTo = s => rows.filter(r => (Number(r.stage) || 0) <= s).length;
   const share = s => (total > 0 ? upTo(s) / total : 1), of = v => round(Math.max(LEAST_LOOK_COST, v * (regionShare ?? 1)));
-  const strokes = until == null ? total : upTo(until), strokeShare = until == null ? 1 : share(until);
-  return { cost: of(strokeShare), strokeShare: round(strokeShare), regionShare: regionShare == null ? null : round(regionShare), strokes, of: total, stages: stages.map(s => ({ stage: s, cost: of(share(s)) })) };
+  const washes = until == null ? total : upTo(until), washShare = until == null ? 1 : share(until);
+  return { cost: of(washShare), washShare: round(washShare), regionShare: regionShare == null ? null : round(regionShare), washes, of: total, stages: stages.map(s => ({ stage: s, cost: of(share(s)) })) };
 }
 
 /** The costs of a plan's looks in one line, for the answer of a plan: told before anything is spent. */

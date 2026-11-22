@@ -7,8 +7,10 @@
 //   <subject>[-variant]/<commit, 8>[-dirty-<diff, 8>][-set-<settings, 8>]/
 //     prepared.json     what was made, when, with which code and settings
 //     plan/             the code planner's plan (CPU): value-plan.json, plan-to-edit.json, its picture
-//     shapes.json       the studies' flat shapes as the planner read them, written out as data (study-shapes.mjs):
-//                       the planner holds them only in memory, so level 4's data is made here, once, and found
+//     shapes.json       the block-in study's flat shapes as the planner read them, BEFORE they are nested, joined or
+//                       filtered into washes (the painter writes them beside its plan: study-shapes-out.mjs). The
+//                       planner holds them only in memory, so level 4's data is made here, once, and found
+//     washes.json       the plan's washes as shapes, a second set (study-shapes.mjs): what the later studies add is here
 //     painting/         level 4: the full-size painting as a run (run.json, plate/)
 //     sheets/           level 4: the painting beside the subject, the replay sheet, the arrows sheet
 import crypto from 'node:crypto';
@@ -17,7 +19,7 @@ import path from 'node:path';
 import { SHEET_FILES } from './work-sheets.mjs';
 
 /** The name of the shapes data in a prepared folder. */
-export const SHAPES_FILE = 'shapes.json';
+export const SHAPES_FILE = 'shapes.json', WASHES_FILE = 'washes.json';
 const sha8 = text => crypto.createHash('sha256').update(text).digest('hex').slice(0, 8);
 
 /** Where the prepared inputs are kept. */
@@ -47,13 +49,13 @@ export function readPrepared(folder, { painting = false, command }) {
   let record; try { record = JSON.parse(fs.readFileSync(path.join(folder, 'prepared.json'), 'utf8')); } catch { throw miss('the automatic plan of this subject'); }
   const plan = path.join(folder, 'plan');
   for (const f of ['value-plan.json', 'plan-to-edit.json']) if (!fs.existsSync(path.join(plan, f))) throw miss(`the automatic plan of this subject (its ${f})`);
-  const shapes = path.join(folder, SHAPES_FILE);
-  if (painting && !fs.existsSync(shapes)) throw miss('the studies\' flat shapes as data (level 4 hands them to the session)');
-  if (!painting) return { plan, record, painting: null, shapes: fs.existsSync(shapes) ? shapes : null };
+  const shapes = path.join(folder, SHAPES_FILE), washes = path.join(folder, WASHES_FILE);
+  if (painting) for (const [f, what] of [[shapes, 'the block-in study\'s flat shapes as data'], [washes, 'the plan\'s washes as data']]) if (!fs.existsSync(f)) throw miss(`${what} (level 4 hands them to the session)`);
+  if (!painting) return { plan, record, painting: null, shapes: fs.existsSync(shapes) ? shapes : null, washes: fs.existsSync(washes) ? washes : null };
   const run = path.join(folder, 'painting'), sheets = Object.values(SHEET_FILES).map(name => ({ from: path.join(folder, 'sheets', name), name }));
   if (!record.painting || !fs.existsSync(path.join(run, 'run.json'))) throw miss('the automatic painter\'s full-size painting of this subject (level 4 hands it to the session)');
   for (const s of sheets) if (!fs.existsSync(s.from)) throw miss(`the automatic painting's ${s.name}`);
-  return { plan, record, painting: { run, sheets }, shapes };
+  return { plan, record, painting: { run, sheets }, shapes, washes };
 }
 
 /** prepared.json written: what was made, with which code and settings. */

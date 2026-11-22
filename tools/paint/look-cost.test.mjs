@@ -2,10 +2,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { DEFAULT_LOOK_UNITS, LEAST_LOOK_COST, readLookAsk, regionBox, lookCost, costLine, scriptInRegion } from './look-cost.mjs';
 
-const rows = [{ stage: 1, strokes: 200 }, { stage: 1, strokes: 100 }, { stage: 3, strokes: 500 }, { stage: 4, strokes: 200 }];
-test('a look costs rendering: 1 for the whole plan on the whole sheet, a stage\'s share of the strokes when stopped, a region\'s share of the sheet', () => {
+const rows = [...Array(3).fill({ stage: 1 }), ...Array(5).fill({ stage: 3 }), ...Array(2).fill({ stage: 4 })];
+test('a look costs rendering: 1 for the whole plan on the whole sheet, a stage\'s share of the washes when stopped, a region\'s share of the sheet', () => {
   assert.equal(DEFAULT_LOOK_UNITS, 5);
-  assert.deepEqual(lookCost(rows), { cost: 1, strokeShare: 1, regionShare: null, strokes: 1000, of: 1000, stages: [{ stage: 1, cost: 0.3 }, { stage: 3, cost: 0.8 }, { stage: 4, cost: 1 }] });
+  assert.deepEqual(lookCost(rows), { cost: 1, washShare: 1, regionShare: null, washes: 10, of: 10, stages: [{ stage: 1, cost: 0.3 }, { stage: 3, cost: 0.8 }, { stage: 4, cost: 1 }] });
   assert.equal(lookCost(rows, { until: 1 }).cost, 0.3); assert.equal(lookCost(rows, { until: 2 }).cost, 0.3, 'a stage the plan has no washes in adds nothing'); assert.equal(lookCost(rows, { until: 3 }).cost, 0.8); assert.equal(lookCost(rows, { until: 9 }).cost, 1);
   assert.equal(lookCost(rows, { regionShare: 0.25 }).cost, 0.25); assert.equal(lookCost(rows, { until: 1, regionShare: 0.5 }).cost, 0.15);
   assert.equal(lookCost(rows, { regionShare: 0.001 }).cost, LEAST_LOOK_COST, 'no look is free: the sheet is set up and dried');

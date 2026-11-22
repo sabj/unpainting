@@ -93,7 +93,8 @@ test('prepared inputs: kept for a subject, a commit and the run\'s settings; a s
     writePrepared(folder, { commit: 'abcdef01', plan: { seconds: 80 }, painting: null }); fs.mkdirSync(path.join(folder, 'plan'));
     assert.throws(() => readPrepared(folder, { command }), /its value-plan\.json/);
     for (const f of ['value-plan.json', 'plan-to-edit.json']) fs.writeFileSync(path.join(folder, 'plan', f), '{}');
-    assert.equal(readPrepared(folder, { command }).painting, null); assert.throws(() => readPrepared(folder, { painting: true, command }), /the studies' flat shapes as data \(level 4 hands them to the session\) is not prepared/); fs.writeFileSync(path.join(folder, 'shapes.json'), '{}');
+    assert.equal(readPrepared(folder, { command }).painting, null); assert.throws(() => readPrepared(folder, { painting: true, command }), /the block-in study's flat shapes as data \(level 4 hands them to the session\) is not prepared/); fs.writeFileSync(path.join(folder, 'shapes.json'), '{}');
+    assert.throws(() => readPrepared(folder, { painting: true, command }), /the plan's washes as data \(level 4 hands them to the session\)/); fs.writeFileSync(path.join(folder, 'washes.json'), '{}');
     assert.throws(() => readPrepared(folder, { painting: true, command }), /the automatic painter's full-size painting of this subject \(level 4 hands it to the session\) is not prepared/);
     writePrepared(folder, { commit: 'abcdef01', plan: { seconds: 80 }, painting: { seconds: 900 } }); fs.mkdirSync(path.join(folder, 'painting')); fs.writeFileSync(path.join(folder, 'painting', 'run.json'), '{}');
     assert.throws(() => readPrepared(folder, { painting: true, command }), /the automatic painting's final-beside-subject\.jpg/);
