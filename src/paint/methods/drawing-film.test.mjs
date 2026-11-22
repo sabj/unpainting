@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { drawingBatches, strokeLengthMm, drawingTimeMm } from './drawing-film.mjs';
+import { drawingBatches, strokeLengthMm, drawingTimeMm, bigFormsFirst } from './drawing-film.mjs';
 import { layVectors } from './ink-vectors.mjs';
 
 const line = (seq, x0, len) => ({ seq, dark: 0.5, path: [[x0, 5], [x0 + len, 5]], outline: [[[x0, 4.8], [x0 + len, 4.8], [x0 + len, 5.2], [x0, 5.2]]] });
@@ -40,4 +40,23 @@ test('laid in batches the drawing is the same as laid in one step', () => {
   for (const b of drawingBatches(strokes, 3)) layVectors({ strokes: b.strokes }, parts, w, h, mm, inkOf);
   assert.deepEqual(parts, whole);
   assert.ok(whole.some(v => v > 0));
+});
+
+test('big forms first: the passes in turn over the whole sheet, the largest form first in each; the same strokes, laid the same', () => {
+  // a file ordered form by form: a small ear (outline, then its tone), then the big head (outline, features, tone)
+  const st = (seq, object, pass, x0, len, part) => ({ ...line(seq, x0, len), object, pass, part });
+  const file = [st(0, 7, 1, 50, 6, 'outline'), st(1, 7, 5, 51, 2, 'tone'), st(2, 7, 5, 52, 2, 'tone'), st(3, 2, 1, 0, 28, 'outline'), st(4, 2, 1, 1, 26, 'outline'), st(5, 2, 2, 5, 8, 'inner'), st(6, 2, 5, 6, 3, 'tone'), st(7, 2, 6, 9, 1, 'small')];
+  const order = bigFormsFirst(file).map(s => s.seq);
+  assert.deepEqual(order, [3, 4, 0, 5, 6, 1, 2, 7], 'head outline, ear outline, head features, the tones (head first), the accent last');
+  assert.equal(file[0].seq, 0, 'the list given is not reordered');
+  // without passes the part of the drawing says which pass; with neither, the file's order stands
+  assert.deepEqual(bigFormsFirst(file.map(({ pass, ...s }) => s)).map(s => s.seq), [3, 4, 0, 5, 7, 6, 1, 2]);
+  assert.deepEqual(bigFormsFirst([line(2, 0, 3), line(0, 0, 9), line(1, 0, 5)]).map(s => s.seq), [0, 1, 2]);
+  // batches keep the order given, and the sheet ends the same
+  const b = drawingBatches(bigFormsFirst(file), 4, { given: true });
+  assert.deepEqual(b.flatMap(q => q.strokes.map(s => s.seq)), order);
+  const w = 140, h = 20, mm = 0.5, inkOf = d => d * 2, whole = new Float32Array(w * h), parts = new Float32Array(w * h);
+  layVectors({ strokes: file }, whole, w, h, mm, inkOf);
+  for (const q of b) layVectors({ strokes: q.strokes }, parts, w, h, mm, inkOf);
+  assert.deepEqual(parts, whole);
 });
