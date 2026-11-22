@@ -27,7 +27,7 @@ import {recordGraphiteBatch} from '../painter/record-graphite.mjs';
 import {SWATCH, swatchMask, swatchLanes, scrapDelivery, chargeFactor} from '../../src/paint/methods/scrap-swatch.mjs';
 import {painterBrushOptions, isSection} from './painter-brush.mjs';
 import {createInstrumentCal, instrumentKey, chargedFromOwnSwatch} from '../../src/paint/methods/instrument-cal.mjs';
-import {representativeMark, markKey, markLayout, markDelivery, isMarkPassage} from '../../src/paint/methods/mark-swatch.mjs';
+import {representativeMarks, markKey, markLayout, markDelivery, isMarkPassage} from '../../src/paint/methods/mark-swatch.mjs';
 import {isDampPassage, underOf, dampScrap, dampCharge, liftShare, DAMP_CHANNEL} from '../../src/paint/methods/damp-swatch.mjs';
 import {nativeDryOptions} from '../painter/native-paint-mode.mjs';
 import {measurePaperBatch, measureBrush} from '../../src/paint/methods/wetdry.mjs';
@@ -792,6 +792,9 @@ GRADED_CAL = CAL_RESULT.value.GRADED_CAL;
 // and passes (src/paint/methods/instrument-cal.mjs). A value plan's shadow glaze is one pass of a 0.45-water brush; the
 // stock glazed swatch is two passes at 0.58 and lays 2.5 times as much. A passage
 // laid into wet is charged the same way (chargedFromOwnSwatch).
+// --markswatches n: how many of a mark passage's strokes are tried on scrap, taken where its planned paint lies
+// (mark-swatch.mjs representativeMarks); the passage is charged by the mean of what they lay. Default 3.
+const MARK_SWATCHES = num('markswatches', 3);
 // --dampchargemost k: the most a script's passage laid into wet paint is charged, as a multiple of the same instrument's
 // charge on dry paper (damp-swatch.mjs dampCharge). Default 8.
 const DAMP_CHARGE_MOST = num('dampchargemost', 8);
@@ -821,15 +824,18 @@ const ownSwatch = T => chargedFromOwnSwatch(T, { instrumentOn: true, authored: f
 const instrumentOf = (T, sh = null) => {
   const damp = isDampPassage(sh, DAMP_SHARE), under = damp ? underOf(sh) : 0;
   if (ownSwatch(T) && isMarkPassage(sh)) {
-    const mark = representativeMark(sh._valuePlan.strokes);
+    const marks = representativeMarks(sh._valuePlan.strokes, MARK_SWATCHES), depth = sh._cover ?? 1;
+    // each mark's swatch, on dry paper (or its own wet bed) and, for a passage laid into wet paint, over a damp wash;
+    // the passage's reading is the mean of what its marks lay
+    const read = into => { const rs = marks.map(mark => INSTRUMENT_CAL.ofMark(T, { ...mark, depth, damp: into })); return { mass: rs.reduce((a, r) => a + r.mass, 0) / rs.length, lift: rs.reduce((a, r) => a + r.lift, 0) / rs.length }; };
     // a mark swatch that cannot be laid (its wet bed never reached its window on the scrap) does not stop the plate: the
     // passage is charged from its technique's lane swatch, and the log says so in capitals
-    if (mark) try {
-      const r = INSTRUMENT_CAL.ofMark(T, { ...mark, depth: sh._cover ?? 1, damp });
-      if (!damp) return r;
-      const dry = INSTRUMENT_CAL.ofMark(T, { ...mark, depth: sh._cover ?? 1, damp: false }).cal;
-      return { ...r, ...dampCharge(r.mass, { lift: r.lift, under, dry, most: DAMP_CHARGE_MOST }), dry, under, damp };
-    } catch (e) { console.log(`MARK SWATCH FAILED for passage ${sh._valuePlan.script?.passage ?? sh._valuePlan.id} (${T.name}, brush ${(2 * mark.radiusMm).toFixed(1)} mm): ${e.message.slice(0, 160)}; CHARGED FROM THE WASH LANE SWATCH INSTEAD`); ctx.MARK_SWATCH_FAILURES = (ctx.MARK_SWATCH_FAILURES ?? 0) + 1; }
+    if (marks.length) try {
+      const dry = read(false), dryCal = chargeFactor(dry.mass), own = { graded: null, key: null, stock: false, marks: marks.length };
+      if (!damp) return { ...own, cal: dryCal, mass: dry.mass };
+      const wet = read(true);
+      return { ...own, ...dampCharge(wet.mass, { lift: wet.lift, under, dry: dryCal, most: DAMP_CHARGE_MOST }), mass: wet.mass, lift: wet.lift, dry: dryCal, under, damp };
+    } catch (e) { console.log(`MARK SWATCH FAILED for passage ${sh._valuePlan.script?.passage ?? sh._valuePlan.id} (${T.name}, brush ${(2 * marks[0].radiusMm).toFixed(1)} mm): ${e.message.slice(0, 160)}; CHARGED FROM THE WASH LANE SWATCH INSTEAD`); ctx.MARK_SWATCH_FAILURES = (ctx.MARK_SWATCH_FAILURES ?? 0) + 1; }
   }
   if (ownSwatch(T) && damp) { const r = INSTRUMENT_CAL.ofDamp(T); return { ...r, ...dampCharge(r.delivered, { lift: r.lift, under, dry: r.dry, most: DAMP_CHARGE_MOST }), under, damp }; }
   return ownSwatch(T) ? INSTRUMENT_CAL.of(T) : INSTRUMENT_CAL.byName(T.name);

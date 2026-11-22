@@ -1,15 +1,27 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { representativeMark, markKey, markLayout, readMark } from './mark-swatch.mjs';
+import { representativeMark, representativeMarks, markKey, markLayout, readMark } from './mark-swatch.mjs';
 import { SWATCH } from './scrap-swatch.mjs';
 
 const touch = (x, y, len, r = 3) => ({ radiusMm: r, points: [[x, y, 0.2], [x + len / 2, y, 0.9], [x + len, y, 0.15]] });
 
-test('the mark that stands for a passage is its stroke of median length, moved to the origin', () => {
+test('the mark that stands for a passage is the stroke at the middle of its planned cover, moved to the origin', () => {
   const m = representativeMark([touch(10, 10, 4), touch(50, 20, 8), touch(30, 30, 20)]);
-  assert.equal(m.lengthMm, 8); assert.deepEqual(m.points[0].slice(0, 2), [0, 0]); assert.equal(m.radiusMm, 3);
+  assert.equal(m.lengthMm, 20, 'half the passage\'s planned paint lies in its longest stroke'); assert.deepEqual(m.points[0].slice(0, 2), [0, 0]); assert.equal(m.radiusMm, 3);
   assert.ok(Math.abs(m.pressure - (0.2 + 0.9 + 0.15) / 3) < 1e-9);
   assert.equal(representativeMark([]), null);
+});
+
+test('several marks stand for a passage whose marks differ: one from each equal share of its planned cover, light and heavy', () => {
+  const light = (x, len) => ({ radiusMm: 6, points: [[x, 0, 0.05], [x + len, 0, 0.1]] }), heavy = (x, len) => ({ radiusMm: 6, points: [[x, 0, 0.4], [x + len, 0, 0.7]] });
+  const strokes = [...Array.from({ length: 30 }, (_, i) => light(i, 6)), ...Array.from({ length: 6 }, (_, i) => heavy(i, 25))];
+  const three = representativeMarks(strokes, 3);
+  assert.equal(three.length, 3);
+  assert.ok(three[0].pressure < 0.1 && three[2].pressure > 0.5, 'a light touch and a heavy stroke are both tried');
+  assert.ok(three[1].pressure > 0.5, 'most of the planned paint is in the heavy strokes, though there are five times as many light ones');
+  assert.equal(representativeMarks([touch(0, 0, 8)], 3).length, 1, 'one stroke is tried once');
+  assert.deepEqual(representativeMarks([], 3), []);
+  assert.throws(() => representativeMarks(strokes, 0), /whole number/);
 });
 
 test('marks of one brush, about one length and pressure share a reading; a different brush or length does not', () => {

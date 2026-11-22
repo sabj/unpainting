@@ -18,17 +18,40 @@ export const pressedRadius = (r, p) => r * (0.25 + 0.75 * Math.min(1, Math.max(0
 
 const lengthOf = P => { let s = 0; for (let k = 1; k < P.length; k++) s += Math.hypot(P[k][0] - P[k - 1][0], P[k][1] - P[k - 1][1]); return s; };
 
-/**
- * The mark that stands for a passage's strokes ({radiusMm, points: [[x, y, pressure], ...]} in mm): the stroke of median
- * length, moved to start at the origin. `null` when the passage has no stroke of two points.
- */
-export function representativeMark(strokes) {
-  const list = (strokes ?? []).filter(st => st?.points?.length >= 2 && st.radiusMm > 0).map(st => ({ st, len: lengthOf(st.points) })).sort((a, b) => a.len - b.len);
-  if (!list.length) return null;
-  const { st, len } = list[list.length >> 1], [x0, y0] = st.points[0];
-  const points = st.points.map(q => [q[0] - x0, q[1] - y0, Math.max(0.05, Math.min(1.2, q[2] ?? 1))]);
-  return { radiusMm: st.radiusMm, lengthMm: len, pressure: points.reduce((a, q) => a + q[2], 0) / points.length, points };
+/** The paper a stroke is planned to cover, mm2: its pressed width along its length, and its round ends. */
+function plannedArea(st) {
+  let area = 0; const P = st.points, pr = q => pressedRadius(st.radiusMm, q[2] ?? 1);
+  for (let k = 1; k < P.length; k++) area += Math.hypot(P[k][0] - P[k - 1][0], P[k][1] - P[k - 1][1]) * (pr(P[k]) + pr(P[k - 1]));
+  return area + Math.PI * pr(P[0]) * pr(P.at(-1));
 }
+
+/**
+ * The marks that stand for a passage's strokes ({radiusMm, points: [[x, y, pressure], ...]} in mm), each moved to start
+ * at the origin. A script's marks differ widely within one passage (Codex Astra's cloud: pressure 0.10 to 0.42, 5 to
+ * 28 mm long) and what a mark lays is far from proportional to either, so one mark cannot stand for them: the stroke
+ * of median length was a light short touch that laid 0.04 of its charge where the passage as a whole laid four times
+ * that. So `count` strokes are taken where the passage's planned paint lies: sorted by the paper each is planned to
+ * cover, the strokes at the middles of `count` equal shares of the passage's whole planned cover. The mean of their
+ * readings is the passage's. With count 1: the stroke at the middle of the planned cover. [] when the passage has no
+ * stroke of two points.
+ */
+export function representativeMarks(strokes, count = 1) {
+  if (!Number.isInteger(count) || count < 1) throw new RangeError(`mark swatch: the number of marks tried must be a whole number, 1 or more, got ${count}`);
+  const list = (strokes ?? []).filter(st => st?.points?.length >= 2 && st.radiusMm > 0).map(st => ({ st, area: plannedArea(st) })).sort((a, b) => a.area - b.area);
+  if (!list.length) return [];
+  const total = list.reduce((a, e) => a + e.area, 0), picked = [];
+  let run = 0, k = 0;
+  for (const e of list) {
+    run += e.area;
+    while (k < count && run >= total * (k + 0.5) / count) { if (picked.at(-1) !== e.st) picked.push(e.st); k++; }
+  }
+  return picked.map(st => {
+    const [x0, y0] = st.points[0], points = st.points.map(q => [q[0] - x0, q[1] - y0, Math.max(0.05, Math.min(1.2, q[2] ?? 1))]);
+    return { radiusMm: st.radiusMm, lengthMm: lengthOf(st.points), pressure: points.reduce((a, q) => a + q[2], 0) / points.length, points };
+  });
+}
+/** The one mark at the middle of a passage's planned cover, or null (representativeMarks). */
+export const representativeMark = strokes => representativeMarks(strokes, 1)[0] ?? null;
 
 /** A mark's key for a kept reading: brush width to half a millimetre, length to a step of a third, pressure to 0.2. */
 export function markKey(mark) {
