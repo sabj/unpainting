@@ -14,9 +14,10 @@ import { refuseExtraGpuPaint, gpuPaintCount, cacheDirFor, switchesOf, segEnvFor,
 import { expandSubjects, pool, gpuPlace, throughput, jobsNow, DEFAULT_JOBS, PLAN_JOBS } from './queue.mjs';
 import { writeRunSheet, writeGridSheet, runPictures, formsImage } from './sheet.mjs';
 import { authorOf, authorLabel, briefName, readScript, checkAuthored, preparePacket, formBoxes, askAuthor, retryPrompt } from './author.mjs';
-import { readChoice, choiceKey, withChoice, settingsList } from './choice.mjs';
+import { readChoice, choiceKey, choiceKind, withChoice, settingsList } from './choice.mjs';
 import { checkPlanEdit, editLine } from '../../src/paint/methods/plan-edit.mjs';
-import { planNumbers, numbersText, washesText, planPicture, lookPicture } from './plan-data.mjs';
+import { planNumbers, numbersText, washesText, planPicture, lookPicture, stagesPicture } from './plan-data.mjs';
+import { lookSets, lookFault, lookSizeNote, LOOK_JOBS, HEAVY_JOBS } from './look.mjs';
 import { DEFAULT_LOOKS, DEFAULT_MINUTES, writeSession, sessionServer, finalChoice, sessionCall, readTranscript, reachedOutside, ownFolderOf, ownPictures, runSession } from './session.mjs';
 import { qwenRoute, studyRequestPrompt, parseStudyRequests, writeStudyRequest, makeStudies, withAuthorStudies } from './studies.mjs';
 import { codeState } from '../../src/paint/code-state.mjs';
@@ -104,10 +105,15 @@ if (req.dryRun) { console.log('\ndry run: nothing was started'); process.exit(0)
 console.log('');
 
 // Several runs go on together: model replies in parallel (agy one at a time: its sessions interrupt one another),
-// CPU plans three at a time, GPU paintings --jobs at a time (queue.mjs).
+// CPU plans three at a time, GPU paintings --jobs at a time (queue.mjs). A session's look is a small GPU painting:
+// LOOK_JOBS of them at once in this command, each waiting for a place among the machine's GPU paintings (--jobs).
 // a queue's places can be changed while it runs: write the number into <out>/jobs
 const readJobs = () => { try { return jobsNow(jobs, fs.readFileSync(path.join(outRoot, 'jobs'), 'utf8')); } catch { return jobs; } };
-const painterSlot = pool(req.mode === 'plan' ? PLAN_JOBS : many ? 16 : jobs), planSlot = pool(2 * PLAN_JOBS), startGate = pool(1), agySlot = pool(1), modelSlot = pool(6), qwenSlot = pool(1);
+// Memory: a plan, a look's painting and a painting each hold 13 to 18 GB, so in plan mode one pool of HEAVY_JOBS places
+// holds them all (a session's plans, its looks, and the plan of what it hands over); the models themselves mostly wait
+// and all run at once (agy three at a time: three at once in separate folders did not interrupt one another).
+const heavySlot = pool(HEAVY_JOBS);
+const painterSlot = req.mode === 'plan' ? heavySlot : pool(many ? 16 : jobs), planSlot = req.mode === 'plan' ? heavySlot : pool(2 * PLAN_JOBS), startGate = pool(1), agySlot = pool(3), modelSlot = pool(12), qwenSlot = pool(1), lookSlot = req.mode === 'plan' ? heavySlot : pool(LOOK_JOBS), lookGate = pool(1);
 const say = (r, text) => console.log(`[${r.spec.id} · ${r.record.author.name}] ${text}`);
 const SHOWN = /^(study washes: \d|wash plan:|plan values|phases|!!!|UNUSED|IGNORED|named forms|painting script)/;
 
@@ -179,7 +185,54 @@ async function compileOnce(r, choice, script, plate, edit) {
       return { ok: false, error: tidy(why ?? `the planner ended with exit ${done.exit ?? done.signal} and no plan`) };
     }
     const numbers = await planNumbers({ plate, planPreview: results.planPreview, run: record, script });
-    return { ok: true, ...numbers, numbersText: numbersText(numbers, { script: Boolean(script) }), picture: await lookPicture({ planPreview: results.planPreview, run: record }), planPreview: results.planPreview, seconds: done.seconds, plate };
+    return { ok: true, ...numbers, planPreview: results.planPreview, seconds: done.seconds, plate };
+  } catch (e) { return { ok: false, error: tidy(e.message) }; }
+}
+
+/**
+ * A look: one compiled choice painted for real on the GPU, small (look.mjs), through drying, into `plate`, for a
+ * session. {ok: true, picture, stages, planPicture, numbersText, marked, painted} or {ok: false, error}: a painting
+ * that failed or did not stay on the GPU is no look. The same choice of the same subject is painted once in a run,
+ * whoever looks. Nothing of this machine's paths is in what the model reads.
+ */
+const lookedAt = new Map();
+function paintLook(r, choice, script, plate, at, edit, compiled) {
+  const key = `${r.spec.id}:${r.spec.variant ?? ''}:${choiceKey(choice, script ? JSON.stringify(script) : edit ? JSON.stringify(edit) : '')}`;
+  if (!lookedAt.has(key)) lookedAt.set(key, paintLookOnce(r, choice, script, plate, at, edit, compiled).then(got => { if (!got.ok) lookedAt.delete(key); return got; }));
+  return lookedAt.get(key);
+}
+async function paintLookOnce(r, choice, script, plate, at, edit, compiled) {
+  const { spec, record } = r, scriptFile = `${plate}.script.json`, editFile = `${plate}.plan-edit.json`;
+  try {
+    const full = specWith(spec, choice);
+    const small = checkInputs(resolveSubject(registry, spec.id, { sets: lookSets(withChoice(req.sets, choice), full.sheet.cells, choice.kind), variant: spec.variant ? variants[spec.id]?.[spec.variant] : null, variantName: spec.variant }));
+    fs.mkdirSync(path.dirname(plate), { recursive: true });
+    if (script) fs.writeFileSync(scriptFile, JSON.stringify(script, null, 1) + '\n');
+    if (edit) fs.writeFileSync(editFile, JSON.stringify(edit, null, 1) + '\n');
+    const size = lookSizeNote({ cells: small.sheet.cells, fullCells: full.sheet.cells, cellMm: small.sheet.cellMm, kind: choice.kind }), asked = Date.now(); let started = null;
+    const done = await lookSlot(async () => {
+      // the wait for a place among the machine's GPU paintings and the start are one step at a time
+      const going = await lookGate(async () => {
+        await gpuPlace({ most: readJobs, running: gpuPaintCount, onWait: n => say(r, `look ${at.look}: waiting, ${n} GPU paintings are running and --jobs is ${readJobs()}`) });
+        const command = buildCommand(small, { mode: 'paint', out: plate, known, dirty: codeState(ROOT).dirty, segEnv, script: script ? { file: scriptFile, paints: script.palette } : null, edit: edit ? { file: editFile } : null });
+        fs.writeFileSync(`${plate}.command.txt`, shellLine(command) + '\n'); started = Date.now();
+        say(r, `look ${at.look} (plan ${at.plan}, ${choiceKind(choice)}): ${size}; started at ${new Date().toTimeString().slice(0, 8)}`);
+        return { ended: runPainter(command, { cwd: ROOT, logFile: `${plate}.log` }) };
+      });
+      return going.ended;
+    });
+    const results = collectResults(plate, 'paint'), fault = lookFault(done, results);
+    if (fault) {
+      const why = fs.readFileSync(`${plate}.log`, 'utf8').split('\n').filter(l => /(^|\s)(Error|TypeError|RangeError)\b/.test(l)).pop()?.trim().slice(0, 400);
+      say(r, `look ${at.look} NOT PAINTED: ${fault}${why ? ` (${why})` : ''}`);
+      return { ok: false, error: tidy(`${fault}${why ? `: ${why}` : ''}`) };
+    }
+    const numbers = await planNumbers({ plate, planPreview: results.planPreview ?? compiled.planPreview, run: record, script, painting: results.painting });
+    say(r, `look ${at.look} painted and dried in ${Math.round(done.seconds / 60)} min (${results.backend.backend}, no fallback); ${numbers.marked.forms} named forms marked`);
+    return { ok: true, picture: await lookPicture({ planPreview: results.painting, run: record }), stages: results.strip ? await stagesPicture(results.strip) : null,
+      planPicture: compiled.planPreview ? await planPicture({ planPreview: compiled.planPreview, run: record }) : null,
+      numbersText: numbersText(numbers, { script: Boolean(script), painted: size }), marked: numbers.marked,
+      painted: { cells: small.sheet.cells, fullCells: full.sheet.cells, size, seconds: done.seconds, waitedSeconds: Math.round((started - asked) / 1000), backend: results.backend, plate, painting: results.painting, strip: results.strip } };
   } catch (e) { return { ok: false, error: tidy(e.message) }; }
 }
 
@@ -231,7 +284,8 @@ async function sessionRun(r) {
       const { prompt } = writeSession({ dir: cwd, packet, sheet: spec.sheet, medium: record.drawing.medium, auto: { picture: await planPicture({ planPreview: auto.planPreview, run: record }), washesText: washesText(auto), plan: { summary: auto.summary, washes: auto.rows }, toEdit: listing }, settings: settingsList(spec),
         forms: record.masks.mask ? await formBoxes(record.masks.mask, record.masks.forms, W) : null, formsIds: record.masks.mask ?? null, looks: looksMost, minutes: minutesMost, briefFile: path.join(HERE, 'SESSION-BRIEF.md'), readmeFile: path.join(HERE, 'SESSION-README.md') });
       fs.writeFileSync(path.join(dir, 'session-prompt.txt'), prompt);
-      const server = sessionServer({ dir: cwd, looks: looksMost, minutes: minutesMost, checkScript: check, checkPlan: obj => checkEdit(obj, listing), ledger: path.join(dir, 'looks.jsonl'), compile: (choice, script, n, edit) => compileChoice(r, choice, script, path.join(dir, 'plans', String(n)), edit) });
+      const server = sessionServer({ dir: cwd, looks: looksMost, minutes: minutesMost, checkScript: check, checkPlan: obj => checkEdit(obj, listing), ledger: path.join(dir, 'looks.jsonl'), keep: path.join(dir, 'looks'), compile: (choice, script, n, edit) => compileChoice(r, choice, script, path.join(dir, 'plans', String(n)), edit),
+        look: (choice, script, at, edit, compiled) => paintLook(r, choice, script, path.join(dir, 'look-paints', String(at.plan)), at, edit, compiled) });
       // what nothing of the session may read: this checkout, the checkout it is a worktree of (with every worktree, cache
       // and earlier run under it), the subject list with its inputs, and whatever UNPAINT_SESSION_DENY adds (a:b:c)
       const deny = [...sessionDeny(spec), ...runs.filter(o => o !== r && o.sessionDir).map(o => o.sessionDir)];
@@ -242,7 +296,7 @@ async function sessionRun(r) {
         if (can(path.join(ROOT, 'package.json'))) throw new Error('the session\'s sandbox does not hold: a file of the repository can be read under it; the session is not started');
         if (!can(path.join(cwd, 'README.md'))) throw new Error('the session\'s sandbox cannot be started on this machine (its own folder is not readable under it); the session is not started');
       }
-      say(r, `${author.name} starts its working session (${author.cli}; ${minutesMost} min of its own time, ${looksMost} looks): ${call.closed}`);
+      say(r, `${author.name} starts its working session (${author.cli}; ${minutesMost} min of its own time, ${looksMost} looks, each a small real painting): ${call.closed}`);
       server.start();
       const t0 = Date.now(), done = await modelSlot(() => (call.serial ? agySlot : f => f())(() => runSession(call, { cwd, outFile: path.join(dir, 'S.out.txt'), errFile: path.join(dir, 'S.err.txt'), over: server.over })));
       await server.tick(); const kept = await server.stop(), seen = readTranscript(author.cli, fs.readFileSync(path.join(dir, 'S.out.txt'), 'utf8'));

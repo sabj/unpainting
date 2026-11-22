@@ -1,7 +1,12 @@
 # This folder and its tools
 
 All positions are sheet millimetres, x to the right, y down; the sheet is `SHEET_W` by `SHEET_H` mm. Every picture in
-`inputs/`, `auto/` and `looks/` carries the same millimetre grid (red numbers across, blue down).
+`inputs/` and `auto/`, and every look's `beside.png`, carries the same millimetre grid (red numbers across, blue down).
+
+**A look paints your plan for real, small, and shows you the dried sheet.** The painter that will paint your final
+choice lays your present choice on a small sheet (the same millimetres, fewer cells), with real water, pigment and
+brush, lets it dry, and you are shown what dried.
+
 
 ## Files
 
@@ -20,18 +25,31 @@ INPUT_LIST
 
 ## Commands
 
-Run them from this folder. A plan takes from under a minute to several minutes on the CPU. A command that is still
-working after about 50 seconds returns with the words "still working"; run `./unpaint wait` (again, if need be) to
-get its answer. Give your shell commands a timeout of at least 60 seconds. Waiting is not counted in your time.
+Run them from this folder. A plan takes from under a minute to several minutes on the CPU. A look is a painting: it
+takes about 5 to 15 minutes (longer when the machine is busy, and as long as a full painting, half an hour or more,
+for an edited plan). A command that is still working after about 50 seconds returns with the words "still working";
+run `./unpaint wait` (again and again, as often as need be) to get its answer. Give your shell commands a timeout of
+at least 60 seconds. Waiting is not counted in your time: neither the planner's minutes nor a look's painting.
 
 | Command | What it does | What it returns | Limit |
 |---|---|---|---|
 | `./unpaint status` | nothing | your time used and left, looks used and left, the plans made so far | none |
 | `./unpaint plan` | runs the wash planner on your present `choice.json` (and your script or edited plan, if the choice names one) | whether it compiled, or why it was refused, and its counts (shapes or passages, washes, strokes, widest brush, washes by stage; for an edited plan also how many washes you left untouched, changed, moved, merged, left out and added). Nothing else: no picture and no wash data | none |
-| `./unpaint look` | the same, and shows you the result | `looks/N/beside.png` (your plan, the subject, the middle study, side by side), `looks/N/numbers.txt` (each named form measured against the study, marked when it is too dark OR too pale, and every wash), `looks/N/plan.json` (every wash as data, as in `auto/plan.json`) | LOOKS looks; each is counted before it is shown |
+| `./unpaint look` | the same, then PAINTS your present choice for real, small, through drying, and shows you the dried sheet | `looks/N/beside.png` (your painting as it dried, the subject, the middle study, side by side), `looks/N/stages.png` (the subject, then your sheet at 10, 25, 50, 75 and 100% of the strokes: the order of the work), `looks/N/numbers.txt` (each named form measured on the DRIED sheet against the study and against your plan, marked when it is TOO DARK or TOO PALE, and every wash), `looks/N/plan.json` (every wash as data, as in `auto/plan.json`), `looks/N/plan.png` (the plan as a diagram) | LOOKS looks; each is counted before it is shown |
 | `./unpaint wait` | waits for the answer of the command that said "still working" | that answer | none |
 
-A choice the planner refuses costs no look. A look at a choice you have already looked at still costs a look.
+A choice the planner refuses costs no look. A painting that fails on this side costs no look either: the answer
+says NOT PAINTED, and you may ask again. A look at a choice you have already looked at still costs a look.
+
+What a look's painting is, exactly:
+
+- Your own script is written in millimetres, so the look paints the same script on half the cells across: the same
+  washes, strokes, water and drying, with a coarser grain than the final sheet.
+- The code planner under your settings is planned again for the small sheet, so its shapes are a little broader in
+  the look than they will be at full size, and the wash table of the look is that small plan's.
+- An edited plan exists on the full sheet only: its look is painted at full size and takes as long as a painting.
+- The dried sheet shows what the plan's diagram cannot: brush marks, direction, soft and hard edges, how much
+  pigment really lay down, blooms and back-runs, and what a later wash did to the one under it.
 
 ## Editing the plan
 
@@ -68,10 +86,10 @@ What to know before you edit:
   under-wash and the washes over it come out paler there; darken it and they come out darker.
 - A wash laid again (brush, direction, merge) is laid evenly, without the planner's cut edge or its load varied
   along the wash.
-- `./unpaint plan` checks the file and says what is wrong with it; it costs nothing. The plan's picture shows
-  colour, value, shape and order; it does not show brush, direction or soft edges, which only the painting shows.
+- `./unpaint plan` checks the file and says what is wrong with it; it costs nothing. Brush, direction and soft
+  edges show in a look's dried sheet, not in the plan's diagram.
 
 Your shell is yours: read the files, measure the input pictures (sampling a colour or a position is fair), compute,
 keep notes, write and check your script with your own code. The folder is all there is to work from: the painter, its
-planner and other sessions are out of reach, and a session whose commands name them is not painted. A plan is drawn
-or measured against the subject only by `./unpaint look`.
+planner and other sessions are out of reach, and a session whose commands name them is not painted. A plan is
+painted, drawn or measured against the subject only by `./unpaint look`.

@@ -1,12 +1,13 @@
 // A compiled wash plan as a working author reads it (session.mjs): one row a wash with its brush, strokes, area,
 // colour, move, box on the sheet and the named forms it covers, and no outline or stroke geometry (the plan's picture
-// is a look, counted; the data is not). Also the pictures and numbers of a look: the plan beside the source and the
-// middle study, and each named form measured in the study and in the plan, marked both ways.
+// is a look, counted; the data is not). Also the pictures and numbers of a look: the dried sheet of the small real
+// painting beside the source and the middle study, the stages of that painting, and each named form measured in the
+// study, in the plan and on the dried sheet, marked both ways.
 import fs from 'node:fs';
 import path from 'node:path';
 import sharp from 'sharp';
 import { gridImage } from './author.mjs';
-import { passageNumbers, formsCovered, formValues, formsTable, numbersTable, onGrid } from './step-back.mjs';
+import { passageNumbers, formsCovered, formValues, formsTable, formsTableDried, numbersTable, onGrid } from './step-back.mjs';
 
 /** Kinds of named form that take rounds only, and the widest round inside them (mm), as the step back marks them. */
 const LIVING = new Set(['face', 'eye', 'animal', 'fur', 'figure', 'hair', 'clothing']), MOST_ROUND_MM = 17, IN_FORM_SHARE = 0.1;
@@ -61,29 +62,36 @@ export async function beside(images, { height = 900, gap = 16 } = {}) {
  * What a compiled plan tells its author. `plate` is the folder the plan compiled into; `run` the record's sheet,
  * subject, studies and masks; `script` the author's script when the plan is one. Returns {summary, rows, table (the
  * washes, one line each), formTable (each named form in the middle study and in the plan, marked both ways), marked}.
- * Reads the plan preview only for the form table.
+ * Reads the plan preview only for the form table. With `painting` (the dried sheet of a look's painting) the form
+ * table sets the DRIED sheet against the study and the plan (formsTableDried) and `dried` is true.
  */
-export async function planNumbers({ plate, planPreview, run, script = null }) {
+export async function planNumbers({ plate, planPreview, run, script = null, painting = null }) {
   const plan = JSON.parse(fs.readFileSync(path.join(plate, 'value-plan.json'), 'utf8')), rows = planRows(plan), W = run.sheet.widthMm;
   const study = run.studies[Math.min(1, run.studies.length - 1)];
   let formTable = [], covered = {};
   if (run.masks?.mask && planPreview) {
     const { data, info } = await sharp(run.masks.mask).greyscale().raw().toBuffer({ resolveWithObject: true }), mask = { data, width: info.width, height: info.height };
-    formTable = formsTable(formValues(await onGrid(study.abs, mask), mask, run.masks.forms), formValues(await onGrid(planPreview, mask), mask, run.masks.forms));
+    const inStudy = formValues(await onGrid(study.abs, mask), mask, run.masks.forms), inPlan = formValues(await onGrid(planPreview, mask), mask, run.masks.forms);
+    formTable = painting ? formsTableDried(inStudy, inPlan, formValues(await onGrid(painting, mask), mask, run.masks.forms)) : formsTable(inStudy, inPlan);
     if (script) covered = formsCovered(plan, mask, run.masks.forms, W);
   }
   const table = script ? numbersTable(passageNumbers(plan, script), covered) : rowsTable(rows);
-  return { summary: planSummary(plan), rows, table, formTable, marked: { washes: table.filter(l => l.includes('!!')).length, forms: formTable.filter(l => l.includes('!!')).length } };
+  return { summary: planSummary(plan), rows, table, formTable, dried: Boolean(painting), marked: { washes: table.filter(l => l.includes('!!')).length, forms: formTable.filter(l => l.includes('!!')).length } };
 }
 
 /** The text of a look's numbers: the form table, then the washes. */
-export function numbersText({ summary, table, formTable }, { script = false } = {}) {
+export function numbersText({ summary, table, formTable, dried = false }, { script = false, painted = null } = {}) {
+  const forms = dried ? `EACH NAMED FORM, MEASURED ON THE DRIED SHEET: the middle study's mean lightness (L*, 0 black to 100 white) and its
+darks (the L* its darkest twentieth lies under), the same for your plan with every layer down, and the same for the
+sheet as it DRIED in this look's painting${painted ? ` (${painted})` : ''}. The dried sheet is what counts and it should MATCH the study, both
+ways: a form paler than the study is as wrong as one darker. A fault is marked !! (TOO PALE or TOO DARK). The paper
+is a little off white and the pencil drawing lies on the sheet, so a form left as bare paper reads about L* 95.` : `EACH NAMED FORM, MEASURED: the middle study's mean lightness (L*, 0 black to 100 white) and its darks (the L* its darkest
+twentieth lies under), then the same for this plan with every layer down. The finished form should MATCH the study,
+both ways: a form paler than the study is as wrong as one darker. A fault is marked !!.`;
   return `THE PLAN IN NUMBERS
 ${summary.passages != null ? `${summary.passages} passages, ` : summary.shapes != null ? `${summary.shapes} shapes, ` : ''}${summary.washes} washes, ${summary.strokes ?? '?'} strokes, widest wash brush ${summary.widestBrushMm ?? '?'} mm${summary.washesByStage ? `, washes by stage ${summary.washesByStage.join('/')}` : ''}${summary.paintedShare != null ? `, ${Math.round(100 * summary.paintedShare)}% of the sheet painted` : ''}
 
-EACH NAMED FORM, MEASURED: the middle study's mean lightness (L*, 0 black to 100 white) and its darks (the L* its darkest
-twentieth lies under), then the same for this plan with every layer down. The finished form should MATCH the study,
-both ways: a form paler than the study is as wrong as one darker. A fault is marked !!.
+${forms}
 
 ${formTable.length ? formTable.join('\n') : '(no named forms for this subject)'}
 
@@ -114,8 +122,16 @@ async function sheetOf(planPreview, run) {
   return sharp(planPreview).extract({ left: 0, top: 0, width: m.width, height: rows }).png().toBuffer();
 }
 
-/** The picture of a look: the plan preview, the source and the middle study side by side on the millimetre grid. A PNG buffer. */
+/**
+ * The picture of a look: the sheet (the dried painting of the look; a plan preview is cut to the sheet), the source
+ * and the middle study side by side on the millimetre grid. A PNG buffer.
+ */
 export async function lookPicture({ planPreview, run }) {
   const W = run.sheet.widthMm, study = run.studies[Math.min(1, run.studies.length - 1)];
   return beside([await gridImage(await sheetOf(planPreview, run), W, { width: 1000 }), await gridImage(run.subject.sourceAbs, W, { width: 1000 }), await gridImage(study.abs, W, { width: 1000 })]);
+}
+
+/** The stage strip of a painting (the source, then the sheet at 10, 25, 50, 75 and 100% of the strokes) as a PNG no wider than `most` px. */
+export async function stagesPicture(strip, { most = 3000 } = {}) {
+  return sharp(strip).resize({ width: most, withoutEnlargement: true }).png().toBuffer();
 }

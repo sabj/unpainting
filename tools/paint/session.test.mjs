@@ -18,6 +18,8 @@ function folder({ looks = 2, minutes = 85 } = {}) {
   return { dir, ledger: path.join(tmp(), 'looks.jsonl'), ...out };
 }
 const compiled = n => ({ ok: true, summary: { shapes: 10, washes: 20 + n, strokes: 100, widestBrushMm: 17 }, rows: [{ n: 1 }], numbersText: 'NUMBERS', picture: PNG, marked: { forms: 1, washes: 0 } });
+// a look's painting as the painter's side hands it back: the dried sheet, the stages, the numbers measured on it
+const looked = async () => ({ ok: true, picture: PNG, stages: PNG, planPicture: PNG, numbersText: 'DRIED NUMBERS', marked: { forms: 2, washes: 0 }, painted: { cells: 543, fullCells: 1086, seconds: 240, backend: { backend: 'gpu', fallback: false } } });
 const put = (dir, choice) => fs.writeFileSync(path.join(dir, 'choice.json'), JSON.stringify(choice));
 let seq = 0;
 async function ask(dir, server, cmd) { fs.writeFileSync(path.join(dir, '.requests', `${Date.now() % 1e9}-${++seq}.req`), cmd); await server.tick(); const f = fs.readdirSync(path.join(dir, '.requests')).filter(x => x.endsWith('.ans')).map(x => path.join(dir, '.requests', x)).sort((a, b) => fs.statSync(b).mtimeMs - fs.statSync(a).mtimeMs || b.localeCompare(a)); const all = f.map(x => fs.readFileSync(x, 'utf8')); for (const x of f) fs.rmSync(x); return all[0]; }
@@ -40,14 +42,14 @@ test('the folder holds the task, the tools, the code planner\'s plan and a choic
 test('a plan answers with counts only and looks are counted: after the last look the command refuses, and a refused choice costs nothing', async () => {
   const { dir, ledger } = folder({ looks: 2 }); let n = 0;
   try {
-    const server = sessionServer({ dir, ledger, looks: 2, minutes: 85, checkScript: s => { if (!s.passages) throw new Error('painting script: no passages'); return s; }, compile: async (choice) => (choice.sets.some(([k]) => k === 'bogus') ? { ok: false, error: '--set bogus: not an option' } : compiled(++n)) });
+    const server = sessionServer({ dir, ledger, look: looked, looks: 2, minutes: 85, checkScript: s => { if (!s.passages) throw new Error('painting script: no passages'); return s; }, compile: async (choice) => (choice.sets.some(([k]) => k === 'bogus') ? { ok: false, error: '--set bogus: not an option' } : compiled(++n)) });
     assert.match(await ask(dir, server, 'status'), /Looks: 0 of 2 used, 2 left\. Plans made: 0\./);
     const free = await ask(dir, server, 'plan');
     assert.match(free, /^It compiles \(nothing changed\): 10 shapes, 21 washes, 100 strokes, widest wash brush 17 mm\. Nothing else is shown without a look\./);
     assert.deepEqual(fs.readdirSync(path.join(dir, 'plans')), [], 'a free plan leaves no data and no picture in the folder'); assert.doesNotMatch(free, /rgb|box|covers|plan\.json/);
     put(dir, { kind: 'settings', settings: { 'study1.shapes': 60 } });
-    assert.match(await ask(dir, server, 'look'), /^LOOK 1 of 2 \(settings\).*\n.*looks\/1\/beside\.png.*looks\/1\/numbers\.txt: 1 named forms and 0 washes are marked/);
-    assert.ok(fs.existsSync(path.join(dir, 'looks/1/beside.png'))); assert.equal(fs.readFileSync(path.join(dir, 'looks/1/numbers.txt'), 'utf8'), 'NUMBERS'); assert.ok(fs.existsSync(path.join(dir, 'looks/1/plan.json')));
+    assert.match(await ask(dir, server, 'look'), /^LOOK 1 of 2 \(settings\), PAINTED small \(543 cells across of the final 1086\) and dried.*\n.*looks\/1\/beside\.png: your painting as it dried.*looks\/1\/stages\.png.*looks\/1\/numbers\.txt: each named form on the DRIED sheet.*2 named forms are marked !!/);
+    assert.ok(fs.existsSync(path.join(dir, 'looks/1/beside.png'))); assert.ok(fs.existsSync(path.join(dir, 'looks/1/stages.png'))); assert.equal(fs.readFileSync(path.join(dir, 'looks/1/numbers.txt'), 'utf8'), 'DRIED NUMBERS'); assert.ok(fs.existsSync(path.join(dir, 'looks/1/plan.json')));
     for (const bad of [{ kind: 'plan' }, { kind: 'settings', settings: { masks: 'none' } }, { kind: 'settings', settings: { bogus: 1 } }, { kind: 'script', script: 'none.json' }]) { put(dir, bad); assert.match(await ask(dir, server, 'look'), /^REFUSED.*no look was counted/, JSON.stringify(bad)); }
     fs.writeFileSync(path.join(dir, 'script.json'), '{"palette": ["ochre"]}'); put(dir, { kind: 'script', script: 'script.json' });
     assert.match(await ask(dir, server, 'plan'), /^REFUSED, nothing was planned: painting script: no passages/);
@@ -67,13 +69,13 @@ test('a plan answers with counts only and looks are counted: after the last look
 test('a look is spent before it is delivered, and the count outlives the server', async () => {
   const { dir, ledger } = folder({ looks: 2 });
   try {
-    const mk = () => sessionServer({ dir, ledger, looks: 2, minutes: 85, checkScript: s => s, compile: async () => compiled(1) });
+    const mk = () => sessionServer({ dir, ledger, look: looked, looks: 2, minutes: 85, checkScript: s => s, compile: async () => compiled(1) });
     // the session blocks the delivery of the numbers with a folder that cannot be replaced by a file write alone, and
     // points the picture at a file outside its folder: the look is counted all the same, and nothing outside is written
     const outside = path.join(path.dirname(ledger), 'host-file.txt'); fs.writeFileSync(outside, 'HOST');
     fs.mkdirSync(path.join(dir, 'looks/1/numbers.txt/deep'), { recursive: true }); fs.symlinkSync(outside, path.join(dir, 'looks/1/beside.png'));
     const a = mk(); assert.match(await ask(dir, a, 'look'), /^LOOK 1 of 2/);
-    assert.equal(fs.readFileSync(outside, 'utf8'), 'HOST', 'a link in the folder is replaced, never written through'); assert.ok(fs.lstatSync(path.join(dir, 'looks/1/beside.png')).isFile()); assert.equal(fs.readFileSync(path.join(dir, 'looks/1/numbers.txt'), 'utf8'), 'NUMBERS');
+    assert.equal(fs.readFileSync(outside, 'utf8'), 'HOST', 'a link in the folder is replaced, never written through'); assert.ok(fs.lstatSync(path.join(dir, 'looks/1/beside.png')).isFile()); assert.equal(fs.readFileSync(path.join(dir, 'looks/1/numbers.txt'), 'utf8'), 'DRIED NUMBERS');
     assert.equal(ledgerLooks(ledger).length, 1); await a.stop();
     // a delivery that fails outright still leaves the look spent
     fs.rmSync(path.join(dir, 'looks'), { recursive: true }); fs.symlinkSync(path.dirname(ledger), path.join(dir, 'looks'));
@@ -84,10 +86,50 @@ test('a look is spent before it is delivered, and the count outlives the server'
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });
 
+test('a look is a real painting: one that fails or leaves the GPU costs no look; one painted is counted, kept outside the folder, and the same choice is painted once', async () => {
+  const { dir, ledger } = folder({ looks: 3 }), keep = path.join(path.dirname(ledger), 'kept'); let paints = 0, fail = 'the painting did not stay on the GPU (backend cpu, fallback true), so it is not shown';
+  try {
+    const seenArgs = [];
+    const server = sessionServer({ dir, ledger, keep, looks: 3, minutes: 85, checkScript: s => s, compile: async () => compiled(1),
+      look: async (choice, script, at, edit, got) => { seenArgs.push({ kind: choice.kind, at, compiled: got.ok }); if (fail) return { ok: false, error: fail }; paints++; return looked(); } });
+    // the painter fell back to the CPU: nothing is shown, nothing is counted, and the ledger says why
+    const refused = await ask(dir, server, 'look');
+    assert.match(refused, /^NOT PAINTED, no look was counted: the painting did not stay on the GPU/); assert.match(refused, /Looks: 0 of 3 used, 3 left/);
+    assert.ok(!fs.existsSync(path.join(dir, 'looks/1')), 'nothing of a failed painting reaches the folder'); assert.equal(ledgerLooks(ledger).length, 0);
+    assert.ok(fs.readFileSync(ledger, 'utf8').includes('"notPainted"'));
+    // painted: the look is counted, delivered, and kept outside the folder with the choice as it was looked at
+    fail = null; fs.writeFileSync(path.join(dir, 'script.json'), '{"palette": ["ochre"], "passages": [1]}'); put(dir, { kind: 'script', script: 'script.json', why: 'mine' });
+    assert.match(await ask(dir, server, 'look'), /^LOOK 1 of 3 \(own script\), PAINTED small/);
+    assert.deepEqual(seenArgs.at(-1), { kind: 'script', at: { plan: 2, look: 1 }, compiled: true }, 'the look paints the compiled choice');
+    for (const f of ['choice.json', 'script.json', 'beside.png', 'stages.png', 'numbers.txt', 'look.json']) assert.ok(fs.existsSync(path.join(keep, '1', f)), `kept outside the folder: ${f}`);
+    assert.equal(JSON.parse(fs.readFileSync(path.join(keep, '1', 'look.json'), 'utf8')).painted.backend.fallback, false);
+    assert.equal(JSON.parse(fs.readFileSync(path.join(keep, '1', 'script.json'), 'utf8')).passages.length, 1);
+    // the same choice looked at again is a look again, and is not painted again
+    assert.match(await ask(dir, server, 'look'), /^LOOK 2 of 3/); assert.equal(paints, 1);
+    // a changed choice is painted
+    fs.writeFileSync(path.join(dir, 'script.json'), '{"palette": ["ochre"], "passages": [1, 2]}');
+    assert.match(await ask(dir, server, 'look'), /^LOOK 3 of 3/); assert.equal(paints, 2);
+    assert.match(await ask(dir, server, 'look'), /^REFUSED: all 3 looks are used/); assert.equal(paints, 2, 'no painting is started for a look that cannot be had');
+    const rec = await server.stop();
+    assert.deepEqual(rec.looks.map(l => l.look), [1, 2, 3]); assert.equal(rec.looks[0].painted.cells, 543);
+    // the free plan stays compile-only
+    assert.match(await ask(dir, sessionServer({ dir, ledger, keep, look: looked, looks: 3, minutes: 85, checkScript: s => s, compile: async () => compiled(1) }), 'plan'), /^It compiles \(own script\).*Nothing else is shown without a look\./);
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); fs.rmSync(path.dirname(ledger), { recursive: true, force: true }); }
+});
+
+test('the time a look\'s painting takes is not the model\'s own', async () => {
+  const { dir, ledger } = folder({ looks: 2, minutes: 1 }); let clock = 1000;
+  try {
+    const server = sessionServer({ dir, ledger, looks: 2, minutes: 1, now: () => clock, checkScript: s => s, compile: async () => compiled(1), look: async () => { clock += 900000; return looked(); } });
+    assert.match(await ask(dir, server, 'look'), /^LOOK 1 of 2/); assert.equal(server.over(), false, 'fifteen minutes of painting used none of its one minute');
+    const rec = await server.stop(); assert.ok(rec.waitSeconds >= 900); assert.ok(rec.ownSeconds < 5);
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+});
+
 test('the folder is not trusted: no link is followed and no request is echoed', async () => {
   const { dir, ledger } = folder(); const secret = path.join(path.dirname(ledger), 'secret.txt'); fs.writeFileSync(secret, 'SECRET-GEOMETRY');
   try {
-    const server = sessionServer({ dir, ledger, looks: 2, minutes: 85, checkScript: s => s, compile: async () => compiled(1) });
+    const server = sessionServer({ dir, ledger, look: looked, looks: 2, minutes: 85, checkScript: s => s, compile: async () => compiled(1) });
     const answers = () => fs.readdirSync(path.join(dir, '.requests')).filter(f => f.endsWith('.ans')).map(f => fs.readFileSync(path.join(dir, '.requests', f), 'utf8')).join('\n');
     fs.symlinkSync(secret, path.join(dir, '.requests/100-1.req')); fs.writeFileSync(path.join(dir, '.requests/100-2.req'), 'SECRET-IN-A-REQUEST'); fs.writeFileSync(path.join(dir, '.requests/../x.req'), 'look');
     await server.tick();
@@ -110,12 +152,12 @@ test('the folder is not trusted: no link is followed and no request is echoed', 
 test('the model\'s command writes a request and prints its answer, and time spent waiting is not the model\'s own', async () => {
   const { dir, ledger } = folder(); let clock = 0;
   try {
-    const server = sessionServer({ dir, ledger, looks: 2, minutes: 1, now: () => clock, checkScript: s => s, compile: async () => { clock += 600000; return compiled(1); } });
+    const server = sessionServer({ dir, ledger, look: looked, looks: 2, minutes: 1, now: () => clock, checkScript: s => s, compile: async () => { clock += 600000; return compiled(1); } });
     clock = 30000; assert.equal(server.over(), false);
     fs.writeFileSync(path.join(dir, '.requests/1-1.req'), 'plan'); fs.utimesSync(path.join(dir, '.requests/1-1.req'), 1, 1); await server.tick();
     assert.equal(server.ownSeconds(), 30, 'ten minutes in the planner are not counted, and the request\'s own date is not believed'); clock += 31000; assert.equal(server.over(), true);
     await server.stop();
-    const live = sessionServer({ dir, ledger, looks: 2, minutes: 85, checkScript: s => s, compile: async () => compiled(1), everyMs: 50 }); live.start();
+    const live = sessionServer({ dir, ledger, look: looked, looks: 2, minutes: 85, checkScript: s => s, compile: async () => compiled(1), everyMs: 50 }); live.start();
     const out = await new Promise((res, rej) => import('node:child_process').then(cp => cp.execFile(path.join(dir, 'unpaint'), ['status'], { cwd: dir }, (e, so) => (e ? rej(e) : res(so)))));
     await live.stop(); assert.match(out, /Looks: 0 of 2 used/);
     assert.throws(() => execFileSync(path.join(dir, 'unpaint'), ['paint'], { cwd: dir, stdio: 'pipe' }), e => e.status === 2 && /usage: \.\/unpaint/.test(String(e.stdout)));
@@ -198,7 +240,7 @@ test('an edited plan: the free answer says what the edit changes, in counts; the
   try {
     const record = { auto: 20, kept: 17, untouched: 15, changed: 2, moved: 0, merged: 1, mergedFrom: 2, dropped: 1, added: 1, untouchedShare: 0.75, unchanged: false, fields: { colour: 2 }, notes: [] };
     const checkPlan = e => { if (e.of !== 'abc') throw new Error('plan edit: "of" must stay as it was'); return { edit: e, record }; };
-    const server = sessionServer({ dir, ledger, looks: 2, minutes: 85, checkScript: s => s, checkPlan, compile: async (choice, script, n, edit) => { seen = edit; return compiled(1); } });
+    const server = sessionServer({ dir, ledger, look: looked, looks: 2, minutes: 85, checkScript: s => s, checkPlan, compile: async (choice, script, n, edit) => { seen = edit; return compiled(1); } });
     assert.ok(fs.existsSync(path.join(dir, 'auto/plan-to-edit.json')));
     put(dir, { kind: 'plan', plan: 'my-plan.json' });
     assert.match(await ask(dir, server, 'plan'), /^REFUSED, nothing was planned: there is no file my-plan.json/);

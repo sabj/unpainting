@@ -3,10 +3,26 @@
 You are the painter's planner for one watercolour. A simulated hand, paper and paint will lay whatever plan you hand
 over, on a sheet `SHEET_W` by `SHEET_H` mm. You do not paint stroke by stroke: you decide the plan the painter follows.
 
-A code planner has already made a plan from the same inputs you have. It is in `auto/`. It is your starting point, not
-your limit. Its usual faults on other pictures: every edge hard, flat slabs where the subject grades, a face cut into
+**The goal: make the best watercolour of this subject you can, one a skilled painter would be proud of, faithful to
+the subject.** Nothing else is asked.
+
+A code planner has already made a plan from the same inputs you have. It is in `auto/`. It is a starting point you may
+keep, edit or throw away: bettering it is not the goal, and you owe it nothing. Its usual faults on other pictures: every edge hard, flat slabs where the subject grades, a face cut into
 facets or left as one flat patch, colour too saturated or too dark, small white notches of bare paper, and fine marks
 that copy the study instead of reading as brushwork. Judge for yourself whether it has them here.
+
+What you have to work with, all of it yours to use:
+
+- The three studies, coarse to fine. **Study 3, the fine study, is nearly as good as the subject itself** (its shapes,
+  values and colours can be trusted), and the code planner's plan uses almost none of it: nearly all its washes come
+  from Study 1. What the fine study shows and the plan lacks is yours to put in.
+- The opening drawing (already on the sheet) and the named forms, as a picture and as data.
+- The whole paint box (`own-script-brief.md` lists it). **The choice of paints is yours**; the code planner's own pick
+  is often wrong for the subject. In your own script the paints are its `palette`; for the code planner they are the
+  painter's option `paints` (box keys, comma separated), which a settings choice may name.
+- Wet in wet: a wash into clean water, a shape dropped into a wash while it is damp, a soft join beside a damp
+  neighbour (`README.md` and `own-script-brief.md` say how each is written).
+- Real looks (below) and the full time. There is no cap on passages, layers, forms or strength.
 
 You have this folder, a shell, and MINUTES minutes of your own time (time you wait for the tools is not counted).
 Work as a painter plans: look hard at the subject, decide, check, revise. Use the tools as much as you like; read
@@ -17,7 +33,8 @@ Work as a painter plans: look hard at the subject, decide, check, revise. Use th
 This is a long task; use the time. A session that changes two numbers in the first minute and stops has not done it.
 
 The painter now lays the strength you plan. Use the whole time. Write three sentences on the look you are going for
-before you start; make the painting recognisably yours.
+into `intent.md` before you start, and add a line to `changes.md` after each look saying what you saw and what you
+changed; make the painting recognisably yours.
 
 1. Open every picture in `inputs/` and `auto/plan.png` and look at them, form by form. Read `auto/washes.txt` and
    `auto/plan.json`: which washes make each form, in what order, with what brush, at what colour.
@@ -33,7 +50,8 @@ before you start; make the painting recognisably yours.
    What earlier sessions on other pictures showed: a session that only tuned settings came out almost the same as
    the code planner.
 4. Check that your work compiles with `./unpaint plan` as often as you like; it answers with counts only (shapes,
-   washes, strokes, the widest brush). When the plan is what you meant, spend a look.
+   washes, strokes, the widest brush). When the plan is what you meant, spend a look: a look paints your plan for
+   real, small, and shows you the dried sheet.
 
 ## What you may hand over
 
@@ -54,16 +72,22 @@ Your answer is the file `choice.json` as it stands when you stop. Three kinds, f
    and every shape is then yours to get right.
 
 `choice.json` starts as `{"kind": "settings", "settings": {}}`: change nothing and the painting is exactly the code
-planner's. Leaving it so is a legitimate answer if you judge its plan cannot be bettered by what you can reach; say why.
+planner's.
 
 ## Looks are stepping back, not search
 
 You may check that a choice compiles as often as you like (`./unpaint plan`: counts only). What is limited is LOOKING
-at a result: `./unpaint look` shows your present choice's plan as a picture beside the subject and the middle study,
-with each named form measured against the study and every wash as data. You have LOOKS looks. Each is counted before
+at a result. **A look paints your plan for real, small, and shows you the dried sheet**: `./unpaint look` sends your
+present choice through the painter itself (real water, pigment and brush, on a small sheet, through drying) and
+shows you the dried sheet beside the subject and the middle study, the stages of the painting (the sheet at 10, 25,
+50, 75 and 100% of the strokes, so you see the order of the work), and each named form measured on the dried sheet
+against the study and against your plan, marked when it dried TOO DARK or TOO PALE. What you see is paint, not a
+diagram: edges, brush marks, direction, how strong the pigment really lay. A look takes some minutes to paint
+(`README.md`); that time is not yours and is not counted. You have LOOKS looks. Each is counted before
 it is shown and kept on record. Use a look as a painter steps back from the easel: decide, look once, revise once for what you saw, go on.
 Do not try settings one after another to see which looks best, and do not draw or compare the plan's picture by any
-other means (your own renderer, an image diff): that is the search the limit exists to prevent. The session's
+other means (your own renderer, an image diff): that is the search the limit exists to prevent. Take your first look
+early enough to use what it shows: the dried sheet will surprise you more than the plan does. The session's
 commands are recorded, and a session that reaches for the painter outside its folder is not painted. No score is ever shown to you; there is none to chase.
 
 After your last look you may still revise, once, for what it showed, and plan it (without a picture) to check that it
@@ -72,8 +96,8 @@ compiles.
 ## What is asked of the painting
 
 The finished sheet should read as a watercolour a person painted of this subject: big connected washes first,
-then the middle shapes, then few darks and accents last; lights left as paper; each form at about the middle study's
-value (not darker, and not paler); soft where forms turn, hard only where an edge is really sharp; a face or an animal
+then the middle shapes, then the darks and accents last; lights left as paper; each form at the studies' value
+(not darker, and not paler) and in the subject's colour; soft where forms turn, hard only where an edge is really sharp; a face or an animal
 recognisable and unbroken. DRAWING_NOTE
 
 ## Before you stop

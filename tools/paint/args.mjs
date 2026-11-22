@@ -15,7 +15,8 @@ export const USAGE = `usage: npm run paint -- <subject[,subject...]> plan|paint 
                         folder, the code planner's plan as its starting point, uncapped planning and a fixed
                         number of counted looks at its plan; it hands over planner settings or its own script.
                         reply: one read-only reply holding a whole script (the earlier route).
-  --looks N             looks at its plan's picture a session may take before paint (default 4)
+  --looks N             looks a session may take (default 4): each paints its present choice for real, small, on the
+                        GPU and shows it the dried sheet; a look's painting waits for a place among --jobs
   --minutes N           minutes of its own time a session may take; waiting for the tools is not counted (default 85)
   --from <dir>          paint what the sessions of an earlier run handed over (its --out folder), calling no model:
                         plan first, look, then paint the same choices.

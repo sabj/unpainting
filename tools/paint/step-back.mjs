@@ -75,6 +75,23 @@ export function formsTable(study, plan) {
   }).filter(Boolean);
 }
 
+/**
+ * The table of forms of a look that was painted: for each form the study's mean and darks, the plan's, and the DRIED
+ * sheet's. The dried sheet is what is judged against the study, both ways (TOO PALE, TOO DARK; its darks short of the
+ * study's or past them); where the paint dried away from the plan by as much, that is said too (no fault mark: the
+ * plan is not the measure).
+ */
+export function formsTableDried(study, plan, dried) {
+  return study.map(s => {
+    const d = dried.find(x => x.id === s.id), p = plan?.find(x => x.id === s.id) ?? null; if (!d) return null;
+    const dm = Math.round(d.meanL - s.meanL), dd = Math.round(d.darkL - s.darkL), flags = [];
+    if (dm >= MEAN_L_OFF) flags.push(`TOO PALE: paler than the study by ${dm}`); else if (dm <= -MEAN_L_OFF) flags.push(`TOO DARK: darker than the study by ${-dm}`);
+    if (dd >= DARK_L_OFF) flags.push(`TOO PALE IN ITS DARKS: they do not reach the study's (short by ${dd})`); else if (dd <= -DARK_L_OFF) flags.push(`TOO DARK IN ITS DARKS: they pass the study's by ${-dd}`);
+    const off = p ? Math.round(d.meanL - p.meanL) : 0, drift = p && Math.abs(off) >= MEAN_L_OFF ? ` | the paint dried ${Math.abs(off)} ${off > 0 ? 'paler' : 'darker'} than your plan` : '';
+    return `${s.name} (${s.kind}) | study: mean L* ${Math.round(s.meanL)}, darks L* ${Math.round(s.darkL)}${p ? ` | your plan: mean L* ${Math.round(p.meanL)}, darks L* ${Math.round(p.darkL)}` : ''} | DRIED SHEET: mean L* ${Math.round(d.meanL)}, darks L* ${Math.round(d.darkL)}${drift}${flags.length ? ` | !! ${flags.join('; ')}` : ' | close to the study'}`;
+  }).filter(Boolean);
+}
+
 /** The table the author reads: one line a passage, with the faults a number can show said in capitals. */
 export function numbersTable(rows, covered = {}) {
   return rows.map(r => {

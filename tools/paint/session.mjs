@@ -1,14 +1,18 @@
 // A model author as a working session, not one reply. The model gets a folder of its own outside the repository (the
 // locked inputs, the code planner's plan of the subject, the planner's settings, a README of its tools), a shell in
-// that folder, and a budget of its own minutes. It may plan as often as it likes; LOOKING at a plan's picture is
-// counted and capped (bench/v4v5/README.md: looks are stepping back, not search). What it leaves in choice.json is
-// painted (choice.mjs): the code planner tuned, or its own script; nothing changed is exactly the code planner.
+// that folder, and a budget of its own minutes. It may plan as often as it likes; LOOKING is counted and capped
+// (bench/v4v5/README.md: looks are stepping back, not search). A look is a real painting of its present choice: the
+// painter run small on the GPU through drying (look.mjs), shown as the dried sheet beside the source and the middle
+// study, with the stages of the painting and each named form measured on the dried sheet. What it leaves in
+// choice.json is painted (choice.mjs): the code planner tuned, its plan edited, or its own script; nothing changed
+// is exactly the code planner.
 //
 // The model's commands are request files this module answers (./unpaint plan|look|status|wait): the planner itself
 // runs here, outside the model's folder. The boundary: the folder holds the input pictures the code planner gets and
-// the code planner's plan; a plan is RENDERED or MEASURED against the subject only by a counted look. So a free plan
-// call answers with whether it compiled and its counts, nothing else; a look is written into a ledger outside the
-// folder before anything is delivered; the folder is never trusted (no symlink is followed, no request is echoed);
+// the code planner's plan; a plan is PAINTED, RENDERED or MEASURED against the subject only by a counted look. So a
+// free plan call answers with whether it compiled and its counts, nothing else; a look is painted, then written into
+// a ledger outside the folder before anything of it is delivered (a painting that failed or left the GPU delivers
+// nothing and is no look); the folder is never trusted (no symlink is followed, no request is echoed);
 // and the model's shell cannot read the repository, the subject list, the caches or other sessions (seatbelt).
 // What this cannot stop: a model drawing its own script's polygons with its own code. Its commands are kept.
 import fs from 'node:fs';
@@ -19,7 +23,7 @@ import { readChoice, choiceKind, choiceKey } from './choice.mjs';
 import { needsOf } from './author.mjs';
 import { editLine } from '../../src/paint/methods/plan-edit.mjs';
 
-/** Looks at a plan's picture before paint, and minutes of the model's own time, when the command line names neither. */
+/** Looks (each a small real painting of the present choice), and minutes of the model's own time, when the command line names neither. */
 export const DEFAULT_LOOKS = 4, DEFAULT_MINUTES = 85;
 /** Seconds ./unpaint waits before it says "still working". */
 const WAIT_SECONDS = 50;
@@ -114,14 +118,21 @@ export function ledgerLooks(ledger) {
 
 /**
  * The answering side of the session: the one broker. `compile(choice, script, n)` plans a checked choice outside the
- * model's folder and resolves {ok, error, summary, rows, numbersText, picture}; `checkScript(obj)` returns a checked
- * script or throws. `ledger` is a file outside the folder: every request is appended to it, and a look is appended
- * (and synced) BEFORE anything of it is delivered, so a look that fails on the way is still spent, and a server
- * started again for the same run goes on from the count already there. start() begins polling; stop() ends it and
- * returns the record.
+ * model's folder and resolves {ok, error, summary, rows}; `checkScript(obj)` returns a checked script or throws.
+ * `look(choice, script, {plan, look}, edit, compiled)` paints a compiled choice for real, small, outside the folder
+ * and resolves {ok: true, picture (the dried sheet beside the source and the middle study, PNG), stages (the stage
+ * strip, PNG, or null), numbersText, marked, planPicture (the plan's diagram, PNG, or null), painted (what was
+ * painted: cells, seconds, backend)} or {ok: false, error}: a painting that failed, or did not stay on the GPU, shows
+ * nothing and is no look. `ledger` is a file outside the folder: every request is appended to it, and a look is
+ * appended (and synced) once it is painted and BEFORE anything of it is delivered, so a look that fails on the way
+ * to the folder is still spent, and a server started again for the same run goes on from the count already there.
+ * `keep`: a folder outside the model's folder where each look is kept as it was shown (keep/N/: the choice and its
+ * script or edited plan as looked at, the dried sheet, the stages, the numbers). The time a request waits on this
+ * side (the planner, a look's painting) is not the model's own. start() begins polling; stop() ends it and returns
+ * the record.
  */
-export function sessionServer({ dir, looks: most, minutes, compile, checkScript, checkPlan = null, ledger, now = Date.now, everyMs = 400 }) {
-  const t0 = now(), plans = [], cache = new Map(), requests = [], good = new Set(), seen = new Map();
+export function sessionServer({ dir, looks: most, minutes, compile, look: paintLook, keep = null, checkScript, checkPlan = null, ledger, now = Date.now, everyMs = 400 }) {
+  const t0 = now(), plans = [], cache = new Map(), painted = new Map(), requests = [], good = new Set(), seen = new Map();
   let waitMs = 0, busy = false, timer = null, lastGood = null, n = 0, pending = null, lastEnd = t0;
   const note = entry => { const fd = fs.openSync(ledger, 'a'); try { fs.writeSync(fd, JSON.stringify(entry) + '\n'); fs.fsyncSync(fd); } finally { fs.closeSync(fd); } };
   const used = () => ledgerLooks(ledger).length;
@@ -135,7 +146,7 @@ export function sessionServer({ dir, looks: most, minutes, compile, checkScript,
     if (choice.kind === 'script') { const got = safeJson(dir, choice.script); text = got.text; script = checkScript(got.value); }
     // an edited plan is checked against the code planner's plan it must be an edit of: {edit, record (what it changes, counted)}
     if (choice.kind === 'plan') { if (!checkPlan) throw new Error('an edited plan cannot be read in this session'); const got = safeJson(dir, choice.plan); text = got.text; edit = checkPlan(got.value); }
-    return { choice, script, edit, key: choiceKey(choice, text) };
+    return { choice, script, edit, text, key: choiceKey(choice, text) };
   }
 
   async function answer(cmd) {
@@ -153,14 +164,31 @@ export function sessionServer({ dir, looks: most, minutes, compile, checkScript,
     // a free plan answers with whether it compiled and its counts: no picture, no colours, no places
     const edited = p.edit ? ` Your edit: ${editLine(p.edit.record)}.${p.edit.record.notes.map(x => ` Note: ${x}.`).join('')}` : '';
     if (cmd === 'plan') return `It compiles (${what}): ${line}.${edited} Nothing else is shown without a look.\n${left()}`;
-    // the look is spent before it is delivered: whatever happens to the delivery, it stays spent
+    // a look is the choice painted for real, small: the painter runs outside the folder. A painting that fails, or
+    // does not stay on the GPU, shows nothing and is no look. The same choice looked at again is not painted again
+    // (and is a look again).
     const look = used() + 1;
-    note({ look, plan: id, atSeconds, at: new Date(now()).toISOString(), what, kind: p.choice.kind, settings: entry.settings, script: p.choice.script, plan: p.choice.plan ?? null, edit: p.edit?.record ?? null, key: p.key, marked: got.marked ?? null });
+    let seenIt = painted.get(p.key);
+    if (!seenIt) { try { seenIt = await paintLook(p.choice, p.script, { plan: id, look }, p.edit?.edit ?? null, got); } catch (e) { seenIt = { ok: false, error: e.message }; } if (seenIt?.ok) painted.set(p.key, seenIt); }
+    if (!seenIt?.ok) { note({ notPainted: String(seenIt?.error ?? 'no painting').slice(0, 300), plan: id, key: p.key }); return `NOT PAINTED, no look was counted: ${seenIt?.error ?? 'the painter gave no painting'}\nYour choice compiles (${what}): ${line}. Ask for the look again, or go on.\n${left()}`; }
+    // the look is spent before it is delivered: whatever happens to the delivery, it stays spent
+    note({ look, plan: id, atSeconds, at: new Date(now()).toISOString(), what, kind: p.choice.kind, settings: entry.settings, script: p.choice.script, plan: p.choice.plan ?? null, edit: p.edit?.record ?? null, key: p.key, marked: seenIt.marked ?? null, painted: seenIt.painted ?? null });
     entry.look = look;
-    const folder = `looks/${look}`;
-    safeWrite(dir, `${folder}/beside.png`, got.picture); safeWrite(dir, `${folder}/numbers.txt`, got.numbersText);
+    const folder = `looks/${look}`, choiceText = JSON.stringify({ kind: p.choice.kind, settings: entry.settings, script: p.choice.script, plan: p.choice.plan ?? null, why: p.choice.why }, null, 1) + '\n';
+    // kept outside the folder as it was shown, with the choice as it was looked at: what changed between looks is read from here
+    if (keep) {
+      try {
+        const at = path.join(keep, String(look)); fs.mkdirSync(at, { recursive: true });
+        fs.writeFileSync(path.join(at, 'choice.json'), choiceText); if (p.text) fs.writeFileSync(path.join(at, p.choice.kind === 'script' ? 'script.json' : 'plan-edit.json'), p.text);
+        fs.writeFileSync(path.join(at, 'beside.png'), seenIt.picture); if (seenIt.stages) fs.writeFileSync(path.join(at, 'stages.png'), seenIt.stages); fs.writeFileSync(path.join(at, 'numbers.txt'), seenIt.numbersText);
+        fs.writeFileSync(path.join(at, 'look.json'), JSON.stringify({ look, plan: id, atSeconds, what, key: p.key, marked: seenIt.marked ?? null, painted: seenIt.painted ?? null }, null, 1) + '\n');
+      } catch (e) { note({ fault: `look ${look} not kept outside the folder: ${String(e.message).slice(0, 200)}` }); }
+    }
+    safeWrite(dir, `${folder}/beside.png`, seenIt.picture); if (seenIt.stages) safeWrite(dir, `${folder}/stages.png`, seenIt.stages); safeWrite(dir, `${folder}/numbers.txt`, seenIt.numbersText);
+    if (seenIt.planPicture) safeWrite(dir, `${folder}/plan.png`, seenIt.planPicture);
     safeWrite(dir, `${folder}/plan.json`, JSON.stringify({ choice: { kind: p.choice.kind, settings: entry.settings, script: p.choice.script, plan: p.choice.plan ?? null }, summary: got.summary, washes: got.rows }, null, 1) + '\n');
-    return `LOOK ${look} of ${most} (${what}): ${line}.${edited}\nOpen ${folder}/beside.png: your plan, the subject and the middle study, left to right, on the same grid. Read ${folder}/numbers.txt: ${got.marked ? `${got.marked.forms} named forms and ${got.marked.washes} washes are marked !!` : 'the forms and washes'}. ${folder}/plan.json holds every wash as data.\nStep back from it as from the easel; revise once for what you see.\n${left()}`;
+    const m = seenIt.marked;
+    return `LOOK ${look} of ${most} (${what}), PAINTED${seenIt.painted?.cells ? ` small (${seenIt.painted.cells} cells across${seenIt.painted.fullCells ? ` of the final ${seenIt.painted.fullCells}` : ''})` : ''} and dried: ${line}.${edited}\nOpen ${folder}/beside.png: your painting as it dried, the subject and the middle study, left to right, on the same grid.${seenIt.stages ? ` Open ${folder}/stages.png: the subject, then the sheet at 10, 25, 50, 75 and 100% of the strokes (the order of the work).` : ''} Read ${folder}/numbers.txt: each named form on the DRIED sheet against the study and against your plan${m ? `; ${m.forms} named forms are marked !! (too dark or too pale)${m.washes ? ` and ${m.washes} washes` : ''}` : ''}. ${folder}/plan.json holds every wash as data${seenIt.planPicture ? `, ${folder}/plan.png the plan as a diagram` : ''}.\nStep back from it as from the easel; revise once for what you see.\n${left()}`;
   }
 
   async function tick() {
@@ -174,7 +202,7 @@ export function sessionServer({ dir, looks: most, minutes, compile, checkScript,
         const asked = Math.max(lastEnd, seen.get(id)); pending = asked;
         let cmd = 'unreadable', text;
         try { const word = safeRead(dir, `.requests/${f}`).trim(); cmd = ['status', 'plan', 'look'].includes(word) ? word : 'unknown'; } catch { /* a request that is a link, a folder or too large is not read */ }
-        try { text = cmd === 'unknown' || cmd === 'unreadable' ? 'REFUSED: a request is one of status, plan, look, written by ./unpaint.' : await answer(cmd); } catch (e) { text = `the command failed on this side${cmd === 'look' ? '; if a look was counted it stays counted' : ''}. ${left()}`; note({ fault: String(e.message).slice(0, 300), cmd }); }
+        try { text = cmd === 'unknown' || cmd === 'unreadable' ? 'REFUSED: a request is one of status, plan, look, written by ./unpaint.' : await answer(cmd); } catch (e) { text = `the command failed on this side${cmd === 'look' ? '; if a look was counted it stays counted (./unpaint status says)' : ''}. ${left()}`; note({ fault: String(e.message).slice(0, 300), cmd }); }
         try { fs.rmSync(path.join(req, f), { recursive: true, force: true }); safeWrite(dir, `.requests/${id}.ans.tmp`, text + '\n'); fs.renameSync(path.join(req, `${id}.ans.tmp`), path.join(req, `${id}.ans`)); } catch (e) { note({ fault: `answer not delivered: ${String(e.message).slice(0, 200)}`, cmd }); }
         lastEnd = now(); waitMs += lastEnd - asked; pending = null;
         const entry = { cmd, seconds: Math.round((lastEnd - asked) / 1000), answer: text.split('\n')[0].slice(0, 200) }; requests.push(entry); note({ request: cmd, at: new Date(lastEnd).toISOString(), seconds: entry.seconds, answer: entry.answer });
