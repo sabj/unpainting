@@ -8,7 +8,7 @@ import { FORM_READ } from '../../src/paint/methods/form-read.mjs';
 
 const MOST_ASPECT = 0.02;
 /** The settings a study of the wash plan takes after its file, as @name=value. */
-export const STUDY_SETTINGS = Object.freeze(['clusters', 'join', 'shapes', 'formbrush', 'formbase', 'round', 'keep', 'hue', 'lay', 'largest', 'lightest']);
+export const STUDY_SETTINGS = Object.freeze(['clusters', 'join', 'shapes', 'formbrush', 'formbase', 'whites', 'round', 'keep', 'hue', 'lay', 'largest', 'lightest']);
 /** ... and for one named form of the run, as @name#FORM=value (src/paint/methods/form-read.mjs). */
 const FORM_SETTINGS = Object.freeze([...new Set([...FORM_READ.first, ...FORM_READ.later])]);
 
@@ -32,7 +32,7 @@ export async function loadStudies(spec, root, w, h) {
   if (!list.length) throw Error('--washplan: no study named');
   const studies = [];
   for (const item of list) {
-    // "@name=value" after a study sets how it is read: clusters, join, shapes, formbrush, formbase (study-washes.mjs READ), round, keep, hue
+    // "@name=value" after a study sets how it is read: clusters, join, shapes, formbrush, formbase, whites (study-washes.mjs READ), round, keep, hue
     // and "@name#FORM=value" sets it inside one named form of the run (FORM: its number): {forms: {FORM: {name: value}}}
     const [head, ...tune] = item.split('@'), read = {}, forms = {};
     for (const t of tune) {
