@@ -151,7 +151,7 @@ test('a near-monochrome subject: every mix is its own paint, and one cluster of 
 
 // --- named forms (a SAM id map of the source with each form's name and kind) ---
 // the left half of the sheet the ground, the right half sky (kinds with no brush ceiling); a strip at the bottom in no form
-const halves = (w, h) => ({ width: w, height: h, ids: Uint8Array.from({ length: w * h }, (_, i) => (((i / w) | 0) >= 0.9 * h ? 0 : i % w < w / 2 ? 1 : 2)), names: ['the ground', 'the sky'], kinds: ['ground', 'sky'], provenance: { schema: 'named-sam-v1' } });
+const halves = (w, h) => ({ width: w, height: h, ids: Uint8Array.from({ length: w * h }, (_, i) => (((i / w) | 0) >= 0.9 * h ? 0 : i % w < w / 2 ? 1 : 2)), names: ['the ground', 'a wall'], kinds: ['ground', 'building'], provenance: { schema: 'named-sam-v1' } });
 function planWith(st, extra = {}, read = null, minMm2 = null) {
   const log = console.log; console.log = () => {};
   try { return planStudyWashes({ k: pigments.length, w: st.w, h: st.h, studies: [{ rgb: st.rgb, file: 'test', ...(read ? { read } : {}), ...(minMm2 ? { minMm2 } : {}) }], paperRGB: PAPER, pigments, sheetWidthMm: 160, washBrushMm: 5, washKitMm: [38, 25.4, 7, 5], ...extra }); } finally { console.log = log; }
@@ -163,11 +163,11 @@ test('named forms: every wash records the forms it lies in, with their kinds; wi
   assert.deepEqual(JSON.parse(JSON.stringify(planWith(st, { thingMasks: null }).instructions)), JSON.parse(JSON.stringify(plain.instructions)));
   // the same washes and strokes with masks; each also names its forms
   assert.deepEqual(JSON.parse(JSON.stringify(named.instructions.map(({ forms, ...q }) => q))), JSON.parse(JSON.stringify(plain.instructions)));
-  assert.deepEqual(named.summary.namedForms.forms.map(f => [f.id, f.name, f.kind]), [[1, 'the ground', 'ground'], [2, 'the sky', 'sky']]);
+  assert.deepEqual(named.summary.namedForms.forms.map(f => [f.id, f.name, f.kind]), [[1, 'the ground', 'ground'], [2, 'a wall', 'building']]);
   // the under-wash of the wall spans both halves; the window (x 100 to 115 of 160 mm) lies in the sky half only
-  assert.deepEqual(named.instructions[0].forms.map(f => f.kind).sort(), ['ground', 'sky']);
+  assert.deepEqual(named.instructions[0].forms.map(f => f.kind).sort(), ['building', 'ground']);
   const windowWash = named.instructions.find(q => q.forms.length === 1 && q.forms[0].share > 0.95 && q.areaMm2 < 600);
-  assert.equal(windowWash.forms[0].name, 'the sky');
+  assert.equal(windowWash.forms[0].name, 'a wall');
 });
 
 // --- the limits are settings (READ; a wash plan changes one with @name=value after a study) ---
@@ -251,4 +251,19 @@ test('the brush ceiling: inside a face no wash brush is wider than 17 mm; the sk
   // the ceiling is a setting; a form that is not a round kind has none
   assert.ok(inForm(planFace('face', { formbrush: 10 }), 'face').every(q => widest(q) <= 10 + 1e-6));
   assert.ok(Math.max(...inForm(planFace('ground'), 'ground').map(widest)) > 17);
+});
+
+test('a soft named form is begun with one pale base wash laid into clean water; its shapes go over it; none without masks or with @formbase=0', () => {
+  const st = patchStudy(), face = { width: st.w, height: st.h, ids: new Uint8Array(st.w * st.h).fill(1), names: ['a face'], kinds: ['face'] };
+  const p = planWith(st, { thingMasks: face }), base = p.instructions.filter(q => /^base wash of a face/.test(q.thing));
+  assert.equal(base.length, 1); assert.equal(p.summary.formBases, 1);
+  assert.equal(p.instructions[0], base[0], 'laid first');
+  assert.equal(base[0].move, 'wet on wet');
+  assert.ok(base[0].areaMm2 > 0.95 * 120 * 75, `${base[0].areaMm2}`);
+  // no family under-wash inside the form; every other wash in it goes over the base, dry, darker than it
+  assert.ok(p.instructions.every(q => !/under-wash/.test(q.thing)));
+  const L = q => labOf(q.colour, 0, PAPER)[0];
+  assert.ok(p.instructions.slice(1).every(q => q.stage >= 3 && q.move === 'wet on dry' && L(q) < L(base[0]) + 3), p.instructions.map(q => `${q.stage} ${q.thing}`).join(' | '));
+  assert.ok(planWith(st).instructions.every(q => !/base wash/.test(q.thing)));
+  assert.ok(planWith(st, { thingMasks: face }, { formbase: 0 }).instructions.some(q => /under-wash/.test(q.thing)));
 });

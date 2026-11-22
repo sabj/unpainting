@@ -27,6 +27,7 @@ import { monoAt } from './mono-mix.mjs';
 import { touchesFrom } from './touch-layer.mjs';
 import { namedForms, formCoverage } from './named-forms.mjs';
 import { brushCeilingMm, kitUnder } from './form-brush.mjs';
+import { formBases } from './form-base.mjs';
 
 /** The plan's grid cell (mm). */
 const PLAN_MM = 0.25;
@@ -43,8 +44,11 @@ const PLAN_MM = 0.25;
  *   does not grow with the sheet (it was also held to 0.08% of the sheet, 77 mm2 on a 380 mm sheet).
  * formbrush (on the first study; it holds for the plan): the widest wash brush (mm) inside named forms painted with rounds
  *   (form-brush.mjs: a face, an eye, an animal, fur, a figure, hair, clothing). The mop and the flat are for a sky, water,
- *   the ground, a building, a background and paper in no named form. Without named forms it does nothing. */
-export const READ = Object.freeze({ clusters: 16, join: 10, shapes: 160, leastMm2: 6, formbrush: 17 });
+ *   the ground, a building, a background and paper in no named form. Without named forms it does nothing.
+ * formbase (on the first study): 1 begins every soft named form (form-base.mjs: a face, fur, an animal, hair, a figure,
+ *   clothing, a sky, water) with one pale wash over the whole form, laid into clean water so its lanes run together, at
+ *   the form's light value; the study's shapes in the form go over it and no family under-wash is laid there. 0: none. */
+export const READ = Object.freeze({ clusters: 16, join: 10, shapes: 160, leastMm2: 6, formbrush: 17, formbase: 1 });
 const CLUSTERS = READ.clusters, CLUSTER_JOIN = READ.join;
 /** The planted-pattern copy test of this reading (19-20 Nov 2026; no drawing; copied with the spread of the same measure
  * against patterns not planted, and stable against two studies of the clean piece that differ only in seed): */
@@ -605,15 +609,17 @@ export function planStudyWashes({ k, w, h, studies, flat = false, density = null
   // connected under-wash over the whole family and over every shape lying mostly inside it (windows, a gate, foliage on the
   // wall, a small white), reserving only the true lights; the other shapes go over it. Lightest family first.
   const fam = new Int32Array(shapes.length).fill(-1);
-  const roots = flat ? [] : painted.filter(i => parent[i] < 0 && shapes[i].lab[0] >= FIRST_L && share(i) >= FAMILY_LEAST).sort((a, b) => shapes[b].lab[0] - shapes[a].lab[0] || share(b) - share(a));
-  for (const r of roots) for (const q of under(r)) if (fam[q] < 0) fam[q] = r;
+  // the soft named forms begun with one base wash; a shape in one is in no family (the base is its under-wash)
+  const { bases, baseOf } = !flat && !MONO && (R1.formbase ?? READ.formbase) > 0 ? formBases(named, label, shapes, paperMask, cellMm2) : formBases(null, label, shapes, paperMask, cellMm2);
+  const roots = flat ? [] : painted.filter(i => parent[i] < 0 && baseOf[i] < 0 && shapes[i].lab[0] >= FIRST_L && share(i) >= FAMILY_LEAST).sort((a, b) => shapes[b].lab[0] - shapes[a].lab[0] || share(b) - share(a));
+  for (const r of roots) for (const q of under(r)) if (fam[q] < 0 && baseOf[q] < 0) fam[q] = r;
   for (let changed = true, it = 0; changed && it < 8; it++) {
     changed = false;
     shapes.forEach((s, i) => {
-      if (fam[i] >= 0 || isLight(i)) return;
+      if (fam[i] >= 0 || isLight(i) || baseOf[i] >= 0) return;
       const by = new Map(); for (const [o, c] of s.border) if (fam[o] >= 0) by.set(fam[o], (by.get(fam[o]) ?? 0) + c);
       let best = -1, bv = 0; for (const [f, c] of by) if (c > bv) { bv = c; best = f; }
-      if (best >= 0 && bv >= ABSORB_BORDER * s.rim) { for (const q of s.paper ? [i] : under(i)) if (fam[q] < 0) fam[q] = best; changed = true; }
+      if (best >= 0 && bv >= ABSORB_BORDER * s.rim) { for (const q of s.paper ? [i] : under(i)) if (fam[q] < 0 && baseOf[q] < 0) fam[q] = best; changed = true; }
     });
   }
   // a shape's outline: it and the darker shapes nested on it (its wash carried under them), rounded, off the true lights
@@ -632,7 +638,7 @@ export function planStudyWashes({ k, w, h, studies, flat = false, density = null
     }
     return { m: own, parts: partLoops(m, roundMm, paperMask) };
   };
-  const phaseOf = i => { const s = shapes[i]; if (s.lab[0] < DARK_L && share(i) < DARK_SMALL) return 3; return parent[i] < 0 && fam[i] < 0 && s.lab[0] >= FIRST_L ? 1 : 2; };
+  const phaseOf = i => { const s = shapes[i]; if (s.lab[0] < DARK_L && share(i) < DARK_SMALL) return 3; return parent[i] < 0 && fam[i] < 0 && baseOf[i] < 0 && s.lab[0] >= FIRST_L ? 1 : 2; };
   // the session open now: its stage, its shapes, the study shapes in it (a close-valued neighbour may join it while damp)
   let session = null;
   const close = () => { if (session) layer(session.stage, session.list); session = null; };
@@ -641,6 +647,15 @@ export function planStudyWashes({ k, w, h, studies, flat = false, density = null
   const laidL = new Map();
   // the under-washes: each family's cells, run on under any darker neighbour by UNDER_MM (the lighter wash under the
   // darker's edge, so the two never meet at a hairline), never onto a true light or a lighter family's ground
+  // the base washes: each soft form whole, pale, into clean water (the painter wets the form first: 'wet on wet'), so its
+  // lanes run into one wash; the lights stay paper
+  let formBaseCount = 0;
+  for (const b of bases) {
+    const m = new Uint8Array(pn); for (const q of b.cells) m[q] = 1;
+    const parts = partLoops(m, roundFirst, paperMask); if (!parts.length) continue;
+    const made = wash(1, `base wash of ${b.name} [${b.kind}]: one pale wash over the whole form, into clean water`, parts.flat(), shapes[b.light].colour, { own: b.cells, parts, move: 'wet on wet', grade: false });
+    if (made) { layer(1, [made]); formBaseCount++; }
+  }
   for (const r of roots) {
     const s = shapes[r], m = new Uint8Array(pn); for (let q = 0; q < pn; q++) if (fam[label[q]] === r) m[q] = 1;
     const grow = dilate(m, pw, ph, rC(UNDER_MM));
@@ -679,7 +694,7 @@ export function planStudyWashes({ k, w, h, studies, flat = false, density = null
     if (done.has(i)) continue;
     const group = (groupOf.get(i) ?? [i]).filter(j => !done.has(j)); for (const j of group) done.add(j);
     const s = shapes[i], own = group.flatMap(j => shapes[j].cells), phase = phaseOf(i);
-    const over = parent[i] >= 0 || fam[i] >= 0, stage = phase === 1 ? 1 : phase === 3 ? 3 : over ? 3 : 1;
+    const over = parent[i] >= 0 || fam[i] >= 0 || baseOf[i] >= 0, stage = phase === 1 ? 1 : phase === 3 ? 3 : over ? 3 : 1;
     const dark = isDark(i), { m, parts } = outlineOf(group, dark ? Math.min(roundFirst, DARK_ROUND_MM) : roundFirst, dark ? null : s.lab[0]); if (!parts.length) continue;
     const loops = parts.flat();
     const what = `study shape ${group.join(' ')}${parent[i] >= 0 ? ` over ${parent[i]}` : fam[i] >= 0 ? ` over the under-wash of ${fam[i]}` : ''}${kids[i].length ? `, carried under ${kids[i].join(' ')}` : ''}`;
@@ -874,7 +889,7 @@ export function planStudyWashes({ k, w, h, studies, flat = false, density = null
   const sheetLabels = new Int32Array(n); for (let y = 0; y < h; y++) { const py = Math.min(ph - 1, ((y + .5) * ph / h) | 0); for (let x = 0; x < w; x++) sheetLabels[y * w + x] = label[py * pw + Math.min(pw - 1, ((x + .5) * pw / w) | 0)] + 1; }
   const regions = { source: 'block-in study', labels: sheetLabels, regions: shapes.map((s, i) => ({ id: i + 1, colour: s.colour, paper: s.paper, parent: parent[i] >= 0 ? parent[i] + 1 : null, share: +(s.cells.length / pn).toFixed(4) })) };
   const washes = instructions.filter(q => q.stage !== 2).length;
-  const summary = { source: 'study', flat, files: studies.map(st => st.file ?? null), layersOfStudy: perLayer, clusters, shapes: shapes.length, paperShapes: shapes.filter(s => s.paper).length, nested, softJoins, dabbed, stages: byStage.filter(Boolean).length, washesByStage: byStage, mixes: mixes.length, washes, charges: 0, planCellMm: mmX, reservedShare,
+  const summary = { source: 'study', flat, files: studies.map(st => st.file ?? null), layersOfStudy: perLayer, clusters, shapes: shapes.length, paperShapes: shapes.filter(s => s.paper).length, nested, softJoins, dabbed, stages: byStage.filter(Boolean).length, washesByStage: byStage, mixes: mixes.length, washes, formBases: formBaseCount, charges: 0, planCellMm: mmX, reservedShare,
     paintedShare: covered.reduce((a, v) => a + v, 0) / pn, meanWashMm2: areas.reduce((a, v) => a + v, 0) / Math.max(1, areas.length), medianWashMm2: areas.length ? areas[areas.length >> 1] : 0, smallestWashMm2: areas[0] ?? 0, plannedStrokes: strokeCount, drawn, stagesAt, touchLog, glazeLog, ...(named ? { namedForms: { provenance: thingMasks.provenance ?? null, forms: named.forms.map(f => ({ id: f.id, name: f.name, kind: f.kind, share: +(f.cells / pn).toFixed(4) })) } } : {}) };
   console.log(`study washes: the wash plan is read from ${studies.length} block-in ${studies.length > 1 ? 'studies' : 'study'} (${studies.map(st => `${st.file ?? '?'}${st.minMm2 ? ` from ${st.minMm2} mm2` : ''}`).join(', ')}), not from the subject (the subject only registers the studies to the sheet${studies[0].registered ? `: ${studies[0].registered}` : ''} and scores the plate; the palette and the drawing are the painter's own as before)${flat ? '; FLAT: plain fills, for comparison' : ''}`);
   perLayer.forEach((pl, li) => console.log(`study washes, layer ${li + 1}${pl.accent ? ' (accents)' : pl.mode === 'glaze' ? ' (connected glazes)' : ''}: ${pl.study}, shapes from ${pl.minMm2 ?? '-'} mm2, registered by ${pl.shift.join(',')} cells: ${pl.washes} washes, ${pl.strokes} strokes`));
@@ -884,7 +899,7 @@ export function planStudyWashes({ k, w, h, studies, flat = false, density = null
   console.log(`study washes, the ten largest touches: ${[...touchLog].sort((a, b) => b.areaMm2 - a.areaMm2).slice(0, 10).map(fmtT).join('; ')}`);
   console.log(`study washes, the ten darkest marks: ${touchLog.filter(t => !t.wash).sort((a, b) => a.L - b.L).slice(0, 10).map(fmtT).join('; ')}`);
   if (named) console.log(`study washes: named forms on the plan grid: ${named.forms.filter(f => f.cells).map(f => `${f.name} [${f.kind}] ${(100 * f.cells / pn).toFixed(1)}%`).join(', ')}; ${(100 * named.ids.reduce((a, v) => a + (v ? 0 : 1), 0) / pn).toFixed(1)}% in no named form`);
-  console.log(`study washes: ${clusters} colours, ${shapes.length} block-in shapes (${summary.paperShapes} left as paper, ${(100 * reservedShare).toFixed(1)}% of the sheet); ${washes} washes (${byStage[0]} first, ${byStage[2]} over a lighter wash, ${byStage[3]} accents), ${nested} nested, ${softJoins} laid against a damp neighbour, ${dabbed} in dabs, 0 charges, ${glazes} glazes; ${strokeCount} strokes`);
+  console.log(`study washes: ${clusters} colours, ${shapes.length} block-in shapes (${summary.paperShapes} left as paper, ${(100 * reservedShare).toFixed(1)}% of the sheet); ${washes} washes (${byStage[0]} first, ${byStage[2]} over a lighter wash, ${byStage[3]} accents), ${nested} nested, ${softJoins} laid against a damp neighbour, ${formBaseCount} base washes of named forms, ${dabbed} in dabs, 0 charges, ${glazes} glazes; ${strokeCount} strokes`);
   return { opticsReport: null, paper: null, style: null, layers, instructions, protectedCells: null, value: inkValue ?? { values: density ?? new Float32Array(n) }, regions, omittedDemand: 0, lightShapes, summary, mixes, polygons,
     geometry: 'Washes from a stack of block-in studies, coarse to fine: the block-in\'s flat shapes, each one mix, lightest and largest first, a darker shape of like hue laid over its lighter one (wash within wash), close values laid against each other damp, broken masses in dabs, the darkest small shapes last; each richer study adds only where it is darker or stronger than what is laid. Whites left as paper.' };
 }
