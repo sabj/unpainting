@@ -200,6 +200,8 @@ A passage:
   SWELL where the brush presses and THIN where it lifts: a streak may land on the point, swell, drag and flick off at an
   angle; a branch thins as it goes out; a shadow edge presses hard on its found side. A group of many small touches is
   given instead as `region`, `count` and `character`, and the painter scatters them. A form's base wash is always `kind: "wash"`, never strokes.
+  Write strokes in the order a hand would travel: finish one area before the next, neighbours after each other, long
+  strokes before short; the replay is watched.
 - `handling.mark`: name a mark from the vocabulary of real brush marks below. The painter lays each stroke you place
   (where it lands, its direction, length and bend) as that mark: its pressure rising and falling, its speed, its water.
   Use the mark names; choose them as a painter chooses a stroke for a form. A passage that writes its own `pressure`

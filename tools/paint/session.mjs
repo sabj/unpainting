@@ -15,6 +15,7 @@
 // nothing and is no look); the folder is never trusted (no symlink is followed, no request is echoed);
 // and the model's shell cannot read the repository, the subject list, the caches or other sessions (seatbelt).
 // What this cannot stop: a model drawing its own script's polygons with its own code. Its commands are kept.
+import { travelLine } from './hand-travel.mjs';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -177,7 +178,7 @@ export function sessionServer({ dir, looks: asked, minutes, compile, look: paint
     // (the painter's own count of the edit when it applied one: it holds the notes of what was laid the nearest way)
     const er = got.editRecord ?? p.edit?.record ?? null; if (er) entry.edit = er;
     const edited = er ? ` Your edit: ${editLine(er)}.${er.notes.length ? `\n${er.notes.length} note${er.notes.length > 1 ? 's' : ''} on it (each was laid the nearest way that can be; change it if that is not what you want):\n${er.notes.slice(0, 60).map(x => `- ${x}`).join('\n')}\n` : ''}` : '';
-    if (cmd === 'plan') return `It compiles (${what}): ${line}.${edited} Nothing else is shown without a look.\n${left()}`;
+    if (cmd === 'plan') return `It compiles (${what}): ${line}.${travelLine(s.handTravel)}${edited} Nothing else is shown without a look.\n${left()}`;
     // a look is the choice painted for real, small: the painter runs outside the folder. A painting that fails, or
     // does not stay on the GPU, shows nothing and is no look. The same choice looked at again is not painted again
     // (and is a look again).
