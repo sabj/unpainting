@@ -96,7 +96,7 @@ const awareUnsupported = () => [
     [GOUACHE_LIGHTS, 'gouache lights'], [ctx.FRAMER, 'async frame worker'],
 ].filter(([on]) => on).map(([, name]) => name);
 const awareRemaining = from => ctx.layers.slice(from).map((l, k) => ({
-  pass: from + k + 1, value: l.value, pigment: PIGS[l.pigment]?.name ?? l.pigment, order: l._order?.phase ?? null,
+  pass: from + k + 1, value: l.value, pigment: PIGS[l.pigment]?.name ?? l.pigment, order: l._order?.phase ?? null, stage: l.shapes.reduce((a, sh) => Math.max(a, Number(sh._valuePlan?.stage) || 0), 0),
   passages: l.shapes.length, areaShare: +(l.shapes.reduce((a, sh) => a + (sh.area ?? 0), 0) / n).toFixed(4),
   techniques: l.shapes.reduce((a, sh) => { const t = sh._valuePlan ? valueTechnique(sh._valuePlan).name : '?'; a[t] = (a[t] ?? 0) + 1; return a; }, {}) }));
 const awareCounts = () => { let s = 0, p = 0; if (MARKTAPE) for (const m of MARKTAPE) { if (m.k === 's') s++; else if (m.k === 'P') p++; } return { strokes: s, penLines: p }; };

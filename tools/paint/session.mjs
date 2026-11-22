@@ -31,14 +31,16 @@ import { editLine } from '../../src/paint/methods/plan-edit.mjs';
 import { tinyTouchWarning } from './plan-data.mjs';
 import { revertCounter, DEFAULT_REVERTS } from './reverts.mjs';
 import { readSeen, seenAsk } from './seen.mjs';
+import { DEFAULT_LOOK_UNITS, readLookAsk, regionBox, lookCost, costLine } from './look-cost.mjs';
 
 /**
  * The benchmark's resource budget for one try (one model, one subject, one level), when the command line names none:
- * looks (each a small real painting of the present choice) and minutes on the wall clock, looks and planning included.
- * It is set by whoever runs the benchmark, told to the model at the start, and is not a judgment of the work: a
- * session that reaches it is asked to hand in what it has and the run says so. Nothing else caps a session.
+ * rendering, in look units (look-cost.mjs: a full look of the whole plan on the whole sheet costs 1), and minutes on
+ * the wall clock, looks and planning included. It is set by whoever runs the benchmark, told to the model at the
+ * start, and is not a judgment of the work: a session that reaches it is asked to hand in what it has and the run
+ * says so. Nothing else caps a session.
  */
-export const DEFAULT_LOOKS = 100, DEFAULT_WALL_MINUTES = 60;
+export const DEFAULT_LOOKS = DEFAULT_LOOK_UNITS, DEFAULT_WALL_MINUTES = 60;
 /** Minutes a session has to hand in once the wall-clock budget is reached, before its command is ended. */
 export const DEFAULT_GRACE_MINUTES = 10;
 /** Seconds ./unpaint waits before it says "still working". */
@@ -79,12 +81,13 @@ function safeJson(dir, rel) {
 
 /** The model's command: a request file in .requests/, then the wait for its answer. POSIX sh, nothing else needed. */
 export const UNPAINT_SH = `#!/bin/sh
-# ./unpaint status | plan | look | wait      (README.md says what each returns)
+# ./unpaint status | plan | look [--until STAGE] [--region x0,y0,x1,y1 | --region FORM] | cost [the same] | wait
+# (README.md says what each returns)
 d="$(cd "$(dirname "$0")" && pwd)"; r="$d/.requests"
 case "\${1:-}" in
-  status|plan|look) id="$(date +%s)-$$"; printf '%s\\n' "$1" > "$r/$id.tmp" && mv "$r/$id.tmp" "$r/$id.req" && printf '%s\\n' "$id" > "$r/last" ;;
+  status|plan|look|cost) id="$(date +%s)-$$"; printf '%s\\n' "$*" > "$r/$id.tmp" && mv "$r/$id.tmp" "$r/$id.req" && printf '%s\\n' "$id" > "$r/last" ;;
   wait) id="$(cat "$r/last" 2>/dev/null)"; [ -n "$id" ] || { echo "nothing to wait for"; exit 1; } ;;
-  *) echo "usage: ./unpaint status | plan | look | wait"; exit 2 ;;
+  *) echo "usage: ./unpaint status | plan | look [--until STAGE] [--region BOX or FORM] | cost [--until STAGE] [--region BOX or FORM] | wait"; exit 2 ;;
 esac
 i=0
 while [ ! -f "$r/$id.ans" ]; do
@@ -146,7 +149,7 @@ export function ledgerLooks(ledger) {
 /**
  * The answering side of the session: the one broker. `compile(choice, script, n)` plans a checked choice outside the
  * model's folder and resolves {ok, error, summary, rows}; `checkScript(obj)` returns a checked script or throws.
- * `look(choice, script, {plan, look}, edit, compiled)` paints a compiled choice for real, small, outside the folder
+ * `look(choice, script, {plan, look}, edit, compiled, {until, region})` paints a compiled choice for real, small, outside the folder
  * and resolves {ok: true, picture (the dried sheet beside the source and the middle study, PNG), stages (the stage
  * strip, PNG, or null), numbersText, marked, planPicture (the plan's diagram, PNG, or null), painted (what was
  * painted: cells, seconds, backend)} or {ok: false, error}: a painting that failed, or did not stay on the GPU, shows
@@ -157,28 +160,29 @@ export function ledgerLooks(ledger) {
  * script or edited plan as looked at, the dried sheet, the stages, the numbers). The time a request waits on this
  * side (the planner, a look's painting) is not the model's own, and is measured apart. start() begins polling; stop()
  * ends it and returns the record.
- * The budget (`looks`, `wallMinutes`, `graceMinutes`) is the benchmark's, for its machines, the same for every model:
+ * The budget (`looks`: look units of rendering, look-cost.mjs; `wallMinutes`, `graceMinutes`) is the benchmark's, for its machines, the same for every model:
  * the wall clock runs from begin(), looks and planning included. When the looks are used a look is not painted; when
  * the minutes are used no look is painted, a plan still is (so the hand-in can be checked), and every answer asks the
  * session to hand in; `graceMinutes` later over() is true and the command is ended. Nothing else stops a session.
  * `reverts`: returns to an earlier choice allowed (reverts.mjs); `startKey`: the fingerprint of the choice the session
  * starts from. `pictures`: handed pictures that each need a line in seen.md before the first plan (seen.mjs).
  */
-export function sessionServer({ dir, looks: most = DEFAULT_LOOKS, wallMinutes = DEFAULT_WALL_MINUTES, graceMinutes = DEFAULT_GRACE_MINUTES, reverts: revertsMost = DEFAULT_REVERTS, startKey = null, pictures = [], compile, look: paintLook, keep = null, checkScript, checkPlan = null, checkTools = null, ledger, now = Date.now, everyMs = 400 }) {
-  if (!(most >= 1) || !(wallMinutes > 0)) throw new Error('session: the budget is a number of looks (1 or more) and of wall minutes');
-  const ofMost = ` of ${most}`;
+export function sessionServer({ dir, sheet = null, forms = [], looks: most = DEFAULT_LOOKS, wallMinutes = DEFAULT_WALL_MINUTES, graceMinutes = DEFAULT_GRACE_MINUTES, reverts: revertsMost = DEFAULT_REVERTS, startKey = null, pictures = [], compile, look: paintLook, keep = null, checkScript, checkPlan = null, checkTools = null, ledger, now = Date.now, everyMs = 400 }) {
+  if (!(most > 0) || !(wallMinutes > 0)) throw new Error('session: the budget is a number of look units and of wall minutes, each above 0');
   const plans = [], cache = new Map(), painted = new Map(), requests = [], good = new Set(), seen = new Map(), reverts = revertCounter(revertsMost, startKey);
   let t0 = now(), waitMs = 0, busy = false, timer = null, lastGood = null, n = 0, pending = null, lastEnd = t0, reached = null, warningsGiven = 0, described = null;
   const note = entry => { const fd = fs.openSync(ledger, 'a'); try { fs.writeSync(fd, JSON.stringify(entry) + '\n'); fs.fsyncSync(fd); } finally { fs.closeSync(fd); } };
   const used = () => ledgerLooks(ledger).length;
+  // rendering spent, in look units: what each look cost when it was painted (a ledger line without a cost is a full look)
+  const spent = () => +ledgerLooks(ledger).reduce((a, l) => a + (l.cost ?? 1), 0).toFixed(2), unitsLeft = () => +Math.max(0, most - spent()).toFixed(2);
   // the model's own time: the clock less every stretch a request of its was waiting on this side (a stretch counted once)
   const ownSeconds = () => Math.round((now() - t0 - waitMs - (pending == null ? 0 : now() - pending)) / 1000);
   const wallSeconds = () => Math.round((now() - t0) / 1000), wallUp = () => wallSeconds() >= wallMinutes * 60;
   // the budget is reached once, by whichever comes first; it is recorded with when, and said in every answer after
-  const reach = what => { if (!reached) { reached = { what, atWallMinutes: +(wallSeconds() / 60).toFixed(1), looks: used() }; note({ budgetReached: reached }); } };
+  const reach = what => { if (!reached) { reached = { what, atWallMinutes: +(wallSeconds() / 60).toFixed(1), looks: used(), lookUnits: spent() }; note({ budgetReached: reached }); } };
   const HAND_IN = 'Hand in what you have now: leave choice.json as your final choice (./unpaint plan still checks that it compiles), write your last message, and stop.';
   const left = () => { const u = used(), r = reverts.record(); if (wallUp()) reach(`${wallMinutes} minutes of wall time`);
-    return `Budget of this try (the benchmark's, the same for every model): ${Math.round(wallSeconds() / 60)} of ${wallMinutes} minutes used on the clock (looks and planning included; ${Math.round(ownSeconds() / 60)} of them your own work), ${u} of ${most} looks, ${r.count} of ${r.allowed} returns to an earlier choice. Plans made: ${plans.length}.${reached ? `\nTHE BENCHMARK'S RESOURCE BUDGET IS REACHED (${reached.what}). ${HAND_IN}${/wall/.test(reached.what) ? ` The session is ended ${graceMinutes} minutes after the budget was reached.` : ''}` : ''}`; };
+    return `Budget of this try (the benchmark's, the same for every model): ${Math.round(wallSeconds() / 60)} of ${wallMinutes} minutes used on the clock (looks and planning included; ${Math.round(ownSeconds() / 60)} of them your own work), ${spent()} of ${most} look units spent on ${u} look${u === 1 ? '' : 's'}, ${r.count} of ${r.allowed} returns to an earlier choice. Plans made: ${plans.length}.${reached ? `\nTHE BENCHMARK'S RESOURCE BUDGET IS REACHED (${reached.what}). ${HAND_IN}${/wall/.test(reached.what) ? ` The session is ended ${graceMinutes} minutes after the budget was reached.` : ''}` : ''}`; };
   /** The handed pictures each described in seen.md, or the words that ask for it. */
   const seenFault = () => {
     if (!pictures.length || described?.ok) return null;
@@ -209,11 +213,14 @@ export function sessionServer({ dir, looks: most = DEFAULT_LOOKS, wallMinutes = 
     return { choice, script, edit, text, tools, warnings, key: choiceKey(choice, text) };
   }
 
-  async function answer(cmd) {
+  async function answer(cmd, words = []) {
     if (cmd === 'status') return left();
     if (wallUp()) reach(`${wallMinutes} minutes of wall time`);
-    if (cmd === 'look' && used() >= most) reach(`${most} looks`);
-    if (cmd === 'look' && reached) return `NOT PAINTED, no look was counted: the benchmark's resource budget for this try is reached (${reached.what}). This is the benchmark's limit on its machines, not a judgment of your work.\n${left()}`;
+    // what the look is asked of: the whole painting, or stopped after a stage, or a region (look-cost.mjs)
+    const looking = cmd === 'look' || cmd === 'cost'; let ask = { until: null, region: null };
+    if (looking) { try { ask = readLookAsk(words); } catch (e) { return `REFUSED, nothing was painted and nothing was spent: ${e.message}`; } }
+    else if (words.length) return `REFUSED: ./unpaint ${cmd} takes no further words.`;
+    if (cmd === 'look' && reached && /wall/.test(reached.what)) return `NOT PAINTED, no look was counted: the benchmark's resource budget for this try is reached (${reached.what}). This is the benchmark's limit on its machines, not a judgment of your work.\n${left()}`;
     const unseen = seenFault(); if (unseen) return unseen;
     let p; try { p = present(); } catch (e) { return `REFUSED, nothing was planned${cmd === 'look' ? ' and no look was counted' : ''}: ${e.message}`; }
     // a return to a choice the session had left is counted; past the allowed number it is refused (reverts.mjs)
@@ -234,19 +241,33 @@ export function sessionServer({ dir, looks: most = DEFAULT_LOOKS, wallMinutes = 
     const er = got.editRecord ?? p.edit?.record ?? null; if (er) entry.edit = er;
     const editSaid = er ? ` Your edit: ${editLine(er)}.${er.notes.length ? `\n${er.notes.length} note${er.notes.length > 1 ? 's' : ''} on it (each was laid the nearest way that can be; change it if that is not what you want):\n${er.notes.slice(0, 60).map(x => `- ${x}`).join('\n')}\n` : ''}` : '';
     entry.warnings = p.warnings.length ? p.warnings : undefined;
+    // what this look would cost, from the plan as compiled, before anything is painted
+    let cost = null, region = null;
+    if (looking) {
+      try {
+        region = regionBox(ask.region, { sheet: sheet ?? { widthMm: Infinity, heightMm: Infinity }, forms });
+        if (region && p.choice.kind !== 'script') throw new Error('a look of a region is painted for your own script only (its passages are written in millimetres, so those in the box can be painted by themselves); the code planner\'s plan and an edited plan are painted whole, or stopped at a stage with --until');
+      } catch (e) { return `REFUSED, nothing was painted and nothing was spent: ${e.message}`; }
+      cost = lookCost(got.rows ?? [], { until: ask.until, regionShare: region?.share ?? null });
+    }
+    const askKey = `${p.key}:${ask.until ?? ''}:${region ? region.box.join(',') : ''}`, costSaid = cost ? `${cost.cost} unit${cost.cost === 1 ? '' : 's'} (${ask.until != null ? `stopped after stage ${ask.until}: ${cost.strokes} of the plan's ${cost.of} strokes` : `the whole plan, ${cost.of} strokes`}${region ? `; the region ${region.name ? `"${region.name}", ` : ''}${region.box.join(', ')} mm, ${Math.round(100 * region.share)}% of the sheet` : ', the whole sheet'})` : '';
     const edited = `${editSaid}${p.tools ? ` ${p.tools.said}${got.toolFiles?.length ? ` See ${got.toolFiles.map(f => f.rel).join(', ')}.` : ''}` : ''}${warned(p.warnings)}${back.revert ? `\nThis is a return to a choice you had left: ${back.count} of ${revertsMost} allowed.` : ''}`;
     // ... and of the strokes too small for a wet bed, before anything is painted (plan-data.mjs tinyTouchWarning)
     const tiny = tinyTouchWarning(s);
-    if (cmd === 'plan') return `It compiles (${what}): ${line}.${travelLine(s.handTravel)}${edited}${tiny} Nothing else is shown without a look.\n${left()}`;
+    if (cmd === 'plan') return `It compiles (${what}): ${line}.${travelLine(s.handTravel)}${edited}${tiny}${costLine(got.rows ?? [], unitsLeft())} Nothing else is shown without a look.\n${left()}`;
+    if (cmd === 'cost') return `This look would cost ${costSaid}. You have ${unitsLeft()} of ${most} units left. Nothing was painted and nothing was spent.${painted.has(askKey) ? ' (You have already looked at exactly this: looking again renders nothing and costs nothing.)' : ''}\n${left()}`;
+    // the same look of the same choice was rendered already: it is shown again and costs nothing
+    const charge = painted.has(askKey) ? 0 : cost.cost;
+    if (charge > unitsLeft() + 1e-9) { reach(`${most} look units of rendering`); return `NOT PAINTED, nothing was spent: this look costs ${costSaid} and you have ${unitsLeft()} of ${most} units left. This is the benchmark's limit on its machines, not a judgment of your work. A look stopped at an earlier stage (--until) or of a region (--region) costs less; ./unpaint cost says what one would cost.\n${left()}`; }
     // a look is the choice painted for real, small: the painter runs outside the folder. A painting that fails, or
     // does not stay on the GPU, shows nothing and is no look. The same choice looked at again is not painted again
     // (and is a look again).
     const look = used() + 1;
-    let seenIt = painted.get(p.key);
-    if (!seenIt) { try { seenIt = await paintLook(p.choice, p.script, { plan: id, look }, p.edit?.edit ?? null, got); } catch (e) { seenIt = { ok: false, error: e.message }; } if (seenIt?.ok) painted.set(p.key, seenIt); }
+    let seenIt = painted.get(askKey);
+    if (!seenIt) { try { seenIt = await paintLook(p.choice, p.script, { plan: id, look }, p.edit?.edit ?? null, got, { until: ask.until, region }); } catch (e) { seenIt = { ok: false, error: e.message }; } if (seenIt?.ok) painted.set(askKey, seenIt); }
     if (!seenIt?.ok) { note({ notPainted: String(seenIt?.error ?? 'no painting').slice(0, 300), plan: id, key: p.key }); return `NOT PAINTED, no look was counted: ${seenIt?.error ?? 'the painter gave no painting'}\nYour choice compiles (${what}): ${line}. Ask for the look again, or go on.\n${left()}`; }
     // the look is spent before it is delivered: whatever happens to the delivery, it stays spent
-    note({ look, plan: id, atSeconds, at: new Date(now()).toISOString(), what, kind: p.choice.kind, settings: entry.settings, script: p.choice.script, plan: p.choice.plan ?? null, edit: er, tools: p.tools?.record ?? null, key: p.key, marked: seenIt.marked ?? null, painted: seenIt.painted ?? null });
+    note({ look, cost: charge, ask: { until: ask.until, region: region ? { box: region.box, name: region.name, share: +region.share.toFixed(4) } : null }, estimate: cost, plan: id, atSeconds, at: new Date(now()).toISOString(), what, kind: p.choice.kind, settings: entry.settings, script: p.choice.script, plan: p.choice.plan ?? null, edit: er, tools: p.tools?.record ?? null, key: p.key, marked: seenIt.marked ?? null, painted: seenIt.painted ?? null });
     entry.look = look;
     const folder = `looks/${look}`, t = p.choice.tools, choiceText = JSON.stringify({ kind: p.choice.kind, settings: entry.settings, script: p.choice.script, plan: p.choice.plan ?? null, ...(t ? { lines: t.lines ?? undefined, forms: t.forms ?? undefined, perForm: t.perFormGiven ?? undefined, medium: t.medium ?? undefined } : {}), why: p.choice.why }, null, 1) + '\n';
     // kept outside the folder as it was shown, with the choice as it was looked at: what changed between looks is read from here
@@ -263,7 +284,7 @@ export function sessionServer({ dir, looks: most = DEFAULT_LOOKS, wallMinutes = 
     if (seenIt.planPicture) safeWrite(dir, `${folder}/plan.png`, seenIt.planPicture);
     safeWrite(dir, `${folder}/plan.json`, JSON.stringify({ choice: { kind: p.choice.kind, settings: entry.settings, script: p.choice.script, plan: p.choice.plan ?? null }, summary: got.summary, washes: got.rows }, null, 1) + '\n');
     const m = seenIt.marked;
-    return `LOOK ${look}${ofMost} (${what}), PAINTED${seenIt.painted?.cells ? ` small (${seenIt.painted.cells} cells across${seenIt.painted.fullCells ? ` of the final ${seenIt.painted.fullCells}` : ''})` : ''} and dried: ${line}.${edited}\nOpen ${folder}/beside.png: your painting as it dried, the subject and the middle study, left to right, on the same grid.${seenIt.stages ? ` Open ${folder}/stages.png: the subject, then the sheet at 10, 25, 50, 75 and 100% of the strokes (the order of the work).` : ''} Read ${folder}/numbers.txt: each named form on the DRIED sheet against the study and against your plan${m ? `; ${m.forms} named forms are marked !! (too dark or too pale)${m.washes ? ` and ${m.washes} washes` : ''}` : ''}. ${folder}/plan.json holds every wash as data${seenIt.planPicture ? `, ${folder}/plan.png the plan as a diagram` : ''}.\nStep back from it as from the easel, and revise for what you see.\n${left()}`;
+    return `LOOK ${look} (${what}), cost ${charge} unit${charge === 1 ? '' : 's'}${charge ? '' : ' (looked at before: nothing was rendered)'}, ${unitsLeft()} of ${most} left${seenIt.stoppedText ? `. ${seenIt.stoppedText.split('\n')[0]}` : ''}${region ? `. Only the passages in the region were painted (${seenIt.painted?.regionPassages ?? '?'})` : ''}. PAINTED${seenIt.painted?.cells ? ` small (${seenIt.painted.cells} cells across${seenIt.painted.fullCells ? ` of the final ${seenIt.painted.fullCells}` : ''})` : ''} and dried: ${line}.${edited}\nOpen ${folder}/beside.png: your painting as it dried, the subject and the middle study, left to right, on the same grid.${seenIt.stages ? ` Open ${folder}/stages.png: the subject, then the sheet at 10, 25, 50, 75 and 100% of the strokes (the order of the work).` : ''} Read ${folder}/numbers.txt: each named form on the DRIED sheet against the study and against your plan${m ? `; ${m.forms} named forms are marked !! (too dark or too pale)${m.washes ? ` and ${m.washes} washes` : ''}` : ''}. ${folder}/plan.json holds every wash as data${seenIt.planPicture ? `, ${folder}/plan.png the plan as a diagram` : ''}.\nStep back from it as from the easel, and revise for what you see.\n${left()}`;
   }
 
   async function tick() {
@@ -276,8 +297,9 @@ export function sessionServer({ dir, looks: most = DEFAULT_LOOKS, wallMinutes = 
         if (!seen.has(id)) seen.set(id, now());
         const asked = Math.max(lastEnd, seen.get(id)); pending = asked;
         let cmd = 'unreadable', text;
-        try { const word = safeRead(dir, `.requests/${f}`).trim(); cmd = ['status', 'plan', 'look'].includes(word) ? word : 'unknown'; } catch { /* a request that is a link, a folder or too large is not read */ }
-        try { text = cmd === 'unknown' || cmd === 'unreadable' ? 'REFUSED: a request is one of status, plan, look, written by ./unpaint.' : await answer(cmd); } catch (e) { text = `the command failed on this side${cmd === 'look' ? '; if a look was counted it stays counted (./unpaint status says)' : ''}. ${left()}`; note({ fault: String(e.message).slice(0, 300), cmd }); }
+        let words = [];
+        try { const line = safeRead(dir, `.requests/${f}`).trim(), [word, ...rest] = /^[A-Za-z0-9 ,.'_-]{1,300}$/.test(line) ? line.split(/\s+/) : ['']; cmd = ['status', 'plan', 'look', 'cost'].includes(word) ? word : 'unknown'; words = rest; } catch { /* a request that is a link, a folder or too large is not read */ }
+        try { text = cmd === 'unknown' || cmd === 'unreadable' ? 'REFUSED: a request is one of status, plan, look, cost, written by ./unpaint.' : await answer(cmd, words); } catch (e) { text = `the command failed on this side${cmd === 'look' ? '; if a look was counted it stays counted (./unpaint status says)' : ''}. ${left()}`; note({ fault: String(e.message).slice(0, 300), cmd }); }
         try { fs.rmSync(path.join(req, f), { recursive: true, force: true }); safeWrite(dir, `.requests/${id}.ans.tmp`, text + '\n'); fs.renameSync(path.join(req, `${id}.ans.tmp`), path.join(req, `${id}.ans`)); } catch (e) { note({ fault: `answer not delivered: ${String(e.message).slice(0, 200)}`, cmd }); }
         lastEnd = now(); waitMs += lastEnd - asked; pending = null;
         const entry = { cmd, seconds: Math.round((lastEnd - asked) / 1000), answer: text.split('\n')[0].slice(0, 200) }; requests.push(entry); note({ request: cmd, at: new Date(lastEnd).toISOString(), seconds: entry.seconds, answer: entry.answer });
@@ -296,7 +318,7 @@ export function sessionServer({ dir, looks: most = DEFAULT_LOOKS, wallMinutes = 
     async stop() { if (timer) clearInterval(timer); while (busy) await new Promise(r => setTimeout(r, 50));
       // the pictures as described when the session ended (a session that never planned is read here)
       if (pictures.length && !described?.ok) { let text = null; try { text = safeRead(dir, 'seen.md'); } catch { /* none */ } described = readSeen(text, pictures); }
-      return { looks: ledgerLooks(ledger), plans, requests, ownSeconds: ownSeconds(), wallSeconds: wallSeconds(), waitSeconds: Math.round(waitMs / 1000), lastGood, good, budgetReached: reached, reverts: reverts.record(), warningsGiven, pictures: pictures.length ? { handed: pictures, said: described.said, missing: described.missing } : null }; },
+      return { looks: ledgerLooks(ledger), plans, requests, ownSeconds: ownSeconds(), wallSeconds: wallSeconds(), waitSeconds: Math.round(waitMs / 1000), lastGood, good, budgetReached: reached, lookUnits: { spent: spent(), budget: most }, reverts: reverts.record(), warningsGiven, pictures: pictures.length ? { handed: pictures, said: described.said, missing: described.missing } : null }; },
   };
 }
 
@@ -379,7 +401,7 @@ export function sessionCall(author, { prompt, cwd, deny = [], images = [], home 
   throw new Error(`author ${author.key}: a working session needs a shell, and "${author.cli}" is called without one here (claude, codex and agy can)`);
 }
 
-const kindOfCommand = c => { const m = /(?:^|[\s;&|/])unpaint\s+(status|plan|look|wait)\b/.exec(c); return m ? `unpaint ${m[1]}` : 'shell'; };
+const kindOfCommand = c => { const m = /(?:^|[\s;&|/])unpaint\s+(status|plan|look|cost|wait)\b/.exec(c); return m ? `unpaint ${m[1]}` : 'shell'; };
 
 /**
  * A session's transcript read: {text (its last message), tokens, tokensIn, tokensOut (null where the command does not
