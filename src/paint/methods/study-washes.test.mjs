@@ -334,3 +334,16 @@ test('a tinted white AND a form read into colours of its own, in one plan: the w
   const seen = new Set([...told(white.instructions), ...told(form.instructions)].map(String));
   for (const t of told(both.instructions)) assert.ok(seen.has(String(t)), `a wash of neither reading: ${t}`);
 });
+
+test('a re-read white INSIDE a form read into colours of its own takes one of the form\'s colours; the rest of the sheet is as it was (Codex Astra\'s case)', () => {
+  // 40 x 10 cells on 40 mm, grey columns: form 1 holds 100, 130 and a white the richer study shows as 120; outside it, 80
+  const w = 40, h = 10, grey = cols => { const rgb = new Uint8ClampedArray(w * h * 3); for (let i = 0; i < w * h; i++) rgb.fill(cols[Math.floor((i % w) / 10)], i * 3, i * 3 + 3); return rgb; };
+  const masks = { width: w, height: h, ids: Uint8Array.from({ length: w * h }, (_, i) => (i % w < 30 ? 1 : 0)), names: ['a wall'], kinds: ['building'], provenance: { schema: 'named-sam-v1' } };
+  const run = whites => { const log = console.log; console.log = () => {}; try { return planStudyWashes({ k: pigments.length, w, h, studies: [{ rgb: grey([100, 130, 255, 80]), file: 'block-in', minMm2: 1, read: { clusters: 4, join: 1, hue: 0, shapes: 0, formbase: 0, whites }, forms: { 1: { clusters: 2 } } }, { rgb: grey([100, 130, 120, 80]), file: 'middle', read: { lay: 0 } }], paperRGB: [255, 255, 255], pigments, sheetWidthMm: 40, washBrushMm: 1, washKitMm: [5, 1], thingMasks: masks }); } finally { console.log = log; } };
+  const off = run(2), on = run(0.7), colourAt = (p, x) => p.regions.regions[p.regions.labels[5 * w + x] - 1].colour;
+  assert.equal(off.summary.whitesWashedMm2, 0); assert.equal(on.summary.whitesWashedMm2, 100);
+  assert.deepEqual(colourAt(on, 25), [130, 130, 130], 'the re-read cells take a colour of the form\'s own two, not the study\'s');
+  assert.deepEqual(colourAt(on, 15), [130, 130, 130]); assert.deepEqual(colourAt(on, 5), [100, 100, 100]);
+  assert.deepEqual(colourAt(on, 35), [80, 80, 80]); assert.deepEqual(colourAt(off, 35), [80, 80, 80]);
+  assert.ok(on.regions.labels.every(id => id >= 1 && id <= on.regions.regions.length), 'no cell without a shape');
+});
