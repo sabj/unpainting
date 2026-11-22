@@ -24,7 +24,8 @@ const PART_PASS = Object.freeze({ outline: 1, inner: 2, small: 3, fill: 3, hatch
  * The strokes as a hand draws a whole sheet: big forms first, detail last. The drawing's passes in turn over the whole
  * sheet (1 the outlines that place each form, then its inner structure, the small detail, hatching, tone and texture,
  * accents last: a stroke's `pass`, else its `part`), and within a pass the forms from the largest to the smallest (a
- * form is the stroke's `object`, its size the span of all its strokes), each form's strokes in the file's own order.
+ * form is the stroke's `object`, its size the span of all its strokes); while a form is placed its outline comes first
+ * and its long strokes before its short ones, and its shading and texture keep the file's own order.
  * A file ordered form by form finishes one ear with its shading before the head is placed; this never does. Which
  * strokes are laid does not change, only when. Returns a new list.
  */
@@ -36,8 +37,12 @@ export function bigFormsFirst(strokes) {
     box.set(s.object, b);
   }
   const size = o => { const b = box.get(o); return b && b[2] >= b[0] ? Math.hypot(b[2] - b[0], b[3] - b[1]) : 0; };
-  const pass = s => (Number.isFinite(s.pass) ? s.pass : PART_PASS[s.part] ?? 3);
-  return [...strokes].sort((a, b) => pass(a) - pass(b) || size(b.object) - size(a.object) || (a.object ?? 0) - (b.object ?? 0) || a.seq - b.seq);
+  // (the lay-in lines that place the whole subject come before any form's own outline)
+  const pass = s => (s.phase === 'layin' ? 0 : Number.isFinite(s.pass) ? s.pass : PART_PASS[s.part] ?? 3);
+  // while a form is being placed (its outline and inner structure) its long strokes come first, the outline before the
+  // rest; shading and texture keep the file's order, which works across a form patch by patch
+  const placing = s => pass(s) <= 2, lead = s => (placing(s) ? (s.part === 'outline' ? 0 : 1) : 0), long = s => (placing(s) ? -strokeLengthMm(s) : 0);
+  return [...strokes].sort((a, b) => pass(a) - pass(b) || size(b.object) - size(a.object) || (a.object ?? 0) - (b.object ?? 0) || lead(a) - lead(b) || long(a) - long(b) || a.seq - b.seq);
 }
 
 /**

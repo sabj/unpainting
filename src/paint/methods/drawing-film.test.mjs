@@ -48,6 +48,8 @@ test('big forms first: the passes in turn over the whole sheet, the largest form
   const file = [st(0, 7, 1, 50, 6, 'outline'), st(1, 7, 5, 51, 2, 'tone'), st(2, 7, 5, 52, 2, 'tone'), st(3, 2, 1, 0, 28, 'outline'), st(4, 2, 1, 1, 26, 'outline'), st(5, 2, 2, 5, 8, 'inner'), st(6, 2, 5, 6, 3, 'tone'), st(7, 2, 6, 9, 1, 'small')];
   const order = bigFormsFirst(file).map(s => s.seq);
   assert.deepEqual(order, [3, 4, 0, 5, 6, 1, 2, 7], 'head outline, ear outline, head features, the tones (head first), the accent last');
+  // in a form's outline the long stroke comes before the short, whatever the file's order; lay-in lines come before all
+  assert.deepEqual(bigFormsFirst([st(0, 2, 1, 0, 5, 'outline'), st(1, 2, 1, 0, 30, 'outline'), st(2, 2, 1, 0, 40, 'inner'), { ...st(3, 9, 3, 0, 4, 'small'), phase: 'layin' }]).map(s => s.seq), [3, 1, 0, 2]);
   assert.equal(file[0].seq, 0, 'the list given is not reordered');
   // without passes the part of the drawing says which pass; with neither, the file's order stands
   assert.deepEqual(bigFormsFirst(file.map(({ pass, ...s }) => s)).map(s => s.seq), [3, 4, 0, 5, 7, 6, 1, 2]);
