@@ -492,7 +492,7 @@ for (let L = L_START; L < ctx.layers.length; L++) {
   // a wash plan's zigzag (laneFill) counts as the lanes it lays, each a pass over the cells it covers (zigzag-lanes.mjs)
   // a passage of separate marks is counted at the width each mark is pressed to (its planned footprint), not at the
   // brush's full width: a tapered touch counted at full width read as 1.5 to 2 marks deep and was charged half
-  const coverPaths = vectorPaths ? (isMarkPassage(sh) ? paths.map(pts => pts.map(q => ({ ...q, r: Math.max(0.5, pressedRadius(q.r, q.p)) }))) : paths.flatMap(lanesOfPath).map(sweptPath)) : paths;
+  const coverPaths = vectorPaths ? (isMarkPassage(sh) ? paths.map(pts => pts.map(q => ({ ...q, r: Math.max(0.5, pressedRadius(q.r, q.p)) }))).map(sweptPath) : paths.flatMap(lanesOfPath).map(sweptPath)) : paths;
   const coverStarted = performance.now(), SHARE = num('gradedshare', 0.6), UNDER = useGradedCal && !detail && SHARE > 0 ? sweepCount(coverPaths, W2, H2) : null;
   SPEED_PROFILE?.add('painting:sweep-count', performance.now() - coverStarted);
   let cachedCover;

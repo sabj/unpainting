@@ -36,3 +36,11 @@ test('a swatch is read at its core: a narrow track at full film reads full, with
   const r = readMark(th, mask, 0.3);
   assert.ok(Math.abs(r.delivered - 1) < 1e-6); assert.ok(Math.abs(r.whole - 0.6) < 1e-6); assert.ok(Math.abs(r.coverage - 0.6) < 1e-6); assert.ok(Math.abs(r.covered - 1) < 1e-6, 'where the paint lies it is the full film');
 });
+
+test('a mass is tried as a mass: copies stepped over one another about as deep as the passage\'s marks, keyed apart from lone marks', () => {
+  const lone = representativeMark([touch(0, 0, 8, 1.5)]), mass = { ...lone, depth: 3.1 };
+  const L = markLayout(mass, 0.23);
+  assert.ok(L.copies >= 4, `${L.copies} copies`); assert.ok(L.cover > 2 && L.cover < 4, `cover ${L.cover}`);
+  assert.ok(Math.abs(markLayout({ ...lone, depth: 1.1 }, 0.23).cover - 1) < 0.05, 'marks apart do not overlap');
+  assert.notEqual(markKey(lone), markKey(mass)); assert.equal(markKey({ ...lone, depth: 1.1 }), markKey(lone));
+});
