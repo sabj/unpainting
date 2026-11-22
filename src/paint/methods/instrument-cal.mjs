@@ -33,9 +33,9 @@ export const chargedFromOwnSwatch = (T, { instrumentOn, authored }) => Boolean(i
  *   swatch's { all, escape, edge }, or null when no graded swatch is laid); measure: lays a swatch for a technique
  *   and returns the same reading.
  */
-export function createInstrumentCal({ stock, measure, measureMark = null, markKey = null, log = () => {} }) {
+export function createInstrumentCal({ stock, measure, measureMark = null, markKey = null, measureDamp = null, log = () => {} }) {
   const stockKey = new Map(Object.entries(stock).map(([name, s]) => [name, instrumentKey(s.technique)]));
-  const own = new Map(), marks = new Map();
+  const own = new Map(), marks = new Map(), damps = new Map();
   const check = (key, r) => {
     if (!r || !(r.cal > 0) || !Number.isFinite(r.cal)) throw new Error(`instrument calibration: the swatch for ${key} gave no charge factor`);
     return { cal: r.cal, graded: r.graded ?? null };
@@ -63,9 +63,26 @@ export function createInstrumentCal({ stock, measure, measureMark = null, markKe
         const r = measureMark(T, mark);
         if (!r || !(r.cal > 0) || !Number.isFinite(r.cal)) throw new Error(`instrument calibration: the mark swatch for ${key} gave no charge factor`);
         marks.set(key, r);
-        log(`  ${T.name} mark, brush ${(2 * mark.radiusMm).toFixed(1)} mm, ${mark.lengthMm.toFixed(1)} mm long, pressure ${mark.pressure.toFixed(2)}, ${(mark.depth ?? 1) >= 1.25 ? `${mark.depth.toFixed(1)} deep in a mass` : 'apart'}: its own swatch charges ${r.cal.toFixed(2)}x (where its paint lies it delivers ${(r.covered ?? r.whole).toFixed(2)}, over its whole planned footprint ${r.whole.toFixed(2)}; the paint covers ${(100 * r.coverage).toFixed(0)}% of the planned footprint)`);
+        log(`  ${T.name} mark, brush ${(2 * mark.radiusMm).toFixed(1)} mm, ${mark.lengthMm.toFixed(1)} mm long, pressure ${mark.pressure.toFixed(2)}, ${(mark.depth ?? 1) >= 1.25 ? `${mark.depth.toFixed(1)} deep in a mass` : 'apart'}${mark.damp ? `, laid into a damp wash (it takes up ${(100 * r.lift).toFixed(0)}% of the wash under it)` : ''}: its own swatch charges ${r.cal.toFixed(2)}x (where its paint lies it delivers ${(r.covered ?? r.whole).toFixed(2)}, over its whole planned footprint ${r.whole.toFixed(2)}; the paint covers ${(100 * r.coverage).toFixed(0)}% of the planned footprint)`);
       }
       return { ...marks.get(key), graded: null, key, stock: false };
+    },
+    /**
+     * The swatch reading for a painting script's wash laid into paint still wet from its own sitting (damp-swatch.mjs):
+     * the passage's technique laid in lanes over a wash that has just lost its shine. { delivered, lift, cal }: what it
+     * laid of its own charge, the share of the wash its brush took up, and the factor over a wash as strong as itself;
+     * the caller reckons each passage's own factor from the wash that lies under it. No graded reading.
+     */
+    ofDamp(T) {
+      if (!measureDamp) throw new Error('instrument calibration: no damp swatch can be laid here');
+      const key = `${instrumentKey(T)}|damp`;
+      if (!damps.has(key)) {
+        const r = measureDamp(T);
+        if (!r || !(r.cal > 0) || !Number.isFinite(r.cal)) throw new Error(`instrument calibration: the damp swatch for ${key} gave no charge factor`);
+        damps.set(key, r);
+        log(`  ${T.name} (water ${T.water}, ${T.passes} pass${T.passes > 1 ? 'es' : ''}) laid into a damp wash delivers ${r.delivered.toFixed(2)} of its charge and takes up ${(100 * r.lift).toFixed(0)}% of the wash, so over a wash as strong as itself it is charged ${r.cal.toFixed(2)}x (on dry paper ${r.dry.toFixed(2)}x)`);
+      }
+      return { ...damps.get(key), graded: null, key, stock: false };
     },
     /** The mark swatches laid, for a report. */
     markEntries: () => [...marks].map(([key, r]) => [key, { ...r }]),

@@ -33,7 +33,7 @@ export function representativeMark(strokes) {
 /** A mark's key for a kept reading: brush width to half a millimetre, length to a step of a third, pressure to 0.2. */
 export function markKey(mark) {
   const step = (v, by) => Math.round(v / by) * by;
-  return `mark|r${step(mark.radiusMm, 0.25).toFixed(2)}|l${(1.33 ** Math.round(Math.log(Math.max(0.2, mark.lengthMm)) / Math.log(1.33))).toFixed(1)}|p${step(mark.pressure, 0.2).toFixed(1)}|d${swatchDepth(mark.depth).toFixed(1)}`;
+  return `mark|r${step(mark.radiusMm, 0.25).toFixed(2)}|l${(1.33 ** Math.round(Math.log(Math.max(0.2, mark.lengthMm)) / Math.log(1.33))).toFixed(1)}|p${step(mark.pressure, 0.2).toFixed(1)}|d${swatchDepth(mark.depth).toFixed(1)}${mark.damp ? '|damp' : ''}`;
 }
 /** How deep a passage's marks overlap, as its swatch is laid: apart (1) under 1.25, else to the nearest half, at most 4. */
 const swatchDepth = depth => (!(depth >= 1.25) ? 1 : Math.min(4, Math.round(depth * 2) / 2));
@@ -92,10 +92,12 @@ export function markLayout(mark, sheetMm) {
  * least a quarter of the core's film), and the mean film over those covered cells, over want. The caller charges a passage so its
  * planned footprint holds the planned paint, reckoning the footprint as no less covered than a floor (tools/plate/sheet.mjs).
  */
-export function markDelivery(T, { mask, paths, pigment, physics, paperOptions, charge, upright, water, paintBrush, dip, stroke, step, dry, prepareBed = null, settle = null }) {
+export function markDelivery(T, { mask, paths, pigment, physics, paperOptions, charge, upright, water, paintBrush, dip, stroke, step, dry, prepareBed = null, settle = null, scrap: given = null, channel = 0 }) {
   if (!Number.isInteger(T.passes) || T.passes < 1) throw new RangeError(`mark swatch: ${T.name} needs a whole number of passes, got ${T.passes}`);
   const { width: SW, height: SH, want } = SWATCH;
-  const scrap = createSheet(makePaper(SW, SH, paperOptions), [pigment]);
+  // `scrap`: a scrap already holding a damp wash (damp-swatch.mjs); the mark's paint goes into its pigment `channel` and is read there
+  const scrap = given ?? createSheet(makePaper(SW, SH, paperOptions), [pigment]);
+  const conc = new Array(scrap.K).fill(0); conc[channel] = charge;
   for (const pts of paths) {
     const r = Math.max(0.5, ...pts.map(p => p.r));
     if (T.intoWet) {
@@ -105,12 +107,12 @@ export function markDelivery(T, { mask, paths, pigment, physics, paperOptions, c
       if (settle) { const cells = []; for (let i = 0; i < scrap.W.length; i++) if (scrap.W[i] > before[i]) cells.push(i); if (cells.length) settle(scrap, cells); }
     }
     const b = paintBrush(r, T);
-    dip(b, { water: water(T), conc: [charge] });
+    dip(b, { water: water(T), conc });
     for (let q = 0; q < T.passes; q++) stroke(b, scrap, pts, { upright, between: st => { if (st % 24 === 0) step(scrap, physics); } });
   }
   for (let q = 0; q < 60; q++) step(scrap, physics);
   dry(scrap, 20000, physics, { levelMax: 400, dt: 4 });
-  return readMark(thickness(scrap)[0], mask, want);
+  return readMark(thickness(scrap)[channel], mask, want);
 }
 
 /** A dried mark swatch read over its planned footprint: see markDelivery. */

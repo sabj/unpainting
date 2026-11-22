@@ -144,3 +144,16 @@ test('a stroke off the sheet is reported with its passage; a wet stroke too smal
   assert.equal(main.move, 'wet on wet'); assert.equal(main.strokes.length, 1);
   assert.ok(!p.instructions.some(q => q.script.passage === 'gone'));
 });
+
+test('each passage says how much of its sitting\'s wet paint already lies under it; a new sitting starts from none', () => {
+  const half = [[10, 10], [35, 10], [35, 50], [10, 50]];
+  const into = { ...wall, paper: undefined, id: 'p2', what: 'a darker turn', region: half, into: 'p1', wait: 'damp', paint: { pigments: { umber: 1 }, dilution: 'medium' } };
+  const later = { ...wall, id: 'p3', what: 'a glaze, once dry', stage: 3, paint: { pigments: { ultramarine: 1 }, dilution: 'pale' } };
+  const r = plan(script([{ ...wall, paper: 'wet' }, into, later]));
+  const by = Object.fromEntries(r.instructions.map(q => [q.script.passage, q]));
+  assert.equal(by.p1.script.underShare, 0); assert.equal(by.p1.script.underFilm, 0);
+  assert.equal(by.p2.move, 'beside damp');
+  assert.ok(by.p2.script.underShare > 0.8, `p2 lies in p1: ${by.p2.script.underShare}`);
+  assert.ok(by.p2.script.underFilm > 0, 'the film of p1 under it');
+  assert.equal(by.p3.script.underShare, 0, 'p1 and p2 have dried under the glaze');
+});

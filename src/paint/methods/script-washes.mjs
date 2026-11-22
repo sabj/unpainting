@@ -224,6 +224,8 @@ export function planScriptWashes({ script: given, k, w, h, pigments, paperRGB = 
   // a mix of the script's pigments, at the strength whose film on white paper reaches the swatch's lightness
   const mixOf = paint => scriptMix(paint, pigments);
   const laid = Array.from({ length: k }, () => new Float32Array(n)), labels = new Int32Array(n);
+  // the paint of the wet session now open, by cell (all pigments together): what a passage of this session is laid into
+  const wetLaid = new Float32Array(n);
   const layers = [], instructions = [], mixes = [], polygons = [], checks = [];
   let session = null, strokeCount = 0, charges = 0, label = 0;
   const dropped = [], laidDry = [], after = [];
@@ -242,7 +244,7 @@ export function planScriptWashes({ script: given, k, w, h, pigments, paperRGB = 
     for (const s of list) s.mix.forEach((v, j) => { mix[j] += v * s.area / area; });
     const t = mix.reduce((a, v) => a + v, 0) || 1, first = list[0]._valuePlan;
     layers.push({ value: session.stage, pigment: mix.indexOf(Math.max(...mix)), mixId: first.mixId, shapes: list, mix: mix.map(v => v / t), amount: list.reduce((a, s) => a + s.amount * s.area, 0) / area, area, _order: { phase: session.stage <= 2 ? 'ground' : session.stage === 3 ? 'mid' : 'dark', region: 0, shoot: true }, _valuePhase: first.phase, _script: session.ids });
-    session = null;
+    session = null; wetLaid.fill(0);
   };
   // one wash of the plan: its strokes, its mix, its move; the cells its strokes touch are its passage (for the ledger and
   // the wet and dry checks, never a clip)
@@ -265,7 +267,11 @@ export function planScriptWashes({ script: given, k, w, h, pigments, paperRGB = 
     const ids = footprint(strokes, w, h, cellMm), box = { x0: w, y0: h, x1: -1, y1: -1 }; let area = 0;
     for (let i = 0; i < n; i++) if (ids[i]) { area++; const x = i % w, y = (i / w) | 0; if (x < box.x0) box.x0 = x; if (x > box.x1) box.x1 = x; if (y < box.y0) box.y0 = y; if (y > box.y1) box.y1 = y; }
     const strength = mix.reduce((a, v) => a + v, 0), mixId = mixes.length; mixes.push({ mix: mix.map(v => v / strength), strength, stage });
-    label++; for (let i = 0; i < n; i++) if (ids[i]) { labels[i] = label; for (let j = 0; j < k; j++) laid[j][i] += mix[j]; }
+    // what of this session's paint, still wet, already lies under the passage: the share of its cells that hold some,
+    // and the film there (damp-swatch.mjs charges a passage laid into wet paint by them)
+    let underCells = 0, underSum = 0; for (let i = 0; i < n; i++) if (ids[i] && wetLaid[i] > 0) { underCells++; underSum += wetLaid[i]; }
+    const under = { share: +(underCells / area).toFixed(3), film: underCells ? +(underSum / underCells).toFixed(4) : 0 };
+    label++; for (let i = 0; i < n; i++) if (ids[i]) { labels[i] = label; wetLaid[i] += strength; for (let j = 0; j < k; j++) laid[j][i] += mix[j]; }
     const sh = passage(ids, 1, box, strength, area, w); sh.mix = [...mix]; sh.graded = null; sh._follow = true; sh.firstWash = stage <= 2; sh._opening = 1; sh.dryAfter = true;
     const phase = how.phase ?? PHASE[stage], wet = how.move !== 'wet on dry' && how.move !== 'dry on dry';
     const areaMm2 = area * cellMm * cellMm;
@@ -276,7 +282,7 @@ export function planScriptWashes({ script: given, k, w, h, pigments, paperRGB = 
       resolution: { question: 'wash', minimumWashBodyCells: 4, estimatedSupportWidthCells: 0, estimateMethod: 'script', mmPerCell: cellMm },
       layer: stage, break: null, load: { water: how.water, pigment: 'the mix at its strength; calibrated delivery', reload: 'existing finite instrument route' },
       edges: { hardCells: [], softCells: [], policy: p.edges ?? 'mixed' }, outline: [], strokes, softEdges: [], depthMm: 0, uncoveredShare: 0, widestBrushMm: Math.max(...strokes.map(st => 2 * st.radiusMm)),
-      protectedLights: p.leave ? [p.leave] : [], failureSigns: 'Lost lights, muddy overlaps, stripes.', stop: 'after the passage', script: { passage: p.id, kind: p.kind, paper: p.paper ?? 'dry', into: p.into ?? null, wait: p.wait ?? null, glaze: p.glaze ?? null, handling: p.handling ?? null } };
+      protectedLights: p.leave ? [p.leave] : [], failureSigns: 'Lost lights, muddy overlaps, stripes.', stop: 'after the passage', script: { passage: p.id, kind: p.kind, paper: p.paper ?? 'dry', into: p.into ?? null, wait: p.wait ?? null, underShare: under.share, underFilm: under.film, glaze: p.glaze ?? null, handling: p.handling ?? null } };
     sh._valuePlan = intent; instructions.push({ ...intent, area, plannedPigmentMass: strength * area });
     polygons.push({ stage, thing: what, kind, colour: null, loops: (charge ? [] : regionsOf(p)).map(P => ({ points: P })) });
     strokeCount += strokes.length;

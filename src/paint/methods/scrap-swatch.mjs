@@ -53,10 +53,13 @@ export function swatchLanes(radius, { overlap = 1 / 3 } = {}) {
  *   over want; all: the whole scrap's pigment over the swatch's cells, over want; escape: the share that ran past the
  *   swatch; edge: the swatch's open-edge share.
  */
-export function scrapDelivery(T, { mask, paths, bedPaths = null, pigment, physics, paperOptions, charge, upright, water, paintBrush, waterBrush, dip, stroke, step, dry, settle = null, prepareBed = null }) {
+export function scrapDelivery(T, { mask, paths, bedPaths = null, pigment, physics, paperOptions, charge, upright, water, paintBrush, waterBrush, dip, stroke, step, dry, settle = null, prepareBed = null, scrap: given = null, channel = 0, finish = true }) {
   if (!Number.isInteger(T.passes) || T.passes < 1) throw new RangeError(`scrap swatch: ${T.name} needs a whole number of passes, got ${T.passes}`);
   const { width: SW, height: SH, want } = SWATCH, SN = SW * SH;
-  const scrap = createSheet(makePaper(SW, SH, paperOptions), [pigment]);
+  // `scrap`: a scrap already made and painted on (damp-swatch.mjs lays a wash on it first); this technique's paint goes
+  // into its pigment `channel` and is read there. `finish` false lays the technique and leaves the scrap wet, unread.
+  const scrap = given ?? createSheet(makePaper(SW, SH, paperOptions), [pigment]);
+  const concOf = c => { const v = new Array(scrap.K).fill(0); v[channel] = c; return v; };
   // bedPaths: a passage laid in lanes into wet has its whole bed wetted first and is charged lane by lane after the wait
   if (T.intoWet && bedPaths) {
     const before = settle ? Float32Array.from(scrap.W) : null, cells = new Set();
@@ -64,7 +67,7 @@ export function scrapDelivery(T, { mask, paths, bedPaths = null, pigment, physic
       const r = Math.max(1, ...pts.map(p => p.r)), lane = laneCells(pts, r, SW, SH);
       for (const i of lane) cells.add(i);
       if (prepareBed) prepareBed(scrap, pts, r, T, lane);
-      else { const wetB = waterBrush(r); dip(wetB, { water: 1, conc: [0] }); stroke(wetB, scrap, pts, { upright }); }
+      else { const wetB = waterBrush(r); dip(wetB, { water: 1, conc: concOf(0) }); stroke(wetB, scrap, pts, { upright }); }
     }
     if (settle) settle(scrap, wettedCells(scrap, before, [...cells]));
   }
@@ -73,23 +76,24 @@ export function scrapDelivery(T, { mask, paths, bedPaths = null, pigment, physic
     if (T.intoWet && !bedPaths) {
       const before = settle ? Float32Array.from(scrap.W) : null;
       if (prepareBed) prepareBed(scrap, pts, r, T, laneCells(pts, r, SW, SH));
-      else { const wetB = waterBrush(r); dip(wetB, { water: 1, conc: [0] }); stroke(wetB, scrap, pts, { upright }); }
+      else { const wetB = waterBrush(r); dip(wetB, { water: 1, conc: concOf(0) }); stroke(wetB, scrap, pts, { upright }); }
       // the lane is charged when the sheet would charge it: after the same wait for the shine to go off, read over the
       // cells the water brush wetted
       if (settle) settle(scrap, wettedCells(scrap, before, laneCells(pts, r, SW, SH)));
     }
     const b = paintBrush(r, T);
-    dip(b, { water: water(T), conc: [charge] });
+    dip(b, { water: water(T), conc: concOf(charge) });
     if (T.chunk) {
       // the water moves on the same clock as an unbroken sweep: counted across the chunks, not restarted in each
       let st = 0;
-      for (let q = 0; q < T.passes; q++) for (let k = 0; k < pts.length; k += T.chunk) { dip(b, { water: water(T), conc: [charge] }); stroke(b, scrap, pts.slice(Math.max(0, k - 1), k + T.chunk + 1), { upright, between: () => { if (++st % 24 === 0) step(scrap, physics); } }); }
+      for (let q = 0; q < T.passes; q++) for (let k = 0; k < pts.length; k += T.chunk) { dip(b, { water: water(T), conc: concOf(charge) }); stroke(b, scrap, pts.slice(Math.max(0, k - 1), k + T.chunk + 1), { upright, between: () => { if (++st % 24 === 0) step(scrap, physics); } }); }
     } else
     for (let q = 0; q < T.passes; q++) stroke(b, scrap, pts, { upright, between: st => { if (st % 24 === 0) step(scrap, physics); } });
   }
+  if (!finish) return null;
   for (let q = 0; q < 60; q++) step(scrap, physics);
   dry(scrap, 20000, physics, { levelMax: 400, dt: 4 });
-  const th = thickness(scrap)[0];
+  const th = thickness(scrap)[channel];
   let got = 0, all = 0, c = 0; for (let i = 0; i < SN; i++) { all += th[i]; if (mask[i]) { got += th[i]; c++; } }
   return { delivered: c ? got / c / want : 1, all: c ? all / c / want : 1, escape: all > 1e-9 ? 1 - got / all : 0, edge: openEdgeShare(mask, SW, SH) };
 }

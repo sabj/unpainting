@@ -542,9 +542,13 @@ for (let L = L_START; L < ctx.layers.length; L++) {
     // larger, not thinner. Spread over the paper past the study's cells, marks dried 30 to 45 L* pale and four glazes
     // planned to L* 31 left a window at L* 63 to 79.
     // a passage of separate marks is charged from a swatch of its own mark, laid as deep as its marks overlap (mark-swatch.mjs)
+    const dampNote = c => (c.damp ? `, laid into wet paint ${c.under.toFixed(2)} times its own film (on dry paper ${c.dry.toFixed(2)}x${c.limited ? '; HELD TO THE MOST A DAMP BED MAY RAISE IT' : ''})` : '');
     if (isMarkPassage(sh)) {
-      if (!sh._markCal) { sh._markCal = instrumentOf(T, sh); console.log(`mark passage ${sh._valuePlan.script?.passage ?? sh._valuePlan.id}: ${paths.length} marks, ${sh._cover.toFixed(2)} deep over their footprint, charged ${sh._markCal.cal.toFixed(2)}x from their own swatch (a wash lane: ${ICAL.cal.toFixed(2)}x)`); }
+      if (!sh._markCal) { sh._markCal = instrumentOf(T, sh); console.log(`mark passage ${sh._valuePlan.script?.passage ?? sh._valuePlan.id}: ${paths.length} marks, ${sh._cover.toFixed(2)} deep over their footprint, charged ${sh._markCal.cal.toFixed(2)}x from their own swatch${dampNote(sh._markCal)} (a wash lane on dry paper: ${ICAL.cal.toFixed(2)}x)`); }
       CHARGE_CAL = sh._markCal.cal;
+    } else if (ICAL.damp && !sh._dampSaid) {
+      // a script's wash laid into wet paint is charged from a swatch laid over a damp wash (damp-swatch.mjs): ICAL above
+      sh._dampSaid = true; console.log(`damp passage ${sh._valuePlan.script.passage}${sh._valuePlan.kind === 'charge' ? ' (charge)' : ''}: ${paths.length} strokes, charged ${ICAL.cal.toFixed(2)}x from a swatch laid into a damp wash${dampNote(ICAL)}`);
     }
     if (sh._spread == null) sh._spread = detail || brush.model !== 'section' || vectorPaths ? 1 : Math.max(1, footprintSpread(paths, up(MASK), W2, H2));
     sh.laidShare = opening;
