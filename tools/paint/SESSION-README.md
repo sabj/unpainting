@@ -99,7 +99,8 @@ Rules are applied in order and a later rule wins. `where` holds conditions that 
 over the dry washes when the painting is done: a closing line) or `drop` (not drawn). `weight` multiplies the line's
 darkness (0.1 to 4; a line never goes past black). A line's shape and width are not changed.
 `after` is for an INK drawing only, and for its lines tagged `ink`: `drawing/lines.json` says at its top whether this
-drawing is one (`linesAfterTheWashes`). The painter lays a pencil drawing before the washes and nowhere else, so on a
+drawing is one (`linesAfterTheWashes`). With your own choice of an ink drawing's lines the ink is set before the
+washes (`inkfast` 1, as for your own script), unless your settings say otherwise. The painter lays a pencil drawing before the washes and nowhere else, so on a
 pencil drawing `after` is refused; darken a pencil line with a `weight` above 1 instead. `./unpaint plan` checks the rules and counts what they do;
 `mine/drawing.png` shows the result. The lines themselves show in a look's dried sheet.
 

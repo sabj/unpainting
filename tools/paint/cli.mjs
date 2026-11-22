@@ -177,7 +177,9 @@ function toolsOf(r, choice) {
 async function specWith(r, choice, sets = null) {
   const t = await toolsOf(r, choice);
   if (!choice.sets.length && !t && !sets) return r.spec;
-  return checkInputs(resolveSubject(registry, r.spec.id, { sets: [...(sets ?? withChoice(req.sets, choice)), ...(t?.sets ?? [])], variant: r.spec.variant ? variants[r.spec.id]?.[r.spec.variant] : null, variantName: r.spec.variant }));
+  // (a setting the tools ask for only as a default gives way to the choice's or the command's own: inkfast)
+  const given = sets ?? withChoice(req.sets, choice), mine = (t?.sets ?? []).filter(([k]) => k !== 'inkfast' || !given.some(([g]) => g === 'inkfast'));
+  return checkInputs(resolveSubject(registry, r.spec.id, { sets: [...given, ...mine], variant: r.spec.variant ? variants[r.spec.id]?.[r.spec.variant] : null, variantName: r.spec.variant }));
 }
 /** The run's record as a plan of this spec is measured: with the forms the choice made, when it made its own. */
 const runOf = (record, mine) => (mine.masks?.receipt && mine.masks.receipt !== record.masks.receipt ? { ...record, masks: { ...record.masks, receipt: mine.masks.receipt, mask: mine.masks.mask, forms: mine.masks.forms } } : record);

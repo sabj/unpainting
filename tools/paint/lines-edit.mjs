@@ -148,5 +148,9 @@ export function writeLinesEdit({ dir, stem, edit, listing }) {
   if (opening) sets.push(['drawing', opening]);
   if (closing) sets.push(['drawinglast', closing], ['drawinglastmin', '0']);
   if (got.order !== 'first') sets.push(['drawingorder', got.order]);
+  // a choice of an ink drawing's lines is laid over ink that was set first, as pen and wash is done and as a script is
+  // (command.mjs): with most of the pen's lines left out, the first washes lift a larger share of what is left than the
+  // painter allows of ink that still rewets, and it stops. The run's own inkfast, when it names one, stands.
+  if (vectors.medium === 'ink' && opening) sets.push(['inkfast', '1']);
   return { order: got.order, opening, closing, record: got.record, sets };
 }

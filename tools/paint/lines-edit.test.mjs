@@ -66,10 +66,12 @@ test('the choice is written as drawing stems of its own, with the run settings t
   try {
     const stem = path.join(dir, 'record'); fs.writeFileSync(`${stem}-vectors.json`, JSON.stringify(vectors())); fs.writeFileSync(`${stem}-lines.json`, JSON.stringify(lines()));
     const got = writeLinesEdit({ dir: path.join(dir, 'mine'), stem, edit: edit([{ where: { tagged: 'drop' }, do: 'drop' }, { where: { ids: [5] }, do: 'after' }]), listing: listing() });
-    assert.deepEqual(got.sets, [['drawing', path.join(dir, 'mine', 'opening')], ['drawinglast', path.join(dir, 'mine', 'closing')], ['drawinglastmin', '0'], ['drawingorder', 'both']]);
+    assert.deepEqual(got.sets, [['drawing', path.join(dir, 'mine', 'opening')], ['drawinglast', path.join(dir, 'mine', 'closing')], ['drawinglastmin', '0'], ['drawingorder', 'both'], ['inkfast', '1']], 'an ink drawing\'s chosen lines are laid over ink set first');
     assert.equal(JSON.parse(fs.readFileSync(`${got.opening}-vectors.json`, 'utf8')).strokes.length, 2); assert.equal(JSON.parse(fs.readFileSync(`${got.closing}-lines.json`, 'utf8')).lines.length, 1);
     assert.equal(JSON.parse(fs.readFileSync(path.join(dir, 'mine', 'lines-edit.json'), 'utf8')).record.dropped, 2);
     const only = writeLinesEdit({ dir: path.join(dir, 'weights'), stem, edit: edit([{ where: {}, weight: 0.8 }]), listing: listing() });
-    assert.deepEqual(only.sets, [['drawing', path.join(dir, 'weights', 'opening')]]); assert.equal(only.closing, null);
+    assert.deepEqual(only.sets, [['drawing', path.join(dir, 'weights', 'opening')], ['inkfast', '1']]); assert.equal(only.closing, null);
+    fs.writeFileSync(`${stem}-vectors.json`, JSON.stringify(vectors('pencil')));
+    assert.deepEqual(writeLinesEdit({ dir: path.join(dir, 'pencil'), stem, edit: edit([{ where: {}, weight: 0.8 }]), listing: linesListing(vectors('pencil')) }).sets, [['drawing', path.join(dir, 'pencil', 'opening')]], 'a pencil drawing needs none');
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });
