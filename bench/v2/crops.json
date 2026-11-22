@@ -163,6 +163,23 @@
    "coarseFile": "targets/dog-ink-coarse.json",
    "licence": "private, not distributed",
    "selfScore": 9.4
+  },
+  {
+   "task": "mittens-closeup",
+   "name": "Mittens close-up",
+   "width": 300,
+   "height": 400,
+   "coarse": {
+    "cols": 24,
+    "rows": 32
+   },
+   "style": "watercolor sketch over faint pencil, no ink: an orange cat's face, close up",
+   "medium": "pencil",
+   "source": "watercolour sketch made by an image generator from the owner's photograph",
+   "distributed": true,
+   "file": "targets/mittens-closeup.png",
+   "coarseFile": "targets/mittens-closeup-coarse.json",
+   "licence": "noncommercial project use; local branch only, not distributed"
   }
  ]
 }
