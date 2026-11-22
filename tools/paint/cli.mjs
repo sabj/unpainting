@@ -12,8 +12,10 @@ import { loadRegistry, resolveSubject, checkInputs } from './subjects.mjs';
 import { buildCommand, describeRun, shellLine, runFolder } from './command.mjs';
 import { refuseExtraGpuPaint, gpuPaintCount, cacheDirFor, switchesOf, segEnvFor, runPainter, collectResults } from './run.mjs';
 import { expandSubjects, pool, gpuPlace, throughput, jobsNow, DEFAULT_JOBS, PLAN_JOBS } from './queue.mjs';
-import { writeRunSheet, writeGridSheet, runPictures, formsImage } from './sheet.mjs';
-import { authorOf, authorLabel, briefName, readScript, checkAuthored, preparePacket, formBoxes, askAuthor, retryPrompt } from './author.mjs';
+import { writeRunSheet, writeGridSheet, runPictures, formsImage, drawingSvg } from './sheet.mjs';
+import { toolsBase, resolveTools, writeTools, linesPictureDoc, allLinesDoc } from './session-tools.mjs';
+import sharp from 'sharp';
+import { authorOf, authorLabel, briefName, readScript, checkAuthored, preparePacket, formBoxes, gridImage, askAuthor, retryPrompt } from './author.mjs';
 import { readChoice, choiceKey, choiceKind, withChoice, settingsList } from './choice.mjs';
 import { checkPlanEdit, editLine } from '../../src/paint/methods/plan-edit.mjs';
 import { planNumbers, numbersText, washesText, planPicture, lookPicture, stagesPicture } from './plan-data.mjs';
@@ -46,14 +48,14 @@ let registry, specs, authors, qwen = null; const refused = [];
 try {
   registry = loadRegistry();
   // a model works as a session (the default) or answers in one reply; its column is named for what it does
-  authors = req.authors.map(a => authorOf(a, ownAuthors, models)).map(a => (a.cli && !['script', 'edit'].includes(a.cli) ? { ...a, work: req.work, brief: req.work === 'reply' ? briefName(BRIEF_FILE) : null } : a));
+  authors = req.authors.map(a => authorOf(a, ownAuthors, models)).map(a => (a.cli && !['script', 'edit', 'choice'].includes(a.cli) ? { ...a, work: req.work, brief: req.work === 'reply' ? briefName(BRIEF_FILE) : null } : a));
   if (req.work === 'session') for (const a of authors) if (a.work) sessionCall(a, { prompt: '', cwd: '' });
   if (req.from && !fs.existsSync(req.from)) throw new Error(`--from ${req.from}: no such folder`);
   if (req.studies === 'author') {
     // open tools: the author's own studies are made by the local image model; every piece of that route must be here
     qwen = qwenRoute(registry.base);
     if (!qwen.ready) throw new Error(`--studies author needs the local study route, and this machine lacks: ${qwen.missing.join('; ')}. Run with --studies locked.`);
-    if (authors.some(a => !a.cli || ['script', 'edit'].includes(a.cli))) throw new Error('--studies author: every author must be a model (auto and kept scripts make no studies)');
+    if (authors.some(a => !a.cli || ['script', 'edit', 'choice'].includes(a.cli))) throw new Error('--studies author: every author must be a model (auto and kept scripts make no studies)');
   }
   const asked = expandSubjects(req.subjects, registry.subjects.map(s => s.id));
   specs = asked.flatMap(({ id, variant }) => {
@@ -75,7 +77,7 @@ const outRoot = path.resolve(req.out ?? path.join(ROOT, 'work', 'paint', `${stam
 const runs = [];
 for (const spec of specs) for (const author of authors) {
   const out = many ? path.join(outRoot, runFolder(spec, author.key === 'auto' ? 'auto' : author.name)) : outRoot;
-  const scriptFile = author.key === 'auto' || author.work === 'session' || author.cli === 'edit' ? null : path.join(out, 'author', 'script.json');
+  const scriptFile = author.key === 'auto' || author.work === 'session' || author.cli === 'edit' || author.cli === 'choice' ? null : path.join(out, 'author', 'script.json');
   let command;
   try { command = buildCommand(spec, { mode: req.mode, out: path.join(out, 'plate'), known, dirty: code.dirty, segEnv, script: scriptFile ? { file: scriptFile, paints: ['(the script\'s palette)'] } : null }); } catch (e) { fail(e.message); }
   const pinned = spec.drawing.files.every(f => f.sha256);
@@ -155,10 +157,40 @@ async function paintOnce(r, commandFor, plate, logFile) {
 }
 
 const tidy = text => String(text).replaceAll(ROOT, '<painter>').replaceAll(registry.base, '<subjects>').replaceAll(os.homedir(), '<home>');
-/** The subject with a session's choice laid over this run's settings (a settings choice), checked as any run's is. */
-function specWith(spec, choice) {
-  if (!choice.sets.length) return spec;
-  return checkInputs(resolveSubject(registry, spec.id, { sets: withChoice(req.sets, choice), variant: spec.variant ? variants[spec.id]?.[spec.variant] : null, variantName: spec.variant }));
+/** What a run's tools work on (the record's drawing and reviewed forms), read once a run. */
+const bases = new Map(), baseOf = r => { if (!bases.has(r)) bases.set(r, toolsBase(r.spec)); return bases.get(r); };
+/**
+ * A choice's tools (its lines, its forms, settings per form: session-tools.mjs) written out for this run, once for
+ * each such choice: the files the painter takes and the run settings that name them. Null for a choice without tools.
+ */
+const toolsWritten = new Map();
+function toolsOf(r, choice) {
+  if (!choice.tools) return null;
+  const key = choiceKey({ kind: 'tools', sets: [], tools: choice.tools }), k = `${r.spec.id}:${r.spec.variant ?? ''}:${r.record.out}:${key}`;
+  if (!toolsWritten.has(k)) toolsWritten.set(k, (async () => writeTools(path.join(r.record.out, 'author', 'tools', key), choice.tools, await baseOf(r)))());
+  return toolsWritten.get(k);
+}
+/**
+ * The subject with a choice laid over this run's settings (its planner settings and its tools), checked as any run's
+ * is. `sets`: the run's settings to lay it over when they are not the command's own (a look's smaller sheet).
+ */
+async function specWith(r, choice, sets = null) {
+  const t = await toolsOf(r, choice);
+  if (!choice.sets.length && !t && !sets) return r.spec;
+  return checkInputs(resolveSubject(registry, r.spec.id, { sets: [...(sets ?? withChoice(req.sets, choice)), ...(t?.sets ?? [])], variant: r.spec.variant ? variants[r.spec.id]?.[r.spec.variant] : null, variantName: r.spec.variant }));
+}
+/** The run's record as a plan of this spec is measured: with the forms the choice made, when it made its own. */
+const runOf = (record, mine) => (mine.masks?.receipt && mine.masks.receipt !== record.masks.receipt ? { ...record, masks: { ...record.masks, receipt: mine.masks.receipt, mask: mine.masks.mask, forms: mine.masks.forms } } : record);
+/** A drawing document as a picture on the millimetre grid. A PNG buffer. */
+const drawingPicture = async (doc, W) => gridImage(await sharp(Buffer.from(drawingSvg(doc, 1400).svg)).flatten({ background: '#ffffff' }).png().toBuffer(), W);
+/** What a choice's tools made, as files of the author's own folder (mine/): its forms as a picture and data, its lines as a picture. */
+async function toolFiles(r, choice) {
+  const t = await toolsOf(r, choice); if (!t) return [];
+  const W = r.spec.sheet.widthMm, out = [], strokes = stem => (stem ? JSON.parse(fs.readFileSync(`${stem}-vectors.json`, 'utf8')).strokes : []);
+  if (t.mask) out.push({ rel: 'mine/forms.png', data: await gridImage(await formsImage(t.mask), W) }, { rel: 'mine/forms-ids.png', data: fs.readFileSync(t.mask) },
+    { rel: 'mine/forms.json', data: JSON.stringify((await formBoxes(t.mask, t.formsNow, W)).map(f => ({ id: f.id, name: f.name, kind: f.kind, boxMm: f.boxMm ?? null })), null, 1) + '\n' });
+  if (t.order) out.push({ rel: 'mine/drawing.png', data: await drawingPicture(linesPictureDoc((await baseOf(r)).vectors, strokes(t.opening), strokes(t.closing)), W) });
+  return out;
 }
 /**
  * One choice planned on the CPU into `plate`, for a session: {ok, error, summary, rows, numbersText, picture, marked,
@@ -174,7 +206,7 @@ function compileChoice(r, choice, script, plate, edit = null) {
 async function compileOnce(r, choice, script, plate, edit) {
   const { spec, record } = r, scriptFile = `${plate}.script.json`, editFile = `${plate}.plan-edit.json`;
   try {
-    const mine = specWith(spec, choice);
+    const mine = await specWith(r, choice);
     fs.mkdirSync(path.dirname(plate), { recursive: true });
     if (script) fs.writeFileSync(scriptFile, JSON.stringify(script, null, 1) + '\n');
     if (edit) fs.writeFileSync(editFile, JSON.stringify(edit, null, 1) + '\n');
@@ -186,10 +218,10 @@ async function compileOnce(r, choice, script, plate, edit) {
       const why = fs.readFileSync(`${plate}.log`, 'utf8').split('\n').filter(l => /(^|\s)(Error|TypeError|RangeError)\b/.test(l)).pop()?.trim().slice(0, 400);
       return { ok: false, error: tidy(faults ? faults.slice(0, 12000) : why ?? `the planner ended with exit ${done.exit ?? done.signal} and no plan`), seconds: done.seconds };
     }
-    const numbers = await planNumbers({ plate, planPreview: results.planPreview, run: record, script });
+    const numbers = await planNumbers({ plate, planPreview: results.planPreview, run: runOf(record, mine), script });
     // the painter's own count of an edit it applied, with its notes (a colour laid as the nearest that can be, a smaller brush)
     let editRecord = null; if (edit) { try { editRecord = JSON.parse(fs.readFileSync(path.join(plate, 'plan-edit-record.json'), 'utf8')); } catch { /* the session's own count stands */ } }
-    return { ok: true, ...numbers, planPreview: results.planPreview, seconds: done.seconds, plate, editRecord };
+    return { ok: true, ...numbers, planPreview: results.planPreview, seconds: done.seconds, plate, editRecord, toolFiles: await toolFiles(r, choice) };
   } catch (e) { return { ok: false, error: tidy(e.message) }; }
 }
 
@@ -208,8 +240,8 @@ function paintLook(r, choice, script, plate, at, edit, compiled) {
 async function paintLookOnce(r, choice, script, plate, at, edit, compiled) {
   const { spec, record } = r, scriptFile = `${plate}.script.json`, editFile = `${plate}.plan-edit.json`;
   try {
-    const full = specWith(spec, choice);
-    const small = checkInputs(resolveSubject(registry, spec.id, { sets: lookSets(withChoice(req.sets, choice), full.sheet.cells, choice.kind), variant: spec.variant ? variants[spec.id]?.[spec.variant] : null, variantName: spec.variant }));
+    const full = await specWith(r, choice);
+    const small = await specWith(r, choice, lookSets(withChoice(req.sets, choice), full.sheet.cells, choice.kind));
     fs.mkdirSync(path.dirname(plate), { recursive: true });
     if (script) fs.writeFileSync(scriptFile, JSON.stringify(script, null, 1) + '\n');
     if (edit) fs.writeFileSync(editFile, JSON.stringify(edit, null, 1) + '\n');
@@ -231,7 +263,7 @@ async function paintLookOnce(r, choice, script, plate, at, edit, compiled) {
       say(r, `look ${at.look} NOT PAINTED: ${fault}${why ? ` (${why})` : ''}`);
       return { ok: false, error: tidy(`${fault}${why ? `: ${why}` : ''}`) };
     }
-    const numbers = await planNumbers({ plate, planPreview: results.planPreview ?? compiled.planPreview, run: record, script, painting: results.painting });
+    const numbers = await planNumbers({ plate, planPreview: results.planPreview ?? compiled.planPreview, run: runOf(record, small), script, painting: results.painting });
     say(r, `look ${at.look} painted and dried in ${Math.round(done.seconds / 60)} min (${results.backend.backend}, no fallback); ${numbers.marked.forms} named forms marked`);
     return { ok: true, picture: await lookPicture({ planPreview: results.painting, run: record }), stages: results.strip ? await stagesPicture(results.strip) : null,
       planPicture: compiled.planPreview ? await planPicture({ planPreview: compiled.planPreview, run: record }) : null,
@@ -272,7 +304,9 @@ async function sessionRun(r) {
     let earlier; try { earlier = JSON.parse(fs.readFileSync(path.join(record.author.from, 'run.json'), 'utf8')); } catch { throw new Error(`--from: no finished run at ${record.author.from}`); }
     const sub = earlier.author?.session?.submitted;
     if (!sub || earlier.subject.id !== spec.id || earlier.author.key !== author.key) throw new Error(`--from: ${record.author.from} is not a session of ${author.name} on ${spec.id} that handed over a choice`);
-    const choice = readChoice({ kind: sub.kind, settings: sub.settings, script: sub.script ?? undefined, plan: sub.plan ?? undefined, why: sub.why });
+    const choice = readChoice({ kind: sub.kind, settings: sub.settings, script: sub.script ?? undefined, plan: sub.plan ?? undefined, lines: sub.tools?.lines ?? undefined, forms: sub.tools?.forms ?? undefined, perForm: sub.tools?.perForm ?? undefined, why: sub.why });
+    // its lines and forms as the session left them in its folder
+    if (choice.tools) for (const [k, to] of [['lines', 'linesEdit'], ['forms', 'formsEdit']]) if (choice.tools[k]) choice.tools[to] = JSON.parse(fs.readFileSync(path.join(record.author.from, 'author', 'folder', choice.tools[k]), 'utf8'));
     // the kept commands are judged again by the present rule: a session that reached outside its folder is not painted,
     // and one an earlier rule failed wrongly is (the record says which)
     const from = record.author.from, commands = fs.readFileSync(path.join(from, 'author', 'S.commands.txt'), 'utf8').split('\n---\n').map(c => c.trim()).filter(Boolean), own = ownFolderOf(commands);
@@ -294,14 +328,17 @@ async function sessionRun(r) {
     const auto = await compileChoice(r, readChoice({ kind: 'settings', settings: {} }), null, path.join(dir, 'plans', 'auto'));
     if (!auto.ok) throw new Error(`the code planner's own plan did not compile, so the session has no starting point: ${auto.error}`);
     // the model's folder: a temporary one outside the repository; it is kept in the run folder when the session ends
-    const cwd = r.sessionDir, real = fs.realpathSync(cwd), listing = toEdit(auto.plate);
+    const cwd = r.sessionDir, real = fs.realpathSync(cwd), listing = toEdit(auto.plate), base = await baseOf(r);
+    // a choice's tools are checked against the drawing and the forms of this run; nothing is written for a check
+    const checkTools = t => { try { const g = resolveTools(t, base); return { record: g.record, said: g.said }; } catch (e) { throw new Error(tidy(e.message)); } };
     try {
       for (const f of packet.files) { fs.mkdirSync(path.dirname(path.join(cwd, f)), { recursive: true }); fs.copyFileSync(path.join(dir, f), path.join(cwd, f)); }
       const { prompt } = writeSession({ dir: cwd, packet, sheet: spec.sheet, medium: record.drawing.medium, auto: { picture: await planPicture({ planPreview: auto.planPreview, run: record }), washesText: washesText(auto), plan: { summary: auto.summary, washes: auto.rows }, toEdit: listing }, settings: settingsList(spec),
-        forms: record.masks.mask ? await formBoxes(record.masks.mask, record.masks.forms, W) : null, formsIds: record.masks.mask ?? null, looks: looksMost, minutes: minutesMost, briefFile: path.join(HERE, 'SESSION-BRIEF.md'), readmeFile: path.join(HERE, 'SESSION-README.md'), previous: previousTry() });
+        forms: record.masks.mask ? await formBoxes(record.masks.mask, record.masks.forms, W) : null, formsIds: record.masks.mask ?? null, looks: looksMost, minutes: minutesMost, briefFile: path.join(HERE, 'SESSION-BRIEF.md'), readmeFile: path.join(HERE, 'SESSION-README.md'), previous: previousTry(),
+        drawing: base.listing ? { listing: base.listing, picture: await drawingPicture(allLinesDoc(base.vectors), W) } : null });
       if (previousTry()) record.author.previousTry = { tryNumber: previousTry().tryNumber, from: process.env.UNPAINT_SESSION_PREVIOUS };
       fs.writeFileSync(path.join(dir, 'session-prompt.txt'), prompt);
-      const server = sessionServer({ dir: cwd, looks: looksMost, minutes: minutesMost, checkScript: check, checkPlan: obj => checkEdit(obj, listing), ledger: path.join(dir, 'looks.jsonl'), keep: path.join(dir, 'looks'), compile: (choice, script, n, edit) => compileChoice(r, choice, script, path.join(dir, 'plans', String(n)), edit),
+      const server = sessionServer({ dir: cwd, looks: looksMost, minutes: minutesMost, checkScript: check, checkPlan: obj => checkEdit(obj, listing), checkTools, ledger: path.join(dir, 'looks.jsonl'), keep: path.join(dir, 'looks'), compile: (choice, script, n, edit) => compileChoice(r, choice, script, path.join(dir, 'plans', String(n)), edit),
         look: (choice, script, at, edit, compiled) => paintLook(r, choice, script, path.join(dir, 'look-paints', String(at.plan)), at, edit, compiled) });
       // what nothing of the session may read: this checkout, the checkout it is a worktree of (with every worktree, cache
       // and earlier run under it), the subject list with its inputs, and whatever UNPAINT_SESSION_DENY adds (a:b:c)
@@ -335,12 +372,30 @@ async function sessionRun(r) {
   }
   record.author.session = session; record.author.label = authorLabel(record.author);
   if (fin.failure) throw new Error(fin.failure);
-  // what it handed over is painted: the code planner under its settings (none: exactly the code planner), or its script
-  const mine = specWith(spec, fin.choice), kept = path.join(dir, 'script.json'), keptEdit = path.join(dir, 'plan-edit.json');
+  await paintChoice(r, fin);
+}
+
+/**
+ * A choice painted (or planned) as this run: the code planner under its settings (none: exactly the code planner),
+ * its plan as edited, or a script, with the choice's tools (its lines, its forms, settings per form) laid over the
+ * run. `fin`: {choice, script, edit, submitted}. The record gets what was chosen and what was painted.
+ */
+async function paintChoice(r, fin) {
+  const { record } = r, dir = path.join(record.out, 'author');
+  const mine = await specWith(r, fin.choice), kept = path.join(dir, 'script.json'), keptEdit = path.join(dir, 'plan-edit.json');
+  // its tools: what it chose of the lines and the forms, and the settings it gave single forms, counted; the drawing and
+  // the forms of the record are then its own (never the pinned drawing or the reviewed receipt)
+  const tools = await toolsOf(r, fin.choice);
+  if (tools) {
+    record.author.tools = tools.record; say(r, `its tools: ${tools.said}`);
+    record.subject.deviations = mine.deviations;
+    if (tools.order) record.drawing = { ...record.drawing, stem: mine.drawing.stem, pinned: false, files: mine.drawing.files.map(f => f.abs), sha256: mine.drawing.files.map(f => f.sha256 ?? f.unpinnedSha256), chosenBy: 'the author: its choice of the record\'s lines', order: tools.order, closing: tools.closing ?? null, of: r.spec.drawing.stem };
+    if (tools.receipt) record.masks = { ...record.masks, receipt: mine.masks.receipt, from: 'the author\'s edit of the reviewed forms (not reviewed)', mask: mine.masks.mask, review: null, forms: mine.masks.forms, reviewedReceipt: r.spec.masks.receipt };
+  }
   // an edited plan: the file is kept, and what it changed (washes changed, merged, left out, added; the share untouched) is in the record
   if (fin.edit) { fs.writeFileSync(keptEdit, JSON.stringify(fin.edit, null, 1) + '\n'); record.author.planEdit = fin.submitted?.edit ?? null; if (record.author.planEdit) say(r, `its edit: ${editLine(record.author.planEdit)}`); }
   if (fin.script) { fs.writeFileSync(kept, JSON.stringify(fin.script, null, 1) + '\n'); Object.assign(record.author, { passages: fin.script.passages.length, palette: fin.script.palette }); record.masks.read = false; }
-  else { record.subject.deviations = mine.deviations; record.masks.read = Boolean(record.masks.receipt); record.masks.whyNotRead = null; record.studies = record.studies.map((s, i) => ({ ...s, floorMm2: mine.studies[i].floorMm2, read: mine.studies[i].read })); }
+  else { record.subject.deviations = mine.deviations; record.masks.read = Boolean(record.masks.receipt); record.masks.whyNotRead = null; record.studies = record.studies.map((s, i) => ({ ...s, floorMm2: mine.studies[i].floorMm2, read: mine.studies[i].read, ...(mine.studies[i].forms ? { forms: mine.studies[i].forms } : {}) })); }
   const commandFor = dirty => { const c = buildCommand(mine, { mode: req.mode, out: record.plate, known, dirty, segEnv, script: fin.script ? { file: kept, paints: fin.script.palette } : null, edit: fin.edit ? { file: keptEdit } : null }); record.settings = c.settings; return c; };
   const painted = await paintOnce(r, commandFor, record.plate, path.join(record.out, 'run.log'));
   record.failure = painted.failure; record.results = painted.results;
@@ -362,6 +417,15 @@ async function oneRun(r) {
       const got = await paintOnce(r, dirty => buildCommand(spec, { mode: req.mode, out: record.plate, known, dirty, segEnv, edit: { file: kept } }), record.plate, path.join(record.out, 'run.log'));
       record.failure = got.failure; record.results = got.results;
       try { record.author.planEdit = JSON.parse(fs.readFileSync(path.join(record.plate, 'plan-edit-record.json'), 'utf8')); record.author.label = authorLabel(record.author); } catch { /* the plan failed */ }
+    } else if (author.cli === 'choice') {
+      // a kept choice (a folder holding choice.json and the files it names: a script, an edited plan, its lines, its
+      // forms): painted as a session's choice is, no model called
+      fs.mkdirSync(path.join(record.out, 'author'), { recursive: true });
+      const read = f => JSON.parse(fs.readFileSync(path.join(author.dir, f), 'utf8')), choice = readChoice(read('choice.json'));
+      if (choice.tools) for (const [k, to] of [['lines', 'linesEdit'], ['forms', 'formsEdit']]) if (choice.tools[k]) choice.tools[to] = read(choice.tools[k]);
+      const fin = { choice, script: choice.kind === 'script' ? checkAuthored(read(choice.script), { sheetWidthMm: spec.sheet.widthMm }).script : null, edit: choice.kind === 'plan' ? read(choice.plan) : null, submitted: { kind: choice.kind, what: choiceKind(choice) } };
+      record.author.chose = fin.submitted.what; record.author.label = authorLabel(record.author);
+      await paintChoice(r, fin);
     } else if (author.work === 'session') {
       await sessionRun(r);
     } else {

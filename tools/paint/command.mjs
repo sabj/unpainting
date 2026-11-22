@@ -6,9 +6,9 @@ const OWNED = new Set(['image', 'width', 'sheetmm', 'drawingfile', 'washplan', '
 /** Heap for the painter (MB): a full sheet's plan does not fit node's default. */
 const HEAP_MB = { plan: 13312, paint: 18432 };
 
-/** The --washplan value of the registered studies: FILE:FLOOR@name=value,... coarse to fine. */
+/** The --washplan value of the registered studies: FILE:FLOOR@name=value@name#FORM=value,... coarse to fine (#FORM: inside that named form only). */
 export function washPlanOf(studies) {
-  return studies.map(s => `${s.abs}${s.floorMm2 != null ? `:${s.floorMm2}` : ''}${Object.entries(s.read).map(([k, v]) => `@${k}=${v}`).join('')}`).join(',');
+  return studies.map(s => `${s.abs}${s.floorMm2 != null ? `:${s.floorMm2}` : ''}${Object.entries(s.read).map(([k, v]) => `@${k}=${v}`).join('')}${Object.entries(s.forms ?? {}).flatMap(([id, set]) => Object.entries(set).map(([k, v]) => `@${k}#${id}=${v}`)).join('')}`).join(',');
 }
 
 /**
@@ -65,7 +65,7 @@ export function describeRun(run) {
   studies.forEach((st, i) => row(`study ${i + 1}`, `${st.path}, ${st.role}, shapes from ${st.floorMm2 ?? '?'} mm2${Object.entries(st.read).map(([k, v]) => `, ${k} ${v}`).join('')}`));
   row('masks', masks.receipt ? `${masks.forms.length} named forms (${masks.forms.map(f => f.name).join(', ')}) from ${masks.receipt} (${masks.from === 'set' ? '--set masks' : 'the named-forms folder'}); ${masks.read ? 'given to the planner' : 'shown to the author and on the sheet: ' + masks.whyNotRead}` : `none (${masks.none})`);
   row('labels', s.labels ? `${s.labels}${s.labelCount ? `, ${s.labelCount} things` : ''}` : 'none');
-  row('author', author.key === 'auto' ? 'the code planner alone (the control)' : author.cli === 'script' || author.cli === 'edit' ? author.label : author.work === 'session' ? `${author.name}${author.effort ? `, ${author.effort} effort` : ''} (${author.id}, through ${author.cli}): ${author.from ? 'what its earlier session handed over is painted; no model is called' : `a working session with a shell in its own folder, ${author.minutesMost} min of its own time, ${author.looksMost > 0 ? `${author.looksMost} looks` : 'looks without limit'} (each a small real painting of its plan, dried); it starts from the code planner's plan`}` : `${author.name}${author.effort ? `, ${author.effort} effort` : ''} (${author.id}, one read-only reply through ${author.cli}): ${author.label}`);
+  row('author', author.key === 'auto' ? 'the code planner alone (the control)' : ['script', 'edit', 'choice'].includes(author.cli) ? author.label : author.work === 'session' ? `${author.name}${author.effort ? `, ${author.effort} effort` : ''} (${author.id}, through ${author.cli}): ${author.from ? 'what its earlier session handed over is painted; no model is called' : `a working session with a shell in its own folder, ${author.minutesMost} min of its own time, ${author.looksMost > 0 ? `${author.looksMost} looks` : 'looks without limit'} (each a small real painting of its plan, dried); it starts from the code planner's plan`}` : `${author.name}${author.effort ? `, ${author.effort} effort` : ''} (${author.id}, one read-only reply through ${author.cli}): ${author.label}`);
   row('mode', `${run.mode === 'plan' ? 'plan only, CPU' : 'full painting, GPU'}; ${run.studiesMode === 'author' ? 'open tools (the author may brief and review its own studies)' : 'locked inputs'}; target guard gentle`);
   if (s.deviations.length) for (const d of s.deviations) row('DIFFERS', `${d.what}: ${d.now} (the record: ${d.record})`);
   if (run.settings.length) for (const d of run.settings) row('setting', `${d.name} = ${d.value ?? 'painter default'} (default ${d.default})`);

@@ -10,9 +10,13 @@ import path from 'node:path';
 /** Roles of the studies of a wash plan, coarse to fine, in plain words. */
 const ROLES = ['block-in (the broad shapes)', 'middle study (later washes)', 'fine study (details and accents)'];
 /** --set keys this module reads; every other key is a paint-plate option (command.mjs). */
-const SUBJECT_KEYS = new Set(['drawing', 'width', 'sheetmm', 'masks', 'floors']);
+const SUBJECT_KEYS = new Set(['drawing', 'drawingorder', 'width', 'sheetmm', 'masks', 'floors']);
 const STUDY_KEY = /^study([1-9])\.([a-z]+)$/;
-const isSubjectKey = k => SUBJECT_KEYS.has(k) || STUDY_KEY.test(k);
+/** A study setting for one named form, by the form's number in its receipt: form3.study1.clusters. */
+const FORM_KEY = /^form([1-9][0-9]{0,2})\.study([1-9])\.([a-z]+)$/;
+/** When the drawing is laid (the painter's --drawing): before the washes, before and after, after, or not at all. */
+const DRAWING_ORDERS = ['first', 'both', 'last', 'none'];
+const isSubjectKey = k => SUBJECT_KEYS.has(k) || STUDY_KEY.test(k) || FORM_KEY.test(k);
 
 /** Where SUBJECTS.json is: $UNPAINT_SUBJECTS, else Scratch/unpainting-033 in the home folder, found when the run starts. */
 export function registryPath(env = process.env) {
@@ -84,6 +88,14 @@ export function resolveSubject(registry, id, { sets = [], variant = null, varian
     if (!(Number(v) >= 0)) throw new Error(`--set ${k}: a number`);
     st.read[m[2]] = Number(v); say(`study ${m[1]} ${m[2]}`, v, 'the planner default');
   }
+  // a study setting for one named form (the form's number in the receipt the run reads): its own value inside that form
+  for (const [k, v] of all) {
+    const m = FORM_KEY.exec(k); if (!m) continue;
+    const st = studies[Number(m[2]) - 1];
+    if (!st) throw new Error(`--set ${k}: the subject has ${studies.length} studies`);
+    if (!(Number(v) >= 0)) throw new Error(`--set ${k}: a number`);
+    st.forms ??= {}; (st.forms[m[1]] ??= {})[m[3]] = Number(v); say(`study ${m[2]} ${m[3]} in named form ${m[1]}`, v, 'the study\'s own setting');
+  }
 
   const labels = rec.labels?.path ? { path: rec.labels.path, abs: abs(rec.labels.path), sha256: rec.labels.sha256, count: rec.labels.count ?? null } : null;
   // named SAM forms, in this order: --set masks=<receipt.json> (none: no forms), then <forms folder>/<id>/receipt.json
@@ -94,11 +106,18 @@ export function resolveSubject(registry, id, { sets = [], variant = null, varian
       : { receipt: path.join(formsDir ?? formsPath(registry), rec.id, 'receipt.json'), from: 'folder' };
   if (asked) say('named forms', asked === 'none' ? 'none (turned off)' : asked, 'the reviewed receipt in the named-forms folder');
 
+  const options = optionPairs([...(rec.options?.common ?? []), ...(rec.options?.line ?? []), ...(rec.options?.paper ?? [])]);
+  if (all.has('drawingorder')) {
+    const v = all.get('drawingorder'), at = options.findIndex(([k]) => k === 'drawing'), was = at >= 0 ? options[at][1] : 'first';
+    if (!DRAWING_ORDERS.includes(v)) throw new Error(`--set drawingorder: one of ${DRAWING_ORDERS.join(', ')}`);
+    if (v !== was) say('when the drawing is laid', v, was);
+    if (at >= 0) options[at] = ['drawing', v]; else options.push(['drawing', v]);
+  }
   return {
     id: rec.id, name: rec.name ?? rec.id, variant: variantName, variantWhy: variant?.why ?? null, registry: registry.file, use: rec.use ?? null,
     source: { path: rec.source.path, abs: abs(rec.source.path), sha256: rec.source.sha256, px: rec.source.px ?? null },
     sheet, drawing, studies, labels, masks, deviations, studySeed: rec.studySeed?.chosen ?? null,
-    options: optionPairs([...(rec.options?.common ?? []), ...(rec.options?.line ?? []), ...(rec.options?.paper ?? [])]),
+    options,
     otherSets: [...all].filter(([k]) => !isSubjectKey(k)),
   };
 }

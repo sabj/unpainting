@@ -81,3 +81,8 @@ test('the block before a run says everything in plain rows', () => {
 test('run folders are safe names', () => {
   assert.equal(runFolder({ id: 'h36', variant: 'approved' }, 'Opus 5.5'), 'h36-approved--Opus_5.5');
 });
+
+test('a study setting for one named form goes into the wash plan after the study\'s own: @name#FORM=value', () => {
+  const s = spec({ studies: [{ abs: '/r/a.png', floorMm2: 6, read: { clusters: 20 }, forms: { 3: { clusters: 24, floor: 3 }, 11: { formbase: 0 } } }, { abs: '/r/b.png', floorMm2: 4, read: {}, forms: { 3: { lay: 1 } } }, { abs: '/r/c.png', floorMm2: 2, read: {} }] });
+  assert.equal(washPlanOf(s.studies), '/r/a.png:6@clusters=20@clusters#3=24@floor#3=3@formbase#11=0,/r/b.png:4@lay#3=1,/r/c.png:2');
+});
