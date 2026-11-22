@@ -58,6 +58,8 @@ test('a part too short for lanes across it is laid along its own length: a band 
   assert.ok(s.length <= 3 && Math.max(...long) > 45, `${s.length} strokes, the longest ${Math.max(...long).toFixed(0)} mm`);
   // a ruler keeps the passage's direction only where the lanes are long enough: the same band at hand 0 is still laid along itself
   assert.ok(sweeps([band], { widthMm: 5, deg: 90, rng: handOf('a'), hand: 0 }).length <= 3);
+  // upright lanes are laid from the left to the right, whatever the seed
+  for (const seed of ['a', 'b', 'c', 'd']) { const up = sweeps([[[10, 10], [120, 10], [120, 100], [10, 100]]], { widthMm: 8, deg: 90, rng: handOf(seed) }); assert.ok(up[0].points[0][0] < 40 && up.at(-1).points[0][0] > 90, `seed ${seed}: from ${up[0].points[0][0]} to ${up.at(-1).points[0][0]}`); }
   // a region long enough along the direction keeps it
   const tall = lanesOf(sweeps([[[10, 10], [40, 10], [40, 100], [10, 100]]], { widthMm: 5, deg: 90, rng: handOf('a'), hand: 0 }), 1);
   assert.ok(tall.length >= 4 && tall.every(l => Math.abs(Math.abs(heading(l)) - 90) < 1));

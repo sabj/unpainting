@@ -261,7 +261,10 @@ function lanes(polys, { widthMm, deg, pressure, perLoad, lights, rng, hand }) {
   }
   const centre = q => { const t = (q.t0 + q.t1) / 2, d = q.d * Math.PI / 180; return [q.cx + Math.cos(d) * t, q.cy + Math.sin(d) * t]; };
   runs.sort((p, q) => p.i - q.i || p.t0 - q.t0);
-  if (runs.length > 1 && centre(runs[0])[1] > centre(runs.at(-1))[1]) runs.reverse();
+  // level lanes from the top down; upright lanes from the left to the right (their middles are at one height, and which
+  // was "higher" came down to the lanes' small tilts: the same wash began at the left with one seed and the right with another)
+  const first = centre(runs[0] ?? { cx: 0, cy: 0, d: 0, t0: 0, t1: 0 }), final = centre(runs.at(-1) ?? { cx: 0, cy: 0, d: 0, t0: 0, t1: 0 }), level = Math.abs(vy) >= Math.abs(vx);
+  if (runs.length > 1 && (level ? first[1] > final[1] : first[0] > final[0])) runs.reverse();
   const strokes = []; let cur = null, inLoad = 0, back = false, last = null, most = 3;
   const lane = (q, rev) => {
     // the arm's arc (the same way for every lane of the wash, whichever way the lane is drawn) and the lane's own bulge
