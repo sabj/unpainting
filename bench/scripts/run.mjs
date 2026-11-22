@@ -35,7 +35,7 @@ for (let i = 0; i < argv.length; i++) {
 
 const DRY = has('dry-run');
 const round = roundById(opt('round', 'V4'));
-if (!round || !['V4', 'V5'].includes(round.id)) fail('--round must be V4 or V5 (V1 to V3 are published history and can no longer be run)');
+if (!round || !['V3', 'V4', 'V5'].includes(round.id)) fail('--round must be V3, V4 or V5 (V1 and V2 are published history and can no longer be run)');
 if (['V4', 'V5'].includes(round.id)) fail((await import('./pipeline/round45.mjs')).RETIRED_V45);
 let profile;
 try { profile = profileForRound(round.id, opt('profile')); } catch (e) { fail(e.message); }
@@ -98,7 +98,9 @@ const outRoot = path.resolve(opt('out', path.join(BENCH, 'work', DRY ? 'dry-run'
   if (skills && !['painting-planner', 'watercolor-technique'].every(k => fs.existsSync(path.join(skills, k, 'SKILL.md')))) fail('--skills must hold painting-planner/SKILL.md and watercolor-technique/SKILL.md');
   const runOpts = { round, model, tries, crops, dry: DRY, outRoot, force: has('force') || DRY, gpu: opt('gpu', DRY ? 'off' : 'on'), dryWidth: Number(opt('dry-width', 96)), fromTry, strictVerdict: has('strict-verdict'), noTargetLooks: opt('notargetlooks') === '1', profile, python, skills };
   try {
-    await (await import('./pipeline/round45.mjs')).runPipeline(runOpts);
+    // V3 (level 1): the toolkit round, one session a target in attempts (v3.mjs); V4 and V5: the pipeline rounds
+    if (round.id === 'V3') { if (fromTry > 1) fail('--from-try applies to V4 and V5; V3 runs every target through all its attempts'); await (await import('./v3.mjs')).runV3(runOpts); }
+    else await (await import('./pipeline/round45.mjs')).runPipeline(runOpts);
   } catch (e) { fail(e.stack || e.message); }
   process.exit(process.exitCode ?? 0);
 }

@@ -63,6 +63,20 @@
    "medium": "pen",
    "width": 300,
    "sheetmm": 77.7
+  },
+  "mittens-closeup": {
+   "name": "Mittens close-up",
+   "taskStyle": "watercolor sketch over faint pencil, no ink",
+   "medium": "pencil",
+   "width": 300,
+   "sheetmm": 77.7
+  },
+  "mittens-closeup-full": {
+   "name": "Mittens close-up, full size",
+   "taskStyle": "watercolor sketch over faint pencil, no ink",
+   "medium": "pencil",
+   "width": 1086,
+   "sheetmm": 281.274
   }
  }
 }
