@@ -35,7 +35,7 @@ test('the folder holds the task, the tools, the code planner\'s plan and a choic
     assert.match(readme, /`inputs\/source.png`: the SUBJECT/); assert.match(readme, /`inputs\/study-2.png`: block-in STUDY 2/); assert.match(readme, /\| `\.\/unpaint look` \|.*\| 4 looks; each is counted before it is shown \|/); assert.doesNotMatch(readme, /INPUT_LIST|SHEET_W/);
     assert.ok(fs.statSync(path.join(dir, 'unpaint')).mode & 0o100, 'the command can be run');
     assert.ok(!fs.existsSync(path.join(dir, 'auto/beside.png')) && !fs.existsSync(path.join(dir, 'auto/numbers.txt')), 'nothing at the start sets a plan against the subject: that is a look');
-    assert.equal(DEFAULT_LOOKS, 4); assert.equal(DEFAULT_MINUTES, 85);
+    assert.equal(DEFAULT_LOOKS, 0, 'gentle mode: no limit on looks'); assert.equal(DEFAULT_MINUTES, 85);
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });
 
@@ -124,6 +124,24 @@ test('the time a look\'s painting takes is not the model\'s own', async () => {
     assert.match(await ask(dir, server, 'look'), /^LOOK 1 of 2/); assert.equal(server.over(), false, 'fifteen minutes of painting used none of its one minute');
     const rec = await server.stop(); assert.ok(rec.waitSeconds >= 900); assert.ok(rec.ownSeconds < 5);
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('gentle mode: looks have no limit and each is recorded; a later try gets its previous painting and a teacher\'s words, never a number', async () => {
+  const dir = tmp(), prev = tmp(), ledger = path.join(tmp(), 'looks.jsonl');
+  try {
+    fs.mkdirSync(path.join(dir, 'inputs')); fs.writeFileSync(path.join(dir, 'inputs/source.png'), PNG); fs.mkdirSync(path.join(prev, 'submitted'));
+    fs.writeFileSync(path.join(prev, 'painting.jpg'), PNG); fs.writeFileSync(path.join(prev, 'critique.txt'), 'The sky is flat.'); fs.writeFileSync(path.join(prev, 'submitted/script.json'), '{}');
+    const { prompt } = writeSession({ dir, packet: { files: ['inputs/source.png'], brief: 'B' }, sheet: { widthMm: 280, heightMm: 186.7 }, medium: 'pencil (graphite)', auto: { picture: PNG, washesText: 'W', plan: { summary: {}, washes: [] } }, settings: [], looks: 0, minutes: 85,
+      briefFile: path.join(HERE, 'SESSION-BRIEF.md'), readmeFile: path.join(HERE, 'SESSION-README.md'), previous: { tryNumber: 2, tries: 3, files: [{ from: path.join(prev, 'painting.jpg'), name: 'painting.jpg', what: 'the painting as it dried, full size' }, { from: path.join(prev, 'critique.txt'), name: 'critique.txt', what: 'a watercolour teacher\'s words on that painting' }, { from: path.join(prev, 'submitted/script.json'), name: 'submitted/script.json', what: 'what you handed over' }] } });
+    assert.match(prompt, /Look as often as you like, as a painter steps back\. Each look paints your plan for real\./); assert.doesNotMatch(prompt, /You have \d+ looks|LOOKS_LINE/);
+    assert.match(prompt, /This is try 2 of 3/); assert.match(prompt, /`previous\/critique\.txt` \(a watercolour teacher's words/); assert.doesNotMatch(prompt, /score of|verdict/i);
+    for (const f of ['previous/painting.jpg', 'previous/critique.txt', 'previous/submitted/script.json']) assert.ok(fs.existsSync(path.join(dir, f)), f);
+    assert.match(fs.readFileSync(path.join(dir, 'README.md'), 'utf8'), /\| no limit; every look is recorded \|/);
+    const server = sessionServer({ dir, ledger, look: looked, looks: 0, minutes: 85, checkScript: s => s, compile: async () => compiled(1) });
+    for (let i = 1; i <= 6; i++) assert.match(await ask(dir, server, 'look'), new RegExp(`^LOOK ${i} \\(nothing changed\\), PAINTED`));
+    assert.match(await ask(dir, server, 'status'), /Looks: 6 taken \(no limit; each is recorded\)/);
+    assert.equal((await server.stop()).looks.length, 6); assert.equal(ledgerLooks(ledger).length, 6);
+  } finally { for (const d of [dir, prev, path.dirname(ledger)]) fs.rmSync(d, { recursive: true, force: true }); }
 });
 
 test('the folder is not trusted: no link is followed and no request is echoed', async () => {

@@ -15,8 +15,9 @@ export const USAGE = `usage: npm run paint -- <subject[,subject...]> plan|paint 
                         folder, the code planner's plan as its starting point, uncapped planning and a fixed
                         number of counted looks at its plan; it hands over planner settings or its own script.
                         reply: one read-only reply holding a whole script (the earlier route).
-  --looks N             looks a session may take (default 4): each paints its present choice for real, small, on the
-                        GPU and shows it the dried sheet; a look's painting waits for a place among --jobs
+  --looks N             the most looks a session may take: default 0, no limit (gentle mode, bench/docs/anti-cheat.md;
+                        every look is recorded); 100 is the hard mode. Each look paints its present choice for
+                        real, small, on the GPU and shows it the dried sheet
   --minutes N           minutes of its own time a session may take; waiting for the tools is not counted (default 85)
   --from <dir>          paint what the sessions of an earlier run handed over (its --out folder), calling no model:
                         plan first, look, then paint the same choices.
@@ -72,7 +73,7 @@ export function parseArgs(argv) {
   if (!['session', 'reply'].includes(work)) throw new Error('--work is session or reply');
   if (studies === 'author' && work === 'session') throw new Error('--studies author needs --work reply: a working session cannot make its own studies yet');
   const whole = (flag, least, most) => { if (given[flag] === undefined) return null; const n = Number(given[flag]); if (!(Number.isInteger(n) && n >= least && n <= most)) throw new Error(`${flag}: a whole number, ${least} to ${most}`); return n; };
-  const looks = whole('--looks', 0, 20), minutes = whole('--minutes', 1, 600);
+  const looks = whole('--looks', 0, 100), minutes = whole('--minutes', 1, 600);
   const sets = given['--set'].map(s => {
     const at = s.indexOf('=');
     if (at < 1 || at === s.length - 1) throw new Error(`--set ${s}: write key=value`);

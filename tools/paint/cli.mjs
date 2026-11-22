@@ -236,6 +236,18 @@ async function paintLookOnce(r, choice, script, plate, at, edit, compiled) {
   } catch (e) { return { ok: false, error: tidy(e.message) }; }
 }
 
+/**
+ * A later try (level 3): UNPAINT_SESSION_PREVIOUS names a folder holding the model's own previous try of this subject
+ * (its painting, the stages, what it handed over, a teacher's words; plain files, one level of folders), and
+ * UNPAINT_SESSION_TRY its number of three. The files are copied into the session's folder as previous/. Never a score.
+ */
+function previousTry() {
+  const from = process.env.UNPAINT_SESSION_PREVIOUS; if (!from) return null;
+  const what = n => (/^painting\./.test(n) ? 'the painting as it dried, full size' : /^stages\./.test(n) ? 'the subject, then that sheet at 10, 25, 50, 75 and 100% of the strokes' : /critique/.test(n) ? 'a watercolour teacher\'s words on that painting' : /^submitted/.test(n) ? 'what you handed over' : 'from your last try');
+  const files = []; const walk = (d, rel) => { for (const e of fs.readdirSync(d, { withFileTypes: true })) { const f = path.join(d, e.name), r = rel ? `${rel}/${e.name}` : e.name; if (e.isDirectory()) walk(f, r); else if (e.isFile() && !/score|verdict|judge|metric|risk/i.test(e.name)) files.push({ from: f, name: r, what: what(r) }); } }; walk(from, '');
+  return { tryNumber: Number(process.env.UNPAINT_SESSION_TRY) || 2, tries: 3, files };
+}
+
 /** What nothing of a session may read, besides the other sessions' folders (the comment where it is used says why). */
 function sessionDeny(spec) {
   return [...new Set([ROOT, path.resolve(ROOT, '..', '..'), registry.base, path.dirname(spec.source.abs), ...(process.env.UNPAINT_SESSION_DENY ?? '').split(':').filter(Boolean).map(d => path.resolve(d))])].filter(d => d !== path.parse(d).root && d !== os.homedir());
@@ -282,7 +294,8 @@ async function sessionRun(r) {
     try {
       for (const f of packet.files) { fs.mkdirSync(path.dirname(path.join(cwd, f)), { recursive: true }); fs.copyFileSync(path.join(dir, f), path.join(cwd, f)); }
       const { prompt } = writeSession({ dir: cwd, packet, sheet: spec.sheet, medium: record.drawing.medium, auto: { picture: await planPicture({ planPreview: auto.planPreview, run: record }), washesText: washesText(auto), plan: { summary: auto.summary, washes: auto.rows }, toEdit: listing }, settings: settingsList(spec),
-        forms: record.masks.mask ? await formBoxes(record.masks.mask, record.masks.forms, W) : null, formsIds: record.masks.mask ?? null, looks: looksMost, minutes: minutesMost, briefFile: path.join(HERE, 'SESSION-BRIEF.md'), readmeFile: path.join(HERE, 'SESSION-README.md') });
+        forms: record.masks.mask ? await formBoxes(record.masks.mask, record.masks.forms, W) : null, formsIds: record.masks.mask ?? null, looks: looksMost, minutes: minutesMost, briefFile: path.join(HERE, 'SESSION-BRIEF.md'), readmeFile: path.join(HERE, 'SESSION-README.md'), previous: previousTry() });
+      if (previousTry()) record.author.previousTry = { tryNumber: previousTry().tryNumber, from: process.env.UNPAINT_SESSION_PREVIOUS };
       fs.writeFileSync(path.join(dir, 'session-prompt.txt'), prompt);
       const server = sessionServer({ dir: cwd, looks: looksMost, minutes: minutesMost, checkScript: check, checkPlan: obj => checkEdit(obj, listing), ledger: path.join(dir, 'looks.jsonl'), keep: path.join(dir, 'looks'), compile: (choice, script, n, edit) => compileChoice(r, choice, script, path.join(dir, 'plans', String(n)), edit),
         look: (choice, script, at, edit, compiled) => paintLook(r, choice, script, path.join(dir, 'look-paints', String(at.plan)), at, edit, compiled) });
@@ -296,7 +309,7 @@ async function sessionRun(r) {
         if (can(path.join(ROOT, 'package.json'))) throw new Error('the session\'s sandbox does not hold: a file of the repository can be read under it; the session is not started');
         if (!can(path.join(cwd, 'README.md'))) throw new Error('the session\'s sandbox cannot be started on this machine (its own folder is not readable under it); the session is not started');
       }
-      say(r, `${author.name} starts its working session (${author.cli}; ${minutesMost} min of its own time, ${looksMost} looks, each a small real painting): ${call.closed}`);
+      say(r, `${author.name} starts its working session (${author.cli}; ${minutesMost} min of its own time, ${looksMost > 0 ? `${looksMost} looks` : 'looks without limit'}, each a small real painting${previousTry() ? `; try ${previousTry().tryNumber} of 3, with its previous painting and a teacher's words` : ''}): ${call.closed}`);
       server.start();
       const t0 = Date.now(), done = await modelSlot(() => (call.serial ? agySlot : f => f())(() => runSession(call, { cwd, outFile: path.join(dir, 'S.out.txt'), errFile: path.join(dir, 'S.err.txt'), over: server.over })));
       await server.tick(); const kept = await server.stop(), seen = readTranscript(author.cli, fs.readFileSync(path.join(dir, 'S.out.txt'), 'utf8'));
@@ -312,7 +325,7 @@ async function sessionRun(r) {
       fs.cpSync(cwd, path.join(dir, 'folder'), { recursive: true, verbatimSymlinks: true });
       // a session that named the painter, the repository or another session in a command went round its looks: it is not painted
       if (outside.length && !fin.failure) fin = { failure: `the look limit was not held: ${outside.length} of its commands name the painter or a place outside its folder (author/S.commands.txt); nothing of this session is painted`, submitted: fin.submitted };
-      say(r, `session ${done.ended === 'done' ? 'ended' : `ended (${done.ended})`}: ${session.ownMinutes} min of its own time, ${kept.looks.length} of ${looksMost} looks, ${kept.plans.length} plans, ${session.toolCallsTotal} tool calls; handed over: ${fin.submitted ? `${fin.submitted.what}${fin.submitted.note ? ` (${fin.submitted.note})` : ''}` : 'nothing'}${outside.length ? `; ${outside.length} COMMANDS NAME PLACES OUTSIDE ITS FOLDER (S.commands.txt)` : ''}${pictures.length ? `; it made ${pictures.length} pictures of its own` : ''}`);
+      say(r, `session ${done.ended === 'done' ? 'ended' : `ended (${done.ended})`}: ${session.ownMinutes} min of its own time, ${kept.looks.length}${looksMost > 0 ? ` of ${looksMost}` : ''} looks, ${kept.plans.length} plans, ${session.toolCallsTotal} tool calls; handed over: ${fin.submitted ? `${fin.submitted.what}${fin.submitted.note ? ` (${fin.submitted.note})` : ''}` : 'nothing'}${outside.length ? `; ${outside.length} COMMANDS NAME PLACES OUTSIDE ITS FOLDER (S.commands.txt)` : ''}${pictures.length ? `; it made ${pictures.length} pictures of its own` : ''}`);
     } finally { fs.rmSync(cwd, { recursive: true, force: true }); }
   }
   record.author.session = session; record.author.label = authorLabel(record.author);

@@ -35,7 +35,7 @@ at least 60 seconds. Waiting is not counted in your time: neither the planner's 
 |---|---|---|---|
 | `./unpaint status` | nothing | your time used and left, looks used and left, the plans made so far | none |
 | `./unpaint plan` | runs the wash planner on your present `choice.json` (and your script or edited plan, if the choice names one) | whether it compiled, or why it was refused, and its counts (shapes or passages, washes, strokes, widest brush, washes by stage; for an edited plan also how many washes you left untouched, changed, moved, merged, left out and added). Nothing else: no picture and no wash data | none |
-| `./unpaint look` | the same, then PAINTS your present choice for real, small, through drying, and shows you the dried sheet | `looks/N/beside.png` (your painting as it dried, the subject, the middle study, side by side), `looks/N/stages.png` (the subject, then your sheet at 10, 25, 50, 75 and 100% of the strokes: the order of the work), `looks/N/numbers.txt` (each named form measured on the DRIED sheet against the study and against your plan, marked when it is TOO DARK or TOO PALE, and every wash), `looks/N/plan.json` (every wash as data, as in `auto/plan.json`), `looks/N/plan.png` (the plan as a diagram) | LOOKS looks; each is counted before it is shown |
+| `./unpaint look` | the same, then PAINTS your present choice for real, small, through drying, and shows you the dried sheet | `looks/N/beside.png` (your painting as it dried, the subject, the middle study, side by side), `looks/N/stages.png` (the subject, then your sheet at 10, 25, 50, 75 and 100% of the strokes: the order of the work), `looks/N/numbers.txt` (each named form measured on the DRIED sheet against the study and against your plan, marked when it is TOO DARK or TOO PALE, and every wash), `looks/N/plan.json` (every wash as data, as in `auto/plan.json`), `looks/N/plan.png` (the plan as a diagram) | LOOKS_LIMIT |
 | `./unpaint wait` | waits for the answer of the command that said "still working" | that answer | none |
 
 A choice the planner refuses costs no look. A painting that fails on this side costs no look either: the answer
@@ -50,6 +50,22 @@ What a look's painting is, exactly:
 - An edited plan exists on the full sheet only: its look is painted at full size and takes as long as a painting.
 - The dried sheet shows what the plan's diagram cannot: brush marks, direction, soft and hard edges, how much
   pigment really lay down, blooms and back-runs, and what a later wash did to the one under it.
+
+## Everything you can call or change
+
+| Tool | How you reach it | What is yours to decide |
+|---|---|---|
+| The wash planner | a settings choice (`auto/settings.json` lists each setting, its present value and meaning) | for each study: how many colours it is read into (`studyN.clusters`), how near colours join (`studyN.join`); the least shape each study lays (`floors`); for the block-in: the most shapes (`study1.shapes`), corner rounding (`study1.round`), the widest brush inside a face, figure or animal (`study1.formbrush`), the pale base wash of each soft form (`study1.formbase`) |
+| The paint box | `"paints": "ochre,sienna,..."` in a settings choice; `palette` in your own script | which paints the picture is mixed from (`own-script-brief.md` lists the box) |
+| The drawing's medium | `"outlinemedium": "graphite"`, `"ink"` or `"auto"` in a settings choice | pencil or waterproof ink for the opening drawing. The lines themselves are laid as the drawing file has them: you cannot choose, drop or weight single lines |
+| The plan, wash by wash | an edited plan (below) | each wash's colour, strength, brush, direction, edge (hard, wet on wet, beside damp), its place in the order and its wet sitting; leave out, merge, add your own passages |
+| The painter itself | your own script (`own-script-brief.md`) | every passage: its shape, paint and dilution, brush and width, paper wet, damp or dry, what it is laid into, how long the sheet dries first, stroke paths, pressure and hold, the order, the lights kept as paper |
+| The preview | `./unpaint look` | the painter run for real, small: the dried sheet, the stages, each form measured on the dried sheet |
+| The compile check | `./unpaint plan` | whether the planner takes your choice, and its counts |
+| Your shell | any command in this folder | measure the input pictures, compute positions and colours, write and check your files, keep notes |
+
+Given and fixed in this session: the three studies, the named forms and their labels, the drawing file, the sheet
+size, and the painter's guard. You cannot ask for new studies, new masks or a new drawing here.
 
 ## Editing the plan
 

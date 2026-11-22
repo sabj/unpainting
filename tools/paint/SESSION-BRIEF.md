@@ -50,7 +50,7 @@ changed; make the painting recognisably yours.
    What earlier sessions on other pictures showed: a session that only tuned settings came out almost the same as
    the code planner.
 4. Check that your work compiles with `./unpaint plan` as often as you like; it answers with counts only (shapes,
-   washes, strokes, the widest brush). When the plan is what you meant, spend a look: a look paints your plan for
+   washes, strokes, the widest brush). When the plan is what you meant, look: a look paints your plan for
    real, small, and shows you the dried sheet.
 
 ## What you may hand over
@@ -74,24 +74,23 @@ Your answer is the file `choice.json` as it stands when you stop. Three kinds, f
 `choice.json` starts as `{"kind": "settings", "settings": {}}`: change nothing and the painting is exactly the code
 planner's.
 
-## Looks are stepping back, not search
+## Looking
 
-You may check that a choice compiles as often as you like (`./unpaint plan`: counts only). What is limited is LOOKING
-at a result. **A look paints your plan for real, small, and shows you the dried sheet**: `./unpaint look` sends your
+Look as often as you like, as a painter steps back. Each look paints your plan for real. You may also check that a
+choice compiles as often as you like (`./unpaint plan`: counts only). **A look paints your plan for real, small, and shows you the dried sheet**: `./unpaint look` sends your
 present choice through the painter itself (real water, pigment and brush, on a small sheet, through drying) and
 shows you the dried sheet beside the subject and the middle study, the stages of the painting (the sheet at 10, 25,
 50, 75 and 100% of the strokes, so you see the order of the work), and each named form measured on the dried sheet
 against the study and against your plan, marked when it dried TOO DARK or TOO PALE. What you see is paint, not a
 diagram: edges, brush marks, direction, how strong the pigment really lay. A look takes some minutes to paint
-(`README.md`); that time is not yours and is not counted. You have LOOKS looks. Each is counted before
-it is shown and kept on record. Use a look as a painter steps back from the easel: decide, look once, revise once for what you saw, go on.
-Do not try settings one after another to see which looks best, and do not draw or compare the plan's picture by any
-other means (your own renderer, an image diff): that is the search the limit exists to prevent. Take your first look
-early enough to use what it shows: the dried sheet will surprise you more than the plan does. The session's
-commands are recorded, and a session that reaches for the painter outside its folder is not painted. No score is ever shown to you; there is none to chase.
+(`README.md`); that time is not yours and is not counted. LOOKS_LINE
+Take your first look early: the dried sheet will surprise you more than the plan does. Then work as a painter does:
+look, judge with your eye, change what is wrong, look again.
 
-After your last look you may still revise, once, for what it showed, and plan it (without a picture) to check that it
-compiles.
+What is not allowed is fitting the picture by measurement instead of painting it: changing strokes to cut an image
+error, matching the subject pixel by pixel, keeping a stroke only when a number improves, or drawing or comparing
+your plan by any means other than a look (your own renderer, an image diff). The session's commands are recorded,
+and a session that reaches for the painter outside its folder is not painted. No score is ever shown to you; there is none to chase.
 
 ## What is asked of the painting
 

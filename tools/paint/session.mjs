@@ -24,7 +24,9 @@ import { needsOf } from './author.mjs';
 import { editLine } from '../../src/paint/methods/plan-edit.mjs';
 
 /** Looks (each a small real painting of the present choice), and minutes of the model's own time, when the command line names neither. */
-export const DEFAULT_LOOKS = 4, DEFAULT_MINUTES = 85;
+export const DEFAULT_LOOKS = 0, DEFAULT_MINUTES = 85;
+/** Looks in the hard mode of bench/docs/anti-cheat.md (--looks 100); the default, 0, is gentle mode: no limit, every look recorded. */
+export const HARD_LOOKS = 100;
 /** Seconds ./unpaint waits before it says "still working". */
 const WAIT_SECONDS = 50;
 
@@ -88,14 +90,22 @@ const fill = (text, v) => Object.entries(v).reduce((t, [k, x]) => t.replaceAll(k
  * `settings` settingsList(); `forms` [{id, name, kind, boxMm}] with `formsIds` the id map's file, or null.
  * Returns {prompt, files}. Nothing of this machine's paths goes into any file of the folder.
  */
-export function writeSession({ dir, packet, sheet, medium, auto, settings, forms = null, formsIds = null, looks, minutes, briefFile, readmeFile }) {
+export function writeSession({ dir, packet, sheet, medium, auto, settings, forms = null, formsIds = null, looks, minutes, briefFile, readmeFile, previous = null }) {
   const mk = d => fs.mkdirSync(path.join(dir, d), { recursive: true });
   for (const d of ['auto', 'plans', 'looks', '.requests']) mk(d);
   const put = (f, text) => fs.writeFileSync(path.join(dir, f), text);
-  const ink = /^ink/.test(medium), v = { SHEET_W: sheet.widthMm, SHEET_H: sheet.heightMm, LOOKS: looks, MINUTES: minutes,
+  const ink = /^ink/.test(medium), v = { SHEET_W: sheet.widthMm, SHEET_H: sheet.heightMm, MINUTES: minutes,
+    LOOKS_LINE: looks > 0 ? `You have ${looks} looks. Each is counted before it is shown and kept on record.` : 'Look as often as you like, as a painter steps back. Each look paints your plan for real. Every look is recorded (when, of what, and what you changed after it); there is no limit on them.',
+    LOOKS_LIMIT: looks > 0 ? `${looks} looks; each is counted before it is shown` : 'no limit; every look is recorded',
     DRAWING_NOTE: ink ? 'The drawing (waterproof ink) is already on the sheet and carries the form; the washes go over it.' : 'The drawing (light pencil) is already on the sheet and only places the forms; the paint must carry form, value and edge.',
     INPUT_LIST: packet.files.map(f => `- \`${f}\`: ${f.includes('source') ? 'the SUBJECT, the picture to paint' : f.includes('drawing') ? 'the opening DRAWING, already on the sheet before any wash' : f.includes('forms') ? 'the NAMED FORMS, each one flat colour' : `block-in STUDY ${/study-(\d)/.exec(f)?.[1]}: the subject simplified to flat shapes (1 the broad shapes, 2 the middle study, 3 details and accents); the code planner reads its washes from these`}`).join('\n') };
-  const prompt = fill(fs.readFileSync(briefFile, 'utf8'), v);
+  let prompt = fill(fs.readFileSync(briefFile, 'utf8'), v);
+  // a later try of the same model on the same subject: its own previous painting and a teacher's words on it, never a number
+  if (previous) {
+    mk('previous');
+    for (const f of previous.files) { const to = path.join(dir, 'previous', f.name); fs.mkdirSync(path.dirname(to), { recursive: true }); fs.copyFileSync(f.from, to); }
+    prompt += `\n## This is try ${previous.tryNumber} of ${previous.tries}\n\nYou have painted this subject before. \`previous/\` holds your own last try: ${previous.files.map(f => `\`previous/${f.name}\` (${f.what})`).join(', ')}. Open them first. The painting there is the real sheet as it dried at full size; the teacher's words are a watercolour teacher's faults with it, in plain sentences. Keep what worked, put right what the teacher faults and what you see yourself, and hand over a better painting. You may start from what you handed over last time (copy it out of \`previous/\`) or start again.\n`;
+  }
   put('TASK.md', prompt); put('README.md', fill(fs.readFileSync(readmeFile, 'utf8'), v));
   put('own-script-brief.md', packet.brief);
   put('choice.json', JSON.stringify({ kind: 'settings', settings: {}, why: '' }, null, 1) + '\n');
@@ -131,14 +141,16 @@ export function ledgerLooks(ledger) {
  * side (the planner, a look's painting) is not the model's own. start() begins polling; stop() ends it and returns
  * the record.
  */
-export function sessionServer({ dir, looks: most, minutes, compile, look: paintLook, keep = null, checkScript, checkPlan = null, ledger, now = Date.now, everyMs = 400 }) {
+export function sessionServer({ dir, looks: asked, minutes, compile, look: paintLook, keep = null, checkScript, checkPlan = null, ledger, now = Date.now, everyMs = 400 }) {
+  // no limit on looks (gentle mode) when the number asked is 0 or not given
+  const most = asked > 0 ? asked : Infinity, ofMost = most === Infinity ? '' : ` of ${most}`;
   const t0 = now(), plans = [], cache = new Map(), painted = new Map(), requests = [], good = new Set(), seen = new Map();
   let waitMs = 0, busy = false, timer = null, lastGood = null, n = 0, pending = null, lastEnd = t0;
   const note = entry => { const fd = fs.openSync(ledger, 'a'); try { fs.writeSync(fd, JSON.stringify(entry) + '\n'); fs.fsyncSync(fd); } finally { fs.closeSync(fd); } };
   const used = () => ledgerLooks(ledger).length;
   // the model's own time: the clock less every stretch a request of its was waiting on this side (a stretch counted once)
   const ownSeconds = () => Math.round((now() - t0 - waitMs - (pending == null ? 0 : now() - pending)) / 1000);
-  const left = () => { const u = used(); return `Time: ${Math.round(ownSeconds() / 60)} of ${minutes} minutes of your own time used. Looks: ${u} of ${most} used, ${Math.max(0, most - u)} left. Plans made: ${plans.length}.`; };
+  const left = () => { const u = used(); return `Time: ${Math.round(ownSeconds() / 60)} of ${minutes} minutes of your own time used. Looks: ${most === Infinity ? `${u} taken (no limit; each is recorded)` : `${u} of ${most} used, ${Math.max(0, most - u)} left`}. Plans made: ${plans.length}.`; };
 
   /** The folder's present choice, checked: {choice, script, scriptText, key}. Throws with the reason. */
   function present() {
@@ -188,7 +200,7 @@ export function sessionServer({ dir, looks: most, minutes, compile, look: paintL
     if (seenIt.planPicture) safeWrite(dir, `${folder}/plan.png`, seenIt.planPicture);
     safeWrite(dir, `${folder}/plan.json`, JSON.stringify({ choice: { kind: p.choice.kind, settings: entry.settings, script: p.choice.script, plan: p.choice.plan ?? null }, summary: got.summary, washes: got.rows }, null, 1) + '\n');
     const m = seenIt.marked;
-    return `LOOK ${look} of ${most} (${what}), PAINTED${seenIt.painted?.cells ? ` small (${seenIt.painted.cells} cells across${seenIt.painted.fullCells ? ` of the final ${seenIt.painted.fullCells}` : ''})` : ''} and dried: ${line}.${edited}\nOpen ${folder}/beside.png: your painting as it dried, the subject and the middle study, left to right, on the same grid.${seenIt.stages ? ` Open ${folder}/stages.png: the subject, then the sheet at 10, 25, 50, 75 and 100% of the strokes (the order of the work).` : ''} Read ${folder}/numbers.txt: each named form on the DRIED sheet against the study and against your plan${m ? `; ${m.forms} named forms are marked !! (too dark or too pale)${m.washes ? ` and ${m.washes} washes` : ''}` : ''}. ${folder}/plan.json holds every wash as data${seenIt.planPicture ? `, ${folder}/plan.png the plan as a diagram` : ''}.\nStep back from it as from the easel; revise once for what you see.\n${left()}`;
+    return `LOOK ${look}${ofMost} (${what}), PAINTED${seenIt.painted?.cells ? ` small (${seenIt.painted.cells} cells across${seenIt.painted.fullCells ? ` of the final ${seenIt.painted.fullCells}` : ''})` : ''} and dried: ${line}.${edited}\nOpen ${folder}/beside.png: your painting as it dried, the subject and the middle study, left to right, on the same grid.${seenIt.stages ? ` Open ${folder}/stages.png: the subject, then the sheet at 10, 25, 50, 75 and 100% of the strokes (the order of the work).` : ''} Read ${folder}/numbers.txt: each named form on the DRIED sheet against the study and against your plan${m ? `; ${m.forms} named forms are marked !! (too dark or too pale)${m.washes ? ` and ${m.washes} washes` : ''}` : ''}. ${folder}/plan.json holds every wash as data${seenIt.planPicture ? `, ${folder}/plan.png the plan as a diagram` : ''}.\nStep back from it as from the easel, and revise for what you see.\n${left()}`;
   }
 
   async function tick() {
@@ -370,7 +382,7 @@ export function ownPictures(dir) {
  * are ended (SIGTERM, and SIGKILL to the group after `graceMs`). Its output goes to outFile/errFile.
  * Resolves {exit, ended: 'done' | 'time limit' | 'not started', error}.
  */
-export function runSession(call, { cwd, outFile, errFile, over, env = cleanEnv(), everyMs = 5000, wallMinutes = 480, graceMs = 10000 }) {
+export function runSession(call, { cwd, outFile, errFile, over, env = cleanEnv(), everyMs = 5000, wallMinutes = 180, graceMs = 10000 }) {
   return new Promise(resolve => {
     const mine = { ...env, ...call.env }; for (const k of call.unset ?? []) delete mine[k];
     let closed = false; const out = fs.openSync(outFile, 'w'), err = fs.openSync(errFile, 'w'), close = () => { if (closed) return; closed = true; fs.closeSync(out); fs.closeSync(err); };
