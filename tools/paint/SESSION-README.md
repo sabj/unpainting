@@ -69,6 +69,12 @@ size, and the painter's guard. You cannot ask for new studies, new masks or a ne
 
 ## Editing the plan
 
+**How long a check takes, today.** `./unpaint plan` on your own script answers in about a minute. On an edited plan it
+can take ten minutes while the machine is busy, and it stops at the FIRST wash it cannot take (for instance a colour
+no darker than what lies under it), so several faults cost several long waits. The waiting is not counted in your
+time, but it is slow: choose knowing that, and check an edit carefully before you send it.
+
+
 `cp auto/plan-to-edit.json my-plan.json`, change `my-plan.json`, and write
 `{"kind": "plan", "plan": "my-plan.json", "why": "..."}` into `choice.json`. Keep `format` and `of` as they are.
 `washes` is the plan in painting order, one entry a wash:
