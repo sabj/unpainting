@@ -121,6 +121,7 @@ The painter dips a brush, tries it on scrap, lays a stroke along a path, and rel
 
 - Brushes: `src/media/brush.mjs` (bristles and load), `src/paint/brushes.json` (real brush sizes), `src/paint/methods/brushes.mjs` (`--physical 1`).
 - Paths: `src/paint/methods/sweep-fill.mjs` (parallel sweeps that carry the bead), `src/paint/methods/wash-strokes.mjs`, `src/media/wash.mjs`, `src/paint/methods/lay.mjs`, `src/paint/methods/mop-lanes.mjs`.
+- A script's washes (`src/paint/methods/script-marks.mjs` `sweeps`, `LANE_HAND`): the lanes are laid as a hand lays them. Each lane laps the one before by 30 to 55% of the width the brush really lays at its pressure, so lanes run into one wash; the lanes turn steadily across the wash as a wrist pivots, bow along the arm's arc, the pressure swells along a stroke, and two to four lanes are one load. `--handlanes` (default 1) is the amount of it (0: a ruler's lanes); `--seed` is the hand: another seed lays the same script visibly differently.
 - Loop: `tools/plate/paint.mjs`. The stroke record (`src/paint/stroke-ledger.mjs`) is kept in every run; `--marks 1` ships the full tape.
 - Optics: `src/media/km.mjs` (Kubelka-Munk absorption and scattering) turns layers into colour.
 

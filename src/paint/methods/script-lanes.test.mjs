@@ -1,0 +1,64 @@
+// A wash's lanes as a hand lays them (script-marks.mjs sweeps, LANE_HAND).
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { handOf, sweeps, LANE_HAND } from './script-marks.mjs';
+import { planScriptWashes } from './script-washes.mjs';
+import { BOX, boxPigment } from '../../crop/box.mjs';
+
+const field = [[10, 10], [150, 10], [150, 100], [10, 100]];
+// the lanes of the strokes (a stroke is two to four lanes laid back and forth): a lane is a run of points going one way
+// along the lanes (`along`: 0 for level lanes, 1 for upright ones); the short step across to the next lane ends it
+const lanesOf = (strokes, along = 0) => strokes.flatMap(st => {
+  const out = []; let cur = [st.points[0]], way = 0;
+  for (let k = 1; k < st.points.length; k++) { const d = st.points[k][along] - st.points[k - 1][along], w = Math.abs(d) > 1 ? Math.sign(d) : 0, step = Math.abs(st.points[k][1 - along] - st.points[k - 1][1 - along]); if (w === 0 || step > 1.5 || (way && w !== way)) { out.push(cur); cur = []; way = 0; } else way = w; cur.push(st.points[k]); }
+  out.push(cur); return out;
+}).filter(l => l.length >= 3 && Math.hypot(l.at(-1)[0] - l[0][0], l.at(-1)[1] - l[0][1]) > 30);
+const heading = l => { const d = Math.atan2(l.at(-1)[1] - l[0][1], l.at(-1)[0] - l[0][0]) * 180 / Math.PI; return ((d + 270) % 180) - 90; };
+// how far a lane's middle stands off the straight line between its ends (mm)
+const bulge = l => { const a = l[0], b = l.at(-1), m = l[l.length >> 1], len = Math.hypot(b[0] - a[0], b[1] - a[1]); return Math.abs((b[0] - a[0]) * (m[1] - a[1]) - (b[1] - a[1]) * (m[0] - a[0])) / len; };
+const spread = v => Math.max(...v) - Math.min(...v);
+
+test('with no hand the lanes are a ruler\'s: straight, parallel, at one lap', () => {
+  const l = lanesOf(sweeps([field], { widthMm: 10, deg: 0, rng: handOf('a'), hand: 0 }));
+  assert.ok(l.length >= 8, `${l.length} lanes`);
+  assert.ok(spread(l.map(heading)) < 0.01 && Math.max(...l.map(bulge)) < 0.01);
+  const ys = l.map(q => q[1][1]).sort((a, b) => a - b), gaps = ys.slice(1).map((y, k) => y - ys[k]).slice(0, -1);
+  assert.ok(spread(gaps) < 0.05, `the lap is even: ${gaps.map(g => g.toFixed(2)).join(' ')}`);
+});
+
+test('a hand\'s lanes turn across the wash, bow, and lap unevenly, and always lap', () => {
+  const W = 10, pressure = 0.8, laid = W * (0.25 + 0.75 * pressure), turns = [], bows = [];
+  for (const seed of ['a', 'b', 'c', 'd', 'e', 'f']) {
+    const l = lanesOf(sweeps([field], { widthMm: W, deg: 0, pressure, rng: handOf(seed) }));
+    turns.push(spread(l.map(heading))); bows.push(Math.max(...l.map(bulge)));
+    // each lane overlaps the one before by at least a quarter of the width the brush lays (never bars with paper between)
+    const ys = l.map(q => q[q.length >> 1][1]).sort((a, b) => a - b), gaps = ys.slice(1).map((y, k) => y - ys[k]);
+    assert.ok(Math.max(...gaps) <= laid * (1 - LANE_HAND.lap[0]) + 0.5 * W * 0.25, `seed ${seed}: widest step ${Math.max(...gaps).toFixed(1)} mm of ${laid} laid`);
+    assert.ok(spread(gaps.slice(0, -1)) > 0.5, `seed ${seed}: the lap varies (${gaps.map(g => g.toFixed(1)).join(' ')})`);
+  }
+  assert.ok(Math.max(...turns) > 5 && turns.filter(t => t > 3).length >= 4, `the lanes turn: ${turns.map(t => t.toFixed(1)).join(' ')} degrees`);
+  assert.ok(Math.max(...bows) > 3 && bows.every(b => b > 0.4), `the lanes bow: ${bows.map(b => b.toFixed(1)).join(' ')} mm`);
+});
+
+test('two seeds are two hands: the same wash is laid visibly differently; the same seed lays it the same', () => {
+  const lay = seed => sweeps([field], { widthMm: 10, deg: 0, rng: handOf(seed) });
+  assert.deepEqual(lay('0/p1'), lay('0/p1'));
+  const a = lanesOf(lay('0/p1')), b = lanesOf(lay('1/p1'));
+  // the lanes of one seed lie millimetres from the other's: mean distance between lane middles, lane for lane
+  const n = Math.min(a.length, b.length); let off = 0; for (let k = 0; k < n; k++) off += Math.hypot(a[k][a[k].length >> 1][0] - b[k][b[k].length >> 1][0], a[k][a[k].length >> 1][1] - b[k][b[k].length >> 1][1]) / n;
+  assert.ok(off > 2 || a.length !== b.length, `lane middles ${off.toFixed(1)} mm apart`);
+  assert.ok(Math.abs(heading(a[0]) - heading(a.at(-1)) - (heading(b[0]) - heading(b.at(-1)))) > 1, 'they turn differently');
+});
+
+test('the load: full after a dip, thinner until the next, about the mix on average; the seed and the amount reach a script\'s washes', () => {
+  const s = sweeps([field], { widthMm: 6, deg: 0, rng: handOf('a') }), c = s.map(st => st.charge);
+  assert.ok(Math.abs(c.reduce((a, v) => a + v, 0) / c.length - 1) < 0.08, `mean charge ${(c.reduce((a, v) => a + v, 0) / c.length).toFixed(3)}`);
+  assert.ok(Math.max(...c) > 1.05 && Math.min(...c) < 0.95);
+  const keys = ['ochre', 'ultramarine'], pigments = keys.map(key => ({ ...boxPigment(BOX.find(p => p.key === key)), key }));
+  const script = { format: 'painting-script 2', subject: 't', author: 'test', sheet: { widthMm: 160, heightMm: 110 }, palette: keys, brushes: { mop: { shape: 'round', widthMm: 12 } },
+    passages: [{ id: 'p1', what: 'sky', stage: 1, kind: 'wash', region: field, paint: { pigments: { ultramarine: 1 }, dilution: 'pale' }, brush: 'mop', paper: 'dry', handling: { direction: 0 } }] };
+  const plan = (seed, hand) => { const log = console.log; console.log = () => {}; try { return planScriptWashes({ script, k: 2, w: 320, h: 220, pigments, sheetWidthMm: 160, seed, hand }).instructions[0].strokes; } finally { console.log = log; } };
+  assert.deepEqual(plan(0, 1), plan(0, 1));
+  assert.notDeepEqual(plan(0, 1), plan(1, 1));
+  assert.ok(spread(lanesOf(plan(0, 0)).map(heading)) < 0.01 && spread(lanesOf(plan(0, 1)).map(heading)) > 0.5);
+});

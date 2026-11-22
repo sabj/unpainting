@@ -202,7 +202,9 @@ const pencilDraw=(target,gs,pigment,options)=>{
  // the receipt must match. No receipt: no named forms, and the plan is as it was without them.
  const thingMasks=await studyThingMasks({root,source:opt('image'),maskOption:opt('thingmasks','auto'),labelsOption:opt('things','auto'),blockIn:Boolean(WASH_PLAN&&!SCRIPT)});
  if(thingMasks){valueOptions.thingMasks=thingMasks;console.log(`named forms: ${thingMasks.names.length} forms from a named-sam-v1 receipt (${thingMasks.names.map((n,i)=>`${n}${thingMasks.kinds[i]?` [${thingMasks.kinds[i]}]`:''}`).join(', ')})`);}
- if(SCRIPT){valueOptions.script=SCRIPT;const paper=estimatePaper(valueOptions.rgb,w,h,valueOptions.density);valueOptions.inkValue=targetValueMap(paper?Float32Array.from(valueOptions.density,v=>Math.max(0,v-paper.density)):valueOptions.density);}
+ // --seed: the hand of a script's washes (another seed, another hand); --handlanes a (default 1): how much of a hand is
+ // in a wash's lanes (script-marks.mjs LANE_HAND: their turning, bowing, swelling and uneven lap; 0 is a ruler)
+ if(SCRIPT){valueOptions.script=SCRIPT;valueOptions.seed=Math.round(num('seed',0));valueOptions.hand=Math.max(0,num('handlanes',1));const paper=estimatePaper(valueOptions.rgb,w,h,valueOptions.density);valueOptions.inkValue=targetValueMap(paper?Float32Array.from(valueOptions.density,v=>Math.max(0,v-paper.density)):valueOptions.density);}
  if(WASH_PLAN&&!SCRIPT){Object.assign(valueOptions,await loadStudies(WASH_PLAN,root,w,h));
   // a near-monochrome subject is mixed from its own one or two paints, read from it at a coarse scale as the palette is (mono-mix.mjs)
   valueOptions.mono=valueOptions.flat?null:monoPaints(ctx.px,w,h,PIGS,paperRGB);if(valueOptions.mono)console.log(valueOptions.mono.note);

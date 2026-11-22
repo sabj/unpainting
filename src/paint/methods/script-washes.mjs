@@ -149,8 +149,8 @@ function asLibraryMark(kind, st, widthMm, { seed, bend = 0, load = 0.75, rng = n
 }
 
 /** The strokes of one passage (mm), from its kind, brush and handling; no picture read. */
-export function passageStrokes(p, brushes, seed = 0, sheetLights = []) {
-  const st = placedStrokes(p, brushes, seed, sheetLights), kind = p.handling?.mark;
+export function passageStrokes(p, brushes, seed = 0, sheetLights = [], { hand = 1 } = {}) {
+  const st = placedStrokes(p, brushes, seed, sheetLights, hand), kind = p.handling?.mark;
   // a named mark from the shared library, unless the author wrote the pressure out (then the author's handling is laid)
   if (!kind || !MARK_KINDS[kind] || p.kind === 'wash' || Array.isArray(p.handling?.pressure)) return st;
   if (p.kind === 'lines' && p.paths?.some(P => P.length > 2)) return st;
@@ -159,7 +159,7 @@ export function passageStrokes(p, brushes, seed = 0, sheetLights = []) {
     bend: path === 'straight' ? 0.05 * (rng.next() < 0.5 ? -1 : 1) : path === 'curved' || path === 'flick' ? rng.range(0.4, 0.8) * (rng.next() < 0.5 ? -1 : 1) : 0, load, rng: p.kind === 'touches' || p.kind === 'strokes' ? rng : null }));
 }
 
-function placedStrokes(p, brushes, seed = 0, sheetLights = []) {
+function placedStrokes(p, brushes, seed = 0, sheetLights = [], hand = 1) {
   // the paper this passage keeps: the sheet's lights and its own reserves (shapes it is laid round, painted later)
   const lights = [...sheetLights, ...(p.reserveRegions ?? []).filter(P => P?.length >= 3)];
   const named = {}, rng = handOf(`${seed}/${p.id}`), h = { ...named, ...(p.handling ?? {}) }, ch = p.character ?? {}, polys = regionsOf(p);
@@ -175,7 +175,7 @@ function placedStrokes(p, brushes, seed = 0, sheetLights = []) {
   });
   const n = Math.max(1, Math.round(p.count ?? 1)), lengthMm = Number(h.lengthMm) || (MARK_LEN[h.mark] ? MARK_LEN[h.mark] * widthMm : p.kind === 'touches' ? 2.6 * widthMm : 4 * widthMm);
   switch (p.kind) {
-    case 'wash': return sweeps(polys, { widthMm, deg, pressure: Math.max(0.6, Math.max(...pressure)), lights, rng });
+    case 'wash': return sweeps(polys, { widthMm, deg, pressure: Math.max(0.6, Math.max(...pressure)), lights, rng, hand });
     case 'strokes': return scattered(polys, { ...style, n, widthMm, deg, lengthMm, size: ch.size, spread: ch.spread ?? 'scattered', denser: ch.denser, lights, rng });
     case 'touches': return scattered(polys, { ...style, n, widthMm, deg, lengthMm, size: ch.size ?? 'varied', spread: ch.spread ?? 'clustered', denser: ch.denser, touches: true, lights, rng });
     case 'lines': return lines(p.paths, { widthMm, pressure, hold: h.hold, rng });
@@ -214,7 +214,7 @@ export function footprint(strokes, w, h, cellMm) {
  * `script`: the parsed script; `pigments`: the painter's box (each with its `key`); `rgb`: the subject on the sheet's
  * grid, read only for the colour check written to the plan's summary.
  */
-export function planScriptWashes({ script: given, k, w, h, pigments, paperRGB = null, sheetWidthMm = 280, rgb = null, density = null, inkValue = null, seed = 0 }) {
+export function planScriptWashes({ script: given, k, w, h, pigments, paperRGB = null, sheetWidthMm = 280, rgb = null, density = null, inkValue = null, seed = 0, hand = 1 }) {
   const n = w * h, cellMm = sheetWidthMm / w, paperCol = paperRGB ?? [252, 251, 248], keys = pigments.map(p => p.key);
   let script = given;
   if (pigments.length !== k || k < 1) throw Error('the script wash plan needs the pigments');
@@ -298,7 +298,7 @@ export function planScriptWashes({ script: given, k, w, h, pigments, paperRGB = 
     if (p.into != null && !joins) console.log(`painting script: ${p.id} is to go into ${p.into}, which is not the passage just before it (${prev?.id ?? 'none'}); laid on its own, on a dry sheet`);
     const own = moveOf({ ...p, paper: p.paper ?? (joins && wait === 'damp' ? 'damp' : 'dry') }, joins);
     if (!joins) close();
-    const strokes = passageStrokes(p, brushes, seed, lights), mix = mixOf(p.paint);
+    const strokes = passageStrokes(p, brushes, seed, lights, { hand }), mix = mixOf(p.paint);
     const sh = wash(p, stage, strokes, mix, own, { kind: p.kind, what: `${p.id}: ${p.what ?? ''}` });
     prev = p;
     const smalls = after.splice(0).map(f => f()).filter(Boolean);
