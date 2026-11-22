@@ -290,8 +290,8 @@ const SEGMENTS_RECORD = await prepareSegments({ image: path.resolve(root, opt('i
 // Every painter brush is a section brush (painter-brush.mjs), whose sizes are physical: no density scaling or hair cap.
 const createBrush = o => { const b = painterBrushOptions(o); return createBrushRaw(isSection(b) ? b : gpuHairCap(scaleBrushForDensity(b, { renderWidth: w * num('scale', 1) }))); };
 // --mmspacing 0|1: space brush dabs by sheet size, not cells, so marks match at any resolution. Default 1 above 540 px.
-// --finalwidth n: the cells across of the painting this one is a look at (src/paint/methods/look-scale.mjs); its own by default.
-const FINAL_W = finalWidthOf(w, opt('finalwidth', '') === '' ? null : num('finalwidth', w));
+// --finalwidth own|n: the cells across of the painting this one is a look at (src/paint/methods/look-scale.mjs). Default own: this sheet is the painting.
+const FINAL_W = (v => finalWidthOf(w, v === 'own' ? null : Number(v)))(opt('finalwidth', 'own'));
 if (FINAL_W !== w) console.log(`look: this sheet of ${w} cells is a look at a painting of ${FINAL_W}; its swatches are laid as that painting's are`);
 const MM_SPACING_ON = () => { try { return num('mmspacing', mmSpacingDefault(FINAL_W) ? 1 : 0) > 0; } catch { return false; } };
 // (a target of fewer cells than the sheet is scrap: a swatch)
