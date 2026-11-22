@@ -13,6 +13,10 @@
 //     {"where": {"ids": [12, 13]}, "weight": 0.5} ]}
 // Every stroke starts as the painter lays it today: before the washes, at its own darkness. Rules are applied in
 // order and a later rule wins. `where` holds conditions that must all be true.
+// Lines after the washes need an ink drawing: the painter lays a pencil drawing before the washes only (its rule,
+// src/paint/subject-medium.mjs: graphite is a preparatory drawing, and a subject without pen lines is given none), and
+// takes any closing drawing out of a pencil run. So "after" on a pencil drawing is refused here, with that reason,
+// and never asked of the painter to be dropped in silence.
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -50,7 +54,9 @@ export function linesListing(vectors, { mask = null, forms = [] } = {}) {
       widthMm: +(Array.isArray(s.widths) && s.widths.length ? median(s.widths) : stripWidth(s.outline)).toFixed(2), boxMm: P.length ? [x0, y0, x1, y1].map(v => +v.toFixed(1)) : null, form: most ? nameOf.get(most) ?? 'none' : 'none' };
   });
   const count = k => strokes.reduce((a, s) => ({ ...a, [s[k] ?? 'none']: (a[s[k] ?? 'none'] ?? 0) + 1 }), {});
-  return { format: 'lines 1', sheet: { widthMm: vectors.sheetMm, heightMm: vectors.heightMm }, medium: vectors.medium, note: 'Every stroke is drawn before the washes at its own darkness unless your rules say otherwise.',
+  const ink = vectors.medium === 'ink';
+  return { format: 'lines 1', sheet: { widthMm: vectors.sheetMm, heightMm: vectors.heightMm }, medium: vectors.medium, linesAfterTheWashes: ink,
+    note: `Every stroke is drawn before the washes at its own darkness unless your rules say otherwise. ${ink ? 'This is an ink drawing: its ink lines may also be drawn after the washes ("do": "after").' : 'This is a pencil drawing: the painter lays pencil before the washes only, so "after" is not offered for it; you may choose, drop and weight its lines.'}`,
     counts: { strokes: strokes.length, tagged: count('tagged'), part: count('part'), form: count('form') }, strokes };
 }
 
@@ -104,6 +110,8 @@ export function applyLinesEdit(vectors, lines, edit, listing) {
     state.set(s.id, st);
   }
   const none = matched.findIndex(m => !m); if (none >= 0) throw new Error(`lines edit, rule ${none + 1}: no line matches its "where"; drop the rule or correct it`);
+  const after = listing.strokes.filter(s => state.get(s.id).do === 'after').length;
+  if (after && vectors.medium !== 'ink') throw new Error(`lines edit: ${after} lines are to be drawn after the washes, but this drawing is pencil. The painter lays a pencil drawing before the washes only (graphite is a preparatory drawing; a subject without pen lines is given none), so they would not be drawn. Draw them "before" (a "weight" above 1 makes them darker), or drop them`);
   const whole = vectors.medium === 'ink' ? 'ink' : 'graphite', layin = vectors.medium === 'ink' ? vectors.strokes.filter(s => (s.medium ?? whole) === 'graphite' && state.get(s.seq).do === 'after') : [];
   if (layin.length) throw new Error(`lines edit: ${layin.length} of the lines you draw after the washes are the pencil lay-in of an ink drawing (tagged "layin"); the closing pen lays ink only. Draw them before the washes, or drop them`);
   const part = which => {

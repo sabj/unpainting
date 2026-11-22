@@ -97,8 +97,10 @@ Rules are applied in order and a later rule wins. `where` holds conditions that 
 `form`, `part`, `phase`, `tagged` (one value or a list), `darkAbove`, `darkBelow`, `lengthAboveMm`, `lengthBelowMm`,
 `widthAboveMm`, `widthBelowMm`; `{}` is every line. `do` is `before` (drawn before the first wash), `after` (drawn
 over the dry washes when the painting is done: a closing line) or `drop` (not drawn). `weight` multiplies the line's
-darkness (0.1 to 4; a line never goes past black). A line's shape and width are not changed, and lines after the
-washes are drawn in the drawing's own medium. `./unpaint plan` checks the rules and counts what they do;
+darkness (0.1 to 4; a line never goes past black). A line's shape and width are not changed.
+`after` is for an INK drawing only, and for its lines tagged `ink`: `drawing/lines.json` says at its top whether this
+drawing is one (`linesAfterTheWashes`). The painter lays a pencil drawing before the washes and nowhere else, so on a
+pencil drawing `after` is refused; darken a pencil line with a `weight` above 1 instead. `./unpaint plan` checks the rules and counts what they do;
 `mine/drawing.png` shows the result. The lines themselves show in a look's dried sheet.
 
 ## Your own named forms

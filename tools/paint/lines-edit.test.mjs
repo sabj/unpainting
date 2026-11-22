@@ -10,15 +10,15 @@ import { layVectors } from '../../src/paint/methods/ink-vectors.mjs';
 // drop, and a short dark accent; the left half of the sheet is the form "face"
 const stroke = (seq, part, y, x0, x1, dark, more = {}) => ({ seq, line: seq, part, phase: part === 'hatch' ? 'texture' : 'growth', object: seq < 3 ? 0 : 1, dark, path: [[x0, y], [(x0 + x1) / 2, y], [x1, y]], widths: [0.3, 0.3, 0.3],
   outline: [[[x0, y - 0.15], [x1, y - 0.15], [x1, y + 0.15], [x0, y + 0.15]]], medium: 'graphite', ...more });
-const vectors = () => ({ source: 'test', medium: 'pencil', sheetMm: 100, heightMm: 50, fills: 'marked', strokes: [stroke(1, 'outline', 5, 10, 90, 0.3), stroke(2, 'inner', 15, 10, 40, 0.2), stroke(3, 'hatch', 25, 60, 90, 0.15, { drop: true }), stroke(4, 'hatch', 30, 60, 90, 0.15, { drop: true }), stroke(5, 'small', 40, 20, 24, 0.6)] });
+const vectors = (medium = 'ink') => ({ source: 'test', medium: medium === 'ink' ? 'ink' : 'pencil', sheetMm: 100, heightMm: 50, fills: 'marked', strokes: [stroke(1, 'outline', 5, 10, 90, 0.3), stroke(2, 'inner', 15, 10, 40, 0.2), stroke(3, 'hatch', 25, 60, 90, 0.15, { drop: true }), stroke(4, 'hatch', 30, 60, 90, 0.15, { drop: true }), stroke(5, 'small', 40, 20, 24, 0.6)].map(s => ({ ...s, medium: medium === 'ink' ? 'ink' : 'graphite' })) });
 const lines = () => ({ medium: 'pencil', lines: [1, 2, 3, 4, 5].map(seq => ({ seq, points: [[0, 0], [1, 1]] })) });
 const mask = { ids: Uint8Array.from({ length: 20 * 10 }, (_, i) => (i % 20 < 10 ? 1 : 0)), width: 20, height: 10 }, forms = [{ id: 1, name: 'face' }];
 const listing = () => linesListing(vectors(), { mask, forms }), edit = rules => ({ format: LINES_EDIT_FORMAT, rules });
 
 test('every stroke is listed with what an author chooses by: its part, tag, darkness, length, width and form', () => {
   const l = listing();
-  assert.deepEqual(l.strokes.map(s => [s.id, s.part, s.tagged, s.dark, s.lengthMm, s.widthMm, s.form]), [[1, 'outline', 'layin', 0.3, 80, 0.3, 'none'], [2, 'inner', 'layin', 0.2, 30, 0.3, 'face'], [3, 'hatch', 'drop', 0.15, 30, 0.3, 'none'], [4, 'hatch', 'drop', 0.15, 30, 0.3, 'none'], [5, 'small', 'layin', 0.6, 4, 0.3, 'face']]);
-  assert.deepEqual(l.counts.tagged, { layin: 3, drop: 2 }); assert.deepEqual(l.strokes[0].boxMm, [10, 5, 90, 5]); assert.deepEqual(l.sheet, { widthMm: 100, heightMm: 50 });
+  assert.deepEqual(l.strokes.map(s => [s.id, s.part, s.tagged, s.dark, s.lengthMm, s.widthMm, s.form]), [[1, 'outline', 'ink', 0.3, 80, 0.3, 'none'], [2, 'inner', 'ink', 0.2, 30, 0.3, 'face'], [3, 'hatch', 'drop', 0.15, 30, 0.3, 'none'], [4, 'hatch', 'drop', 0.15, 30, 0.3, 'none'], [5, 'small', 'ink', 0.6, 4, 0.3, 'face']]);
+  assert.deepEqual(l.counts.tagged, { ink: 3, drop: 2 }); assert.equal(l.linesAfterTheWashes, true); assert.equal(linesListing(vectors('pencil')).linesAfterTheWashes, false); assert.match(linesListing(vectors('pencil')).note, /pencil before the washes only/); assert.deepEqual(l.strokes[0].boxMm, [10, 5, 90, 5]); assert.deepEqual(l.sheet, { widthMm: 100, heightMm: 50 });
   assert.ok(!JSON.stringify(l).includes('outline":[['), 'no stroke geometry beyond its box');
 });
 
@@ -52,9 +52,13 @@ test('a rule that is wrong is refused with the reason', () => {
   assert.throws(() => applyLinesEdit(vectors(), lines(), edit([{ where: { darkAbove: 0.99 }, do: 'drop' }]), l), /rule 1: no line matches/);
   assert.throws(() => checkLinesEdit(edit([]), l), /leave "lines" out/); assert.throws(() => checkLinesEdit({ format: 'x', rules: [{}] }, l), /"format" is "lines-edit 1"/);
   // an ink drawing's pencil lay-in cannot be a closing line: the closing pen lays ink only
-  const ink = { ...vectors(), medium: 'ink' }; ink.strokes[0] = { ...ink.strokes[0], medium: 'ink' };
+  const ink = vectors(); for (const i of [1, 2, 3, 4]) ink.strokes[i] = { ...ink.strokes[i], medium: 'graphite' };
   assert.throws(() => applyLinesEdit(ink, lines(), edit([{ where: {}, do: 'after' }]), linesListing(ink, { mask, forms })), /4 of the lines you draw after the washes are the pencil lay-in of an ink drawing/);
   assert.equal(applyLinesEdit(ink, lines(), edit([{ where: { tagged: 'ink' }, do: 'after' }]), linesListing(ink, { mask, forms })).order, 'both');
+  // a pencil drawing is laid before the washes only: "after" is refused with the reason, never dropped in silence; dropping and weighting it are taken
+  const pencil = vectors('pencil'), pl = linesListing(pencil, { mask, forms });
+  assert.throws(() => applyLinesEdit(pencil, lines(), edit([{ where: { ids: [5] }, do: 'after' }]), pl), /1 lines are to be drawn after the washes, but this drawing is pencil\. The painter lays a pencil drawing before the washes only/);
+  const kept = applyLinesEdit(pencil, lines(), edit([{ where: { tagged: 'drop' }, do: 'drop' }, { where: { ids: [5] }, weight: 1.5 }]), pl); assert.equal(kept.order, 'first'); assert.equal(kept.record.dropped, 2); assert.equal(kept.closing, null);
 });
 
 test('the choice is written as drawing stems of its own, with the run settings that paint them', () => {

@@ -6,8 +6,8 @@ import { linesListing } from './lines-edit.mjs';
 // a 20 x 10 pixel map on a 100 x 50 mm sheet: the face (1) is the left half, an eye (2) a patch in it
 const mask = { ids: Uint8Array.from({ length: 200 }, (_, i) => { const x = i % 20, y = (i / 20) | 0; return x >= 4 && x < 6 && y >= 4 && y < 6 ? 2 : x < 10 ? 1 : 0; }), width: 20, height: 10 };
 const things = [{ thing: 'face', kind: 'face' }, { thing: 'eye', kind: 'eye', parentId: 1 }], forms = [{ id: 1, name: 'face', kind: 'face' }, { id: 2, name: 'eye', kind: 'eye' }];
-const stroke = (seq, x, y, more = {}) => ({ seq, line: seq, part: 'outline', phase: 'growth', object: 0, dark: 0.3, path: [[x, y], [x + 4, y], [x + 8, y]], widths: [0.3], outline: [[[x, y - 0.1], [x + 8, y - 0.1], [x + 8, y + 0.1], [x, y + 0.1]]], medium: 'graphite', ...more });
-const vectors = { medium: 'pencil', sheetMm: 100, heightMm: 50, strokes: [stroke(1, 10, 10), stroke(2, 20, 22), stroke(3, 60, 30, { drop: true }), stroke(4, 70, 40)] };
+const stroke = (seq, x, y, more = {}) => ({ seq, line: seq, part: 'outline', phase: 'growth', object: 0, dark: 0.3, path: [[x, y], [x + 4, y], [x + 8, y]], widths: [0.3], outline: [[[x, y - 0.1], [x + 8, y - 0.1], [x + 8, y + 0.1], [x, y + 0.1]]], medium: 'ink', ...more });
+const vectors = { medium: 'ink', sheetMm: 100, heightMm: 50, strokes: [stroke(1, 10, 10), stroke(2, 20, 22), stroke(3, 60, 30, { drop: true }), stroke(4, 70, 40)] };
 const base = { vectors, mask, things, forms, sheet: { widthMm: 100, heightMm: 50 }, studies: 3, listing: linesListing(vectors, { mask, forms }) };
 
 test('a choice\'s tools are checked together: the forms first, then the lines and the per-form settings against them', () => {
