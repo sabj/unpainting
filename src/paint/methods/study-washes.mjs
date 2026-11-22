@@ -21,9 +21,9 @@ import { passage } from '../../crop/blockin.mjs';
 import { labOf } from '../../eval/colour.mjs';
 import { outlineLoops, loopsMask } from './wash-strokes.mjs';
 import { laneFill } from './sweep-fill.mjs';
-import { mixFor, mixOver, filmLab } from './puddles.mjs';
+import { filmLab } from './puddles.mjs';
+import { valueMix as mixToValue, valueRefOf } from './value-mix.mjs';
 import { kmeans, roundMask, dilate } from './study-shapes.mjs';
-import { monoAt } from './mono-mix.mjs';
 import { touchesFrom } from './touch-layer.mjs';
 import { namedForms, formCoverage } from './named-forms.mjs';
 import { brushCeilingMm, kitUnder } from './form-brush.mjs';
@@ -308,8 +308,6 @@ const JOIN_MM = 2;
 /** Near-monochrome value steps: a wash whose study lightness spans at least this (L*, 10th to 90th percentile) is laid in
  * steps: first at the lightness of this quantile, then the cells at or under these quantiles over it, each part at least
  * MONO_STEP_LEAST mm2. */
-/** A sheet darker than this (L* against white) is toned. */
-const TONED_L = 95;
 const MONO_STEP_L = 8, MONO_FIRST = 0.7, MONO_CUTS = [0.4, 0.12], MONO_STEP_LEAST = 25;
 /** Touches are laid with rounds of these widths (mm): the smallest a pointed round's touch, the largest a big round's stroke. */
 const TOUCH_KIT = [0.8, 1.4, 2.4, 4, 6.5, 10];
@@ -454,16 +452,8 @@ export function planStudyWashes({ k, w, h, studies, flat = false, density = null
   // the sheet (the paper rule: bare paper is the toned sheet). So a wash's value is read against the study's own white and
   // laid as that much darker than the sheet. Read against the sheet instead, every value of the study lighter than the
   // buff is lost and the rest come out a few L* deep.
-  const valueRef = labOf(paperCol, 0, [255, 255, 255])[0] < TONED_L ? [255, 255, 255] : paperCol;
-  const valueMix = (colour, u, given = null) => {
-    const fresh = u.every(v => v <= 1e-9), sL = labOf(colour, 0, valueRef)[0], want = sL >= DARK_L ? sL + (100 - sL) * ERR_LIGHT : sL;
-    const base = given ?? MONO ? given ?? monoAt(MONO, want) : fresh ? mixFor(colour, pigments, paperCol) : mixOver(colour, u, pigments, paperCol);
-    if (!(base.reduce((a, v) => a + v, 0) > 1e-9)) return base;
-    const Lat = t => filmLab(u.map((v, j) => v + t * base[j]), pigments, paperCol)[0];
-    let lo = MONO ? 0.01 : 0.05, hi = MONO ? 32 : 8; if (Lat(hi) > want) return base.map(v => v * hi); if (Lat(lo) < want) return base.map(v => v * lo);
-    for (let it = 0; it < 11; it++) { const mid = Math.sqrt(lo * hi); if (Lat(mid) > want) lo = mid; else hi = mid; }
-    return base.map(v => v * Math.sqrt(lo * hi));
-  };
+  const valueRef = valueRefOf(paperCol);
+  const valueMix = (colour, u, given = null) => mixToValue(colour, u, { pigments, paperCol, valueRef, mono: MONO, given, want: sL => (sL >= DARK_L ? sL + (100 - sL) * ERR_LIGHT : sL) });
   // One wash: `colour` is what its own cells are to read as over what is laid there (or, with `amounts`, the mix itself).
   const wash = (stage, what, loops, colour, { strokes = null, amounts = null, own = null, move = 'wet on dry', grade = !flat, studyLayer = 1, parts = null, growMm = GROW_MM, kit = washKitMm, edge = null, edgeCharge = 1, base = null, scale = 1, onMix = null } = {}) => {
     if (!loops.length) return null;

@@ -1,0 +1,87 @@
+# Paint this picture: a working session
+
+You are the painter's planner for one watercolour. A simulated hand, paper and paint will lay whatever plan you hand
+over, on a sheet `SHEET_W` by `SHEET_H` mm. You do not paint stroke by stroke: you decide the plan the painter follows.
+
+A code planner has already made a plan from the same inputs you have. It is in `auto/`. It is your starting point, not
+your limit. Its usual faults on other pictures: every edge hard, flat slabs where the subject grades, a face cut into
+facets or left as one flat patch, colour too saturated or too dark, small white notches of bare paper, and fine marks
+that copy the study instead of reading as brushwork. Judge for yourself whether it has them here.
+
+You have this folder, a shell, and MINUTES minutes of your own time (time you wait for the tools is not counted).
+Work as a painter plans: look hard at the subject, decide, check, revise. Use the tools as much as you like; read
+`README.md` first, it lists them.
+
+## How to work
+
+This is a long task; use the time. A session that changes two numbers in the first minute and stops has not done it.
+
+The painter now lays the strength you plan. Use the whole time. Write three sentences on the look you are going for
+before you start; make the painting recognisably yours.
+
+1. Open every picture in `inputs/` and `auto/plan.png` and look at them, form by form. Read `auto/washes.txt` and
+   `auto/plan.json`: which washes make each form, in what order, with what brush, at what colour.
+2. Write down, for yourself (`notes.md`), how a painter would paint this subject: the forms, the order, where the
+   lights are kept, where edges are lost, where the few darks go. Then write what the code planner's plan does
+   differently, fault by fault, and which of those you can reach: through a setting, by editing its plan wash by
+   wash, or only by writing the plan yourself.
+3. Decide. Tuning is cheap and re-plans the whole picture. Editing the plan keeps every wash you do not touch
+   exactly as the code planner would lay it (its shape, its value, its strokes) and lets you change the washes you
+   judge wrong, one by one. Your own script is free in every passage and is all your own work, values included:
+   nothing of the code planner's plan is kept. Use your shell to measure and compute what you need: positions and
+   boxes from `inputs/forms-ids.png`, colours from the studies.
+   What earlier sessions on other pictures showed: a session that only tuned settings came out almost the same as
+   the code planner.
+4. Check that your work compiles with `./unpaint plan` as often as you like; it answers with counts only (shapes,
+   washes, strokes, the widest brush). When the plan is what you meant, spend a look.
+
+## What you may hand over
+
+Your answer is the file `choice.json` as it stands when you stop. Three kinds, from the least change to the most:
+
+1. **The code planner, tuned.** `{"kind": "settings", "settings": {"study1.shapes": 60, "floors": "8,4,2"}, "why": "..."}`.
+   `auto/settings.json` lists the planner's settings with their present values and what each does. Any other option of
+   the painter may be named too if you know it; the inputs and the guard are locked.
+2. **The code planner's plan, edited wash by wash.** `{"kind": "plan", "plan": "my-plan.json", "why": "..."}`.
+   Copy `auto/plan-to-edit.json` to a file of your own and change it: it lists every wash of the plan in painting
+   order. You may change a wash's colour, strength, brush, direction or the way it is laid (soft or hard), move it,
+   leave it out, merge several into one, and add passages of your own between them. `README.md` gives the format.
+   **A wash you do not touch is painted exactly as the code planner would paint it**: this is the way to keep its
+   values and shapes where they are right and change only what you judge wrong.
+3. **Your own painting script.** `{"kind": "script", "script": "script.json", "why": "..."}`: you write every passage
+   yourself. `own-script-brief.md` is the full brief for that: the format, the kit, the paints, how a watercolour is
+   built. A script is laid as written; the code planner is not used, and nothing of its plan is kept: every value
+   and every shape is then yours to get right.
+
+`choice.json` starts as `{"kind": "settings", "settings": {}}`: change nothing and the painting is exactly the code
+planner's. Leaving it so is a legitimate answer if you judge its plan cannot be bettered by what you can reach; say why.
+
+## Looks are stepping back, not search
+
+You may check that a choice compiles as often as you like (`./unpaint plan`: counts only). What is limited is LOOKING
+at a result: `./unpaint look` shows your present choice's plan as a picture beside the subject and the middle study,
+with each named form measured against the study and every wash as data. You have LOOKS looks. Each is counted before
+it is shown and kept on record. Use a look as a painter steps back from the easel: decide, look once, revise once for what you saw, go on.
+Do not try settings one after another to see which looks best, and do not draw or compare the plan's picture by any
+other means (your own renderer, an image diff): that is the search the limit exists to prevent. The session's
+commands are recorded, and a session that reaches for the painter outside its folder is not painted. No score is ever shown to you; there is none to chase.
+
+After your last look you may still revise, once, for what it showed, and plan it (without a picture) to check that it
+compiles.
+
+## What is asked of the painting
+
+The finished sheet should read as a watercolour a person painted of this subject: big connected washes first,
+then the middle shapes, then few darks and accents last; lights left as paper; each form at about the middle study's
+value (not darker, and not paler); soft where forms turn, hard only where an edge is really sharp; a face or an animal
+recognisable and unbroken. DRAWING_NOTE
+
+## Before you stop
+
+- `choice.json` holds your final choice, with one or two sentences of `why`.
+- You ran `./unpaint plan` on it and it compiled. A final choice that was not planned, or does not compile, is not
+  painted: the last choice of yours that did compile is painted in its place, and the record says so.
+- Say in your last message what you chose, what you changed from the code planner's plan and why (for an edited
+  plan: which washes, by number), and what you expect to be still wrong in the painting.
+
+The pictures and files are in the current directory. Start with `README.md`.

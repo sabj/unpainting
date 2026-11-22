@@ -5,10 +5,10 @@ way the project's painting-planner skill asks (its text is at the end of this br
 that carries the plan out. A simulated painter lays your script on a simulated sheet of cold-press paper: real water,
 real pigment, a real brush with a loaded belly and a point, drying in real time. The replay is watched. It must look
 like a person painting in watercolour, broad to fine and light to dark, and the finished sheet must look like that
-person's work: pale, connected, soft where the form is soft, with few and late darks.
+person's work: connected, soft where the form is soft, with darks laid late.
 
 Earlier scripts written from the first version of this brief had strokes that followed the form well, but they were
-crude and far too dark and saturated, they laid a hard dark shape per feature instead of one wash per form, and they
+crude, they laid a hard dark shape per feature instead of one wash per form, and they
 ignored the brush guidance (a 38 mm mop across a cat's face). This brief exists to correct exactly that.
 
 ## What you are given
@@ -21,8 +21,8 @@ INPUT_LIST
 DRAWING_NOTE
 
 The studies run coarse to fine. They are your VALUE AND COLOUR REFERENCE: the finished sheet should be accurate to
-them, place by place, and never darker or more saturated than the richest study shows at that place. The first study
-gives the broad pale washes; the later ones the smaller shapes laid afterwards. Do not copy their flat hard shapes.
+them, place by place. The first study
+gives the broad washes; the later ones the smaller shapes laid afterwards. Do not copy their flat hard shapes.
 
 The named forms are a reviewed segmentation of the subject: each form is one flat colour in the forms picture, and the
 `FORMS` list at the end gives each form's name, kind and box in sheet millimetres. Plan and paint FORM BY FORM.
@@ -45,31 +45,27 @@ The painter's kit today (name: belly width in mm at full pressure) is: KIT_LIST.
 
 For every soft named form (a face, fur, an animal, hair, a figure, clothing; and the sky or background as one form):
 
-1. **One pale connected base wash over the whole form**, its lights reserved (they stay paper), hard only at the
-   form's outer silhouette. Its swatch is the form's LIGHT value in the first study: pale (L* about 82 to 92; for a
-   dark form such as black fur or dark hair a mid-tone, never darker than L* 60). One passage, `paper: "wet"`,
+1. **One connected base wash over the whole form**, its lights reserved (they stay paper), hard only at the
+   form's outer silhouette. Its swatch is the form's LIGHT value in the first study. One passage, `paper: "wet"`,
    `edges: "lost"`, flooded, direction along the form's long axis. No white holes inside the form except the lights.
 2. **Darker shapes dropped in while it is damp**: the form's darker masses from the block-in and the middle study, as
    their own shapes with lost edges, written IMMEDIATELY after the base wash (`into`, `wait: "damp"`), a step darker
-   than the base, never the final dark. Two to five such shapes a form; they follow the form (fur growth, round a
+   than the base. They follow the form (fur growth, round a
    cheek, the fall of hair or cloth).
-3. **After drying, at most two feathered glazes** from the later studies, each smaller than the last, each pale
+3. **After drying, feathered glazes** from the later studies, each smaller than the last
    (`wait: "dry"`, `edges: "lost"`), to bring the shadow side to the study's value.
 4. **Crisp marks only** in the eyes, nostrils, the mouth and the few darkest accents of the whole picture
-   (`paper: "dry"`, `edges: "found"`, the 3 mm round or the rigger, strokes placed point by point). No more than
-   about a dozen such passages on the sheet.
+   (`paper: "dry"`, `edges: "found"`, the 3 mm round or the rigger, strokes placed point by point).
 
 Rules that hold everywhere:
 
-- **About four layers at most at any spot** (base, a drop, two glazes; or base, a glaze and an accent). Count them.
-  Each layer darkens what is under it: write each swatch as that ONE layer on white paper, and check that the layers
-  together reach the richest study's value at that spot and do not pass it.
-- **Not darker, not more saturated than the studies.** If in doubt, paler. Most of the sheet is pale.
+- **Each layer darkens what is under it**: write each swatch as that ONE layer on white paper, and check that the layers
+  together reach the richest study's value at that spot.
 - **Stroke direction along the form**: `handling.direction` for a wash; for the darker shapes and glazes inside a
   form prefer `kind: "strokes"` written point by point along the form, pressure swelling and lifting.
 - Sky and background: one or two large soft washes (wet, lost), laid first or while a form dries; they stop at the
   outer silhouette of a figure or animal and never cross a face. A cloud's lit top is reserved, never outlined.
-- Order over the whole sheet: (drawing, already done) then reserve the lights and lay the broad pale washes, then
+- Order over the whole sheet: (drawing, already done) then reserve the lights and lay the broad washes, then
   mid-values and shadow glazes, then the selected darks. Darks are later than lights, always.
 - Boundaries: hard at the outer silhouette of a figure or animal against the background; soft or lost across
   internal borders (cheek to hair, face to neck, muzzle to cheek). Never paper cut-outs.
@@ -86,7 +82,7 @@ order, because you must plan before you script:
 ```
 "plan": {
   "checklist": [ "<each line of the checklist below, ticked [x], with what you found or decided>", ... ],
-  "forms": [ <one row per named form you paint, and one for the sky or background>, ... ],
+  "forms": [ <a row for each form you paint, and one for the sky or background>, ... ],
   "order": "<the order of visits over the whole sheet, in two or three sentences>"
 }
 ```
@@ -99,10 +95,10 @@ The checklist (copy every line, tick it, and add your finding after a colon):
 - [ ] Record the drawing given (ink or pencil) and what it carries
 - [ ] Read the studies, coarse to fine: the lightest and darkest value (L*) and local colour of each named form
 - [ ] Choose the paints
-- [ ] Record one row per form (fields below)
+- [ ] Record a row for each form you paint (fields below)
 - [ ] Name the checkpoint that shows each stage's contribution
-- [ ] Check: every form's first wash pale and connected; rounds of 17 mm or less inside faces, figures and animals;
-      darks later than lights; four layers at most at any spot; nothing darker or more saturated than the studies
+- [ ] Check: every form's first wash connected; rounds of 17 mm or less inside faces, figures and animals;
+      darks later than lights; every form at the studies' value
 ```
 
 A row of `forms` (every field, in plain words and numbers):
@@ -273,7 +269,7 @@ Aim for 20 to 45 passages: one base wash and a few drops and glazes a form, then
 
 Go through the last line of the checklist against your script, form by form, and correct the script where it fails.
 Then look at the script as a picture: where would the brush go, in what order? If any form is a set of hard dark
-patches rather than one pale wash with soft darker shapes in it, rewrite that form.
+patches rather than one connected wash with soft darker shapes in it, rewrite that form.
 
 ## FORMS
 

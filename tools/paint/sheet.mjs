@@ -111,7 +111,19 @@ export function riskLine(r) {
 }
 const planLine = p => (p ? `${p.passages != null ? `${p.passages} passages` : `${p.shapes ?? '?'} shapes`}, ${p.washes ?? '?'} washes, ${p.strokes ?? '?'} strokes` : 'no plan was written');
 /** What the author cost: its time, and tokens and dollars when its command reports them. */
-const authorLine = a => (a.key === 'auto' || a.cli === 'script' ? '' : `author ${a.seconds != null ? `${a.seconds} s` : 'not called'}${a.calls?.length > 1 ? ` in ${a.calls.length} calls` : ''}${a.tokens ? `, ${a.tokens.toLocaleString('en-US')} tokens` : ', tokens not reported'}${a.costUSD != null ? `, $${a.costUSD.toFixed(2)}` : ''}`);
+const authorLine = a => (a.key === 'auto' || a.cli === 'script' ? '' : a.work === 'session' ? sessionLine(a) : `author ${a.seconds != null ? `${a.seconds} s` : 'not called'}${a.calls?.length > 1 ? ` in ${a.calls.length} calls` : ''}${a.tokens ? `, ${a.tokens.toLocaleString('en-US')} tokens` : ', tokens not reported'}${a.costUSD != null ? `, $${a.costUSD.toFixed(2)}` : ''}`);
+/**
+ * What a working session did, in one line: what it handed over, its looks, its own minutes and its tool calls.
+ * Exported for the sheets that set several authors side by side.
+ */
+export function sessionLine(a) {
+  const s = a.session, sub = s?.submitted;
+  if (!s) return 'working session: not run';
+  const set = Object.entries(sub?.settings ?? {}).map(([k, v]) => `${k}=${v}`);
+  const e = a.planEdit ?? sub?.edit;
+  const did = !sub ? 'handed over nothing' : sub.kind === 'plan' ? (e ? (e.unchanged ? 'edited nothing: this is the code planner\'s plan' : `edited the code planner's plan: ${e.untouched} of its ${e.auto} washes untouched (${Math.round(100 * e.untouchedShare)}%), ${e.changed} changed, ${e.moved} moved, ${e.mergedFrom} merged into ${e.merged}, ${e.dropped} left out, ${e.added} of its own added`) : 'edited the code planner\'s plan') : sub.kind === 'script' ? `wrote its own script${a.passages ? ` (${a.passages} passages)` : ''}` : set.length ? `changed ${set.length} planner setting${set.length > 1 ? 's' : ''}: ${set.join(', ')}` : 'changed nothing: this is the code planner\'s plan';
+  return `${did} · ${s.looks.length} of ${s.looksMost} looks · ${Math.round(s.ownMinutes)} of ${s.minutesMost} min · ${s.toolCallsTotal} tool calls${s.ended === 'time limit' ? ' · STOPPED BY THE CLOCK' : ''}${sub?.note ? ` · ${sub.note}` : ''}${s.reusedFrom ? ' · from its earlier session' : ''}`;
+}
 /** Words wrapped to lines of about `chars` letters. */
 export function wrap(text, chars, most = 9) {
   const lines = [''];
@@ -131,7 +143,7 @@ export function runPanels(run, pics) {
     panels.push({ title: `Study ${i + 1}: ${s.role.split(" (")[0]}`, captions: [`${s.path.split('/').pop()}, shapes from ${s.floorMm2 ?? '?'} mm2`, got ? `gave ${got.shapes} shapes, ${got.washes} washes, ${got.strokes} strokes` : ''], image: s.abs });
   });
   if (pics.forms) panels.push({ title: `Named forms (SAM), ${run.masks.forms.length}`, captions: [fit(run.masks.forms.map(f => f.name).join(', '), 4000, 16), run.masks.read ? 'given to the planner' : 'shown to the author; a script is laid as written'], image: pics.forms });
-  if (pics.plan) panels.push({ title: `Wash plan by ${run.author.label ?? run.author.name}`, alert: res?.planPreview ? null : 'NO PLAN',
+  if (pics.plan) panels.push({ title: `Wash plan: ${run.author.label ?? run.author.name}`, alert: res?.planPreview ? null : 'NO PLAN',
     captions: [res?.planPreview ? planLine(res?.plan) : 'no plan compiled', res?.planPreview ? `widest wash brush ${mm(res?.plan?.widestBrushMm)}; ${res?.plan?.stages ?? '?'} stages` : '', authorLine(run.author)], image: pics.plan });
   const state = res?.state ?? 'not run';
   panels.push({ title: state === 'finished' ? 'Painting' : `Painting: ${state.toUpperCase()}`, alert: state === 'finished' ? null : state === 'plan only' ? 'PLAN ONLY' : state === 'unfinished' ? 'UNFINISHED' : 'NOT PAINTED',
@@ -141,7 +153,7 @@ export function runPanels(run, pics) {
 
 /** The header of one run. */
 export function runHeader(run) {
-  const c = run.code, h = [`${run.subject.id} (${run.subject.name}) · ${run.mode === 'plan' ? 'PLAN ONLY (CPU)' : 'painting (GPU)'} · author ${run.author.label ?? run.author.name} · ${run.studiesMode === 'author' ? 'open tools' : 'locked inputs'} · ${c.commit ? c.commit.slice(0, 8) : 'no commit'}${c.dirty ? ' + uncommitted changes' : ''} · ${run.started}`];
+  const c = run.code, h = [`${run.subject.id} (${run.subject.name}) · ${run.mode === 'plan' ? 'PLAN ONLY (CPU)' : 'painting (GPU)'} · ${run.author.label ?? run.author.name} · ${run.studiesMode === 'author' ? 'open tools' : 'locked inputs'} · ${c.commit ? c.commit.slice(0, 8) : 'no commit'}${c.dirty ? ' + uncommitted changes' : ''} · ${run.started}`];
   h.push(`sheet ${run.sheet.widthMm} mm, ${run.sheet.cells} cells, ${run.sheet.cellMm} mm a cell · ${riskLine(run.results?.cheatRisk)} · widest wash brush ${mm(run.results?.plan?.widestBrushMm)}`);
   for (const d of run.subject.deviations) h.push(`DIFFERS from the record: ${d.what} ${d.now} (record ${d.record})`);
   if (run.settings.length) h.push(`settings changed: ${run.settings.map(s => `${s.name}=${s.value ?? 'painter default'} (default ${s.default})`).join(', ')}`);
@@ -182,6 +194,7 @@ export async function writeRunSheet(run, file, { height = 440 } = {}) {
  * with several, a row is the source and then each author's wash plan and painting.
  */
 export async function writeGridSheet(runs, file, { title, height = 400 } = {}) {
+  const label = run => run.author.label ?? run.author.name;
   const subjects = [...new Set(runs.map(r => r.subject.key))], authors = [...new Set(runs.map(r => r.author.key))], rows = [];
   for (const s of subjects) {
     const mine = runs.filter(r => r.subject.key === s);
@@ -190,12 +203,12 @@ export async function writeGridSheet(runs, file, { title, height = 400 } = {}) {
     for (const a of authors) {
       const run = mine.find(r => r.author.key === a); if (!run) continue;
       const all = runPanels(run, await runPictures(run));
-      for (const p of all.filter(p => (run.mode === 'plan' ? /^Wash plan/ : /^Wash plan|^Painting/).test(p.title))) panels.push({ ...p, title: p.title.replace(/^Wash plan by /, '').replace(/^Painting/, `${run.author.name}: painting`) });
+      for (const p of all.filter(p => (run.mode === 'plan' ? /^Wash plan/ : /^Wash plan|^Painting/).test(p.title))) panels.push({ ...p, title: /^Wash plan/.test(p.title) ? (run.mode === 'plan' ? label(run) : `Wash plan of: ${label(run)}`) : p.title.replace(/^Painting/, label(run)) });
     }
     rows.push({ label: `${mine[0].subject.id} (${mine[0].subject.name})`, height, panels });
   }
   const first = runs[0], c = first.code;
-  const header = [title ?? `${subjects.length} subjects x ${authors.length} authors`, `${first.mode === 'plan' ? 'PLAN ONLY (CPU)' : 'painting (GPU)'} · authors across: ${authors.map(a => { const x = runs.find(r => r.author.key === a).author; return x.label ?? x.name; }).join(' | ')} · locked inputs · target guard gentle · ${c.commit ? c.commit.slice(0, 8) : 'no commit'}${c.dirty ? ' + uncommitted changes' : ''} · ${first.started}`];
+  const header = [title ?? `${subjects.length} subjects x ${authors.length} authors`, `${first.mode === 'plan' ? 'PLAN ONLY (CPU)' : 'painting (GPU)'} · columns: Source | ${authors.map(a => { const x = runs.find(r => r.author.key === a).author; return x.key === 'auto' ? 'Code planner alone' : x.name; }).join(' | ')} · locked inputs · target guard gentle · ${c.commit ? c.commit.slice(0, 8) : 'no commit'}${c.dirty ? ' + uncommitted changes' : ''} · ${first.started}`];
   if (Object.keys(first.switches).length) header.push(`SWITCHES in the environment: ${Object.entries(first.switches).map(([k, v]) => `${k}=${v}`).join(' ')}`);
   return composeSheet({ header, rows, file });
 }

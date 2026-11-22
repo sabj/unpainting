@@ -33,6 +33,7 @@ import fullsize as fz  # noqa: E402
 
 VERSION = "pairs-v1"
 ALPHA = 0.05          # the usual two-sided level for calling a difference; not fitted to anything
+TOP_LOGPROBS = 5      # alternatives asked for at each reply token on the local route; "1" and "2" are the top two
 MIN_PAINT = 0.05      # fullsize.py's rule: a tile under 5% paint in both paintings has nothing to judge
 PAIR_PROMPT = """Image 1 and Image 2 show the same part of one subject, painted two different ways. Each is shown at full size: about {mm} mm of paper across, from the {where} of the sheet.
 Both are meant to be made by hand in this style: {style}. You do not know who or what made either one.
@@ -40,6 +41,26 @@ Look closely, the way a watercolour teacher looks at a sheet. Which image looks 
 Weigh the edges (a mix of hard, soft and lost edges, against cut-out rims and stepped contour bands), the washes (graded and transparent, against flat poster fills, stripes and blotches), the marks (marks a brush in a hand makes, against rectangles, grids and slits) and artefacts (white flecks, pale seams, speckle, a digital look).
 Do not choose by which image is darker, sharper or more detailed. You must choose one.
 Reply with JSON only, no prose: {{"choice":1,"reason":"one short sentence"}} or {{"choice":2,"reason":"one short sentence"}}"""
+# J3 (local route): the same question, answered with the choice alone. The reason came after the choice and never
+# informed it; leaving it out makes a local call several times shorter.
+PAIR_PROMPT_J3 = PAIR_PROMPT.rsplit("\n", 1)[0] + """
+Reply with JSON only, no prose: {{"choice":1}} or {{"choice":2}}"""
+
+# Two more questions, for scoring a painting against the target picture itself (versus.py's target mode). They are asked
+# apart, in separate calls, so that loose attractive washes cannot stand in for a subject that is wrong, and the
+# other way round. Neither says that one of the two images may be the target.
+_HEAD = """Image 1 and Image 2 show the same part of one subject, painted two different ways. Each is shown at full size: about {mm} mm of paper across, from the {where} of the sheet.
+Both are meant to be watercolours in this style: {style}. You do not know who or what made either one.
+"""
+_TAIL = """
+You must choose one.
+Reply with JSON only, no prose: {{"choice":1}} or {{"choice":2}}"""
+QUESTIONS = {
+    "subject": _HEAD + """Which image shows the subject better? Weigh whether the forms read clearly as what they are, whether features are in the right place and the right shape, whether the lights and darks model the form, and whether the colours belong to the subject and to each other.
+Do not choose by how the paint is handled: a loose, attractive wash that does not describe the subject is the worse one here.""" + _TAIL,
+    "craft": _HEAD + """Which image is the better piece of watercolour painting, as craft alone? Weigh the edges (a mix of hard, soft and lost edges, against cut-out rims and stepped contour bands), the washes (graded and transparent, against flat poster fills, stripes and blotches), the marks (marks a brush in a hand makes, against rectangles, grids and slits) and artefacts (white flecks, pale seams, speckle, a digital look).
+Do not choose by which image shows the subject more exactly, or by which is darker, sharper or more detailed.""" + _TAIL,
+}
 
 
 def parse_choice(txt):
@@ -54,6 +75,80 @@ def parse_choice(txt):
         except Exception:
             pass
     return None
+
+
+def choice_logit(logprobs, labels=("1", "2")):
+    """How strongly a reply preferred image 1 over image 2: log P("1") - log P("2") at the token that carries the
+    choice, from the server's token log-probabilities. None when the reply has no such token. When the other answer
+    is not among the listed alternatives its probability is at most the smallest listed one, so that is used: the
+    result then understates the preference and never overstates it."""
+    digit = lambda tok: re.sub(r"[^0-9A-Za-z]", "", tok or "")   # '2', ' 2}', '2}\n```' all carry the answer 2
+    for t in logprobs or []:
+        if not digit(t.get("token")).isdigit():   # the answer token, even when it names neither image (a "1" for the source)
+            continue
+        tops = t.get("top_logprobs") or []
+        best = {}
+        for alt in [t, *tops]:
+            d = digit(alt.get("token"))
+            if d in labels and alt.get("logprob") is not None:
+                best[d] = max(best.get(d, -math.inf), float(alt["logprob"]))
+        floor = min([float(a["logprob"]) for a in tops if a.get("logprob") is not None] or [None], default=None)
+        one, two = best.get(labels[0], floor), best.get(labels[1], floor)
+        if one is None or two is None or (labels[0] not in best and labels[1] not in best):
+            return None
+        return one - two
+    return None
+
+
+def aggregate_margins(tiles, margins, judges):
+    """J3's vote. margins[(judge, tile index)] is {"ab": x, "ba": y}: each the judge's log-odds for the image shown
+    first in that order. A judge's habit of picking a position adds the same amount to both, so half their difference
+    is its preference for painting A with the habit taken out; it votes A when that is above zero and B when below.
+    A judge that could only be read in one order casts no vote. A tile goes to the painting with more judge votes.
+    Same result shape as aggregate()."""
+    live = [i for i, t in enumerate(tiles) if not t["identical"]]
+    need = math.ceil(0.6 * len(live))
+    per_judge, votes, prefs = {}, {i: {} for i in live}, {i: {} for i in live}
+    for j in judges:
+        r = {"a": 0, "b": 0, "split": 0, "answered": 0}
+        habit, strength = [], []
+        for i in live:
+            m = margins.get((j, i), {})
+            if m.get("ab") is None or m.get("ba") is None:
+                continue
+            r["answered"] += 1
+            pref = (m["ab"] - m["ba"]) / 2
+            habit.append((m["ab"] + m["ba"]) / 2); strength.append(abs(pref))
+            v = "a" if pref > 0 else "b" if pref < 0 else "split"
+            r[v] += 1
+            votes[i][j] = v; prefs[i][j] = round(pref, 3)
+        r["counts"] = r["answered"] >= need and r["answered"] > 0
+        r["positionHabit"] = round(sum(habit) / len(habit), 3) if habit else None   # log-odds for the first image; 0 is none
+        r["meanStrength"] = round(sum(strength) / len(strength), 3) if strength else None
+        per_judge[j] = r
+    ta = tb = ties = 0
+    rows = []
+    for i, t in enumerate(tiles):
+        row = {"row": t["row"], "col": t["col"], "box": list(t["box"]), "where": t["where"], "identical": t["identical"]}
+        if t["identical"]:
+            row.update(votes={}, prefers=None); ties += 1
+        else:
+            va = sum(1 for v in votes[i].values() if v == "a"); vb = sum(1 for v in votes[i].values() if v == "b")
+            row.update(votes=votes[i], prefA=prefs[i], prefers="a" if va > vb else "b" if vb > va else None)
+            ta += va > vb; tb += vb > va; ties += va == vb
+        rows.append(row)
+    complete = bool(tiles) and (not live or all(r["counts"] for r in per_judge.values()))
+    # graded answer: the chance a judge picks B over A with its position habit removed, averaged over tiles within
+    # a judge and then over judges. It still moves when A takes every tile.
+    soft = [sum(1 / (1 + math.exp(max(-50.0, min(50.0, p[j])))) for p in prefs.values() if j in p) / max(1, sum(j in p for p in prefs.values()))
+            for j in judges if any(j in p for p in prefs.values())]
+    out = {"complete": complete, "minTilesPerJudge": need, "callsPerTile": 2, "vote": "margin", "per_judge": per_judge,
+           "tiles": rows, "tilesA": ta, "tilesB": tb, "ties": ties, "softB": round(sum(soft) / len(soft), 4) if soft else None}
+    if complete:
+        out.update(verdict(ta, tb))
+        out["judgeVotes"] = {"a": sum(r["a"] for r in per_judge.values()), "b": sum(r["b"] for r in per_judge.values()),
+                             "split": sum(r["split"] for r in per_judge.values())}
+    return out
 
 
 def sign_test(k, n):
@@ -92,9 +187,10 @@ def paired_tiles(img_a, img_b, plate_mm):
     return out
 
 
-def _content(first, second, tile, style, plate_mm, width, sp):
+def _content(first, second, tile, style, plate_mm, width, sp, question="look"):
     side_mm = round((tile["box"][2] - tile["box"][0]) / (width / plate_mm))
-    text = PAIR_PROMPT.format(mm=side_mm, where=tile["where"], style=style)
+    prompt = QUESTIONS[question] if question != "look" else PAIR_PROMPT_J3 if sp.PROVIDER == "local" else PAIR_PROMPT
+    text = prompt.format(mm=side_mm, where=tile["where"], style=style)
     uri = lambda im: sp.data_uri(im, max(im.size))  # 1:1, never resized
     return [{"type": "text", "text": text}, {"type": "image_url", "image_url": {"url": uri(first)}},
             {"type": "image_url", "image_url": {"url": uri(second)}}]
@@ -147,20 +243,28 @@ def aggregate(tiles, picks, judges, calls):
     return out
 
 
-def compare(image_a, image_b, style, plate_mm, calls=2, seed=1, post=None, vision=True):
-    """Judge every tile in both orders. calls must be even: half the calls of a (judge, tile) show A first."""
+def compare(image_a, image_b, style, plate_mm, calls=2, seed=1, post=None, vision=True, question="look"):
+    """Judge every tile in both orders. calls must be even: half the calls of a (judge, tile) show A first.
+    question is "look" (which looks more hand-painted, the default) or one of QUESTIONS. An image may be a path or
+    an already loaded picture."""
+    if question != "look" and question not in QUESTIONS:
+        raise ValueError(f"unknown question {question}; known: look, {', '.join(QUESTIONS)}")
     if plate_mm <= 0:
         raise ValueError("plate_mm must be positive")
     if calls < 2 or calls % 2:
         raise ValueError("calls must be an even number, 2 or more: each judge sees each tile in both orders")
-    img_a, img_b = load_rgb(image_a), load_rgb(image_b)
+    img_a, img_b = [im if isinstance(im, Image.Image) else load_rgb(im) for im in (image_a, image_b)]
     tiles = paired_tiles(img_a, img_b, plate_mm)
-    base = {"version": VERSION, "paintingSize": list(img_a.size), "plateMm": plate_mm, "style": style, "tileMm": fz.TILE_MM,
+    base = {"version": VERSION, **({"question": question} if question != "look" else {}), "paintingSize": list(img_a.size), "plateMm": plate_mm, "style": style, "tileMm": fz.TILE_MM,
             "seed": seed, "alpha": ALPHA}
     if not vision:
         return {**base, "complete": False, "tiles": [{k: (list(v) if k == "box" else v) for k, v in t.items()} for t in tiles]}
     import score_painting as sp
-    post = post or sp._post
+    local = sp.PROVIDER == "local"
+    if local and calls != 2:
+        raise ValueError("the local route (J3) makes exactly 2 calls per judge and tile, one in each order")
+    if post is None:
+        post = (lambda m, msgs, max_tokens=0: sp.local_route.post(sp.LOCAL, m, msgs, max_tokens=max_tokens, top_logprobs=TOP_LOGPROBS)) if local else sp._post
     crops = [(img_a.crop(t["box"]), img_b.crop(t["box"])) for t in tiles]
     jobs = [(j, i, order) for j in sp.JUDGES for i, t in enumerate(tiles) if not t["identical"]
             for order in ("ab", "ba") * (calls // 2)]
@@ -170,7 +274,7 @@ def compare(image_a, image_b, style, plate_mm, calls=2, seed=1, post=None, visio
         j, i, order = job
         a, b = crops[i]
         first, second = (a, b) if order == "ab" else (b, a)
-        content = _content(first, second, tiles[i], style, plate_mm, img_a.width, sp)
+        content = _content(first, second, tiles[i], style, plate_mm, img_a.width, sp, question)
         budget, err = sp.J2_MAX_TOKENS, "no reply"
         for _ in range(3):  # up to two retries with the images, as fullsize.py does
             try:
@@ -180,23 +284,36 @@ def compare(image_a, image_b, style, plate_mm, calls=2, seed=1, post=None, visio
                 continue
             d = parse_choice(raw)
             if d:
-                return {"painting": order[d["choice"] - 1], "reason": d["reason"]}
+                return {"painting": order[d["choice"] - 1], "reason": d["reason"],
+                        **({"logit": choice_logit(_usage.get("logprobs"))} if local else {})}
             err, budget = "no valid JSON", min(budget * 2, sp.J2_MAX_TOKENS_CAP)
         return {"error": err}
 
-    with ThreadPoolExecutor(9) as ex:
+    workers, route = 9, {}
+    if sp.PROVIDER == "local":  # one model at a time: the server must not swap models between calls
+        jobs.sort(key=lambda job: sp.JUDGES.index(job[0]))
+        workers = sp.LOCAL["parallel"]
+        route = sp.local_route.record(sp.LOCAL)
+    with ThreadPoolExecutor(workers) as ex:
         got = list(ex.map(run, jobs)) if jobs else []
-    picks, errors, calls_log = {}, {j: 0 for j in sp.JUDGES}, []
+    picks, errors, calls_log, margins = {}, {j: 0 for j in sp.JUDGES}, [], {}
     for (j, i, order), d in zip(jobs, got):
         if "error" in d:
             errors[j] += 1
             calls_log.append({"judge": j, "tile": i, "order": order, "error": d["error"]})
         else:
             picks.setdefault((j, i), []).append((order, d["painting"]))
-            calls_log.append({"judge": j, "tile": i, "order": order, "picked": d["painting"], "reason": d["reason"]})
+            calls_log.append({"judge": j, "tile": i, "order": order, "picked": d["painting"], "reason": d["reason"],
+                              **({"logit": d["logit"]} if local else {})})
+            if local:
+                margins.setdefault((j, i), {})[order] = d["logit"]
     out = aggregate(tiles, picks, sp.JUDGES, calls)
+    if local:  # J3 votes by margin; the both-orders-agree count of J1 is kept beside it for reading
+        strict = {k: out.get(k) for k in ("tilesA", "tilesB", "ties", "p", "winner", "judgeVotes")}
+        strict["firstShare"] = {j: r["firstShare"] for j, r in out["per_judge"].items()}
+        out = {**aggregate_margins(tiles, margins, sp.JUDGES), "strictVote": strict}
     calls_log.sort(key=lambda c: (c["judge"], c["tile"], c["order"]))
-    return {**base, **out, "errors": errors, "judges": list(sp.JUDGES), "provider": sp.PROVIDER, "calls": calls_log}
+    return {**base, **out, "errors": errors, "judges": list(sp.JUDGES), "provider": sp.PROVIDER, **route, "calls": calls_log}
 
 
 def pool(results):
@@ -300,7 +417,7 @@ def main():
                 ap.error("--a, --b and --plate-mm are required")
             if not a.no_vision:
                 import score_painting as sp
-                if not os.environ.get(sp.KEY):
+                if sp.KEY and not os.environ.get(sp.KEY):
                     sys.exit(f"{sp.KEY} is not set (JUDGE_ROUTE={sp.PROVIDER}); pass --no-vision to list tiles only")
             r = compare(a.a, a.b, a.style, a.plate_mm, a.calls, a.seed, vision=not a.no_vision)
             if a.sheet:

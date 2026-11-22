@@ -1,0 +1,77 @@
+# This folder and its tools
+
+All positions are sheet millimetres, x to the right, y down; the sheet is `SHEET_W` by `SHEET_H` mm. Every picture in
+`inputs/`, `auto/` and `looks/` carries the same millimetre grid (red numbers across, blue down).
+
+## Files
+
+INPUT_LIST
+- `inputs/forms-ids.png` and `inputs/forms.json`: the named forms as data. The PNG is the sheet as a grey image whose
+  pixel value is the form's number (0: no named form); the JSON lists each number, name, kind and box in mm.
+- `auto/plan.png`: the code planner's plan as a picture (each wash's colour where its strokes fall, all layers down).
+- `auto/washes.txt`: that plan as a table, one line a wash.
+- `auto/plan.json`: that plan as data: every wash in painting order (stage, kind, brush, strokes, area, colour, how it
+  is laid, its box, the named forms it covers).
+- `auto/plan-to-edit.json`: the same plan as the file you edit (see "Editing the plan" below). Leave it as it is;
+  work on a copy.
+- `auto/settings.json`: the planner's settings, their present values, and what each does.
+- `own-script-brief.md`: the brief for writing your own painting script (the format, the kit, the paints).
+- `choice.json`: your choice. What it holds when you stop is painted.
+
+## Commands
+
+Run them from this folder. A plan takes from under a minute to several minutes on the CPU. A command that is still
+working after about 50 seconds returns with the words "still working"; run `./unpaint wait` (again, if need be) to
+get its answer. Give your shell commands a timeout of at least 60 seconds. Waiting is not counted in your time.
+
+| Command | What it does | What it returns | Limit |
+|---|---|---|---|
+| `./unpaint status` | nothing | your time used and left, looks used and left, the plans made so far | none |
+| `./unpaint plan` | runs the wash planner on your present `choice.json` (and your script or edited plan, if the choice names one) | whether it compiled, or why it was refused, and its counts (shapes or passages, washes, strokes, widest brush, washes by stage; for an edited plan also how many washes you left untouched, changed, moved, merged, left out and added). Nothing else: no picture and no wash data | none |
+| `./unpaint look` | the same, and shows you the result | `looks/N/beside.png` (your plan, the subject, the middle study, side by side), `looks/N/numbers.txt` (each named form measured against the study, marked when it is too dark OR too pale, and every wash), `looks/N/plan.json` (every wash as data, as in `auto/plan.json`) | LOOKS looks; each is counted before it is shown |
+| `./unpaint wait` | waits for the answer of the command that said "still working" | that answer | none |
+
+A choice the planner refuses costs no look. A look at a choice you have already looked at still costs a look.
+
+## Editing the plan
+
+`cp auto/plan-to-edit.json my-plan.json`, change `my-plan.json`, and write
+`{"kind": "plan", "plan": "my-plan.json", "why": "..."}` into `choice.json`. Keep `format` and `of` as they are.
+`washes` is the plan in painting order, one entry a wash:
+
+```json
+{ "wash": 12, "session": 7, "colour": [201, 150, 98], "strength": 1, "brushMm": 13, "direction": null,
+  "lay": "wet on dry", "about": { "what": "...", "stage": 3, "laidIn": "lanes", "strokes": 14, "areaMm2": 412,
+  "boxMm": [60, 110, 95, 140], "forms": "cat face 80%" } }
+```
+
+`wash` is the wash's number, the same as in `auto/washes.txt` and `auto/plan.json`. `about` describes it and is not
+read back. An entry you leave as it is, in its place, is painted exactly as the code planner would paint it: the same
+cells, the same paint, the same strokes. What you may change:
+
+| Change | How | What happens |
+|---|---|---|
+| its colour | `"colour": [r, g, b]` | what the place is to read as once the wash is down. The paint is mixed for you, over what is under it by then, to that colour's value |
+| its strength | `"strength": 0.6` (0.05 to 4) | the same paint, that many times as much: under 1 paler, over 1 darker |
+| its brush | `"brushMm"`: one of `brushesMm` | the wash is laid again in lanes of that brush over the same cells (a wash `laidIn` touches cannot be) |
+| its direction | `"direction"`: degrees, 0 the lanes run left to right, 90 top to bottom | laid again in lanes along that direction. `null`: the planner's own, along the shape |
+| its edge | `"lay"`: `"wet on dry"` (hard edges), `"wet on wet"` (into clean water: soft all round), `"beside damp"` (against the entry just before it in the same session while that is damp: a soft join between the two) | the same cells and paint, laid that way |
+| the order | move the entry | it is laid when its turn comes. Later means over, earlier means under |
+| the wet session | `"session"`: consecutive entries with the same value are one sitting, laid without drying between them; the sheet dries between sessions | |
+| leave it out | delete the entry | it is not painted |
+| merge | `{ "merge": [12, 13, 15], "session": "face" }` in place of those entries, with any of the fields above | one wash over the cells of all of them (small gaps between them closed), holding the same paint in all, or mixed to the `colour` you give |
+| add your own | `{ "own": { "id": "a1", "what": "...", "kind": "wash", "stage": 3, "region": [[x, y], ...], "brushMm": 13, "colour": [r, g, b], "handling": { "direction": 20 } }, "lay": "wet on wet" }` | a passage written as `own-script-brief.md` describes (`wash`, `strokes`, `touches`, `lines`), with `colour` in place of `paint` and `brushMm` in place of `brush`; no charges |
+
+What to know before you edit:
+
+- Nothing else is re-planned. A wash keeps its own paint when you change what is under it: leave out or pale an
+  under-wash and the washes over it come out paler there; darken it and they come out darker.
+- A wash laid again (brush, direction, merge) is laid evenly, without the planner's cut edge or its load varied
+  along the wash.
+- `./unpaint plan` checks the file and says what is wrong with it; it costs nothing. The plan's picture shows
+  colour, value, shape and order; it does not show brush, direction or soft edges, which only the painting shows.
+
+Your shell is yours: read the files, measure the input pictures (sampling a colour or a position is fair), compute,
+keep notes, write and check your script with your own code. The folder is all there is to work from: the painter, its
+planner and other sessions are out of reach, and a session whose commands name them is not painted. A plan is drawn
+or measured against the subject only by `./unpaint look`.

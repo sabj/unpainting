@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import sharp from 'sharp';
-import { authorOf, authorLabel, fillBrief, jsonWith, checkAuthored, readScript, gridImage, formBoxes, authorCall, askAuthor, retryPrompt, preparePacket } from './author.mjs';
+import { authorOf, authorLabel, briefName, keptScriptAuthor, fillBrief, jsonWith, checkAuthored, readScript, gridImage, formBoxes, authorCall, askAuthor, retryPrompt, preparePacket } from './author.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url)), ROOT = path.resolve(HERE, '..', '..');
 const AUTHORS = JSON.parse(fs.readFileSync(path.join(HERE, 'authors.json'), 'utf8')).authors;
@@ -19,13 +19,22 @@ const script = (over = {}) => ({
 const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'paint-author-test-'));
 
 test('an author is auto, a kept script, or a model of authors.json or the benchmark list', () => {
-  assert.equal(authorOf('auto', AUTHORS).key, 'auto'); assert.equal(authorLabel(authorOf('auto', AUTHORS)), 'auto (code planner)');
-  const opus = authorOf('opus', AUTHORS, BENCH); assert.equal(opus.cli, 'claude'); assert.equal(authorLabel(opus), 'Opus 5.5, high effort');
+  assert.equal(authorOf('auto', AUTHORS).key, 'auto'); assert.equal(authorLabel(authorOf('auto', AUTHORS)), 'Code planner alone');
+  const opus = authorOf('opus', AUTHORS, BENCH); assert.equal(opus.cli, 'claude'); assert.equal(authorLabel({ ...opus, work: 'reply', brief: briefName('x/AUTHOR-BRIEF.md') }), 'Opus 5.5, its own script, brief v2');
+  assert.equal(authorLabel({ ...opus, work: 'session' }), 'Opus 5.5, tuning the code planner'); assert.equal(authorLabel({ ...opus, work: 'session', session: { submitted: { kind: 'settings' } } }), 'Opus 5.5, tuning the code planner');
+  assert.equal(authorLabel({ ...opus, work: 'session', session: { submitted: { kind: 'script' } } }), 'Opus 5.5, its own script');
+  assert.equal(authorLabel({ ...opus, work: 'session', session: { submitted: { kind: 'plan' } } }), 'Opus 5.5, editing the code planner\'s plan');
+  const kept = authorOf('edit:some/plan-to-edit.json', AUTHORS); assert.equal(kept.cli, 'edit'); assert.doesNotMatch(authorLabel(kept), /\.json/);
+  assert.equal(authorLabel({ ...kept, planEdit: { unchanged: true } }), 'The code planner\'s plan, written out and read back unchanged');
   assert.equal(authorOf('neon', AUTHORS).cli, 'agy'); assert.equal(authorOf('astra', AUTHORS).cli, 'codex');
   assert.equal(authorOf('sonnet', AUTHORS, BENCH).effort, 'xhigh');
-  const s = authorOf('script:some/kept-plan.json', AUTHORS); assert.equal(s.cli, 'script'); assert.equal(s.name, 'script kept-plan');
+  const s = authorOf('script:some/kept-plan.json', AUTHORS); assert.equal(s.cli, 'script'); assert.doesNotMatch(authorLabel(s), /kept-plan|\.json/, 'a column is never named for a file');
+  // a kept script is named for the model of the run it lies in, and for the brief and the step back
+  const runOf = f => (/run\.json$/.test(f) ? { author: { key: 'astra', name: 'Codex Astra', brief: 'brief v2' } } : {});
+  assert.equal(authorLabel({ cli: 'script', ...keptScriptAuthor('/r/cat--astra/step-back/script-revised.json', runOf) }), 'Codex Astra, its own script, revised after one step back, brief v2, written earlier');
+  assert.equal(authorLabel({ cli: 'script', ...keptScriptAuthor('/r/x/author/script.json', f => { if (/run\.json$/.test(f)) throw new Error('none'); return { author: 'Opus' }; }) }), 'Opus, its own script, written earlier');
   assert.throws(() => authorOf('minimax', AUTHORS, BENCH), /cannot be called as an author/);
-  assert.throws(() => authorOf('gpt9', AUTHORS, BENCH), /auto, script:FILE.json, or one of opus.*sonnet/);
+  assert.throws(() => authorOf('gpt9', AUTHORS, BENCH), /auto, script:FILE.json, edit:FILE.json, or one of opus.*sonnet/);
 });
 
 test('the committed brief is filled: sheet, pictures, drawing medium, wash brushes, paints, named forms; nothing left blank', () => {
@@ -38,7 +47,7 @@ test('the committed brief is filled: sheet, pictures, drawing medium, wash brush
   assert.match(b, /- 2\. cat face \(face\): box x 40 to 120, y 30 to 110 mm/);
   assert.doesNotMatch(b, /SHEET_W|SHEET_H|INPUT_LIST|KIT_LIST|PAINT_LIST|FORMS_LIST|DRAWING_NOTE|SKILLS_TEXT|lampblack|pen: 0.5/);
   assert.match(fill('ink, ink recipe wash'), /waterproof ink/);
-  assert.match(b, /"format": "painting-script 2"/); assert.match(b, /One pale connected base wash over the whole form/); assert.match(b, /"plan": \{/);
+  assert.match(b, /"format": "painting-script 2"/); assert.match(b, /One connected base wash over the whole form/); assert.match(b, /"plan": \{/);
 });
 
 test('the script is found in a reply with words or a fence round it', () => {

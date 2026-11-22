@@ -1,5 +1,6 @@
 // The command line of `npm run paint`:
 //   npm run paint -- <subject[,subject...]> plan|paint [--author auto|<model key>[,...]] [--studies locked|author]
+//                    [--work session|reply] [--looks N] [--minutes N] [--from <dir>]
 //                    [--set key=value ...] [--jobs N] [--out <dir>] [--dry-run] [--no-open]
 // Nothing here touches a file: it turns the words into one request object, or throws with the usage.
 
@@ -10,9 +11,18 @@ export const USAGE = `usage: npm run paint -- <subject[,subject...]> plan|paint 
   --author a[,b...]     who writes the wash plan: auto (the code planner, the control), a model key of
                         tools/paint/authors.json or bench/models.json, or script:FILE.json (a kept script).
                         Several authors make a grid, subjects down and authors across. Default auto.
+  --work session|reply  how a model author works. session (default): a working session with a shell in its own
+                        folder, the code planner's plan as its starting point, uncapped planning and a fixed
+                        number of counted looks at its plan; it hands over planner settings or its own script.
+                        reply: one read-only reply holding a whole script (the earlier route).
+  --looks N             looks at its plan's picture a session may take before paint (default 4)
+  --minutes N           minutes of its own time a session may take; waiting for the tools is not counted (default 85)
+  --from <dir>          paint what the sessions of an earlier run handed over (its --out folder), calling no model:
+                        plan first, look, then paint the same choices.
   --studies locked|author
                         locked: the author gets the registered studies as they are (default).
-                        author: the author first briefs its own studies; the local image model makes them.
+                        author: the author first briefs its own studies; the local image model makes them
+                        (with --work reply only: a session cannot make studies yet).
   --set key=value       one setting for this run, repeatable. drawing=<stem>, width=<cells>, sheetmm=<mm>,
                         masks=<receipt.json>|none, floors=6,4,2, study2.clusters=20 (a
                         wash-plan setting of the second study), heapmb=<MB>; any other key is a paint-plate option.
@@ -27,10 +37,10 @@ export const USAGE = `usage: npm run paint -- <subject[,subject...]> plan|paint 
 A subject may name a variant kept in tools/paint/variants.json: h36:approved.
 "all" is every registered subject not already named: all, or a,b,all to paint a and b first.`;
 
-const VALUED = new Set(['--author', '--studies', '--set', '--out', '--jobs']);
+const VALUED = new Set(['--author', '--studies', '--set', '--out', '--jobs', '--work', '--looks', '--minutes', '--from']);
 const FLAGS = new Set(['--dry-run', '--no-open']);
 
-/** {subjects: [{id, variant}], mode, authors, studies, sets: [[key, value]], jobs, out, dryRun, open}. Throws on anything unknown. */
+/** {subjects: [{id, variant}], mode, authors, studies, work, looks, minutes, from, sets: [[key, value]], jobs, out, dryRun, open}. Throws on anything unknown. */
 export function parseArgs(argv) {
   const words = [], given = { '--set': [] }, flags = new Set();
   for (let i = 0; i < argv.length; i++) {
@@ -57,6 +67,11 @@ export function parseArgs(argv) {
   const studies = given['--studies'] ?? 'locked';
   if (!['locked', 'author'].includes(studies)) throw new Error('--studies is locked or author');
   if (studies === 'author' && authors.every(a => a === 'auto')) throw new Error('--studies author needs a model as --author (the code planner makes no studies)');
+  const work = given['--work'] ?? 'session';
+  if (!['session', 'reply'].includes(work)) throw new Error('--work is session or reply');
+  if (studies === 'author' && work === 'session') throw new Error('--studies author needs --work reply: a working session cannot make its own studies yet');
+  const whole = (flag, least, most) => { if (given[flag] === undefined) return null; const n = Number(given[flag]); if (!(Number.isInteger(n) && n >= least && n <= most)) throw new Error(`${flag}: a whole number, ${least} to ${most}`); return n; };
+  const looks = whole('--looks', 0, 20), minutes = whole('--minutes', 1, 600);
   const sets = given['--set'].map(s => {
     const at = s.indexOf('=');
     if (at < 1 || at === s.length - 1) throw new Error(`--set ${s}: write key=value`);
@@ -66,7 +81,7 @@ export function parseArgs(argv) {
   if (new Set(keys).size !== keys.length) throw new Error('a --set key is given twice');
   const jobs = given['--jobs'] === undefined ? null : Number(given['--jobs']);
   if (jobs !== null && !(Number.isInteger(jobs) && jobs >= 1 && jobs <= 16)) throw new Error('--jobs: a whole number of paintings at once, 1 to 16');
-  return { subjects, mode, authors, studies, sets, jobs, out: given['--out'] ?? null, dryRun: flags.has('--dry-run'), open: !flags.has('--no-open') };
+  return { subjects, mode, authors, studies, work, looks, minutes, from: given['--from'] ?? null, sets, jobs, out: given['--out'] ?? null, dryRun: flags.has('--dry-run'), open: !flags.has('--no-open') };
 }
 
 function list(s) { return s.split(',').map(x => x.trim()).filter(Boolean); }

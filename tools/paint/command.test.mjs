@@ -54,6 +54,9 @@ test('named forms go to the planner when the painter reads them; an authored scr
   const s = buildCommand(spec({ masks }), { mode: 'paint', out: '/o', known, script: { file: '/o/author/script.json', paints: ['ochre', 'ultramarine'] } });
   assert.equal(value(s, 'washplan'), 'script:/o/author/script.json'); assert.equal(value(s, 'paints'), 'ochre,ultramarine'); assert.equal(value(s, 'paintsextend'), '0');
   assert.equal(s.masksRead, false); assert.ok(!s.argv.includes('--thingmasks'));
+  // an edited plan: the studies are read as always (the forms too), and the edit file goes first in the wash plan
+  const e = buildCommand(spec({ masks }), { mode: 'paint', out: '/o', known, edit: { file: '/o/author/plan-edit.json' } });
+  assert.equal(value(e, 'washplan'), `edit:/o/author/plan-edit.json,${value(c, 'washplan')}`); assert.equal(e.masksRead, true); assert.equal(value(e, 'paints'), value(c, 'paints'));
 });
 
 test('the shell line quotes what needs it and puts the environment first', () => {
@@ -71,7 +74,7 @@ test('the block before a run says everything in plain rows', () => {
     code: { commit: 'db0bb9df1992', dirty: true, tracked: ['a'], untracked: [] },
   }).join('\n');
   for (const want of [/subject: +dune \(dune-dog\), variant "old"/, /sheet: +280 x 186.7 mm, 1200 x 800 cells, 0.2333 mm a cell/, /drawing: +vec\/old, ink \(not the record's drawing; unpinned\)/,
-    /study 1: +st\/a.png, block-in, shapes from 6 mm2, clusters 20/, /masks: +none/, /author: +auto: the code planner/, /mode: +plan only, CPU; locked inputs; target guard gentle/,
+    /study 1: +st\/a.png, block-in, shapes from 6 mm2, clusters 20/, /masks: +none/, /author: +the code planner alone \(the control\)/, /mode: +plan only, CPU; locked inputs; target guard gentle/,
     /DIFFERS: +cells across: 1200 \(the record: 1500\)/, /setting: +threads = 2/, /SWITCH: +X_NO_CHARGES=1/, /commit: +db0bb9df plus uncommitted changes/, /command: +node x/]) assert.match(lines, want);
 });
 

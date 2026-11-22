@@ -393,6 +393,8 @@ def main():
     a = ap.parse_args()
     if not a.no_vision:
         import score_painting as sp
+        if sp.PROVIDER == "local":
+            sys.exit("fullsize.py's tile judges are J1 and do not run on the local route (J3); pass --no-vision for the measurements only")
         if not os.environ.get(sp.KEY):
             sys.exit(f"{sp.KEY} is not set (JUDGE_ROUTE={sp.PROVIDER}); pass --no-vision for the classic part only")
     try:

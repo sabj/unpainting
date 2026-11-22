@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { authorOf } from './author.mjs';
-import { passageNumbers, formsTouched, numbersTable, stepBackPrompt, scriptDiff, stepBack } from './step-back.mjs';
+import { passageNumbers, formsCovered, formValues, formsTable, numbersTable, stepBackPrompt, scriptDiff, stepBack } from './step-back.mjs';
 
 const AUTHORS = [{ key: 'opus', name: 'Opus 5.5', id: 'claude-opus-5-5', effort: 'high', cli: 'claude' }];
 const passage = (id, over = {}) => ({ id, what: `the ${id}`, stage: 1, kind: 'wash', brush: 'mop', paper: 'wet', region: [[10, 10], [60, 10], [60, 40], [10, 40]], paint: { pigments: { ochre: 1 }, dilution: 'pale' }, ...over });
@@ -22,20 +22,35 @@ test('the numbers of each passage are read from the compiled plan, charges and s
   assert.deepEqual(n.map(r => [r.id, r.brushMm, r.strokes, Math.round(r.areaMm2), r.move, r.L, r.charges]), [['p01', 38, 3, 1500, 'wet on wet', 84.2, 1], ['p02', 7, 3, 304, 'wet on dry', 48, 0]]);
 });
 
-test('the table names the forms a passage lies on and marks a wide brush in a face and a dark laid early', () => {
-  const s = script(), touched = Object.fromEntries(s.passages.map(p => [p.id, formsTouched(p, mask, forms, 100)]));
-  assert.equal(touched.p01[0].name, 'cat face'); assert.equal(touched.p01[0].share, 1);
-  assert.deepEqual(formsTouched(passage('x', { region: [[80, 10], [95, 10], [95, 40]] }), mask, forms, 100), []);
-  const t = numbersTable(passageNumbers(plan, s), touched);
-  assert.match(t[0], /^p01 \| stage 1 \| brush 38 mm \| 3 strokes \| 1500 mm2 \| wet on wet \| .*L\* 84.*1 charges.*cat face \(face\).*!! BRUSH OVER 17 mm IN cat face/);
-  assert.match(t[1], /^p02 \| stage 2 \| brush 7 mm .*!! A DARK IN THE FIRST STAGES/); assert.doesNotMatch(t[1], /BRUSH OVER/);
+test('a passage is checked on the footprint of its strokes: a wide brush is marked in a face, and no value is called a fault', () => {
+  // strokes in mm on the 100 x 50 mm sheet: p01 a 38 mm sweep along the middle (70% on the face), p02 a 7 mm stroke off it
+  const withStrokes = { passes: [{ ...plan.passes[0], strokes: [{ radiusMm: 19, points: [[0, 25, 1], [100, 25, 1]] }] }, { ...plan.passes[2], strokes: [{ radiusMm: 3.5, points: [[80, 10, 1], [95, 10, 1]] }] }] };
+  const covered = formsCovered(withStrokes, mask, forms, 100);
+  assert.equal(covered.p01[0].name, 'cat face'); assert.ok(Math.abs(covered.p01[0].share - 0.7) < 0.03); assert.deepEqual(covered.p02, []);
+  const t = numbersTable(passageNumbers(withStrokes, script()), covered);
+  assert.match(t[0], /^p01 \| stage 1 \| brush 38 mm \| 1 strokes \| 1500 mm2 \| wet on wet \| .*L\* 84.*covers cat face 7\d%.*!! BRUSH OVER 17 mm IN cat face \(7\d% of its footprint\)/);
+  assert.match(t[1], /^p02 \| stage 2 \| brush 7 mm .*L\* 48.*covers no named form/); assert.doesNotMatch(t[1], /!!/);
+  // a corner of a region on a form no longer counts: only what the strokes cover
+  const edge = { passes: [{ ...plan.passes[0], strokes: [{ radiusMm: 19, points: [[95, 25, 1], [99, 25, 1]] }] }] };
+  assert.doesNotMatch(numbersTable(passageNumbers(edge, script()), formsCovered(edge, mask, forms, 100))[0], /BRUSH OVER/);
 });
 
-test('the prompt of the step back carries the first prompt, the three pictures, the numbers, the checklist and the script', () => {
-  const p = stepBackPrompt({ firstPrompt: 'THE BRIEF', script: script(), table: ['p01 | row'], files: { plan: 'inputs/plan.png', source: 'inputs/source.png', study: 'inputs/study-middle.png' } });
-  assert.match(p, /^THE BRIEF/); assert.match(p, /ONE look/); assert.match(p, /`inputs\/plan.png`: the PLAN PREVIEW/); assert.match(p, /p01 \| row/);
-  assert.match(p, /first wash pale and connected/); assert.match(p, /leave its form/); assert.match(p, /over 17 mm inside a face/); assert.match(p, /darks later than the lights/); assert.match(p, /darker or more saturated than the middle study/);
-  assert.match(p, /\{"keep": true/); assert.match(p, /"format":"painting-script 2"/);
+test('each form is measured in the study and in the plan and marked both ways: too pale and too dark', () => {
+  const grey = v => { const b = Buffer.alloc(5000 * 3, v); return b; }, two = [{ id: 2, name: 'hair', kind: 'hair' }, { id: 9, name: 'none', kind: 'other' }];
+  const study = formValues(grey(60), mask, two), pale = formValues(grey(200), mask, two), dark = formValues(grey(20), mask, two);
+  assert.equal(study.length, 1, 'a form with no cells is left out'); assert.ok(study[0].meanL > 24 && study[0].meanL < 27); assert.equal(study[0].cells, 3500);
+  assert.match(formsTable(study, pale)[0], /^hair \(hair\) \| study: mean L\* 25, darks L\* 25 \| your plan, all layers down: mean L\* 81, darks L\* 81 \| !! PALER THAN THE STUDY BY 55; ITS DARKS DO NOT REACH THE STUDY'S \(short by 55\)/);
+  assert.match(formsTable(study, dark)[0], /!! DARKER THAN THE STUDY BY 19; ITS DARKS PASS THE STUDY'S BY 19$/);
+  assert.match(formsTable(study, study)[0], /\| close$/);
+});
+
+test('the prompt of the step back carries the first prompt, the three pictures, both tables, the two-sided checklist and the script', () => {
+  const p = stepBackPrompt({ firstPrompt: 'THE BRIEF', script: script(), table: ['p01 | row'], formTable: ['hair (hair) | row'], files: { plan: 'inputs/plan.png', source: 'inputs/source.png', study: 'inputs/study-middle.png' } });
+  assert.match(p, /^THE BRIEF/); assert.match(p, /ONE look/); assert.match(p, /`inputs\/plan.png`: the PLAN PREVIEW/); assert.match(p, /p01 \| row/); assert.match(p, /hair \(hair\) \| row/);
+  assert.match(p, /first wash pale and connected/); assert.match(p, /leave its form/); assert.match(p, /over 17 mm inside a face/); assert.match(p, /REACH the study's darks by the end/);
+  assert.match(p, /darker or more saturated than the middle study, OR paler and weaker/); assert.match(p, /a form paler than the study is as wrong as one darker/);
+  assert.doesNotMatch(p, /A DARK IN THE FIRST STAGES/); assert.match(p, /\{"keep": true/); assert.match(p, /"format":"painting-script 2"/);
+  assert.doesNotMatch(stepBackPrompt({ firstPrompt: 'B', script: script(), table: [], files: {} }), /Each named form, measured/);
 });
 
 test('what changed between two scripts is listed by passage and field', () => {

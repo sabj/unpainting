@@ -6,7 +6,8 @@
 // still painting, or failed, keeps its place with the reason in it.
 import fs from 'node:fs';
 import path from 'node:path';
-import { composeSheet, wordsImage, wrap, riskLine } from './sheet.mjs';
+import { composeSheet, wordsImage, wrap, riskLine, sessionLine } from './sheet.mjs';
+import { authorLabel } from './author.mjs';
 
 const args = process.argv.slice(2), at = args.indexOf('--height'), height = at < 0 ? 900 : Number(args.splice(at, 2)[1]);
 const [file, ...dirs] = args;
@@ -19,13 +20,13 @@ const blank = words => wordsImage(words, 700, Math.round(700 * (first.sheet.rows
 const panels = [{ title: 'Source', captions: [first.subject.source], image: first.subject.sourceAbs }], strips = [];
 for (const run of runs) {
   if (run.missing) { panels.push({ title: path.basename(run.missing), alert: 'RUNNING OR NOT RUN', captions: ['no run.json yet'], image: await blank(['NOT PAINTED YET', path.basename(run.missing)]) }); continue; }
-  const res = run.results ?? {}, name = run.author.label ?? run.author.name, done = res.state === 'finished' && res.painting && fs.existsSync(res.painting), p = res.plan;
+  const res = run.results ?? {}, name = authorLabel(run.author), done = res.state === 'finished' && res.painting && fs.existsSync(res.painting), p = res.plan;
   panels.push({
     title: `${name}${done ? '' : ': NOT FINISHED'}`, alert: done ? null : 'NOT FINISHED',
-    captions: [`${p ? `${p.passages != null ? `${p.passages} passages` : `${p.shapes ?? '?'} shapes`}, ${p.washes ?? '?'} washes, ${p.strokes ?? '?'} strokes, widest brush ${p.widestBrushMm ?? '?'} mm` : 'no plan'}; ${Math.round((run.seconds ?? 0) / 60)} min`, riskLine(res.cheatRisk), `${run.code.commit?.slice(0, 8)}${run.code.dirty ? ' + uncommitted changes' : ''}${run.failure ? ` · FAILED: ${run.failure}` : ''}`],
+    captions: [`${p ? `${p.passages != null ? `${p.passages} passages` : `${p.shapes ?? '?'} shapes`}, ${p.washes ?? '?'} washes, ${p.strokes ?? '?'} strokes, widest brush ${p.widestBrushMm ?? '?'} mm` : 'no plan'}; ${Math.round((run.seconds ?? 0) / 60)} min`, ...(run.author.work === 'session' ? [sessionLine(run.author)] : []), riskLine(res.cheatRisk), `${run.code.commit?.slice(0, 8)}${run.code.dirty ? ' + uncommitted changes' : ''}${run.failure ? ` · FAILED: ${run.failure}` : ''}`],
     image: res.painting && fs.existsSync(res.painting) ? res.painting : await blank(['NOT PAINTED', ...wrap(run.failure ?? '', 50)]),
   });
   if (res.strip && fs.existsSync(res.strip)) strips.push({ label: `${name}: the source, then the sheet at 10, 25, 50, 75 and 100% of the strokes`, height: Math.round(height * 0.42), panels: [{ title: '', captions: [], image: res.strip }] });
 }
-const done = await composeSheet({ header: [`${first.subject.id} (${first.subject.name}) painted by each author · locked inputs · ${first.sheet.widthMm} mm, ${first.sheet.cells} cells`, 'auto is the code planner; a "script" author is the wash plan a model wrote earlier from the same inputs, laid by the same painter'], rows: [{ height, panels }, ...strips], file, quality: 86 });
+const done = await composeSheet({ header: [`${first.subject.id} (${first.subject.name}) · one painter, several planners · locked inputs · ${first.sheet.widthMm} mm, ${first.sheet.cells} cells`, 'Code planner alone: the wash plan computed from the studies. A model\'s column: the same inputs and the code planner\'s plan, given to the model; what it handed over (planner settings, an edit of the code planner\'s plan, or its own script) is laid by the same painter.'], rows: [{ height, panels }, ...strips], file, quality: 86 });
 console.log(`author sheet: ${done.file} (${done.width} x ${done.height})`);

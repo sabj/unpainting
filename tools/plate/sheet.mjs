@@ -15,6 +15,7 @@ import {planStudyWashes} from '../../src/paint/methods/study-washes.mjs';
 import {planScriptWashes} from '../../src/paint/methods/script-washes.mjs';
 import {monoPaints} from '../../src/paint/methods/mono-mix.mjs';
 import {loadStudies} from '../painter/study-load.mjs';
+import {splitPlanEdit,planEditStep} from '../painter/plan-edit-step.mjs';
 import {studyThingMasks} from '../painter/thing-masks.mjs';
 import {washStrokeHold, LANE_OVERLAP, FLAT_OVERLAP} from '../../src/paint/methods/wash-strokes.mjs';
 import {smallestBrushMm} from '../../src/paint/methods/light-reserves.mjs';
@@ -187,7 +188,8 @@ const pencilDraw=(target,gs,pigment,options)=>{
  // (images of the subject simplified to flat shapes), registered to the sheet; the subject is not read for them
  // (study-washes.mjs; tools/painter/study-load.mjs). Without one a painting stops; a drawing-only run gets no washes.
  // the default is 'required': a painting stops without a study (a drawing-only run lays no wash)
- const WASH_PLAN_GIVEN=opt('washplan','required'),WASH_PLAN=WASH_PLAN_GIVEN==='required'?'':WASH_PLAN_GIVEN;
+ // --washplan edit:EDIT.json,STUDY...: the study plan, then an author's edit of it (tools/painter/plan-edit-step.mjs)
+ const WASH_PLAN_GIVEN=opt('washplan','required'),[PLAN_EDIT,WASH_PLAN]=splitPlanEdit(WASH_PLAN_GIVEN==='required'?'':WASH_PLAN_GIVEN);
  if(WASH_PLAN==='squint')throw Error('--washplan squint was removed in 0.4: the washes are not read from the subject squinted (last at commit 49447027); give --washplan STUDY.png[:MIN],...');
  if(!WASH_PLAN&&num('drawingonly',0)===0)throw Error('no wash plan: give --washplan STUDY.png[:MIN],... (a block-in study registered to the sheet, made by the image model). The washes are never read from the subject: the squinted-subject plan and the light-to-dark value plan were removed in 0.4 (last at commit 49447027)');
  console.log(`wash plan: ${WASH_PLAN?`study (${WASH_PLAN.split(',').map(f=>path.basename(f)).join(', ')})`:'none (drawing only)'}`);
@@ -211,6 +213,7 @@ const pencilDraw=(target,gs,pigment,options)=>{
   const saved=await cachedStep({...RUN_CACHE,name:'value-plan',code:CODE_HASH,track:optTrack,inputs:valueOptions},async()=>({plan:planValues(valueOptions)}));
   ctx.VALUE_PLAN=saved.value.plan;
  }else ctx.VALUE_PLAN=planValues(valueOptions);
+ if(WASH_PLAN&&!SCRIPT)ctx.VALUE_PLAN=planEditStep({plan:ctx.VALUE_PLAN,file:PLAN_EDIT?path.resolve(root,PLAN_EDIT):null,out,ctx:{w,h,k:PIGS.length,pigments:PIGS,paperRGB,sheetWidthMm:valueOptions.sheetWidthMm,kitMm:valueOptions.washKitMm,mono:valueOptions.mono,seed:num('seed',0)}});
  SPEED_PROFILE?.add('setup:value-plan',performance.now()-valueStarted);
  ctx.layers=ctx.VALUE_PLAN.layers;ctx.steps=5;
  // --washsession 2: within each band step, a region's pigment passes follow one another, so its wash is charged with

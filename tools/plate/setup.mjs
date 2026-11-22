@@ -202,7 +202,7 @@ const LINE_SOURCE = lineSource({ drawing: opt('drawing', 'first'), drawingFile: 
 if (LINE_SOURCE.warning) { console.log(LINE_SOURCE.warning); argv.push('--drawing', LINE_SOURCE.drawing); }
 console.log(`line source: ${LINE_SOURCE.source}${LINE_SOURCE.file ? ` (${path.basename(LINE_SOURCE.file)})` : ''}`);
 // what makes this plate, recorded in the log, the run card and the stroke tape (src/paint/run-methods.mjs)
-const RUN_METHODS = runMethods({ lineSource: LINE_SOURCE, washPlan: opt('washplan', 'required') === 'required' ? '' : opt('washplan', 'required'), drawingOnly: num('drawingonly', 0) > 0 });
+const RUN_METHODS = runMethods({ lineSource: LINE_SOURCE, washPlan: opt('washplan', 'required') === 'required' ? '' : opt('washplan', 'required').replace(/^edit:[^,]*,/, ''), drawingOnly: num('drawingonly', 0) > 0 });
 console.log(describeMethods(RUN_METHODS));
 // every line file is checked against the target (lines.mjs); a --drawingfile made for another image or aspect is
 // registered to the target first (drawing-registration.mjs)

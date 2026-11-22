@@ -14,9 +14,10 @@ export function washPlanOf(studies) {
 /**
  * {cmd, args, env, argv (the paint-plate options alone), settings: [{name, value, default}], medium, heapMb}.
  * known: the painter's option names (scanOptions); script: {file, paints} when an author wrote the wash plan;
+ * edit: {file} when an author edited the code planner's plan (the studies are read as always, then the edit applied);
  * dirty: the checkout has uncommitted changes (the painter refuses those unless told).
  */
-export function buildCommand(spec, { mode, out, known, script = null, dirty = false, segEnv = {} }) {
+export function buildCommand(spec, { mode, out, known, script = null, edit = null, dirty = false, segEnv = {} }) {
   const settings = [], opts = new Map(spec.options);
   const set = (name, value, why) => { const was = opts.get(name) ?? null; if (was !== value) settings.push({ name, value, default: was ?? '(painter default)', why }); if (value === null) opts.delete(name); else opts.set(name, value); };
   if ((opts.get('targetguard') ?? 'gentle') !== 'gentle') throw new Error(`subject ${spec.id}: the record asks for --targetguard ${opts.get('targetguard')}; this command paints in gentle mode only`);
@@ -33,7 +34,7 @@ export function buildCommand(spec, { mode, out, known, script = null, dirty = fa
   if (script) { opts.set('paints', script.paints.join(',')); opts.set('paintsextend', '0'); }
   const masksRead = Boolean(spec.masks?.receipt && !script && known?.has('thingmasks'));
   const argv = [...opts].flatMap(([k, v]) => [`--${k}`, v]);
-  argv.push('--washplan', script ? `script:${script.file}` : washPlanOf(spec.studies), '--drawingfile', spec.drawing.abs);
+  argv.push('--washplan', script ? `script:${script.file}` : `${edit ? `edit:${edit.file},` : ''}${washPlanOf(spec.studies)}`, '--drawingfile', spec.drawing.abs);
   if (masksRead) argv.push('--thingmasks', spec.masks.receipt, ...(spec.masks.labels ? ['--things', spec.masks.labels] : []));
   argv.push('--image', spec.source.abs, '--width', String(spec.sheet.cells), '--sheetmm', String(spec.sheet.widthMm), '--out', out);
   if (dirty) argv.push('--allowdirty', '1');
@@ -61,7 +62,7 @@ export function describeRun(run) {
   studies.forEach((st, i) => row(`study ${i + 1}`, `${st.path}, ${st.role}, shapes from ${st.floorMm2 ?? '?'} mm2${Object.entries(st.read).map(([k, v]) => `, ${k} ${v}`).join('')}`));
   row('masks', masks.receipt ? `${masks.forms.length} named forms (${masks.forms.map(f => f.name).join(', ')}) from ${masks.receipt} (${masks.from === 'set' ? '--set masks' : 'the named-forms folder'}); ${masks.read ? 'given to the planner' : 'shown to the author and on the sheet: ' + masks.whyNotRead}` : `none (${masks.none})`);
   row('labels', s.labels ? `${s.labels}${s.labelCount ? `, ${s.labelCount} things` : ''}` : 'none');
-  row('author', author.key === 'auto' ? 'auto: the code planner (the control)' : author.cli === 'script' ? author.name : `${author.label} (${author.id}, called read-only through ${author.cli})`);
+  row('author', author.key === 'auto' ? 'the code planner alone (the control)' : author.cli === 'script' || author.cli === 'edit' ? author.label : author.work === 'session' ? `${author.name}${author.effort ? `, ${author.effort} effort` : ''} (${author.id}, through ${author.cli}): ${author.from ? 'what its earlier session handed over is painted; no model is called' : `a working session with a shell in its own folder, ${author.minutesMost} min of its own time, ${author.looksMost} looks at its plan; it starts from the code planner's plan`}` : `${author.name}${author.effort ? `, ${author.effort} effort` : ''} (${author.id}, one read-only reply through ${author.cli}): ${author.label}`);
   row('mode', `${run.mode === 'plan' ? 'plan only, CPU' : 'full painting, GPU'}; ${run.studiesMode === 'author' ? 'open tools (the author may brief and review its own studies)' : 'locked inputs'}; target guard gentle`);
   if (s.deviations.length) for (const d of s.deviations) row('DIFFERS', `${d.what}: ${d.now} (the record: ${d.record})`);
   if (run.settings.length) for (const d of run.settings) row('setting', `${d.name} = ${d.value ?? 'painter default'} (default ${d.default})`);

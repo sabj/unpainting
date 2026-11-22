@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import sharp from 'sharp';
-import { fit, drawingSvg, formColour, layout, riskLine, runPanels, runHeader, composeSheet, writeRunSheet, writeGridSheet } from './sheet.mjs';
+import { fit, drawingSvg, formColour, layout, riskLine, sessionLine, runPanels, runHeader, composeSheet, writeRunSheet, writeGridSheet } from './sheet.mjs';
 
 test('text is cut to its panel', () => {
   assert.equal(fit('short', 400, 16), 'short');
@@ -64,10 +64,10 @@ test('a plan run: source, drawing, study, wash plan, and a painting panel marked
   const dir = await fixtures();
   try {
     const r = run(dir), panels = runPanels(r, { source: r.subject.sourceAbs, drawing: r.subject.sourceAbs, plan: r.results.planPreview, painting: r.subject.sourceAbs });
-    assert.deepEqual(panels.map(p => p.title), ['Source', 'Opening drawing (pencil)', 'Study 1: block-in', 'Wash plan by auto', 'Painting: PLAN ONLY']);
+    assert.deepEqual(panels.map(p => p.title), ['Source', 'Opening drawing (pencil)', 'Study 1: block-in', 'Wash plan: auto', 'Painting: PLAN ONLY']);
     assert.equal(panels[4].alert, 'PLAN ONLY'); assert.match(panels[3].captions.join(' '), /12 shapes, 30 washes, 400 strokes.*widest wash brush 25.4 mm/);
     assert.match(panels[2].captions[1], /gave 12 shapes/);
-    const h = runHeader(r); assert.match(h[0], /dune \(dune-dog\) · PLAN ONLY \(CPU\) · author auto · locked inputs · db0bb9df/); assert.ok(h.some(l => /^DIFFERS.*cells across 1200/.test(l)));
+    const h = runHeader(r); assert.match(h[0], /dune \(dune-dog\) · PLAN ONLY \(CPU\) · auto · locked inputs · db0bb9df/); assert.ok(h.some(l => /^DIFFERS.*cells across 1200/.test(l)));
     const out = await writeRunSheet(r, path.join(dir, 'sheet.jpg'), { height: 120 }), m = await sharp(out.file).metadata();
     assert.equal(m.format, 'jpeg'); assert.ok(m.width > 5 * 180 && m.height > 120);
     const unfinished = runPanels(run(dir, { mode: 'paint', results: { ...r.results, state: 'unfinished' } }), {}).at(-1);
@@ -87,4 +87,13 @@ test('a grid: subjects down, authors across', async () => {
     // plan mode, two authors: source and one wash plan for each author
     assert.ok(cross.width >= 3 * 150 && cross.width < 5 * 150, `three panels across, got ${cross.width}`);
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('a working session is said in one plain line: what it handed over, looks, minutes, tool calls', () => {
+  const base = { looks: [{}, {}], looksMost: 4, ownMinutes: 31.4, minutesMost: 85, toolCallsTotal: 57, ended: 'done' };
+  assert.equal(sessionLine({ session: { ...base, submitted: { kind: 'settings', settings: { 'study1.shapes': '60', floors: '8,4,2' } } } }), 'changed 2 planner settings: study1.shapes=60, floors=8,4,2 · 2 of 4 looks · 31 of 85 min · 57 tool calls');
+  assert.match(sessionLine({ session: { ...base, submitted: { kind: 'settings', settings: {} } } }), /^changed nothing: this is the code planner's plan · /);
+  assert.match(sessionLine({ session: { ...base, submitted: { kind: 'plan', settings: {}, edit: { auto: 120, untouched: 90, untouchedShare: 0.75, changed: 12, moved: 2, merged: 3, mergedFrom: 14, dropped: 2, added: 4 } } } }), /^edited the code planner's plan: 90 of its 120 washes untouched \(75%\), 12 changed, 2 moved, 14 merged into 3, 2 left out, 4 of its own added · /);
+  assert.match(sessionLine({ passages: 21, session: { ...base, ended: 'time limit', submitted: { kind: 'script', settings: {}, note: 'the session ran out of time' } } }), /^wrote its own script \(21 passages\) · .* · STOPPED BY THE CLOCK · the session ran out of time$/);
+  assert.equal(sessionLine({}), 'working session: not run');
 });

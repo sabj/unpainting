@@ -3,6 +3,8 @@
 // AUTHOR-BRIEF.md, and answers with a painting script (docs/painting-script.md). The script is checked here and the
 // painter executes it through --washplan script:FILE, the same engine that lays the code planner's plan.
 //
+// This is the one-reply route (--work reply). The default is a working session that starts from the code planner's
+// plan (session.mjs); it uses this module's packet, checks and labels.
 // A model is called once, read-only, for one reply: it may open the pictures of its folder and nothing else is asked
 // of it. Its folder is a temporary one outside the repository, holding copies of the pictures only, and the prompt
 // names files by their path inside that folder. An author "script:FILE.json" replays a kept script without a model.
@@ -23,19 +25,44 @@ const CLI_OF_RUNNER = { claude: 'claude', codex: 'codex', agy: 'agy' };
 /** What each command needs before it can be called, by name only. */
 const NEEDS = { claude: 'the `claude` command, logged in (or ANTHROPIC_API_KEY)', codex: 'the `codex` command, logged in (or OPENAI_API_KEY)', agy: 'the `agy` command, logged in' };
 
-/** The author an --author word names: auto, a kept script, or a model (authors.json, else bench/models.json). */
+/** The author an --author word names: auto, a kept script, a kept edit of the code planner's plan, or a model (authors.json, else bench/models.json). */
 export function authorOf(word, authors, benchModels = []) {
   if (word === 'auto') return { key: 'auto', name: 'auto', id: null, cli: null, effort: null };
-  if (word.startsWith('script:')) { const file = path.resolve(word.slice(7)); return { key: word, name: `script ${path.basename(file, '.json')}`, id: null, cli: 'script', effort: null, file }; }
+  if (word.startsWith('edit:')) return { key: word, name: 'A kept edit of the code planner\'s plan', id: null, cli: 'edit', effort: null, file: path.resolve(word.slice(5)) };
+  if (word.startsWith('script:')) { const file = path.resolve(word.slice(7)); return { key: word, ...keptScriptAuthor(file), id: null, cli: 'script', effort: null, file }; }
   const own = authors.find(x => x.key === word); if (own) return { ...own };
   const m = benchModels.find(x => x.key === word);
   if (m && CLI_OF_RUNNER[m.runner]) return { key: m.key, name: m.name, id: m.id, effort: m.effort === 'n/a' ? null : m.effort, cli: CLI_OF_RUNNER[m.runner] };
   if (m) throw new Error(`--author ${word}: its runner "${m.runner}" cannot be called as an author here (claude, codex and agy can)`);
-  throw new Error(`--author ${word}: auto, script:FILE.json, or one of ${[...authors.map(x => x.key), ...benchModels.filter(x => CLI_OF_RUNNER[x.runner] && !authors.some(a => a.key === x.key)).map(x => x.key)].join(', ')}`);
+  throw new Error(`--author ${word}: auto, script:FILE.json, edit:FILE.json, or one of ${[...authors.map(x => x.key), ...benchModels.filter(x => CLI_OF_RUNNER[x.runner] && !authors.some(a => a.key === x.key)).map(x => x.key)].join(', ')}`);
 }
 export const needsOf = cli => NEEDS[cli] ?? 'an unknown command';
-/** The model and its effort as a cell of the sheet names them. */
-export const authorLabel = a => (a.key === 'auto' ? 'auto (code planner)' : a.cli === 'script' ? a.name : `${a.name}${a.effort ? `, ${a.effort} effort` : ''}`);
+/** The briefs by their file, as a sheet names them. */
+const BRIEFS = { 'AUTHOR-BRIEF.md': 'brief v2', 'AUTHOR-BRIEF-v1.md': 'brief v1' };
+export const briefName = file => (file ? BRIEFS[path.basename(file)] ?? 'its own brief' : null);
+/**
+ * Who wrote a kept script, in plain words, never the file's name: the model of the run the script lies in (run.json
+ * beside its folder), else the script's own "author", and whether it is the script as revised after a step back.
+ * {name, wrote}.
+ */
+export function keptScriptAuthor(file, read = f => JSON.parse(fs.readFileSync(f, 'utf8'))) {
+  let who = null, brief = null;
+  try { const run = read(path.join(path.dirname(path.dirname(file)), 'run.json')); if (run.author?.name && run.author.key !== 'auto') { who = run.author.name; brief = run.author.brief ?? null; } } catch { /* not in a run folder */ }
+  if (!who) { try { const a = read(file).author; if (typeof a === 'string' && a.trim()) who = a.trim().slice(0, 40); } catch { /* the script is checked when it is read */ } }
+  const revised = /revised/.test(path.basename(file));
+  return { name: who ?? 'A kept script (author not recorded)', wrote: `its own script${revised ? ', revised after one step back' : ''}${brief ? `, ${brief}` : ''}, written earlier` };
+}
+/**
+ * The heading of an author's column on a sheet, in plain words: "Code planner alone", "<Model>, tuning the code
+ * planner" (a working session that handed over settings, or has not ended yet), "<Model>, its own script".
+ */
+export function authorLabel(a) {
+  if (a.key === 'auto') return 'Code planner alone';
+  if (a.cli === 'script') return `${a.name}, ${a.wrote ?? 'its own script, written earlier'}`;
+  if (a.cli === 'edit') return a.planEdit?.unchanged ? 'The code planner\'s plan, written out and read back unchanged' : a.name;
+  if (a.work === 'session') return a.session?.submitted?.kind === 'script' ? `${a.name}, its own script` : a.session?.submitted?.kind === 'plan' ? `${a.name}, editing the code planner's plan` : `${a.name}, tuning the code planner`;
+  return `${a.name}, its own script${a.brief ? `, ${a.brief}` : ''}`;
+}
 
 /** The brief with this run's sheet, inputs, kit, paints and named forms written in. */
 export function fillBrief(template, { sheet, inputs, brushes, paints, forms, medium, skills = '' }) {

@@ -64,6 +64,7 @@ input is checked against its sha256 before anything starts. The code is in `tool
 
 ```sh
 npm run paint -- <subject[,subject...]> plan|paint [--author auto|<model key>[,...]] [--studies locked|author]
+                 [--work session|reply] [--looks N] [--minutes N] [--from <dir>]
                  [--set key=value ...] [--jobs N] [--out <dir>] [--dry-run] [--no-open]
 ```
 
@@ -125,22 +126,75 @@ on an otherwise idle machine, and do not run a plan batch beside a paint queue. 
 
 ### A model as the author
 
-`--author auto` is the code planner, the control. `--author <key>` asks a model (`tools/paint/authors.json`, else
-`bench/models.json`) to write the wash plan as a painting script ([painting-script.md](painting-script.md)); the same
-engine paints it. `--author script:FILE.json` paints a kept script. Several authors make a benchmark grid:
+`--author auto` is the code planner alone, the control. `--author <key>` names a model (`tools/paint/authors.json`,
+else `bench/models.json`). `--author edit:FILE.json` paints a kept edit of the code planner's plan with no model called
+(a plan's own `plate/plan-to-edit.json`, unchanged, paints the code planner's plan). Several authors make a grid: `Source | Code planner alone | <Model>, tuning the code planner`.
 
 ```sh
-npm run paint -- mittens-closeup,morisot-face plan --author auto,opus,astra,argon,neon
+# plan first (CPU), look at the sheet, then paint what the same sessions handed over (no model is called again)
+npm run paint -- mittens-closeup,morisot-face plan --author auto,opus,astra --out work/paint/r1/plan
+npm run paint -- mittens-closeup,morisot-face paint --author auto,opus,astra --from work/paint/r1/plan --jobs 6 --out work/paint/r1/paint
 ```
 
-The model gets the brief `tools/paint/AUTHOR-BRIEF.md` with the run's sheet, kit and paints written in, and the
-source, the opening drawing, the three studies and the named forms as pictures with a millimetre grid. It is called
-once, read-only (`claude --allowedTools Read`, `codex exec -s read-only`, `agy --mode plan --sandbox`), in a temporary
-folder that holds only those pictures. Its answer is checked against the script format, the sheet and the paint box.
-A refused answer, or a script the painter cannot plan, goes back to the model once with the reason. After that the
-failure is the result: it is written in that cell of the grid and in `run.json`, and the other cells are unaffected.
-Each call's prompt, answer, time, tokens and cost (where the command reports them) are kept in `<out>/author/`. The
-target guard stays in gentle mode.
+**A working session** (`--work session`, the default; code in `tools/paint/session.mjs`). The model gets a folder of
+its own outside the repository and a shell in it. The folder holds the locked inputs with a millimetre grid (source,
+opening drawing, the three studies, the named forms as a picture and as an id map), the code planner's own plan of
+the subject (`auto/`: its picture, every wash as a table and as data, and the planner's settings with their present
+values and meaning), the brief for writing a script, a `README.md` of its
+tools, and `choice.json`. The task is `tools/paint/SESSION-BRIEF.md`; the tools are `tools/paint/SESSION-README.md`.
+
+- What it hands over is `choice.json` as it stands at the end, one of three kinds. The code planner tuned
+  (`"kind": "settings"`, any of the listed settings, or another painter option by name; the inputs and the guard are
+  locked): an empty settings choice paints exactly what `--author auto` paints, the same command. The code planner's
+  plan edited wash by wash (`"kind": "plan"`, naming its copy of `auto/plan-to-edit.json`): colour, strength, brush,
+  direction and edge of a wash changed, washes moved, left out or merged, passages of its own added; a wash it does
+  not touch is laid exactly as the code planner lays it (`src/paint/methods/plan-edit.mjs`; the format is in `tools/paint/SESSION-README.md`). Or its own painting script
+  (`"kind": "script"`). Only a choice the planner compiled in the session is painted; otherwise the last one that
+  did, and the record says so. For an edited plan `run.json` holds, under `author.planEdit`, the washes untouched,
+  changed, moved, merged, left out and added, and `untouchedShare`, the share of the code planner's washes left as
+  they were.
+- The boundary: the folder holds the input pictures the code planner gets (the model may compute on them) and the
+  code planner's plan (its picture alone, its washes as a table and as data). A plan is drawn or measured against
+  the subject only by a counted look.
+- `./unpaint plan` runs the wash planner on the present choice and answers with whether it compiled and its counts.
+  Nothing else: no picture, no wash data. It is not limited.
+- `./unpaint look` shows the plan's picture beside the source and the middle study, each named form measured against
+  the study and marked when it is too dark or too pale, and every wash as data. Looks are stepping back, not search:
+  `--looks N` of them (default 4). A look is written to `<out>/author/looks.jsonl`, outside the model's folder,
+  before anything is delivered, so a delivery that fails is still a spent look and a restarted broker goes on from
+  the count. No score is shown.
+- The broker never trusts the folder: it follows no symlink, reads only plain files of bounded size, never echoes a
+  request or a file, and takes the time of a request from its own clock. Every request is in `looks.jsonl`.
+- `--minutes N` (default 85) is the model's own time; time it waits for the planner is not counted. At the limit the
+  session and every process it started are ended (SIGTERM, then SIGKILL) and the last choice it had planned is painted.
+- Looks while painting are not offered: the painter cannot stop at a passage and go on from there (`--canarystop`
+  stops for good), so on this trunk every look is at a plan and nothing painted can be undone or redone.
+- What the session can reach. Nothing of it can read this checkout, the checkout it is a worktree of (every
+  worktree, cache and earlier run), the subject list and its inputs, the other sessions of the same run, or the
+  folders named in `UNPAINT_SESSION_DENY` (`a:b:c`). `claude` uses its own sandbox for the shell and Read rules for
+  its file tools. `codex` cannot deny a read and seatbelt profiles do not nest, so the whole `codex` command runs
+  under this harness's seatbelt profile (`sandbox-exec`) with its own sandbox off: reads denied as above, writes only
+  in its folder and temporary folders, network on port 443 only. The profile is tried before the model starts and
+  the session is refused if a file of the repository can be read under it. The model's environment is cleaned.
+- A session whose commands name the painter, a denied folder or another session is not painted (a failed cell).
+- Not closed: a model can draw its own script's polygons, or boxes from the code planner's wash data, with its own
+  code (`run.json` lists the pictures it made and keeps every command, so it can be seen); a copy of the repository
+  in a folder that is not denied; sessions of another run on the same machine. These are deny-lists on the owner's
+  machine: full isolation needs a container or VM with no host mounts and the broker outside it.
+- `run.json` records, under `author.session`: the minutes used, every look and plan with the choice it was of, the
+  tool calls by kind, what was handed over, the commands that named a place outside, and the pictures the model made
+  itself. Its whole folder, transcript and commands are kept in `<out>/author/`.
+- `agy` runs under the same seatbelt profile as `codex`, with this machine's loopback and a pseudo-terminal allowed
+  (it talks to a helper of its own on localhost and runs its shell on a pty) and its own permission prompts off
+  inside the profile. Its sessions run one at a time.
+- `--studies author` (the model briefs its own studies) works with `--work reply` only.
+
+**One reply** (`--work reply`, the earlier route). The model gets the brief `tools/paint/AUTHOR-BRIEF.md` and the same
+pictures, is called once, read-only (`claude --allowedTools Read`, `codex exec -s read-only`, `agy --mode plan
+--sandbox`), and answers with a whole painting script ([painting-script.md](painting-script.md)). A refused answer,
+or a script the painter cannot plan, goes back to the model once with the reason. After that the failure is the
+result. `--author script:FILE.json` paints a kept script; its column is named for the model that wrote it.
+`node tools/paint/step-back.mjs <run folder>` gives such a script one look at its compiled plan and one revision.
 
 `--studies author` (open tools) lets a model brief its own block-in studies before it writes: it answers with up to
 three briefs, the local image model (Qwen Image Edit through mflux, `tools/paint/assisted-studies.py`) makes them one
@@ -158,7 +212,7 @@ Flags use `--name value`. The last repeated flag wins. The default recipe (`src/
 | `--image` | target image path | required |
 | `--drawingfile` | line-file stem: `STEM-lines.json` or `.json.gz` | none: no line |
 | `--drawinglast` | line-file stem for the closing pen | none |
-| `--washplan` | `STUDY.png[:MIN[:glaze]],...` | required unless `--drawingonly 1` |
+| `--washplan` | `STUDY.png[:MIN[:glaze]],...`; `script:SCRIPT.json`; `edit:EDIT.json,STUDY.png...` (`src/paint/methods/plan-edit.mjs`; the format is in `tools/paint/SESSION-README.md`) | required unless `--drawingonly 1` |
 | `--drawingonly` | `0`, `1`: lay the drawing alone | `0` |
 | `--inkrecipe` | `none`, `wash` (pen and wash), `v2` | `none` |
 | `--drawing` | `first`, `last`, `both`, `none` | `first` |
