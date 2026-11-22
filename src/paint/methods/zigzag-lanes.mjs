@@ -20,3 +20,21 @@ export function lanesOfPath(pts) {
   out.push(pts.slice(start));
   return out;
 }
+
+/**
+ * A path with points no further apart than half the brush's radius, for counting the paper it sweeps. The sweep count
+ * (wash.mjs sweepCover, sweepCount) lays a disc at each point of a path and nothing between them, and a wash plan's
+ * lanes keep only the points where the pressure changes (sweep-fill.mjs), so a long straight lane of a wide round read
+ * as a few separate discs: the cover came out under one, the passage was taken to be under-covered and was charged up
+ * to twice its mix (a cat's face planned at L* 70 dried at L* 55).
+ */
+export function sweptPath(pts) {
+  if (pts.length < 2) return pts;
+  const out = [pts[0]];
+  for (let k = 1; k < pts.length; k++) {
+    const a = pts[k - 1], b = pts[k], n = Math.max(1, Math.ceil(Math.hypot(b.x - a.x, b.y - a.y) / Math.max(0.5, (a.r ?? 1) / 2)));
+    for (let j = 1; j < n; j++) { const u = j / n; out.push({ ...a, x: a.x + (b.x - a.x) * u, y: a.y + (b.y - a.y) * u, r: (a.r ?? 1) + ((b.r ?? a.r ?? 1) - (a.r ?? 1)) * u }); }
+    out.push(b);
+  }
+  return out;
+}
