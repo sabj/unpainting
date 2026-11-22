@@ -23,6 +23,7 @@ import { lookSets, lookFault, lookSizeNote, LOOK_JOBS, HEAVY_JOBS } from './look
 import { DEFAULT_LOOKS, DEFAULT_MINUTES, safeRead, writeSession, sessionServer, finalChoice, sessionCall, readTranscript, reachedOutside, ownFolderOf, ownPictures, runSession } from './session.mjs';
 import { qwenRoute, studyRequestPrompt, parseStudyRequests, writeStudyRequest, makeStudies, withAuthorStudies } from './studies.mjs';
 import { readSelfReview, returnPrompt } from './self-review.mjs';
+import { checkSessionFolder, linesOfKept } from './kept-session.mjs';
 import { codeState } from '../../src/paint/code-state.mjs';
 import { scanOptions } from '../../src/paint/option-ledger.mjs';
 
@@ -307,6 +308,8 @@ async function sessionRun(r) {
     let earlier; try { earlier = JSON.parse(fs.readFileSync(path.join(record.author.from, 'run.json'), 'utf8')); } catch { throw new Error(`--from: no finished run at ${record.author.from}`); }
     const sub = earlier.author?.session?.submitted;
     if (!sub || earlier.subject.id !== spec.id || earlier.author.key !== author.key) throw new Error(`--from: ${record.author.from} is not a session of ${author.name} on ${spec.id} that handed over a choice`);
+    // a folder that lacks a file its choice names is refused, the file named: nothing else is painted in its place
+    checkSessionFolder(record.author.from, sub);
     const choice = readChoice({ kind: sub.kind, settings: sub.settings, script: sub.script ?? undefined, plan: sub.plan ?? undefined, lines: sub.tools?.lines ?? undefined, forms: sub.tools?.forms ?? undefined, perForm: sub.tools?.perForm ?? undefined, why: sub.why });
     // its lines and forms as the session left them in its folder
     if (choice.tools) for (const [k, to] of [['lines', 'linesEdit'], ['forms', 'formsEdit']]) if (choice.tools[k]) choice.tools[to] = JSON.parse(fs.readFileSync(path.join(record.author.from, 'author', 'folder', choice.tools[k]), 'utf8'));
@@ -427,6 +430,18 @@ async function oneRun(r) {
     if (author.key === 'auto') {
       const got = await paintOnce(r, dirty => buildCommand(spec, { mode: req.mode, out: record.plate, known, dirty, segEnv }), record.plate, path.join(record.out, 'run.log'));
       record.failure = got.failure; record.results = got.results;
+    } else if ((author.cli === 'edit' || author.cli === 'script') && linesOfKept(author.file, author.cli === 'edit' ? 'plan' : 'script')) {
+      // a kept script or plan edit that lies in the folder of a session which chose its own drawing lines: painted with
+      // those lines, as the session's choice is (kept-session.mjs refuses it when the lines file is missing or the file
+      // is not what the session handed over; it is never painted with the standard drawing in their place)
+      const kind = author.cli === 'edit' ? 'plan' : 'script', tied = linesOfKept(author.file, kind), read = f => JSON.parse(fs.readFileSync(f, 'utf8'));
+      fs.mkdirSync(path.join(record.out, 'author'), { recursive: true });
+      const choice = readChoice({ kind, [kind]: kind === 'script' ? 'script.json' : 'plan-edit.json', lines: tied.lines });
+      choice.tools.linesEdit = read(tied.linesFile);
+      const fin = { choice, script: kind === 'script' ? readScript(author.file, { sheetWidthMm: spec.sheet.widthMm }).script : null, edit: kind === 'plan' ? read(author.file) : null, submitted: { kind, what: tied.what } };
+      Object.assign(record.author, { chose: tied.what, linesFrom: { session: tied.run, file: tied.linesFile } });
+      say(r, `this ${kind === 'script' ? 'script' : 'plan edit'} was handed over by a session with its own drawing lines (${tied.linesFile}): painted with them`);
+      await paintChoice(r, fin);
     } else if (author.cli === 'edit') {
       // a kept edit of the code planner's plan (plan-to-edit.json of a plan, as written or changed): no model is called
       const dir = path.join(record.out, 'author'), kept = path.join(dir, 'plan-edit.json'); fs.mkdirSync(dir, { recursive: true });
