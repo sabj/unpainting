@@ -278,3 +278,35 @@ test('the base wash of a dark form is a mid-tone, and the darks go over it', () 
   assert.ok(L(base) >= 58 && L(base) <= 62, `${L(base)}`);
   assert.ok(p.instructions.slice(1).some(q => L(q) < 45), 'the darks are laid over it');
 });
+
+// --- the block-in's tinted whites ---
+// a pale blue sky over a pale ochre wall (both lights, opposed hues), each 120 x 40 mm, white paper round them
+function skyAndWall({ sky = [196, 214, 236], margin = [255, 255, 255] } = {}) {
+  const w = 320, h = 200, rgb = new Uint8ClampedArray(w * h * 3);
+  for (let i = 0; i < w * h; i++) { const x = (i % w) / 2, y = ((i / w) | 0) / 2; rgb.set(x >= 20 && x < 140 && y >= 10 && y < 90 ? (y < 50 ? sky : [236, 218, 186]) : margin, i * 3); }
+  return { w, h, rgb };
+}
+
+test('a white of the block-in that the richer studies tint is washed in their colour; one they keep white, or with @whites above 1, stays paper', () => {
+  // the block-in leaves the sky white; the middle and fine studies show it pale blue (a green field round both, so the
+  // white is the sky alone: a white that runs on into a white margin is judged whole, margin and all)
+  const field = [128, 150, 110], blockIn = skyAndWall({ sky: [255, 255, 255], margin: field }), rich = skyAndWall({ margin: field }), white = skyAndWall({ sky: [255, 255, 255], margin: field });
+  const run = (richer, read = null) => { const log = console.log; console.log = () => {}; try { return planStudyWashes({ k: pigments.length, w: blockIn.w, h: blockIn.h, studies: [{ rgb: blockIn.rgb, file: 'block-in', ...(read ? { read } : {}) }, { rgb: richer.rgb, file: 'middle', minMm2: 4 }, { rgb: richer.rgb, file: 'fine', minMm2: 2 }], paperRGB: PAPER, pigments, sheetWidthMm: 160, washBrushMm: 5, washKitMm: [38, 25.4, 7, 5] }); } finally { console.log = log; } };
+  const inSky = q => q.outline.some(l => l.points.some(pt => pt[1] < 40)), blue = q => q.colour[2] > q.colour[0] + 10;
+  const p = run(rich);
+  assert.ok(p.summary.whitesWashedMm2 > 0.9 * 120 * 40, `${p.summary.whitesWashedMm2}`);
+  assert.ok(p.instructions.some(q => inSky(q) && blue(q)), p.instructions.map(q => `${q.thing} ${q.colour}`).join(' | '));
+  assert.ok(p.summary.reservedShare < 0.02 && p.summary.paintedShare > 0.97, `${p.summary.reservedShare} ${p.summary.paintedShare}`);
+  // a sky the richer studies keep white is a light: 120 x 40 mm of the 160 x 100 mm sheet
+  const kept = run(white);
+  assert.equal(kept.summary.whitesWashedMm2, 0); assert.ok(Math.abs(kept.summary.reservedShare - 0.3) < 0.02, `${kept.summary.reservedShare}`);
+  assert.ok(kept.instructions.every(q => !(inSky(q) && blue(q))));
+  // the share is a setting: above 1 no white of the block-in is washed
+  const off = run(rich, { whites: 2 });
+  assert.equal(off.summary.whitesWashedMm2, 0); assert.ok(off.instructions.every(q => !(inSky(q) && blue(q))));
+  assert.ok(Math.abs(off.summary.reservedShare - 0.3) < 0.02, `${off.summary.reservedShare}`);
+  // reading the sky from the middle study leaves every other shape as the block-in had it: the wall and the field (their
+  // colours and stages; the wall's wash now runs a little over the painted sky's edge)
+  const others = pl => pl.instructions.filter(q => !blue(q)).map(q => [q.colour, q.stage]);
+  assert.ok(others(off).length >= 2); assert.deepEqual(others(p), others(off));
+});

@@ -28,6 +28,7 @@ import { touchesFrom } from './touch-layer.mjs';
 import { namedForms, formCoverage } from './named-forms.mjs';
 import { brushCeilingMm, kitUnder } from './form-brush.mjs';
 import { formBases } from './form-base.mjs';
+import { tintedWhites, readFrom } from './study-whites.mjs';
 
 /** The plan's grid cell (mm). */
 const PLAN_MM = 0.25;
@@ -47,8 +48,11 @@ const PLAN_MM = 0.25;
  *   the ground, a building, a background and paper in no named form. Without named forms it does nothing.
  * formbase (on the first study): 1 begins every soft named form (form-base.mjs: a face, fur, an animal, hair, a figure,
  *   clothing, a sky, water) with one pale wash over the whole form, laid into clean water so its lanes run together, at
- *   the form's light value; the study's shapes in the form go over it and no family under-wash is laid there. 0: none. */
-export const READ = Object.freeze({ clusters: 16, join: 10, shapes: 160, leastMm2: 6, formbrush: 17, formbase: 1 });
+ *   the form's light value; the study's shapes in the form go over it and no family under-wash is laid there. 0: none.
+ * whites (on the first study): a white shape of the block-in is not a light when every richer study tints at least this
+ *   share of its cells (study-whites.mjs): it is read from the middle study there and washed. Above 1: every white of the
+ *   block-in stays paper. */
+export const READ = Object.freeze({ clusters: 16, join: 10, shapes: 160, leastMm2: 6, formbrush: 17, formbase: 1, whites: 0.7 });
 const CLUSTERS = READ.clusters, CLUSTER_JOIN = READ.join;
 /** The planted-pattern copy test of this reading (19-20 Nov 2026; no drawing; copied with the spread of the same measure
  * against patterns not planted, and stable against two studies of the clean piece that differ only in seed): */
@@ -113,19 +117,30 @@ function parts(lab, w, h) {
 /**
  * The study's flat shapes on a pw x ph grid: {label (0-based shape per cell), shapes: [{cells, colour (sRGB), lab, paper, border: Map(shape -> shared edges), rim}]}.
  * `rgb` is the study on that grid.
+ * `again`: {centres, cells} for a second reading in which some cells were read from another study (the block-in's tinted
+ * whites): the first reading's colours stand (`centres`), every other cell keeps the colour it had, and only the re-read
+ * `cells` (a mask) may open colours of their own. Without this a pale sky read into the block-in moved every cluster a
+ * little and the whole sheet's shapes with them.
  */
-function studyShapes(rgb, pw, ph, paperRGB, { sliverCells, most = 0, clusters: K = CLUSTERS, join: J = CLUSTER_JOIN, keep: KD = KEEP_DARK, hue: HK = KEEP_HUE }) {
+function studyShapes(rgb, pw, ph, paperRGB, { sliverCells, most = 0, clusters: K = CLUSTERS, join: J = CLUSTER_JOIN, keep: KD = KEEP_DARK, hue: HK = KEEP_HUE, again = null }) {
   const pn = pw * ph, L = new Float32Array(pn), A = new Float32Array(pn), B = new Float32Array(pn);
   for (let q = 0; q < pn; q++) { const [l, a, b] = labOf(rgb, q, paperRGB); L[q] = l; A[q] = a; B[q] = b; }
   // the colours, read off a fixed grid of about 8000 cells
   const step = Math.max(1, Math.round(Math.sqrt(pn / 8000))), rows = [];
   for (let y = 0; y < ph; y += step) for (let x = 0; x < pw; x += step) { const q = y * pw + x; rows.push(L[q], A[q], B[q]); }
-  let centres = kmeans(Float32Array.from(rows), 3, K, 20);
   // (a pale tint is never joined to the paper: a cream sail is painted, the white round it is not)
-  const paperish = c => c[0] >= PAPER_L && Math.hypot(c[1], c[2]) <= PAPER_CHROMA;
-  for (let merged = true; merged;) { merged = false; for (let a = 0; a < centres.length && !merged; a++) for (let b = a + 1; b < centres.length && !merged; b++) if (paperish(centres[a]) === paperish(centres[b]) && Math.hypot(...centres[a].map((v, j) => v - centres[b][j])) < J) { centres[a] = centres[a].map((v, j) => (v + centres[b][j]) / 2); centres.splice(b, 1); merged = true; } }
+  const paperish = c => c[0] >= PAPER_L && Math.hypot(c[1], c[2]) <= PAPER_CHROMA, apart = (a, b) => Math.hypot(...a.map((v, j) => v - b[j]));
+  const joined = cs => { for (let merged = true; merged;) { merged = false; for (let a = 0; a < cs.length && !merged; a++) for (let b = a + 1; b < cs.length && !merged; b++) if (paperish(cs[a]) === paperish(cs[b]) && apart(cs[a], cs[b]) < J) { cs[a] = cs[a].map((v, j) => (v + cs[b][j]) / 2); cs.splice(b, 1); merged = true; } } return cs; };
+  let centres = again ? again.centres.map(c => [...c]) : joined(kmeans(Float32Array.from(rows), 3, K, 20));
+  // (the colours every cell may take; the re-read cells of a second reading may also take those they open themselves)
+  const shared = centres.length;
+  if (again) {
+    const own = []; for (let y = 0; y < ph; y += step) for (let x = 0; x < pw; x += step) { const q = y * pw + x; if (again.cells[q]) own.push(L[q], A[q], B[q]); }
+    for (const c of joined(kmeans(Float32Array.from(own), 3, K, 20))) if (!centres.some(o => paperish(o) === paperish(c) && apart(o, c) < J)) centres.push(c);
+  }
+  const base = centres.map(c => [...c]);
   let lab = new Int32Array(pn);
-  for (let q = 0; q < pn; q++) { let best = 0, bd = Infinity; centres.forEach((c, f) => { const d = (L[q] - c[0]) ** 2 + (A[q] - c[1]) ** 2 + (B[q] - c[2]) ** 2; if (d < bd) { bd = d; best = f; } }); lab[q] = best; }
+  for (let q = 0; q < pn; q++) { let best = 0, bd = Infinity; const upTo = again?.cells[q] ? centres.length : shared; for (let f = 0; f < upTo; f++) { const c = centres[f], d = (L[q] - c[0]) ** 2 + (A[q] - c[1]) ** 2 + (B[q] - c[2]) ** 2; if (d < bd) { bd = d; best = f; } } lab[q] = best; }
   // a small region whose HUE differs strongly from its cluster's (a warm niche in a pale wall) gets a cluster of its own,
   // though its value is close: the coarse clusters would swallow it. Hue, not lightness: a faint neutral pattern changes
   // lightness only and cannot open one.
@@ -194,7 +209,7 @@ function studyShapes(rgb, pw, ph, paperRGB, { sliverCells, most = 0, clusters: K
     s.lab = labOf(s.colour, 0, paperRGB); s.chroma = Math.hypot(s.lab[1], s.lab[2]);
     s.paper = s.lab[0] >= PAPER_L && s.chroma <= PAPER_CHROMA;
   }
-  return { label, shapes, clusters: centres.length };
+  return { label, shapes, clusters: centres.length, centres: base };
 }
 
 /** sRGB of a Lab colour whose white is the paper (the inverse of labOf). */
@@ -586,7 +601,16 @@ export function planStudyWashes({ k, w, h, studies, flat = false, density = null
   const stepsAfter = (what, own, colour, studyLayer = 1) => { const st = monoSteps(own, MONO_STEP_LEAST); if (!st) return colour; st.steps.forEach((x, k) => deferredSteps.push({ k, what: `${what}: value step ${k + 2}`, cells: x.cells, colour: withL(colour, x.L), studyLayer })); return withL(colour, st.firstL); };
 
   // --- layer 1: the block-in ---
-  const L1 = studies[0], R1 = L1.read ?? {}, first = studyShapes(grids[0], pw, ph, paperCol, { sliverCells: Math.max(1, (L1.minMm2 ?? READ.leastMm2) / cellMm2), most: R1.shapes ?? READ.shapes, ...R1 });
+  const L1 = studies[0], R1 = L1.read ?? {}, readBlockIn = (again = null) => studyShapes(grids[0], pw, ph, paperCol, { sliverCells: Math.max(1, (L1.minMm2 ?? READ.leastMm2) / cellMm2), most: R1.shapes ?? READ.shapes, ...R1, again });
+  let first = readBlockIn();
+  // a white of the block-in that every richer study tints (a pale sky, a cream sail) is no light: there the block-in is
+  // read from the middle study, and its pale colours are shapes like any other
+  const whitesWashed = [];
+  if (!flat && !MONO && grids.length > 1) {
+    const lights = first.shapes.map((_, i) => i).filter(i => first.shapes[i].paper && first.shapes[i].cells.length * cellMm2 >= LIGHT_LEAST_MM2);
+    const take = tintedWhites({ shapes: first.shapes, lights, richer: grids.slice(1).map(g => q => labOf(g, q, paperCol)), share: R1.whites ?? READ.whites, paperL: PAPER_L, paperC: PAPER_CHROMA });
+    if (take.length) { for (const i of take) whitesWashed.push(first.shapes[i].cells.length * cellMm2); const cells = new Uint8Array(pn); for (const i of take) for (const q of first.shapes[i].cells) cells[q] = 1; grids[0] = readFrom(grids[0], grids[grids.length >> 1], first.shapes, take); first = readBlockIn({ centres: first.centres, cells }); }
+  }
   const { label, shapes, clusters } = first;
   const parent = flat ? shapes.map(() => -1) : nestParents(shapes);
   const kids = shapes.map(() => []); parent.forEach((p, i) => { if (p >= 0) kids[p].push(i); });
@@ -894,7 +918,7 @@ export function planStudyWashes({ k, w, h, studies, flat = false, density = null
   const sheetLabels = new Int32Array(n); for (let y = 0; y < h; y++) { const py = Math.min(ph - 1, ((y + .5) * ph / h) | 0); for (let x = 0; x < w; x++) sheetLabels[y * w + x] = label[py * pw + Math.min(pw - 1, ((x + .5) * pw / w) | 0)] + 1; }
   const regions = { source: 'block-in study', labels: sheetLabels, regions: shapes.map((s, i) => ({ id: i + 1, colour: s.colour, paper: s.paper, parent: parent[i] >= 0 ? parent[i] + 1 : null, share: +(s.cells.length / pn).toFixed(4) })) };
   const washes = instructions.filter(q => q.stage !== 2).length;
-  const summary = { source: 'study', flat, files: studies.map(st => st.file ?? null), layersOfStudy: perLayer, clusters, shapes: shapes.length, paperShapes: shapes.filter(s => s.paper).length, nested, softJoins, dabbed, stages: byStage.filter(Boolean).length, washesByStage: byStage, mixes: mixes.length, washes, formBases: formBaseCount, charges: 0, planCellMm: mmX, reservedShare,
+  const summary = { source: 'study', flat, files: studies.map(st => st.file ?? null), layersOfStudy: perLayer, clusters, shapes: shapes.length, paperShapes: shapes.filter(s => s.paper).length, nested, softJoins, dabbed, stages: byStage.filter(Boolean).length, washesByStage: byStage, mixes: mixes.length, washes, formBases: formBaseCount, whitesWashedMm2: whitesWashed.reduce((a, v) => a + v, 0), charges: 0, planCellMm: mmX, reservedShare,
     paintedShare: covered.reduce((a, v) => a + v, 0) / pn, meanWashMm2: areas.reduce((a, v) => a + v, 0) / Math.max(1, areas.length), medianWashMm2: areas.length ? areas[areas.length >> 1] : 0, smallestWashMm2: areas[0] ?? 0, plannedStrokes: strokeCount, drawn, stagesAt, touchLog, glazeLog, ...(named ? { namedForms: { provenance: thingMasks.provenance ?? null, forms: named.forms.map(f => ({ id: f.id, name: f.name, kind: f.kind, share: +(f.cells / pn).toFixed(4) })) } } : {}) };
   console.log(`study washes: the wash plan is read from ${studies.length} block-in ${studies.length > 1 ? 'studies' : 'study'} (${studies.map(st => `${st.file ?? '?'}${st.minMm2 ? ` from ${st.minMm2} mm2` : ''}`).join(', ')}), not from the subject (the subject only registers the studies to the sheet${studies[0].registered ? `: ${studies[0].registered}` : ''} and scores the plate; the palette and the drawing are the painter's own as before)${flat ? '; FLAT: plain fills, for comparison' : ''}`);
   perLayer.forEach((pl, li) => console.log(`study washes, layer ${li + 1}${pl.accent ? ' (accents)' : pl.mode === 'glaze' ? ' (connected glazes)' : ''}: ${pl.study}, shapes from ${pl.minMm2 ?? '-'} mm2, registered by ${pl.shift.join(',')} cells: ${pl.washes} washes, ${pl.strokes} strokes`));
@@ -903,6 +927,7 @@ export function planStudyWashes({ k, w, h, studies, flat = false, density = null
   const fmtT = t => `${t.wash ? 'glaze' : t.name} ${t.areaMm2.toFixed(0)} mm2 (${t.length.toFixed(0)} x ${t.width.toFixed(1)} mm) L* ${t.L.toFixed(0)} at ${t.cx},${t.cy} mm, layer ${t.layer}`;
   console.log(`study washes, the ten largest touches: ${[...touchLog].sort((a, b) => b.areaMm2 - a.areaMm2).slice(0, 10).map(fmtT).join('; ')}`);
   console.log(`study washes, the ten darkest marks: ${touchLog.filter(t => !t.wash).sort((a, b) => a.L - b.L).slice(0, 10).map(fmtT).join('; ')}`);
+  console.log(`study washes: whites of the block-in washed because every richer study tints them: ${whitesWashed.length ? whitesWashed.map(v => `${v.toFixed(0)} mm2`).join(', ') : 'none'}`);
   if (named) console.log(`study washes: named forms on the plan grid: ${named.forms.filter(f => f.cells).map(f => `${f.name} [${f.kind}] ${(100 * f.cells / pn).toFixed(1)}%`).join(', ')}; ${(100 * named.ids.reduce((a, v) => a + (v ? 0 : 1), 0) / pn).toFixed(1)}% in no named form`);
   console.log(`study washes: ${clusters} colours, ${shapes.length} block-in shapes (${summary.paperShapes} left as paper, ${(100 * reservedShare).toFixed(1)}% of the sheet); ${washes} washes (${byStage[0]} first, ${byStage[2]} over a lighter wash, ${byStage[3]} accents), ${nested} nested, ${softJoins} laid against a damp neighbour, ${formBaseCount} base washes of named forms, ${dabbed} in dabs, 0 charges, ${glazes} glazes; ${strokeCount} strokes`);
   return { opticsReport: null, paper: null, style: null, layers, instructions, protectedCells: null, value: inkValue ?? { values: density ?? new Float32Array(n) }, regions, omittedDemand: 0, lightShapes, summary, mixes, polygons,
