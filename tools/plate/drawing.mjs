@@ -28,6 +28,7 @@ import {fillReserved} from '../../src/crop/lights.mjs';
 import {erasePrep} from '../../src/paint/methods/pencil-erase.mjs';
 import {followErase} from '../../src/paint/methods/fine-erase.mjs';
 import {strokesToLay} from '../../src/paint/methods/drawing-default.mjs';
+import {setPencil} from '../../src/paint/methods/pencil-set.mjs';
 import {makeMopLanes} from '../../src/paint/methods/mop-lanes.mjs';
 import {sealAtBirth, sealTargetMaps} from '../guard/seal-maps.mjs';
 
@@ -206,7 +207,10 @@ function vectorFile(key = 'drawingfile') {
 async function layExactVectors(file, { closing = false } = {}) {
   const bytes = fs.readFileSync(file), whole = JSON.parse(bytes.toString('utf8')), sheetMm = PB?.mm ?? num('sheetmm', DEFAULT_SHEET_MM);
   // the strokes laid: an author's choice exactly, else Auto's default from the drawing's medium and tags (drawing-default.mjs)
-  const chosen = strokesToLay(whole), doc = { ...whole, strokes: chosen.strokes };
+  // (the line file beside the vectors gives each line's importance, which Auto's pencil lay-in reads)
+  const linesFile = file.replace(/-vectors\.json$/, '-lines.json'), lines = fs.existsSync(linesFile) ? JSON.parse(fs.readFileSync(linesFile, 'utf8')) : null;
+  const TM = ctx.THING_MASKS, forms = TM ? { width: TM.width, height: TM.height, ids: TM.ids, list: TM.names.map((name, i) => ({ id: i + 1, name, kind: TM.kinds[i] })) } : null;
+  const chosen = strokesToLay(whole, lines, forms), doc = { ...whole, strokes: chosen.strokes };
   console.log(`drawing ${closing ? 'after the washes' : 'before the washes'}: ${chosen.strokes.length} of ${whole.strokes.length} strokes of ${path.basename(file)}, ${chosen.rule}`);
   // the painter's own record of what it laid, for the drawing harness (tools/drawing-harness): ids and their hash
   const ids = chosen.strokes.map(q => q.seq);
@@ -358,6 +362,8 @@ if (!ctx.RESUMING && PEN_FIRST && opt('draw', '1') !== '0' && DRAWING !== 'none'
   console.log(`pen first: source line ${(100 * SOURCE_INK).toFixed(1)}% of cells`);
   const before = thickness(ctx.sheet).map(a => Float32Array.from(a));
   await drawPass(null, { first: true });
+  // the pencil is set into the paper before the first wash, as dry graphite in the tooth is (pencil-set.mjs)
+  if (GRAPHITE) { const set = setPencil(ctx.sheet, GRAPHITE_AT); if (set > 0) console.log(`pencil set: the opening drawing's graphite set into the paper before the washes (${set.toFixed(1)} units)`); }
   if (PREP_ERASE && STAGE_PLAN?.files.prep && GRAPHITE) followErase(INKRES, ctx.sheet, GRAPHITE_AT, () => erasePrep({ sheet: ctx.sheet, k: GRAPHITE_AT, dabs: PREP_ERASE, strength: num('preperase', 0.85), SC, w, W2, layersChanged, log: console.log }));
   ctx.INK_THK = thickness(ctx.sheet).map((a, j) => Float32Array.from(a, (v, i) => Math.max(0, v - before[j][i])));
   await sharp(INKRES ? INKRES.compose(view()) : render(), { raw: { width: OUT_W, height: OUT_H, channels: 3 } }).png().toFile(path.join(out, 'drawing-opening.png'));

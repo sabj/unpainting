@@ -18,6 +18,7 @@ import { strokesToLay } from '../../src/paint/methods/drawing-default.mjs';
 export async function toolsBase(spec) {
   const stem = spec.drawing.abs, vectorsFile = `${stem}-vectors.json`;
   const vectors = fs.existsSync(vectorsFile) ? JSON.parse(fs.readFileSync(vectorsFile, 'utf8')) : null;
+  const linesFile = `${stem}-lines.json`, lines = vectors && fs.existsSync(linesFile) ? JSON.parse(fs.readFileSync(linesFile, 'utf8')) : null;
   let mask = null, things = null;
   if (spec.masks?.receipt) {
     const r = JSON.parse(fs.readFileSync(spec.masks.receipt, 'utf8')), at = path.dirname(spec.masks.receipt);
@@ -26,7 +27,7 @@ export async function toolsBase(spec) {
     things = JSON.parse(fs.readFileSync(path.resolve(at, r.labels.path), 'utf8')).things;
   }
   const forms = (things ?? []).map((t, i) => ({ id: i + 1, name: t?.name || t?.thing, kind: t?.kind ?? 'other' }));
-  return { stem, vectors, mask, things, forms, receipt: spec.masks?.receipt ?? null, sheet: { widthMm: spec.sheet.widthMm, heightMm: spec.sheet.heightMm }, studies: spec.studies.length, source: { abs: spec.source.abs, sha256: spec.source.sha256 },
+  return { stem, vectors, lines, mask, things, forms, receipt: spec.masks?.receipt ?? null, sheet: { widthMm: spec.sheet.widthMm, heightMm: spec.sheet.heightMm }, studies: spec.studies.length, source: { abs: spec.source.abs, sha256: spec.source.sha256 },
     listing: vectors ? linesListing(vectors, { mask, forms }) : null };
 }
 
@@ -49,7 +50,7 @@ export function resolveTools(tools, base) {
   if (tools.linesEdit || tools.medium) {
     if (!base.vectors) throw new Error('lines edit: this subject\'s drawing has no vector strokes to choose from');
     // (the line file is not needed to check an edit: only the strokes are chosen)
-    lines = applyLinesEdit(base.vectors, { lines: [] }, tools.linesEdit ?? null, listing, { medium: tools.medium ?? null });
+    lines = applyLinesEdit(base.vectors, base.lines ?? { lines: [] }, tools.linesEdit ?? null, listing, { medium: tools.medium ?? null, forms: base.mask ? { ...base.mask, list: base.forms } : null });
     record.lines = { file: tools.lines ?? null, ...lines.record }; said.push(`Your drawing: ${linesLine(lines.record)}.`); warnings.push(...lines.warnings);
   }
   if (tools.perForm) {
@@ -80,7 +81,7 @@ export async function writeTools(dir, tools, base) {
     sets.push(['masks', f.receipt]); Object.assign(out, { receipt: f.receipt, mask: f.mask });
   }
   if (tools.linesEdit || tools.medium) {
-    const l = writeLinesEdit({ dir: path.join(dir, 'lines'), stem: base.stem, edit: tools.linesEdit ?? null, listing: got.listing, medium: tools.medium ?? null });
+    const l = writeLinesEdit({ dir: path.join(dir, 'lines'), stem: base.stem, edit: tools.linesEdit ?? null, listing: got.listing, medium: tools.medium ?? null, forms: base.mask ? { ...base.mask, list: base.forms } : null });
     sets.push(...l.sets); Object.assign(out, { opening: l.opening, closing: l.closing, order: l.order, laidAs: l.laidAs });
   }
   return { ...out, sets };
@@ -92,6 +93,6 @@ export function linesPictureDoc(vectors, before = [], after = []) {
 }
 
 /** The drawing with every stroke the painter lays on its own (drawing-default.mjs; on a pencil lay-in not the strokes tagged drop): the picture of the lines as Auto lays them. */
-export function allLinesDoc(vectors) {
-  return { ...vectors, strokes: strokesToLay(vectors).strokes.map(s => ({ ...s, drop: false })) };
+export function allLinesDoc(vectors, lines = null, forms = null) {
+  return { ...vectors, strokes: strokesToLay(vectors, lines, forms).strokes.map(s => ({ ...s, drop: false })) };
 }

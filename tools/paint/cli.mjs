@@ -471,7 +471,7 @@ async function sessionRun(r) {
       routes = await closedRoutes(author);
       const { prompt, pictures: handedPictures } = writeSession({ dir: cwd, tools: routes.toolbox ? toolsText(routes.toolbox.said) : undefined, packet, sheet: spec.sheet, medium: record.drawing.medium, auto: { picture: await planPicture({ planPreview: auto.planPreview, run: record }), washesText: washesText(auto), plan: { summary: auto.summary, washes: auto.rows }, toEdit: listing }, settings: settingsList(spec),
         forms: record.masks.mask ? await formBoxes(record.masks.mask, record.masks.forms, W) : null, formsIds: record.masks.mask ?? null, looks: looksMost, wallMinutes: wallMost, graceMinutes: graceMost, steps: stepsMost, reverts: revertsMost, briefFile: path.join(HERE, 'SESSION-BRIEF.md'), readmeFile: path.join(HERE, 'SESSION-README.md'), handed,
-        drawing: base.listing ? { listing: base.listing, picture: await drawingPicture(allLinesDoc(base.vectors), W) } : null });
+        drawing: base.listing ? { listing: base.listing, picture: await drawingPicture(allLinesDoc(base.vectors, base.lines, base.mask ? { ...base.mask, list: base.forms } : null), W) } : null });
       // what was handed, by hash, as it lies in the session's folder: a retry's first message can be shown to carry it
       const sha = f => crypto.createHash('sha256').update(fs.readFileSync(f)).digest('hex');
       record.author.handed = handed.map(h => ({ folder: h.folder, files: h.files.map(f => ({ name: f.name, sha256: sha(path.join(cwd, h.folder, f.name)), picture: Boolean(f.picture), namedInTheFirstMessage: prompt.includes(`\`${h.folder}/${f.name}\``) })) }));

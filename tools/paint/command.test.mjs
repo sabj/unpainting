@@ -53,7 +53,7 @@ test('named forms go to the planner when the painter reads them; an authored scr
   assert.equal(buildCommand(spec({ masks }), { mode: 'plan', out: '/o', known: new Set() }).masksRead, false);
   const s = buildCommand(spec({ masks }), { mode: 'paint', out: '/o', known, script: { file: '/o/author/script.json', paints: ['ochre', 'ultramarine'] } });
   assert.equal(value(s, 'washplan'), 'script:/o/author/script.json'); assert.equal(value(s, 'paints'), 'ochre,ultramarine'); assert.equal(value(s, 'paintsextend'), '0');
-  assert.equal(s.masksRead, false); assert.ok(!s.argv.includes('--thingmasks'));
+  assert.equal(s.masksRead, false, 'the script\'s plan reads no forms'); assert.equal(value(s, 'thingmasks'), '/m/receipt.json', 'its drawing does');
   // an edited plan: the studies are read as always (the forms too), and the edit file goes first in the wash plan
   const e = buildCommand(spec({ masks }), { mode: 'paint', out: '/o', known, edit: { file: '/o/author/plan-edit.json' } });
   assert.equal(value(e, 'washplan'), `edit:/o/author/plan-edit.json,${value(c, 'washplan')}`); assert.equal(e.masksRead, true); assert.equal(value(e, 'paints'), value(c, 'paints'));

@@ -47,7 +47,8 @@ export function buildCommand(spec, { mode, out, known, script = null, edit = nul
   const masksRead = Boolean(spec.masks?.receipt && !script && known?.has('thingmasks'));
   const argv = [...opts].flatMap(([k, v]) => [`--${k}`, v]);
   argv.push('--washplan', script ? `script:${script.file}` : `${edit ? `edit:${edit.file},` : ''}${washPlanOf(spec.studies)}`, '--drawingfile', spec.drawing.abs);
-  if (masksRead) argv.push('--thingmasks', spec.masks.receipt, ...(spec.masks.labels ? ['--things', spec.masks.labels] : []));
+  // a script's run reads no forms in its plan, but its drawing does (a pencil lay-in keeps a face's named features)
+  if (masksRead || (script && spec.masks?.receipt && known?.has('thingmasks'))) argv.push('--thingmasks', spec.masks.receipt, ...(spec.masks.labels ? ['--things', spec.masks.labels] : []));
   argv.push('--image', spec.source.abs, '--width', String(spec.sheet.cells), '--sheetmm', String(spec.sheet.widthMm), '--out', out);
   if (dirty) argv.push('--allowdirty', '1');
   const line = opts.get('outlinemedium') ?? 'graphite';

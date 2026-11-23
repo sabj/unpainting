@@ -66,9 +66,11 @@ export async function loadThingMasks(receiptPath, sourcePath, labelsPath) {
 export async function studyThingMasks({root, source, maskOption, labelsOption, blockIn}) {
   const sourcePath = path.resolve(root, source);
   const labelsPath = labelsOption === 'auto' ? undefined : path.resolve(root, labelsOption);
+  // without a block-in study plan (a painting script) the planner reads no forms, but a pencil lay-in still keeps the lines
+  // of a face's named features (drawing-default.mjs): given explicitly, the forms are loaded for the drawing alone
   if (!blockIn) {
-    if (maskOption !== 'auto' || labelsPath) throw Error('--thingmasks and --things require a block-in study wash plan');
-    return null;
+    if (maskOption === 'auto') { if (labelsPath) throw Error('--things requires --thingmasks'); return null; }
+    return { ...(await loadThingMasks(path.resolve(root, maskOption), sourcePath, labelsPath)), drawingOnly: true };
   }
   const explicit = maskOption !== 'auto';
   const receiptPath = explicit ? path.resolve(root, maskOption) : sourcePath + '.named-sam.json';

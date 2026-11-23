@@ -214,7 +214,9 @@ const pencilDraw=(target,gs,pigment,options)=>{
  // forms (a reviewed SAM id map bound to the source by its receipt) for the study wash plan; --things names the label file
  // the receipt must match. No receipt: no named forms, and the plan is as it was without them.
  const thingMasks=await studyThingMasks({root,source:opt('image'),maskOption:opt('thingmasks','auto'),labelsOption:opt('things','auto'),blockIn:Boolean(WASH_PLAN&&!SCRIPT)});
- if(thingMasks){valueOptions.thingMasks=thingMasks;console.log(`named forms: ${thingMasks.names.length} forms from a named-sam-v1 receipt (${thingMasks.names.map((n,i)=>`${n}${thingMasks.kinds[i]?` [${thingMasks.kinds[i]}]`:''}`).join(', ')})`);}
+ // (the drawing reads them too: a pencil lay-in keeps the lines of a face's named features, drawing-default.mjs)
+ ctx.THING_MASKS=thingMasks;
+ if(thingMasks&&!thingMasks.drawingOnly){valueOptions.thingMasks=thingMasks;console.log(`named forms: ${thingMasks.names.length} forms from a named-sam-v1 receipt (${thingMasks.names.map((n,i)=>`${n}${thingMasks.kinds[i]?` [${thingMasks.kinds[i]}]`:''}`).join(', ')})`);}
  // --seed: the hand of a script's washes (another seed, another hand); --handlanes a (default 1): how much of a hand is
  // in a wash's lanes (script-marks.mjs LANE_HAND: their turning, bowing, swelling and uneven lap; 0 is a ruler)
  if(SCRIPT){valueOptions.script=SCRIPT;valueOptions.seed=Math.round(num('seed',0));valueOptions.hand=Math.max(0,num('handlanes',1));const paper=estimatePaper(valueOptions.rgb,w,h,valueOptions.density);valueOptions.inkValue=targetValueMap(paper?Float32Array.from(valueOptions.density,v=>Math.max(0,v-paper.density)):valueOptions.density);}

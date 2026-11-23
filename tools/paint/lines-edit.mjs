@@ -24,7 +24,7 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import { autoDraws, autoStroke, layInDark } from '../../src/paint/methods/drawing-default.mjs';
+import { autoRule } from '../../src/paint/methods/drawing-default.mjs';
 
 export const LINES_EDIT_FORMAT = 'lines-edit 1';
 const DO = ['before', 'after', 'drop'], WEIGHT = [0.1, 4];
@@ -61,7 +61,7 @@ export function linesListing(vectors, { mask = null, forms = [] } = {}) {
   const count = k => strokes.reduce((a, s) => ({ ...a, [s[k] ?? 'none']: (a[s[k] ?? 'none'] ?? 0) + 1 }), {});
   const ink = vectors.medium === 'ink';
   return { format: 'lines 1', sheet: { widthMm: vectors.sheetMm, heightMm: vectors.heightMm }, medium: vectors.medium, linesAfterTheWashes: true,
-    note: `Every stroke starts as the painter lays it on its own: before the washes at its own darkness${ink ? '' : ', except the strokes tagged drop (hatching, tone, texture), which a pencil lay-in leaves for the washes: they start dropped, and {"where": {"tagged": "drop"}, "do": "before"} draws them'}; your rules change that. This is ${ink ? 'an ink' : 'a pencil'} drawing as prepared; the medium is yours to change ("medium" in choice.json: pencil, pen or none), any line may be drawn after the washes ("do": "after"), and you may draw lines of your own ("own").`,
+    note: `Every stroke starts as the painter lays it on its own: before the washes at its own darkness${ink ? '' : ', except the strokes tagged drop that do not place a form (hatching, tone, texture), which a pencil lay-in leaves for the washes: they start dropped, and {"where": {"tagged": "drop"}, "do": "before"} draws them. Those tagged drop that place a form (contours, lay-in strokes, inner contours, the strokes of the most important lines, those in and round a named feature of a face) start drawn at the lay-in\'s darkness; drawing/all-lines.png shows the start'}; your rules change that. This is ${ink ? 'an ink' : 'a pencil'} drawing as prepared; the medium is yours to change ("medium" in choice.json: pencil, pen or none), any line may be drawn after the washes ("do": "after"), and you may draw lines of your own ("own").`,
     counts: { strokes: strokes.length, tagged: count('tagged'), part: count('part'), form: count('form') }, strokes };
 }
 
@@ -155,16 +155,15 @@ export function checkOwnLines(own, sheet, warnings = []) {
  * (each {vectors, lines} or null), laidAs ('pencil' | 'ink' | null: the medium the files declare), state (id -> {do,
  * weight}), record, warnings}. Nothing given is altered; no prepared stroke's shape changes.
  */
-export function applyLinesEdit(vectors, lines, edit, listing, { medium = null } = {}) {
+export function applyLinesEdit(vectors, lines, edit, listing, { medium = null, forms = null } = {}) {
   if (medium != null && !DRAWING_MEDIA.includes(medium)) throw new Error(`"medium" is one of ${DRAWING_MEDIA.join(', ')}`);
   if (!edit && medium == null) throw new Error('lines edit: neither lines nor a medium is chosen');
   const warnings = [], rules = edit ? checkLinesEdit(edit, listing, warnings) : [], state = new Map(), matched = rules.map(() => 0);
   const own = edit ? checkOwnLines(edit.own, { widthMm: vectors.sheetMm, heightMm: vectors.heightMm }, warnings) : [];
   // every line starts as Auto lays it (drawing-default.mjs): on a pencil drawing the lines tagged drop start dropped,
   // but for those that place a form, which start drawn at the lay-in's darkness (a rule that draws hatching draws it as drawn)
-  const startsAs = new Map(vectors.strokes.map(s => [s.seq, autoDraws(s, vectors.medium) ? 'before' : 'drop']));
-  const level = layInDark(vectors);
-  vectors = { ...vectors, strokes: vectors.strokes.map(s => (autoDraws(s, vectors.medium) ? autoStroke(s, vectors, level) : s)) };
+  const auto = autoRule(vectors, lines, forms), startsAs = new Map(vectors.strokes.map(s => [s.seq, auto.draws(s) ? 'before' : 'drop']));
+  vectors = { ...vectors, strokes: vectors.strokes.map(s => (auto.draws(s) ? auto.stroke(s) : s)) };
   for (const s of listing.strokes) {
     const st = { do: startsAs.get(s.id) ?? 'before', weight: 1 };
     rules.forEach((r, i) => { if (!r.test(s)) return; matched[i]++; if (r.do) st.do = r.do; if (r.weight != null) st.weight = r.weight; });
@@ -218,9 +217,9 @@ export function linesLine(r) {
  * edit or null; `medium` the chosen medium or null. Returns {order, opening, closing (absolute stems or null), laidAs,
  * record, warnings, sets: the run settings that paint it}.
  */
-export function writeLinesEdit({ dir, stem, edit, listing, medium = null }) {
+export function writeLinesEdit({ dir, stem, edit, listing, medium = null, forms = null }) {
   const vectors = JSON.parse(fs.readFileSync(`${stem}-vectors.json`, 'utf8')), lines = JSON.parse(fs.readFileSync(`${stem}-lines.json`, 'utf8'));
-  const got = applyLinesEdit(vectors, lines, edit, listing, { medium }); fs.mkdirSync(dir, { recursive: true });
+  const got = applyLinesEdit(vectors, lines, edit, listing, { medium, forms }); fs.mkdirSync(dir, { recursive: true });
   const put = (name, part) => { if (!part) return null; const to = path.join(dir, name); fs.writeFileSync(`${to}-vectors.json`, JSON.stringify(part.vectors)); fs.writeFileSync(`${to}-lines.json`, JSON.stringify(part.lines)); return to; };
   const opening = put('opening', got.opening), closing = put('closing', got.closing);
   fs.writeFileSync(path.join(dir, 'lines-edit.json'), JSON.stringify({ edit, medium, of: { vectorsSha256: sha256(fs.readFileSync(`${stem}-vectors.json`)) }, record: got.record }, null, 1) + '\n');

@@ -24,7 +24,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 export const MEDIA = ['pencil', 'waterproof', 'soluble', 'none'], WHENS = ['before', 'after'], WHO = ['auto', 'lines', 'own'], SIZES = ['look', 'full'];
 /** The stated limits: a pencil line under the washes moves at most this share out of its cells; waterproof ink none
  *  beyond float rounding (0.01%); soluble ink the painter's own limit (ink-held.json `most`). */
-export const LIMITS = Object.freeze({ pencilMoved: 0.005, waterproofMoved: 1e-4, lookFinalDrawing: 0.85, continuityBreaks: 0.05, weightDarker: 1.15, eraseShare: 0.5 });
+export const LIMITS = Object.freeze({ pencilMoved: 0.001, waterproofMoved: 1e-4, lookFinalDrawing: 0.85, continuityBreaks: 0.05, weightDarker: 1.15, eraseShare: 0.5 });
 const W = 48, H = 36, MM = 48, LOOK = 24;
 
 // the subject: a pale paper with one blue block (the washes) over the middle of the drawing
@@ -77,7 +77,7 @@ export function cellPlan(cell, { target, stems, dir }) {
       const doc = drawingDoc(pen ? 'ink' : 'pencil');
       args.push('--drawingfile', pen ? stems.ink : stems.pencil, '--drawing', 'first', '--stages', 'none');
       if (pen) args.push('--inkrecipe', 'wash', '--inkfast', INKFAST[medium]); else args.push('--outlinemedium', 'graphite');
-      expect = { opening: strokesToLay(doc).strokes.map(s => s.seq), closing: null, medium: pen ? 'ink' : 'pencil' };
+      expect = { opening: strokesToLay(doc, JSON.parse(fs.readFileSync(`${pen ? stems.ink : stems.pencil}-lines.json`, 'utf8'))).strokes.map(s => s.seq), closing: null, medium: pen ? 'ink' : 'pencil' };
     }
   } else {
     // a model's choice on the pencil drawing (so a pen choice crosses the drawing's own medium): the session's own writer

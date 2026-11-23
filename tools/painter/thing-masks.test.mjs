@@ -57,5 +57,7 @@ test('no receipt: no masks (the plan is as before); auto finds only the receipt 
   await copyFile(f.receiptPath, f.source + '.named-sam.json');
   assert.deepEqual(await studyThingMasks(options), explicit);
   assert.equal(await studyThingMasks({ ...options, blockIn: false }), null);
-  await assert.rejects(studyThingMasks({ ...options, blockIn: false, maskOption: f.receiptPath }), /require a block-in/);
+  const forDrawing = await studyThingMasks({ ...options, blockIn: false, maskOption: f.receiptPath });
+  assert.equal(forDrawing.drawingOnly, true, 'a script run loads the forms for the drawing alone');
+  await assert.rejects(studyThingMasks({ ...options, blockIn: false, labelsOption: 'x.json' }), /--things requires --thingmasks/);
 });

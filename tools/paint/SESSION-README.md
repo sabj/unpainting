@@ -23,8 +23,10 @@ INPUT_LIST
 - `drawing/lines.json`: every line of the drawing as a row you can choose by (see "Choosing the drawing's lines").
   `drawing/all-lines.png` shows every line the painter lays on its own. On a pencil drawing that leaves out the lines
   tagged `drop` (hatching, tone, texture) other than those that place a form (contours, part `outline`; lay-in
-  strokes, phase `layin`; inner contours of the growth, part `inner` and phase `growth`: eyes, nose), which it lays
-  no darker than the drawing's own lay-in lines: a pencil lay-in places the forms and the washes model them. On a pen drawing
+  strokes, phase `layin`; inner contours of the growth, part `inner` and phase `growth`; and the strokes of the
+  drawing's most important lines, a quarter of them by the line file's `contribution`, not tone or fill; and the
+  strokes in and round a named feature of a face, an eye, a nose, the lips or mouth), which it lays no darker than the drawing's own lay-in lines (the most important up to twice that): a pencil
+  lay-in places the forms and the washes model them. On a pen drawing
   every line is laid, the `drop` ones too, since there the lines carry the modelling.
 - `mine/`: after a plan or a look of a choice that names lines or forms of your own: `mine/drawing.png` (your lines:
   grey before the washes, black after them), `mine/forms.png`, `mine/forms-ids.png`, `mine/forms.json` (your forms).
