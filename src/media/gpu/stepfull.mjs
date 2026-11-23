@@ -271,12 +271,6 @@ export class GpuSheet {
     q.writeBuffer(this.b.EFB, 0, new Uint32Array([b]));
     ef.count = L[0]; ef.boxes = b; this.efWriteRounds(); ef.key = key;
   }
-  efShrink(used, down) {
-    const ef = this.ef, recent = ef.recent ??= []; recent.push(used); if (recent.length > 16) recent.shift();
-    this.device.queue.writeBuffer(this.b.EFB, 12, new Uint32Array([0]));
-    const r = Math.max(4, Math.ceil(1.5 * Math.max(...recent)));
-    if (down && recent.length >= 4 && r < ef.rounds) { ef.rounds = r; this.efWriteRounds(); }
-  }
   efWriteRounds() { this.device.queue.writeBuffer(this.b.EFB, 4, new Uint32Array([this.ef.rounds])); }
   /** One step's feed, encoded in the step's pass: reset, the first substep's length, then the rounds of substeps. */
   efEncode(pass) {
@@ -786,11 +780,7 @@ export class GpuSheet {
       if (st[4]) { this.ef.stale = true; this.ef.batch = 1; } else this.ef.batch = Math.min(EF_BATCH, 2 * (this.ef.batch ?? 1));
       // a step used most of the rounds it had: give it more before one runs short (the last round takes all the time left)
       // (washes at 0.1 mm cells take up to 12 substeps a step; a quarter of the rounds are kept spare)
-      const grow = st[3] > 0.75 * this.ef.rounds && this.ef.rounds < EF_RMAX;
-      if (grow) { this.ef.rounds = Math.min(EF_RMAX, 2 * this.ef.rounds); this.efWriteRounds(); }
-      // and back down to half as many again as the most the last 16 reads used (no fewer than 4): every round encoded is two
-      // dispatches a step, used or not. EFB[3] is cleared after each read, so it is the most since the last.
-      this.efShrink(st[3], !grow);
+      if (st[3] > 0.75 * this.ef.rounds && this.ef.rounds < EF_RMAX) { this.ef.rounds = Math.min(EF_RMAX, 2 * this.ef.rounds); this.efWriteRounds(); }
       if (this.ef.stale) await this.efRefresh();
       const k = Math.min(this.ef.batch, steps - done);
       batch = this.device.createCommandEncoder();
