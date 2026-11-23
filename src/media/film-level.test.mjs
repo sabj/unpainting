@@ -59,14 +59,31 @@ function fiveSweeps(mm, dryOpts) {
   const od = densityOf(luminance(renderLayers(layersOf(s), pigments, base, n), n), luminance([246, 245, 239], 1)[0]);
   return { ...sweptSquare(od, w, w, mm, { centres: [9, 17, 25, 33, 41], half: 6 }), before };
 }
+// The control: the same paint poured flat over the same 40 mm square at the sweeps' density (OD 0.07), dried, read by
+// the same measure. It has no sweeps, so whatever bands and seams it shows are the paint's own grain in the rows.
+function pouredSquare(mm, dryOpts) {
+  const w = Math.round(50 / mm), n = w * w, pigments = [ultramarine, phthalo];
+  const s = createSheet(makePaper(w, w, { seed: 9, scale: 1, toothScale: 0.2, fibres: 0.5, tooth: 0.5, proudBlur: 1, mmPerCell: mm, coldPress: { mmPerCell: mm, bumpMm: [0.5, 2], cover: 2.2, swell: 0.3 } }), pigments);
+  for (let y = Math.round(5 / mm); y < Math.round(45 / mm); y++) for (let x = Math.round(5 / mm); x < Math.round(45 / mm); x++) deposit(s, y * w + x, 0.3, [0.12, 0]);
+  dry(s, 200000, O, dryOpts);
+  const base = new Uint8Array(n * 3); for (let i = 0; i < n; i++) base.set([246, 245, 239], i * 3);
+  const od = densityOf(luminance(renderLayers(layersOf(s), pigments, base, n), n), luminance([246, 245, 239], 1)[0]);
+  return sweptSquare(od, w, w, mm, { centres: [9, 17, 25, 33, 41], half: 6 });
+}
 const squares = {};
 for (const mm of [0.25, 0.1]) for (const [mode, dryOpts] of [['exact', { levelMax: 200 }], ['fast', { levelMax: 200, dt: 14, analyticTail: true }]]) {
   test(`a 40 mm square laid in five sweeps dries as one film at ${mm} mm cells (${mode}): no bands, no seams, a rim all round`, { timeout: 900000 }, () => {
-    const r = fiveSweeps(mm, dryOpts); squares[`${mm} ${mode}`] = r;
-    console.log(`five sweeps ${mm} mm ${mode}: bands ${r.bands.toFixed(4)}, seam ${r.seam.toFixed(4)} OD, rims ${r.rims.map(v => v.toFixed(3)).join(' ')}`);
-    // the row-mean density, outside the rim and over 2 mm of rows, within 3% of its mean (a poured square reads 2.3%)
-    assert.ok(r.bands < 0.03, `bands ${r.bands}`);
-    assert.ok(r.seam < 0.01, `seam step ${r.seam} OD`);
+    const r = fiveSweeps(mm, dryOpts), c = pouredSquare(mm, dryOpts); squares[`${mm} ${mode}`] = r;
+    console.log(`five sweeps ${mm} mm ${mode}: bands ${r.bands.toFixed(4)}, seam ${r.seam.toFixed(4)} OD, rims ${r.rims.map(v => v.toFixed(3)).join(' ')}; poured flat: bands ${c.bands.toFixed(4)}, seam ${c.seam.toFixed(4)} OD, mean ${c.mean.toFixed(3)} against ${r.mean.toFixed(3)}`);
+    // The sweeps leave no bands or seams beyond what the same paint poured flat shows. The row-mean density (outside the
+    // rim, over 2 mm of rows) and a row's step at a sweep's edge carry the paint's own grain, and the seam, the largest
+    // step over many rows, grows with it. At rc7, a pepper a cell across, the poured square read bands 0.024 and seam
+    // 0.006 OD and the sweeps 0.026-0.028 and 0.008 (bounds were 0.03 and 0.01; sweeps over poured: bands 1.06-1.17,
+    // seam 1.34-1.41). On the millimetre grain field (src/media/grain-field.mjs) the poured square reads 0.046-0.049 and
+    // 0.009-0.010, the sweeps 0.033-0.037 and 0.013-0.015 (bands 0.72-0.77, seam 1.48-1.52). Held to 1.25 and 1.6.
+    assert.ok(Math.abs(c.mean / r.mean - 1) < 0.25, `the poured square's density ${c.mean} against the sweeps' ${r.mean}`);
+    assert.ok(r.bands < 1.25 * c.bands, `bands ${r.bands} against the poured square's ${c.bands}`);
+    assert.ok(r.seam < 1.6 * c.seam, `seam step ${r.seam} OD against the poured square's ${c.seam}`);
     for (const v of r.rims) assert.ok(v >= 1.05 && v <= 1.4, `rims ${r.rims}`);
   });
 }

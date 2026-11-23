@@ -276,9 +276,11 @@ test('paint charged into a glossy film mixes out into it (filmDiffuse); on dry p
 // edge. Two lanes laid at twice it apart dry as evenly across their join as within a lane; at the old 3.5% overlap the
 // join dries as a ridge.
 test('two flat-brush lanes at twice the edge half-width dry as evenly across the join as within a lane', () => {
+  // the brush's contact width is under test, so the paint does not granulate: a granulating one's millimetre mottle
+  // (src/media/grain-field.mjs) moves the row profile by as much as the two pitches differ
   const r = 40, W = 10 * r, H = 5 * r, mm = 280 / 1200;
   const lay = halfPitch => {
-    const sheet = createSheet(makePaper(W, H, { seed: 9, mmPerCell: mm, toothScale: .2, coldPress: { mmPerCell: mm, bumpMm: [.5, 2], cover: 2.2, swell: .3 } }), [{ K: [.06, .26, .48], S: [.02, .02, .02], rho: .05, omega: 1.4, gamma: .25 }]);
+    const sheet = createSheet(makePaper(W, H, { seed: 9, mmPerCell: mm, toothScale: .2, coldPress: { mmPerCell: mm, bumpMm: [.5, 2], cover: 2.2, swell: .3 } }), [{ K: [.06, .26, .48], S: [.02, .02, .02], rho: .05, omega: 1.4, gamma: 0 }]);
     const lanes = [H / 2 - halfPitch, H / 2 + halfPitch];
     lanes.forEach((y, k) => {
       const b = createBrush({ flat: true, radius: r, bristles: 2 * r, capacity: 100, belly: 12, feed: .4, give: .9, free: .4, film: .25, splay: .03, stiffness: 8, seed: 31 + k });
