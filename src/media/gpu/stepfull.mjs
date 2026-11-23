@@ -1026,7 +1026,9 @@ export class GpuSheet {
   async dryAdvance(until = Infinity) {
     const S = this.dryS; let nextSurface = null;
     while (S.t < S.max && S.t < until && !S.done) {
-      if (!S.fast && S.t >= S.level && (S.t >= S.levelMax || (S.t % 25 === 0 && (nextSurface ?? await this.surfaceLevel()) < S.levelTol))) { S.fast = true; S.fastAt = S.t; this.setOptions({ dt: S.dt }); }
+      // the faster time once the surface is level, or once no wet cell holds surface water (the last steps read had no level
+      // tile: the surface then measures only the paper's relief, which no step levels)
+      if (!S.fast && S.t >= S.level && (S.t >= S.levelMax || (S.t % 25 === 0 && (this.lv?.light || (nextSurface ?? await this.surfaceLevel()) < S.levelTol)))) { S.fast = true; S.fastAt = S.t; S.fastBy = this.lv?.light ? 'no film' : 'level'; this.setOptions({ dt: S.dt }); }
       let stop = S.max;
       if (!S.fast) {
         if (S.t < S.levelMax) stop = Math.min(stop, S.levelMax);
@@ -1084,7 +1086,7 @@ export class GpuSheet {
     let c;if(this.resident&&S.lastCounters&&S.lastEpoch===this.epoch)c=S.lastCounters;else{const readStarted=performance.now();c=await this.counters();S.counterReads++;S.counterReadMs+=performance.now()-readStarted;} this.lastStillWet = 0; if (c[1] !== 0) { if (!S.allowWet) throw new Error(`Sheet is still wet after dry() limit of ${S.max} steps`); this.lastStillWet = c[1]; this.evaporateInPlace(); }
     this.lastDryZero = !!(S.analyticTailUsed || c[1] !== 0);
     this.setOptions({ dt: S.oLevel });
-    const m=this.dryTelemetry??(this.dryTelemetry={calls:0,counterReads:0,counterReadMs:0,fastIterations:0,fastChunks:0});m.calls++;m.counterReads+=S.counterReads;m.counterReadMs+=S.counterReadMs;m.fastIterations+=S.fastIterations;m.fastChunks+=S.fastChunks;m.fastChunk=S.fastChunk;m.maxFastChunk=Math.max(m.maxFastChunk??0,S.maxFastChunk??0);m.lastWetCounter=c[1];m.analyticTailCalls=(m.analyticTailCalls??0)+(S.analyticTailUsed?1:0);
+    const m=this.dryTelemetry??(this.dryTelemetry={calls:0,counterReads:0,counterReadMs:0,fastIterations:0,fastChunks:0});m.calls++;m.counterReads+=S.counterReads;m.counterReadMs+=S.counterReadMs;m.fastIterations+=S.fastIterations;m.fastChunks+=S.fastChunks;m.fastChunk=S.fastChunk;m.maxFastChunk=Math.max(m.maxFastChunk??0,S.maxFastChunk??0);m.lastWetCounter=c[1];m.analyticTailCalls=(m.analyticTailCalls??0)+(S.analyticTailUsed?1:0);m.fastByNoFilm=(m.fastByNoFilm??0)+(S.fastBy==='no film'?1:0);m.levelSteps=(m.levelSteps??0)+(S.fastAt??S.t);
     return S.t;
   }
   /**
