@@ -47,8 +47,8 @@ if(!isMainThread&&workerData?.nativeRecorder){
  function write(name,b){room(b.length);fs.writeFileSync(path.join(directory,name),b);used+=b.length;}
  function save(){const b=Buffer.from(JSON.stringify({...manifest,payloadAndEventBytes:used},null,2));room(b.length);fs.writeFileSync(path.join(directory,'operations.json'),b);overheadBytes=b.length;}
  const png=(b,w,h)=>sharp(b,{raw:{width:w,height:h,channels:3}}).png({compressionLevel:6}).toBuffer();
- async function capture(event,final=false){
-  const rgb=Buffer.from(pixels),key=!previous||final;let rect=null,payload=null,encoding='replace';
+ async function capture(event,final=false,rgb=Buffer.from(pixels),at=Date.now()){
+  const key=!previous||final;let rect=null,payload=null,encoding='replace';
   if(key){rect={x:0,y:0,width,height};payload=await png(rgb,width,height);}
   else {
    let x0=width,y0=height,x1=-1,y1=-1;
@@ -60,7 +60,7 @@ if(!isMainThread&&workerData?.nativeRecorder){
   }
   let file=null,payloadSHA256=null;
   if(payload){payloadSHA256=hash(payload);file=payloadSHA256+'.png';if(!fs.existsSync(path.join(directory,file)))write(file,payload);}
-  const record={...event,elapsedMs:elapsedOffset+Date.now()-began,index:events.length,keyframe:key,rectangle:rect,encoding,file,payloadSHA256,previousSHA256:previous?hash(previous):null,pixelSHA256:hash(rgb)};
+  const record={...event,elapsedMs:elapsedOffset+at-began,index:events.length,keyframe:key,rectangle:rect,encoding,file,payloadSHA256,previousSHA256:previous?hash(previous):null,pixelSHA256:hash(rgb)};
   const line=Buffer.from(JSON.stringify(record)+'\n');room(line.length);fs.appendFileSync(path.join(directory,'events.jsonl'),line);used+=line.length;events.push(record);previous=Buffer.from(rgb);
  }
  function copyPrefix(source,destination){
@@ -86,10 +86,17 @@ if(!isMainThread&&workerData?.nativeRecorder){
   for(const file of new Set(events.filter(e=>e.file).map(e=>e.file)))used+=fs.statSync(path.join(directory,file)).size;
   overheadBytes=fs.statSync(path.join(directory,'operations.json')).size;room(0);
  }
+ // A capture is acknowledged once its pixels are copied: the painter goes on while the frame is compared and encoded
+ // here, one after another in order. At most two wait; a failure is reported to the next message.
+ let queue=Promise.resolve(),waiting=0,failed=null;
+ const later=(event,rgb,at)=>{waiting++;queue=queue.then(()=>failed?null:capture(event,false,rgb,at)).catch(e=>{failed??=e;}).finally(()=>{waiting--;});};
+ const settle=async()=>{await queue;if(failed)throw failed;};
  parentPort.on('message',async m=>{
   try{
-   if(m.kind==='start'){fs.mkdirSync(directory,{recursive:true});if(resumeFrom){await restorePrefix();started=true;}else{if(fs.existsSync(path.join(directory,'operations.json')))throw Error('Native recording output already exists');room(width*height*3+65536);started=true;save();}}
-   else if(m.kind==='capture')await capture(m.event);
+   if(failed)throw failed;
+   if(m.kind!=='capture')await settle();
+   if(m.kind==='capture'){later(m.event,Buffer.from(new Uint8Array(pixels)),Date.now());if(waiting>2)await settle();}
+   else if(m.kind==='start'){fs.mkdirSync(directory,{recursive:true});if(resumeFrom){await restorePrefix();started=true;}else{if(fs.existsSync(path.join(directory,'operations.json')))throw Error('Native recording output already exists');room(width*height*3+65536);started=true;save();}}
    else if(m.kind==='checkpoint'){if(!previous)throw Error('No native prefix to save');save();copyPrefix(directory,m.destination);const frame=await png(previous,width,height);room(frame.length);fs.writeFileSync(path.join(m.destination,'resume-frame.png'),frame);}
    else if(m.kind==='finish'){await capture({...m.event,operation:'final'},true);manifest.seconds=(elapsedOffset+Date.now()-began)/1000;const keys=events.filter(e=>e.keyframe);write('film.json',Buffer.from(JSON.stringify({operations:'operations.json',frames:keys.map(e=>e.file),frameNumbers:keys.map(e=>e.index),aspect:width/height,seconds:manifest.seconds,keyframes:keys.map(e=>({fraction:e.index/(events.length-1),image:e.file})),nativeWidth:width,nativeHeight:height,operationCount:events.length})));manifest.complete=true;save();}
    else if(m.kind==='abort'){manifest.error=m.reason;save();}
