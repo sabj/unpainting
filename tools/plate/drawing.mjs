@@ -28,6 +28,7 @@ import {fillReserved} from '../../src/crop/lights.mjs';
 import {erasePrep} from '../../src/paint/methods/pencil-erase.mjs';
 import {followErase} from '../../src/paint/methods/fine-erase.mjs';
 import {strokesToLay} from '../../src/paint/methods/drawing-default.mjs';
+import {planPhases, phaseRunner} from './drawing-phases-run.mjs';
 import {makeMopLanes} from '../../src/paint/methods/mop-lanes.mjs';
 import {sealAtBirth, sealTargetMaps} from '../guard/seal-maps.mjs';
 
@@ -129,6 +130,19 @@ if (opt('draw', '1') !== '0') {
   if (PEN_FIRST && DRAWING !== 'none') PEN_PLANS.first = await planPen(PLAN_D, { first: true });
   if (DRAW_LAST && DRAWING !== 'none') PEN_PLANS.last = await planPen(PLAN_D);
 }
+// The opening drawing's phases (drawing-phases.mjs): which of its lines go down before the first washes and which
+// with the painting's later washes, planned here from the drawing and the plan, before the first mark.
+if (opt('draw', '1') !== '0' && PEN_FIRST && DRAWING !== 'none' && vectorFile('drawingfile')) {
+  const V = ctx.OPENING_VECTORS = chosenVectors(vectorFile('drawingfile'));
+  const P = planPhases({ layers: ctx.layers, w, h, sheetMm: PB?.mm ?? num('sheetmm', DEFAULT_SHEET_MM), strokes: V.doc.strokes, penLed: V.doc.medium !== 'pencil', washSession: ctx.WASH_SESSION ?? 0 });
+  for (const m of P.warnings) console.log(`!!! drawing phases: ${m}`);
+  console.log(`drawing phases: ${P.opening.length} of ${V.doc.strokes.length} lines before the first washes, ${P.phases.length} later phases (${Object.entries(P.why).map(([k, v]) => `${v} ${k}`).join('; ')})`);
+  if (P.phases.length) {
+    ctx.DRAWING_PHASES = P;
+    ctx.DRAWING_PHASE_RUN = phaseRunner(P, { sheet: () => ctx.sheet, measurePaperDry, dry: () => clock('dry', () => dry(ctx.sheet, 30000, O, { levelMax: 140, dt: 2 })),
+      inkres: INKRES, out, log: m => console.log(m), onLaid: k => ctx.onDrawingPhase?.(k) });
+  }
+}
 // --texflow d: short texture marks follow the reference's value smoothed over about 2 mm (direction only); d scales density.
 if (num('texflow', 0) > 0) {
   const R = Math.max(1, Math.round(2 / (num('sheetmm', DEFAULT_SHEET_MM) / w))), L0 = Float32Array.from({ length: n }, (_, i) => .2126 * PX_RAW[3 * i] + .7152 * PX_RAW[3 * i + 1] + .0722 * PX_RAW[3 * i + 2]);
@@ -199,40 +213,38 @@ function vectorFile(key = 'drawingfile') {
   const f = (base.endsWith('-lines.json') ? base.slice(0, -'-lines.json'.length) : base) + '-vectors.json';
   return fs.existsSync(f) ? f : null;
 }
-// With the film on, the drawing is laid and filmed as a hand draws it: big forms first, detail last (--drawingorder),
-// a few strokes to a frame at equal shares of the hand's time (drawing-film.mjs). --drawingfilm s (default 0.2):
-// the opening drawing's frames as a share of the washes' --frames; a closing pen is filmed at the same pace. What is
-// laid is the same as in one step. Without the film the drawing is one step, as before.
-async function layExactVectors(file, { closing = false } = {}) {
-  const bytes = fs.readFileSync(file), whole = JSON.parse(bytes.toString('utf8')), sheetMm = PB?.mm ?? num('sheetmm', DEFAULT_SHEET_MM);
-  // the strokes laid: an author's choice exactly, else Auto's default from the drawing's medium and tags (drawing-default.mjs)
-  // (the line file beside the vectors gives each line's importance, which Auto's pencil lay-in reads)
+// What a drawing file lays: an author's choice exactly, else Auto's default from the drawing's medium and tags
+// (drawing-default.mjs; the line file beside the vectors gives each line's importance, which Auto's pencil lay-in reads)
+function chosenVectors(file) {
+  const bytes = fs.readFileSync(file), whole = JSON.parse(bytes.toString('utf8'));
   const linesFile = file.replace(/-vectors\.json$/, '-lines.json'), lines = fs.existsSync(linesFile) ? JSON.parse(fs.readFileSync(linesFile, 'utf8')) : null;
   const TM = ctx.THING_MASKS, forms = TM ? { width: TM.width, height: TM.height, ids: TM.ids, list: TM.names.map((name, i) => ({ id: i + 1, name, kind: TM.kinds[i] })) } : null;
-  const chosen = strokesToLay(whole, lines, forms), doc = { ...whole, strokes: chosen.strokes };
-  console.log(`drawing ${closing ? 'after the washes' : 'before the washes'}: ${chosen.strokes.length} of ${whole.strokes.length} strokes of ${path.basename(file)}, ${chosen.rule}`);
-  // the painter's own record of what it laid, for the drawing harness (tools/drawing-harness): ids and their hash
-  const ids = chosen.strokes.map(q => q.seq);
-  fs.writeFileSync(path.join(out, closing ? 'drawing-laid-closing.json' : 'drawing-laid.json'), JSON.stringify({ file: path.basename(file), fileSha256: crypto.createHash('sha256').update(bytes).digest('hex'),
-    medium: whole.medium, chosen: whole.chosen ?? null, rule: chosen.rule, when: closing ? 'after' : 'before', strokes: whole.strokes.length, laid: ids.length, left: chosen.left.length,
-    laidSha256: crypto.createHash('sha256').update(ids.join(',')).digest('hex'), laidIds: ids }) + '\n');
+  const chosen = strokesToLay(whole, lines, forms);
+  return { file, bytes, whole, chosen, doc: { ...whole, strokes: chosen.strokes } };
+}
+// The hand that lays a drawing file's strokes: lay(strokes) lays them, a pencil drawing in graphite, an ink drawing in
+// ink (its strokes marked graphite, its pencil lay-in, in graphite first), each on the fine sheet when there is one
+// (--inkres: set for a pencil drawing as for a pen's, ink-recipe.mjs drawingInkRes), carried down onto the painting's
+// sheet. With the film on, each call is laid and filmed as a hand draws: big forms first, detail last
+// (--drawingorder), a few strokes to a frame at equal shares of the hand's time (drawing-film.mjs). --drawingfilm s
+// (default 0.2): the whole opening drawing's frames as a share of the washes' --frames, wherever its phases fall; a
+// closing pen is filmed at the same pace. What is laid is the same as in one step.
+function vectorHand(V, { closing = false } = {}) {
+  const { file, doc } = V, sheetMm = PB?.mm ?? num('sheetmm', DEFAULT_SHEET_MM);
   if (Math.abs(doc.sheetMm - sheetMm) > 0.01 * sheetMm) throw new Error(`ink vectors: ${path.basename(file)} is for a ${doc.sheetMm} mm sheet, this sheet is ${sheetMm} mm`);
-  // a pencil drawing is laid in graphite, an ink drawing in ink, each on the fine sheet when there is one (--inkres: set
-  // for a pencil drawing as for a pen's, ink-recipe.mjs drawingInkRes), carried down onto the painting's sheet
   const pencil = doc.medium === 'pencil';
   if (pencil && !GRAPHITE) throw new Error(`ink vectors: ${path.basename(file)} is a pencil drawing but this run has no graphite (--outlinemedium graphite)`);
   const onFine = c => Boolean(INKRES && INKRES.channels.includes(c)), chan = pencil ? GRAPHITE_AT : PIGS.length;
   const fineSheet = onFine(chan);
-  const sheet = fineSheet ? INKRES.fine : ctx.sheet, w = fineSheet ? INKRES.width : W2, h = fineSheet ? INKRES.height : H2, at = fineSheet ? INKRES.channel(chan) : chan;
-  if (!fineSheet) coherent(sheet);
-  const pig = sheet.pigments[at], white = Buffer.alloc(3, 255);
-  const darkOf = t => { const ink = renderLayers([[Float32Array.of(t)]], [pig], white, 1, 1); return 1 - (ink[0] + ink[1] + ink[2]) / 765; };
+  const sheetOf = () => (fineSheet ? INKRES.fine : ctx.sheet), w = fineSheet ? INKRES.width : W2, h = fineSheet ? INKRES.height : H2, at = fineSheet ? INKRES.channel(chan) : chan;
+  const white = Buffer.alloc(3, 255);
+  const darkOf = t => { const ink = renderLayers([[Float32Array.of(t)]], [sheetOf().pigments[at]], white, 1, 1); return 1 - (ink[0] + ink[1] + ink[2]) / 765; };
   // --inkfill (0..1, default 1: the drawing is laid exactly as drawn, under paint too). Below 1 a FILL stroke (a mass of ink
   // the fitter marked: a leaf mass, a dark pane) is laid as one pale soft shape at that share of its darkness; lines are laid
   // whole and nothing is dropped. Tried at 0.25 as the default under paint and rejected (flat grey patches, mud under
   // colour): the code stays, unused unless asked for.
   const fill = Math.max(0, Math.min(1, num('inkfill', 1)));
-  // the film: the drawing's frames, shared between a pencil lay-in and the ink over it by the hand's time
+  // the film: the drawing's frames, shared between a pencil lay-in and the ink over it, and between the phases, by the hand's time
   const allTime = drawingTimeMm(doc.strokes) || 1;
   if (!closing) ctx.DRAWING_FILM_PACE = DRAWING_FILM_FRAMES / allTime;
   const pace = ctx.DRAWING_FILM_PACE ?? DRAWING_FILM_FRAMES / allTime, filmedOf = Math.max(1, Math.round(pace * allTime));
@@ -254,31 +266,59 @@ async function layExactVectors(file, { closing = false } = {}) {
   // sheet without graphite stops the run rather than leave the lines out)
   const pencilOver = closing && doc.pencilAfterWashes === true && graphiteMarked;
   if (pencilOver && !(GRAPHITE_AT != null && GRAPHITE)) throw new Error(`ink vectors: ${path.basename(file)} draws pencil over the dry washes but this run has no graphite on the sheet`);
-  const layin = (!closing || pencilOver) && graphiteMarked && GRAPHITE_AT != null && GRAPHITE ? doc.strokes.filter(q => q.medium === 'graphite' && !q.wash) : [];
-  if (layin.length) {
-    const gp = ctx.sheet.pigments[GRAPHITE_AT], gDark = t => { const c = renderLayers([[Float32Array.of(t)]], [gp], white, 1, 1); return 1 - (c[0] + c[1] + c[2]) / 765; };
-    if (!ctx.sheet.D[GRAPHITE_AT]) throw new Error('ink vectors: the pencil lay-in has no graphite layer on the sheet');
-    coherent(ctx.sheet);
-    // on the fine sheet beside the ink when there is one, as the pencil drawing is
-    const gFine = onFine(GRAPHITE_AT);
-    const g = await inBatches(layin, sub => {
-      if (gFine) { const q = layVectors({ ...doc, strokes: sub }, INKRES.fine.D[INKRES.channel(GRAPHITE_AT)], INKRES.width, INKRES.height, sheetMm / INKRES.width, inkForDarkness(gDark), { fill }); INKRES.changed(); INKRES.carry(); return q; }
-      coherent(ctx.sheet); const q = layVectors({ ...doc, strokes: sub }, ctx.sheet.D[GRAPHITE_AT], W2, H2, sheetMm / W2, inkForDarkness(gDark), { fill }); layersChanged(ctx.sheet); ctx.sheet._gpu?.cpuWroteAll?.(); return q;
-    }, 'pencil lay-in');
-    ctx.drawnCount += g.strokes;
-    console.log(`pencil lay-in: ${g.strokes} graphite strokes laid ${pencilOver ? 'over the dry washes' : 'before the ink'}, ${g.cells} cells${gFine ? ` on the fine sheet (--inkres ${INKRES.N})` : ''}`);
+  const withLayin = (!closing || pencilOver) && graphiteMarked && GRAPHITE_AT != null && GRAPHITE;
+  /** Lays `strokes` (a whole drawing, or one phase of it: `phase` names it); returns {graphite, ink}: what it laid. */
+  async function lay(strokes, { phase = null } = {}) {
+    const layin = withLayin ? strokes.filter(q => q.medium === 'graphite' && !q.wash) : [];
+    if (layin.length) {
+      const gp = ctx.sheet.pigments[GRAPHITE_AT], gDark = t => { const c = renderLayers([[Float32Array.of(t)]], [gp], white, 1, 1); return 1 - (c[0] + c[1] + c[2]) / 765; };
+      if (!ctx.sheet.D[GRAPHITE_AT]) throw new Error('ink vectors: the pencil lay-in has no graphite layer on the sheet');
+      coherent(ctx.sheet);
+      // on the fine sheet beside the ink when there is one, as the pencil drawing is
+      const gFine = onFine(GRAPHITE_AT);
+      const g = await inBatches(layin, sub => {
+        if (gFine) { const q = layVectors({ ...doc, strokes: sub }, INKRES.fine.D[INKRES.channel(GRAPHITE_AT)], INKRES.width, INKRES.height, sheetMm / INKRES.width, inkForDarkness(gDark), { fill }); INKRES.changed(); INKRES.carry(); return q; }
+        coherent(ctx.sheet); const q = layVectors({ ...doc, strokes: sub }, ctx.sheet.D[GRAPHITE_AT], W2, H2, sheetMm / W2, inkForDarkness(gDark), { fill }); layersChanged(ctx.sheet); ctx.sheet._gpu?.cpuWroteAll?.(); return q;
+      }, phase ? `pencil lay-in, ${phase}` : 'pencil lay-in');
+      ctx.drawnCount += g.strokes;
+      console.log(`pencil lay-in${phase ? `, ${phase}` : ''}: ${g.strokes} graphite strokes laid ${pencilOver ? 'over the dry washes' : 'before the ink'}, ${g.cells} cells${gFine ? ` on the fine sheet (--inkres ${INKRES.N})` : ''}`);
+    }
+    const rest = graphiteMarked ? strokes.filter(q => q.medium !== 'graphite') : strokes;
+    // (a whole drawing is laid and told even with no line of its own medium; a phase only when it has some)
+    if (phase && !rest.length) return { graphite: layin.length > 0, ink: false };
+    const sheet = sheetOf();
+    const r = await inBatches(rest, sub => {
+      if (!fineSheet) coherent(sheet);
+      const q = layVectors({ ...doc, strokes: sub }, sheet.D[at], w, h, sheetMm / w, inkForDarkness(darkOf), { fill });
+      if (fineSheet) { INKRES.changed(); INKRES.carry(); } else { layersChanged(sheet); sheet._gpu?.cpuWroteAll?.(); }
+      return q;
+    }, phase ? `${pencil ? 'pencil' : 'pen'}, ${phase}` : pencil ? 'pencil' : 'pen');
+    // a drawing that inked nothing is a sheet too coarse for its lines: said, never passed over
+    if (r.strokes && !r.cells) throw new Error(`ink vectors: ${r.strokes} strokes of ${path.basename(file)} inked no cell of the ${w} x ${h} sheet (${(sheetMm / w).toFixed(2)} mm cells): the lines are too fine for it`);
+    ctx.drawnCount += r.strokes;
+    console.log(`ink vectors${phase ? `, ${phase}` : ''}: ${r.strokes} strokes laid exactly from ${path.basename(file)} (${pencil ? 'graphite' : 'ink'}) on a ${w} x ${h} sheet (${(sheetMm / w).toFixed(3)} mm cells), ${r.cells} cells inked${fill < 1 ? `, ${r.fills} fills at ${fill} inside` : ''}${r.widened ? `, ${r.widened} lines finer than a cell laid a cell wide` : ''}; no tracer, no pen gestures`);
+    return { graphite: layin.length > 0 || (pencil && rest.length > 0), ink: !pencil && rest.length > 0 };
   }
-  const r = await inBatches(graphiteMarked ? doc.strokes.filter(q => q.medium !== 'graphite') : doc.strokes, sub => {
-    if (!fineSheet) coherent(sheet);
-    const q = layVectors({ ...doc, strokes: sub }, sheet.D[at], w, h, sheetMm / w, inkForDarkness(darkOf), { fill });
-    if (fineSheet) { INKRES.changed(); INKRES.carry(); } else { layersChanged(sheet); sheet._gpu?.cpuWroteAll?.(); }
-    return q;
-  }, pencil ? 'pencil' : 'pen');
-  // a drawing that inked nothing is a sheet too coarse for its lines: said, never passed over
-  if (r.strokes && !r.cells) throw new Error(`ink vectors: ${r.strokes} strokes of ${path.basename(file)} inked no cell of the ${w} x ${h} sheet (${(sheetMm / w).toFixed(2)} mm cells): the lines are too fine for it`);
+  return { lay };
+}
+// The painter's own record of what a drawing file lays, for the drawing harness (tools/drawing-harness): ids and their
+// hash, and for the opening drawing when each goes down (drawing-phases.mjs)
+function writeLaid(V, closing, schedule = null) {
+  const ids = V.chosen.strokes.map(q => q.seq);
+  fs.writeFileSync(path.join(out, closing ? 'drawing-laid-closing.json' : 'drawing-laid.json'), JSON.stringify({ file: path.basename(V.file), fileSha256: crypto.createHash('sha256').update(V.bytes).digest('hex'),
+    medium: V.whole.medium, chosen: V.whole.chosen ?? null, rule: V.chosen.rule, when: closing ? 'after' : 'before', strokes: V.whole.strokes.length, laid: ids.length, left: V.chosen.left.length,
+    laidSha256: crypto.createHash('sha256').update(ids.join(',')).digest('hex'), laidIds: ids,
+    ...(schedule ? { opening: schedule.opening.map(q => q.seq), phases: schedule.phases.map(p => ({ beforeWash: p.at, stage: p.stage ?? null, ids: p.strokes.map(q => q.seq) })) } : {}) }) + '\n');
+}
+async function layExactVectors(file, { closing = false } = {}) {
+  const V = !closing && ctx.OPENING_VECTORS?.file === file ? ctx.OPENING_VECTORS : chosenVectors(file);
+  const P = closing ? null : ctx.DRAWING_PHASES;
+  console.log(`drawing ${closing ? 'after the washes' : 'before the washes'}: ${V.chosen.strokes.length} of ${V.whole.strokes.length} strokes of ${path.basename(file)}, ${V.chosen.rule}${P?.phases.length ? `; ${P.opening.length} before the first washes, ${V.chosen.strokes.length - P.opening.length} with the painting's later washes in ${P.phases.length} phases (drawing-phases.mjs)` : ''}`);
+  writeLaid(V, closing, P);
+  const hand = vectorHand(V, { closing });
+  if (P) P.hand = hand;
+  await hand.lay(P ? P.opening : V.doc.strokes);
   fs.copyFileSync(file, path.join(out, closing ? 'ink-vectors-closing.json' : 'ink-vectors.json'));
-  ctx.drawnCount += r.strokes;
-  console.log(`ink vectors: ${r.strokes} strokes laid exactly from ${path.basename(file)} (${pencil ? 'graphite' : 'ink'}) on a ${w} x ${h} sheet (${(sheetMm / w).toFixed(3)} mm cells), ${r.cells} cells inked${fill < 1 ? `, ${r.fills} fills at ${fill} inside` : ''}${r.widened ? `, ${r.widened} lines finer than a cell laid a cell wide` : ''}; no tracer, no pen gestures`);
 }
 async function drawPass(_unused, { first = false, fine = false } = {}) {
   const speedDrawStart = performance.now();

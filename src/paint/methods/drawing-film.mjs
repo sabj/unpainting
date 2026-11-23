@@ -19,6 +19,8 @@ export const drawingTimeMm = (strokes, liftMm = LIFT_MM) => strokes.reduce((a, s
 
 /** The pass a stroke belongs to when its file gives none, from the part of the drawing it is. */
 const PART_PASS = Object.freeze({ outline: 1, inner: 2, small: 3, fill: 3, hatch: 4, tone: 5, texture: 5 });
+/** A stroke's pass over the sheet: 0 the lay-in lines that place the whole subject, then its file's `pass`, else its part's. */
+export const passOf = s => (s.phase === 'layin' ? 0 : Number.isFinite(s.pass) ? s.pass : PART_PASS[s.part] ?? 3);
 
 /**
  * The strokes as a hand draws a whole sheet: big forms first, detail last. The drawing's passes in turn over the whole
@@ -38,7 +40,7 @@ export function bigFormsFirst(strokes) {
   }
   const size = o => { const b = box.get(o); return b && b[2] >= b[0] ? Math.hypot(b[2] - b[0], b[3] - b[1]) : 0; };
   // (the lay-in lines that place the whole subject come before any form's own outline)
-  const pass = s => (s.phase === 'layin' ? 0 : Number.isFinite(s.pass) ? s.pass : PART_PASS[s.part] ?? 3);
+  const pass = passOf;
   // while a form is being placed (its outline and inner structure) its long strokes come first, the outline before the
   // rest; shading and texture keep the file's order, which works across a form patch by patch
   const placing = s => pass(s) <= 2, lead = s => (placing(s) ? (s.part === 'outline' ? 0 : 1) : 0), long = s => (placing(s) ? -strokeLengthMm(s) : 0);

@@ -180,15 +180,23 @@ export async function checkCell(cell, expect, out, { code, log }) {
   }
   // the rendered sheet: the drawing shows where it was laid, continuous, weights honoured
   const pic = fs.existsSync(path.join(out, 'drawing-opening.png')) ? await grey(path.join(out, 'drawing-opening.png')) : null;
-  if (pic && expect.opening?.length) {
-    const shown = expect.opening.filter(id => Y[id]).map(id => [id, darknessAlong(pic, Y[id], { x0: X(id)[0] + 2, x1: X(id)[1] - 2 })]);
+  // the opening drawing holds the lines laid before the first washes; those laid with a later stage (drawing-phases.mjs)
+  // are on the sheet from their phase on, and must show on the finished painting
+  const before = opening?.opening ?? expect.opening, phased = (expect.opening ?? []).filter(id => !(before ?? []).includes(id));
+  if (pic && before?.length) {
+    const shown = before.filter(id => Y[id]).map(id => [id, darknessAlong(pic, Y[id], { x0: X(id)[0] + 2, x1: X(id)[1] - 2 })]);
     put('every chosen line shows on the opening drawing, unbroken', shown.every(([, d]) => d.median > 0.03 && d.breaks <= LIMITS.continuityBreaks), shown.map(([id, d]) => `${id}: dark ${d.median.toFixed(2)}, breaks ${(100 * d.breaks).toFixed(0)}%`).join('; '));
     const left = [1, 2, 3, 4, 5].filter(id => !expect.opening.includes(id) && !(expect.closing ?? []).includes(id));
     if (left.length) put('lines not chosen do not show', left.every(id => darknessAlong(pic, Y[id]).median < 0.02), left.map(id => `${id}: ${darknessAlong(pic, Y[id]).median.toFixed(3)}`).join('; '));
-    if (cell.who === 'lines' && cell.when === 'before') { const a = darknessAlong(pic, Y[5]).median, b = darknessAlong(pic, Y[1]).median; put('a weight of 2 lays its line darker', a >= LIMITS.weightDarker * b, `weighted ${a.toFixed(2)} against ${b.toFixed(2)}`); }
+    if (cell.who === 'lines' && cell.when === 'before' && before.includes(5) && before.includes(1)) { const a = darknessAlong(pic, Y[5]).median, b = darknessAlong(pic, Y[1]).median; put('a weight of 2 lays its line darker', a >= LIMITS.weightDarker * b, `weighted ${a.toFixed(2)} against ${b.toFixed(2)}`); }
   }
   // lines drawn after the washes show on the finished painting, over the paint
   const fin = fs.existsSync(path.join(out, 'painting.png')) ? await grey(path.join(out, 'painting.png')) : null;
+  if (fin && phased.length) {
+    const shown = phased.filter(id => Y[id]).map(id => [id, contrastAlong(fin, Y[id], { x0: X(id)[0] + 2, x1: X(id)[1] - 2 })]);
+    put('the lines drawn with a later stage show on the finished painting', shown.every(([, c]) => c > 0.03), shown.map(([id, c]) => `${id}: contrast ${c.toFixed(2)}`).join('; '));
+  }
+  R.push(...phaseChecks(out, opening));
   if (fin && expect.closing?.length) {
     const shown = expect.closing.filter(id => Y[id]).map(id => [id, contrastAlong(fin, Y[id], { x0: X(id)[0] + 2, x1: X(id)[1] - 2 })]);
     put('the lines drawn after the washes show on the finished painting', shown.every(([, c]) => c > 0.03), shown.map(([id, c]) => `${id}: contrast ${c.toFixed(2)}`).join('; '));
@@ -196,9 +204,12 @@ export async function checkCell(cell, expect, out, { code, log }) {
   // the film shows the drawing being drawn over several frames, big forms first
   const frames = readJson(path.join(out, 'frames.json'));
   if (expect.opening?.length > 1 && frames) {
-    const drawing = (frames.frames ?? []).filter(f => f.stage === 'drawing' && Array.isArray(f.ids));
+    // (the opening drawing's frames, before the first paint: a later phase is drawn big forms first within itself)
+    const all = frames.frames ?? [], paintAt = all.findIndex(f => f.stage === 'paint');
+    const drawing = (paintAt < 0 ? all : all.slice(0, paintAt)).filter(f => f.stage === 'drawing' && Array.isArray(f.ids));
     const len = ids => ids.reduce((a, id) => a + (Y[id] ? X(id)[1] - X(id)[0] : 0), 0) / Math.max(1, ids.filter(id => Y[id]).length);
-    put('the film shows the drawing drawn over several frames', drawing.length >= 2, `${drawing.length} drawing frames`);
+    const every = all.filter(f => f.stage === 'drawing' && Array.isArray(f.ids));
+    put('the film shows the drawing drawn over several frames', every.length >= 2, `${every.length} drawing frames`);
     if (drawing.length >= 2) put('the film lays the big forms first', len(drawing[0].ids) >= len(drawing.at(-1).ids), `first frame lines ${len(drawing[0].ids).toFixed(0)} mm long on average, last ${len(drawing.at(-1).ids).toFixed(0)} mm`);
   }
   const lost = await filmLosses(out);
@@ -212,7 +223,13 @@ export async function checkLookFinal(lookOut, fullOut) {
   if (!a && !b) return [{ check: 'look and final lay the same lines', ok: true, detail: 'neither lays a drawing' }];
   const R = [{ check: 'look and final lay the same lines', ok: Boolean(a && b && a.laidSha256 === b.laidSha256), detail: `${a?.laid ?? 0} and ${b?.laid ?? 0} lines` }];
   const fa = path.join(lookOut, 'drawing-opening.png'), fb = path.join(fullOut, 'drawing-opening.png');
-  if (fs.existsSync(fa) && fs.existsSync(fb)) {
+  // the lines go down with the washes that need them (drawing-phases.mjs): a look whose plan has other washes than the
+  // final's times them otherwise, and its opening drawing is not the final's; with the same plan it must be
+  const open = r => (r?.opening ?? r?.laidIds ?? []).join(), washes = d => readJson(path.join(d, 'drawing-phases.json'))?.washes ?? readJson(path.join(d, 'value-plan.json'))?.summary?.washes ?? null;
+  if (open(a) !== open(b)) {
+    const wa = washes(lookOut), wb = washes(fullOut);
+    R.push({ check: 'look and final open with the same lines, or their plans differ', ok: wa !== wb, detail: `look opens with ${a?.opening?.length ?? a?.laid} lines over ${wa} washes, final with ${b?.opening?.length ?? b?.laid} over ${wb}` });
+  } else if (fs.existsSync(fa) && fs.existsSync(fb)) {
     const A = await grey(fa), B = await sharp(fb).greyscale().resize(A.w, A.h, { kernel: 'cubic' }).raw().toBuffer();
     let ma = 0, mb = 0; for (let i = 0; i < A.data.length; i++) { ma += A.data[i]; mb += B[i]; } ma /= A.data.length; mb /= A.data.length;
     let sab = 0, saa = 0, sbb = 0; for (let i = 0; i < A.data.length; i++) { const x = A.data[i] - ma, y = B[i] - mb; sab += x * y; saa += x * x; sbb += y * y; }
@@ -244,6 +261,58 @@ export async function eraseCell(dir, { gpu = false } = {}) {
   put('each rub takes what the plan answer says', said && rubs.length && Math.abs(share - said.takes.bare) <= 0.1, `${rubs.length} rubs took ${(100 * share).toFixed(0)}% of the pencil under them on average`);
   const fin = await grey(path.join(out, 'painting.png')), left = darknessAlong(fin, Y[1], { x0: 8, x1: 20 }).median, right = darknessAlong(fin, Y[1], { x0: 26, x1: 40 }).median;
   put('the rubbed half of the line is gone from the finished painting', left <= LIMITS.eraseShare * right, `rubbed ${left.toFixed(3)}, kept ${right.toFixed(3)}`);
+  return R;
+}
+
+/** What a run's drawing phases record says: every phase on dry paper, and what the washes over it moved within limits. */
+function phaseChecks(out, laid) {
+  const rec = readJson(path.join(out, 'drawing-phases.json')), R = [];
+  if (!laid?.phases?.length) return R;
+  const put = (check, ok, detail) => R.push({ check, ok: Boolean(ok), detail });
+  put('every phase of the drawing is laid, on dry paper', rec && rec.phases.length === laid.phases.length && rec.phases.every(p => p.paperWasDry || p.extraDryMs >= 0), rec ? `${rec.phases.length} of ${laid.phases.length} phases laid, ${rec.extraDries} needed the paper dried first` : 'no drawing-phases.json');
+  const held = fs.existsSync(path.join(out, 'drawing-phases-held.jsonl')) ? fs.readFileSync(path.join(out, 'drawing-phases-held.jsonl'), 'utf8').split('\n').filter(Boolean).map(l => JSON.parse(l)) : [];
+  for (const h of held) put(`a phase's ${h.medium} moves within its limit under the next wash`, h.moved <= (h.medium === 'graphite' ? LIMITS.pencilMoved : LIMITS.waterproofMoved), `moved ${(100 * h.moved).toFixed(3)}%`);
+  return R;
+}
+
+/**
+ * The drawing laid in phases with a two-stage painting (drawing-phases.mjs): a script washes the lower part in stage 1
+ * and the band round line 2 in stage 2. Auto's pencil lays line 2 with stage 2, the rest first; a pen drawing is inked
+ * whole first; a model's "stage 2" lays its line with stage 2 in pencil or in waterproof ink. Each phase on dry paper,
+ * filmed after paint, and the washes over it move it no more than the stated limits.
+ */
+export async function phasesCells(dir, { gpu = false } = {}) {
+  const subject = await writeSubject(dir), script = path.join(dir, 'two-stages.json');
+  fs.writeFileSync(script, JSON.stringify({ format: 'painting-script 2', author: 'drawing harness', sheet: { widthMm: MM, heightMm: H }, palette: ['ochre', 'ultramarine'],
+    brushes: { mop: { shape: 'round', widthMm: 8 } }, passages: [
+      { id: 'ground', what: 'the lower part', stage: 1, kind: 'wash', region: [[4, 21], [44, 21], [44, 34], [4, 34]], paint: { pigments: { ochre: 1 }, dilution: 'pale' }, brush: 'mop', paper: 'dry', handling: { direction: 0 } },
+      { id: 'band', what: 'the band round line 2', stage: 2, kind: 'wash', region: [[4, 9], [44, 9], [44, 18], [4, 18]], paint: { pigments: { ultramarine: 1 }, dilution: 'pale' }, brush: 'mop', paper: 'dry', handling: { direction: 0 } }] }));
+  const base = ['--image', subject.target, '--washplan', `script:${script}`, '--drawing', 'first', '--stages', 'none', '--paints', 'ochre,ultramarine', '--paintsextend', '0', '--width', String(W)];
+  const choose = (name, rules, medium) => {
+    const got = writeLinesEdit({ dir: path.join(dir, name, 'choice'), stem: subject.stems.pencil, edit: { format: LINES_EDIT_FORMAT, rules }, listing: linesListing(drawingDoc('pencil')), medium });
+    const args = []; for (const [k, v] of got.sets) args.push(k === 'drawing' ? '--drawingfile' : `--${k}`, v); return args;
+  };
+  const cases = [
+    { id: 'pencil-auto', args: ['--drawingfile', subject.stems.pencil, '--outlinemedium', 'graphite'], opening: [1, 5], phases: [[2]] },
+    { id: 'pen-auto', args: ['--drawingfile', subject.stems.ink, '--inkrecipe', 'wash', '--inkfast', '1'], opening: [1, 2, 3, 4, 5], phases: [] },
+    { id: 'pencil-model', args: [...choose('pencil-model', [{ where: { ids: [1] }, do: 'stage 2' }, { where: { ids: [2] }, do: 'before' }], null), '--outlinemedium', 'graphite'], opening: [2, 5], phases: [[1]] },
+    { id: 'pen-model', args: [...choose('pen-model', [{ where: { ids: [2] }, do: 'stage 2' }], 'pen'), '--inkrecipe', 'wash', '--inkfast', '1'], opening: [1, 5], phases: [[2]] },
+  ];
+  const R = [];
+  for (const c of cases) {
+    const out = path.join(dir, c.id, 'plate'); fs.mkdirSync(path.dirname(out), { recursive: true });
+    const done = await runPainter([...base, ...c.args], out, { gpu }), put = (check, ok, detail) => R.push({ check: `${c.id}: ${check}`, ok: Boolean(ok), detail });
+    if (done.code !== 0) { put('the painting finished', false, done.log.split('\n').filter(Boolean).slice(-3).join(' | ')); continue; }
+    const laid = readJson(path.join(out, 'drawing-laid.json')), ph = (laid?.phases ?? []).map(p => p.ids);
+    put('the lines before the first washes are the ones due then', (laid?.opening ?? laid?.laidIds)?.join() === c.opening.join(), `opening ${(laid?.opening ?? laid?.laidIds)?.join(',')}, due ${c.opening.join(',')}`);
+    put('the later lines go down with stage 2', JSON.stringify(ph) === JSON.stringify(c.phases) && (laid?.phases ?? []).every(p => p.stage === 2), `phases ${JSON.stringify(laid?.phases ?? [])}`);
+    if (c.phases.length) {
+      const fr = readJson(path.join(out, 'frames.json'))?.frames ?? [], firstPaint = fr.findIndex(f => f.stage === 'paint');
+      put('the film shows the later lines drawn after paint', firstPaint >= 0 && fr.slice(firstPaint).some(f => f.stage === 'drawing' && f.ids?.some(id => c.phases.flat().includes(id))), `first paint frame ${firstPaint}`);
+      for (const k of phaseChecks(out, laid)) put(k.check, k.ok, k.detail);
+      put('the washes over a phase are measured', fs.existsSync(path.join(out, 'drawing-phases-held.jsonl')), 'drawing-phases-held.jsonl');
+    }
+  }
   return R;
 }
 
@@ -298,6 +367,7 @@ export async function runHarness(dir, opts = {}) {
     { id: 'erase', what: 'erasing removes what the plan answer says (Auto pencil, a script\'s erase passage)', checks: await eraseCell(path.join(dir, 'erase'), opts) },
     { id: 'continuity', what: 'pencil line continuity against ink at equal weight', checks: await continuityCheck(results) },
     { id: 'medium-cross', what: 'a model\'s medium against the drawing\'s own', checks: await crossCell(path.join(dir, 'cross'), opts) },
+    { id: 'phases', what: 'the drawing laid in phases with a two-stage painting (Auto pencil and pen, a model\'s stage 2 in pencil and in ink)', checks: await phasesCells(path.join(dir, 'phases'), opts) },
   ].map(e => ({ ...e, status: e.checks.every(c => c.ok) ? 'pass' : 'fail' }));
   return { results, extra };
 }

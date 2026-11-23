@@ -21,9 +21,9 @@ What you have to work with, all of it yours to use:
   colour.
 - **The drawing, and it is yours.** Its medium: pencil, pen, or no drawing at all, whatever the subject seems to be
   drawn in (`"medium"` in `choice.json`). No drawing is a normal choice: the prepared drawing is offered, not
-  required. Its prepared lines: which are drawn before the washes, which after them
-  over the dry paint, which not at all, and how dark each is. And lines of your own: drawn where you put them, point
-  by point, in pen or pencil, at the width and darkness you give, before or after the washes (`"lines"` beside any
+  required. Its prepared lines: when each is drawn (before the first wash, with a stage of the washes, or after them
+  over the dry paint), which not at all, and how dark each is. And lines of your own: drawn where you put them, point
+  by point, in pen or pencil, at the width and darkness you give, at any of those times (`"lines"` beside any
   choice; `README.md`).
 - The named forms, as a picture and as data: where each form lies and what kind it is, to plan and measure by.
 - The whole paint box (`own-script-brief.md` lists it). The choice of paints is yours: they are your script's

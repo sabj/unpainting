@@ -75,7 +75,7 @@ What a look's painting is, exactly:
 | The paint box | `palette` in your own script | which paints the picture is mixed from (`own-script-brief.md` lists the box) |
 | The drawing's medium | `"medium": "pencil"`, `"pen"` or `"none"` beside your script (below) | what the drawing is drawn in, whatever the subject seems to be drawn in: pencil, pen (its ink in the next row), or no drawing |
 | The pen's ink | `"ink": "waterproof"` or `"soluble"` beside your script | waterproof: set before the washes, a wash over it moves none. soluble: it rewets and bleeds into a wash laid over it; the painter stops a painting whose first wash would move more than 2% of it. Left unsaid, your script is laid over waterproof ink |
-| The drawing's lines | `"lines": "my-lines.json"` beside any kind of choice (below) | which prepared lines are drawn before the washes, which after them over the dry paint, which not at all, and how dark each is: by named form, by kind of line, by length, width or darkness, or one by one |
+| The drawing's lines | `"lines": "my-lines.json"` beside any kind of choice (below) | when each prepared line is drawn (before the first wash, with a stage of the washes, after them over the dry paint) or not at all, and how dark each is: by named form, by kind of line, by length, width or darkness, or one by one |
 | Lines of your own | `"own"` in that same file (below) | new lines, drawn where you put them point by point: pen or pencil, their width and darkness, before or after the washes |
 | The painter itself | your own script (`own-script-brief.md`) | every passage: its shape, paint and dilution, brush and width, paper wet, damp or dry, what it is laid into, how long the sheet dries first, stroke paths, pressure and hold, the order, the lights kept as paper. Write strokes in the order a hand would travel: finish one area before the next, neighbours after each other, long strokes before short; the replay is watched |
 | The preview | `./unpaint look` | the painter run for real, small: the dried sheet, the stages, each form measured on the dried sheet |
@@ -102,8 +102,11 @@ and the drawing is as prepared; `drawing/lines.json` says at its top which that 
 **The prepared lines.** `drawing/lines.json` lists every line: `id`, `part` (outline, inner, small, texture, hatch,
 tone, fill), `phase`, `object`, `tagged` (`ink`: a drawn pen line; `layin`: a pale contour that places a form; `drop`:
 hatching, tone or texture the drawing's maker would leave out), `dark` (0 to 1), `lengthMm`, `widthMm`, `boxMm`, and
-`form` (the named form most of it lies in, or `none`). Every line starts as the painter lays it on its own: before
-the washes, at its own darkness; on a pencil drawing the `drop` ones that do not place a form (see `drawing/all-lines.png` above) start dropped (`{"where": {"tagged": "drop"}, "do": "before"}` draws them), on a pen drawing they are drawn. Write your rules to a file and name it in `choice.json` beside your
+`form` (the named form most of it lies in, or `none`). Every line starts as the painter lays it on its own, at its own
+darkness and at its own time (`auto`): a pen drawing is inked whole before the first wash; a pencil drawing goes down
+in phases with the washes, as a person works: the lay-in and the lines that place the first washes before them, each
+other line just before the later wash that needs it (the wash whose edge it draws or that covers it), on dry paper,
+and detail no wash claims with the last stage; on a pencil drawing the `drop` ones that do not place a form (see `drawing/all-lines.png` above) start dropped (`{"where": {"tagged": "drop"}, "do": "before"}` draws them), on a pen drawing they are drawn. Write your rules to a file and name it in `choice.json` beside your
 script: `{"kind": "script", "script": "script.json", "lines": "my-lines.json"}`.
 
 ```json
@@ -120,15 +123,17 @@ script: `{"kind": "script", "script": "script.json", "lines": "my-lines.json"}`.
 
 Rules are applied in order and a later rule wins. `where` holds conditions that must all be true: `ids`, `object`,
 `form`, `part`, `phase`, `tagged` (one value or a list), `darkAbove`, `darkBelow`, `lengthAboveMm`, `lengthBelowMm`,
-`widthAboveMm`, `widthBelowMm`; `{}` is every line. `do` is `before` (drawn before the first wash), `after` (drawn
-over the dry washes when the painting is done: a closing line) or `drop` (not drawn). `weight` multiplies the line's
+`widthAboveMm`, `widthBelowMm`; `{}` is every line. `do` is `auto` (the painter's own time, above), `before`
+(drawn before the first wash), `"stage N"` (drawn with stage N of your plan: just before that stage's first wash over
+the line, else before the stage's first wash, on dry paper), `after` (drawn over the dry washes when the painting is
+done: a closing line) or `drop` (not drawn). `weight` multiplies the line's
 darkness (usually 0.1 to 4; a line never goes past black). A prepared line's shape and width are not changed: for a
 different line, drop it and draw your own. There is no limit on the number of rules.
 
 **Lines of your own.** `own` lists lines you draw yourself; a file may hold `own` alone, `rules` alone, or both. Each
 is a path of two or more `points` in sheet millimetres, drawn at an even `widthMm` (a pen or pencil draws about 0.2 to
 1 mm; default 0.4) and `dark` (0 to 1; default 0.7), in `medium` `"pen"` or `"pencil"` (default pencil), `when`
-`"before"` the washes or `"after"` them (default before). They are drawn after the prepared lines of the same time,
+`"before"` the first wash, `"stage N"`, `"after"` the washes or `"auto"` (default before). They are drawn after the prepared lines of the same time,
 in the order you list them. There is no limit on how many. Pen and pencil may be mixed on one sheet.
 
 What to know:

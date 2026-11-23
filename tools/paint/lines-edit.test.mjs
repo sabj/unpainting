@@ -18,7 +18,7 @@ const listing = () => linesListing(vectors(), { mask, forms }), edit = rules => 
 test('every stroke is listed with what an author chooses by: its part, tag, darkness, length, width and form', () => {
   const l = listing();
   assert.deepEqual(l.strokes.map(s => [s.id, s.part, s.tagged, s.dark, s.lengthMm, s.widthMm, s.form]), [[1, 'outline', 'ink', 0.3, 80, 0.3, 'none'], [2, 'inner', 'ink', 0.2, 30, 0.3, 'face'], [3, 'hatch', 'drop', 0.15, 30, 0.3, 'none'], [4, 'hatch', 'drop', 0.15, 30, 0.3, 'none'], [5, 'small', 'ink', 0.6, 4, 0.3, 'face']]);
-  assert.deepEqual(l.counts.tagged, { ink: 3, drop: 2 }); assert.equal(l.linesAfterTheWashes, true); assert.equal(linesListing(vectors('pencil')).linesAfterTheWashes, true); assert.match(linesListing(vectors('pencil')).note, /a pencil drawing as prepared; the medium is yours to change .* any line may be drawn after the washes .* lines of your own/); assert.deepEqual(l.strokes[0].boxMm, [10, 5, 90, 5]); assert.deepEqual(l.sheet, { widthMm: 100, heightMm: 50 });
+  assert.deepEqual(l.counts.tagged, { ink: 3, drop: 2 }); assert.equal(l.linesAfterTheWashes, true); assert.equal(linesListing(vectors('pencil')).linesAfterTheWashes, true); assert.match(linesListing(vectors('pencil')).note, /a pencil drawing as prepared; the medium is yours to change .* any line may be drawn before the first wash .* with a stage of the washes .* or after the washes .* lines of your own/); assert.deepEqual(l.strokes[0].boxMm, [10, 5, 90, 5]); assert.deepEqual(l.sheet, { widthMm: 100, heightMm: 50 });
   assert.ok(!JSON.stringify(l).includes('outline":[['), 'no stroke geometry beyond its box');
 });
 
@@ -26,10 +26,10 @@ test('rules in order, the later winning: lines dropped, moved after the washes a
   const v = vectors(), got = applyLinesEdit(v, lines(), edit([{ where: { tagged: 'drop' }, do: 'drop' }, { where: { form: 'face', lengthBelowMm: 10 }, do: 'after', weight: 1.5 }, { where: { ids: [2] }, weight: 0.5 }, { where: { ids: 4 }, do: 'before' }]), listing());
   assert.equal(got.order, 'both');
   assert.deepEqual(got.opening.vectors.strokes.map(s => [s.seq, s.dark]), [[1, 0.3], [2, 0.1], [4, 0.15]]); assert.deepEqual(got.closing.vectors.strokes.map(s => [s.seq, s.dark, s.darkAsDrawn]), [[5, 0.9, 0.6]]);
-  assert.equal(got.opening.vectors.strokes[0], v.strokes[0], 'an unweighted stroke is the record\'s own'); assert.equal(got.closing.vectors.strokes[0].outline, v.strokes[4].outline); assert.equal(v.strokes[4].dark, 0.6);
+  assert.deepEqual(got.opening.vectors.strokes[0], { ...v.strokes[0], when: 'auto' }, 'an unweighted stroke is the record\'s own, with its time'); assert.deepEqual(got.opening.vectors.strokes.map(s => s.when), ['auto', 'auto', 'before']); assert.equal(got.closing.vectors.strokes[0].outline, v.strokes[4].outline); assert.equal(v.strokes[4].dark, 0.6);
   assert.deepEqual(got.opening.lines.lines.map(g => g.seq), [1, 2, 4]); assert.deepEqual(got.closing.lines.lines.map(g => g.seq), [5]);
-  assert.deepEqual({ ...got.record, rules: got.record.rules.map(r => r.lines) }, { strokes: 5, before: 3, after: 1, dropped: 1, lengthMm: { before: 140, after: 4, dropped: 30 }, weighted: 2, darker: 1, paler: 1, rules: [2, 1, 1, 1] });
-  assert.match(linesLine(got.record), /of the drawing's 5 lines 3 are drawn before the washes, 1 after them, 1 not at all; 2 weighted \(1 darker, 1 paler\)/);
+  assert.deepEqual({ ...got.record, rules: got.record.rules.map(r => r.lines) }, { strokes: 5, auto: 2, before: 1, withStages: {}, after: 1, dropped: 1, lengthMm: { auto: 110, before: 30, withStages: 0, after: 4, dropped: 30 }, weighted: 2, darker: 1, paler: 1, rules: [2, 1, 1, 1] });
+  assert.match(linesLine(got.record), /of the drawing's 5 lines 2 are drawn when the painter would draw them, 1 before the first wash, 1 after the washes, 1 not at all; 2 weighted \(1 darker, 1 paler\)/);
   // weight never takes a line past black; all after is "last", all dropped is "none"
   assert.equal(applyLinesEdit(vectors(), lines(), edit([{ where: { ids: [5] }, weight: 4 }]), listing()).opening.vectors.strokes[4].dark, 1);
   assert.equal(applyLinesEdit(vectors(), lines(), edit([{ where: {}, do: 'after' }]), listing()).order, 'last'); assert.equal(applyLinesEdit(vectors(), lines(), edit([{ where: {}, do: 'drop' }]), listing()).order, 'none');
@@ -46,13 +46,13 @@ test('what is laid: the painter\'s own layer lays the chosen strokes and nothing
 
 test('a rule that cannot be read is refused with the reason; a rule that may spoil the drawing is laid and warned of', () => {
   const l = listing(), bad = (r, re) => assert.throws(() => checkLinesEdit(edit([r]), l), re), warned = r => { const w = []; checkLinesEdit(edit([r]), l, w); return w.join(' | '); };
-  bad({ where: { part: 'hatch' } }, /give "do" .* or "weight"/); bad({ where: { part: 'hatch' }, do: 'erase' }, /"do" is "before"/); bad({ where: {}, weight: -1 }, /"weight" is a number above 0/);
+  bad({ where: { part: 'hatch' } }, /give "do" .* or "weight"/); bad({ where: { part: 'hatch' }, do: 'erase' }, /"do" is "auto" .*"before" .*"stage N"/); bad({ where: {}, weight: -1 }, /"weight" is a number above 0/);
   bad({ where: { colour: 'red' }, do: 'drop' }, /"colour" is not a condition/); bad({ where: { darkAbove: 'x' }, do: 'drop' }, /"darkAbove" is a number/);
   assert.throws(() => checkLinesEdit(edit([]), l), /leave "lines" out/); assert.throws(() => checkLinesEdit({ format: 'x', rules: [{}] }, l), /"format" is "lines-edit 1"/);
   // slips and bold choices: warned of, never refused
   assert.match(warned({ where: { ids: [99] }, do: 'drop' }), /there is no line 99/); assert.match(warned({ where: { form: 'nose' }, do: 'drop' }), /no line has form "nose" \(the drawing has: none, face\)/);
   assert.match(warned({ where: {}, weight: 9 }), /a weight of 9 is outside the usual 0.1 to 4; it is laid as you wrote it/);
-  const none = applyLinesEdit(vectors(), lines(), edit([{ where: { darkAbove: 0.99 }, do: 'drop' }]), l); assert.match(none.warnings[0], /rule 1: no line matches its "where"; the rule changes nothing/); assert.equal(none.record.before, 5);
+  const none = applyLinesEdit(vectors(), lines(), edit([{ where: { darkAbove: 0.99 }, do: 'drop' }]), l); assert.match(none.warnings[0], /rule 1: no line matches its "where"; the rule changes nothing/); assert.equal(none.record.auto, 5);
   assert.equal(checkLinesEdit(edit(Array.from({ length: 500 }, () => ({ where: {}, weight: 1 }))), l).length, 500, 'no cap on the number of rules');
   // a pencil drawing's line after the washes: laid, in a file that says its closing lines hold pencil, with a warning
   const pencil = vectors('pencil'), pl = linesListing(pencil, { mask, forms });
@@ -86,7 +86,7 @@ test('lines of the author\'s own: points, pen or pencil, a width and a darkness,
   assert.equal(got.order, 'both'); assert.equal(got.laidAs, 'ink', 'a pen line on a pencil drawing: an ink file, the pencil strokes marked graphite');
   assert.deepEqual(got.opening.vectors.strokes.map(s => [s.seq, s.medium, s.part]), [[1, 'graphite', 'outline'], [2, 'graphite', 'inner'], [5, 'graphite', 'small'], [7, 'graphite', 'own']], 'the hatching tagged drop starts dropped on a pencil drawing');
   assert.deepEqual(got.closing.vectors.strokes.map(s => [s.seq, s.medium, s.dark, s.own]), [[6, 'ink', 0.9, true]]); assert.equal(got.closing.vectors.pencilAfterWashes, undefined);
-  assert.deepEqual(got.record.own, { lines: 2, pen: 1, pencil: 1, before: 1, after: 1, lengthMm: 63 }); assert.match(linesLine(got.record), /2 lines of your own \(1 pen, 1 pencil; 1 before the washes, 1 after them\); the drawing is laid as a pen drawing/);
+  assert.deepEqual(got.record.own, { lines: 2, pen: 1, pencil: 1, before: 1, after: 1, lengthMm: 63 }); assert.match(linesLine(got.record), /2 lines of your own \(1 pen, 1 pencil; 1 under the washes, 1 over them\); the drawing is laid as a pen drawing/);
   // the painter's own layer lays it where it was put, as wide as asked
   const w = 100, h = 50, f = new Float32Array(w * h); layVectors(got.closing.vectors, f, w, h, 1, d => d);
   for (let x = 12; x < 48; x++) assert.ok(f[40 * w + x] > 0 || f[39 * w + x] > 0, `the pen line is laid at x ${x}`); assert.equal(f[20 * w + 30], 0); assert.equal(f[40 * w + 70], 0);
@@ -122,4 +122,15 @@ test('the choice is written as drawing stems of its own, with the run settings t
     assert.deepEqual(last.sets, [['drawing', path.join(dir, 'last', 'closing')], ['drawinglast', path.join(dir, 'last', 'closing')], ['drawinglastmin', '0'], ['drawingorder', 'last'], ['outlinemedium', 'ink']]); assert.equal(JSON.parse(fs.readFileSync(`${last.closing}-vectors.json`, 'utf8')).pencilAfterWashes, true);
     assert.deepEqual(writeLinesEdit({ dir: path.join(dir, 'none'), stem, edit: null, listing: linesListing(vectors('pencil')), medium: 'none' }).sets, [['drawingorder', 'none']]);
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('a line\'s time: Auto\'s unless chosen, before the first wash, with a stage of the washes, or after them', () => {
+  const got = applyLinesEdit(vectors(), lines(), edit([{ where: { ids: [1] }, do: 'stage 2' }, { where: { ids: [2] }, do: 'before' }, { where: { ids: [5] }, do: 'after' }]), listing());
+  assert.deepEqual(got.opening.vectors.strokes.map(s => [s.seq, s.when]), [[1, 'stage 2'], [2, 'before'], [3, 'auto'], [4, 'auto']]);
+  assert.deepEqual(got.closing.vectors.strokes.map(s => [s.seq, s.when]), [[5, undefined]]);
+  assert.deepEqual(got.record.withStages, { 'stage 2': 1 });
+  assert.match(linesLine(got.record), /1 with stage 2/);
+  const own = applyLinesEdit(vectors(), lines(), ({ format: LINES_EDIT_FORMAT, own: [{ points: [[1, 1], [9, 1]], when: 'stage 3' }] }), listing());
+  assert.equal(own.opening.vectors.strokes.at(-1).when, 'stage 3');
+  assert.throws(() => applyLinesEdit(vectors(), lines(), edit([{ where: {}, do: 'stage two' }]), listing()), /"stage N"/);
 });

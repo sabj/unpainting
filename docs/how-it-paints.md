@@ -183,7 +183,7 @@ A look is the painter stepping back to compare whole shapes with the subject. Th
 
 ## 8. Lines
 
-The drawing goes down first and dries before the washes. The pen is a dip pen with a finite load of ink. Speed, pressure, load and paper change its line: a slow line is wide and dark, a pressed nib spreads, a fresh dip leaves a wide first mark and an empty nib thins, skips and needs a dip.
+A pen drawing goes down first and dries before the washes. A pencil drawing goes down in phases with them, as a person works (src/paint/methods/drawing-phases.mjs): the lay-in and the lines that place the first washes before them, each other line just before the later wash whose edge it draws or that covers it, on dry paper, and detail no wash claims with the last stage; each phase is filmed big forms first and dried into the paper before the next wash. An author may time any line (before, with stage N, after). The pen is a dip pen with a finite load of ink. Speed, pressure, load and paper change its line: a slow line is wide and dark, a pressed nib spreads, a fresh dip leaves a wide first mark and an empty nib thins, skips and needs a dip.
 
 ![One pen running dry: the line thins and breaks as its load empties](img/pen-line.webp)
 

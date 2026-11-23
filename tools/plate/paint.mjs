@@ -231,6 +231,22 @@ const checkInkHeld = when => {
   fs.writeFileSync(path.join(out, 'ink-held.json'), JSON.stringify({ moved: r.moved, lost: r.lost, most: INK_MOVED_MOST, when }));
   if (r.moved > INK_MOVED_MOST) throw Error(`the first wash moved ${(100 * r.moved).toFixed(1)}% of the pen's ink (most ${100 * INK_MOVED_MOST}%): the pen was not set before the washes (--inkfast) or was still wet`);
 };
+// A drawing phase's lines (graphite and ink, drawing-phases-run.mjs) held as they were when laid; once the next wash
+// over them has dried, how much of them it moved out of their cells is recorded (drawing-phases-held.jsonl) for the
+// drawing harness, as the first wash's is (graphite-held.json, ink-held.json)
+let PHASE_HELD = null;
+const heldChannels = () => [ctx.GRAPHITE ? ['graphite', ctx.GRAPHITE_AT] : null, ['ink', PIGS.length]].filter(c => c && thickness(ctx.sheet)[c[1]]);
+ctx.onDrawingPhase = k => { PHASE_HELD = { k, before: heldChannels().map(([name, j]) => [name, j, Float32Array.from(thickness(ctx.sheet)[j])]) }; };
+const readPhaseHeld = () => {
+  for (const [name, j, before] of PHASE_HELD.before) {
+    if (!before.some(v => v > 0)) continue;
+    const r = inkMoved(before, thickness(ctx.sheet)[j]);
+    JSONL.append(path.join(out, 'drawing-phases-held.jsonl'), JSON.stringify({ phaseBeforeWash: PHASE_HELD.k, medium: name, moved: r.moved, lost: r.lost }) + '\n');
+    console.log(`drawing phase held: the washes after the phase before wash ${PHASE_HELD.k + 1} moved ${(100 * r.moved).toFixed(3)}% of the ${name} out of its cells`);
+  }
+  PHASE_HELD = null;
+};
+if (ctx.RESUMING && ctx.DRAWING_PHASE_RUN) ctx.DRAWING_PHASE_RUN.resumeFrom(ctx.DRAWING_PHASES.layerStart[L_START]);
 for (let L = L_START; L < ctx.layers.length; L++) {
   const layer = ctx.layers[L];
   // an erase passage of a script or an edited plan: the pencil rubbed out where it passes (tools/painter/erase-step.mjs)
@@ -275,7 +291,12 @@ for (let L = L_START; L < ctx.layers.length; L++) {
   const TRACE_MASS = opt('trace', '0') !== '0' ? thicknessTotals(ctx.sheet) : null;
   // The plan's move is final: every passage comes from the wash plan (valueTechnique). No switch replaces a planned move.
   let T = valueTechnique(sh._valuePlan);
+  const PHASE_K = ctx.DRAWING_PHASES ? ctx.DRAWING_PHASES.layerStart[L] + layer.shapes.indexOf(sh) : -1;
   if(sh._valuePlan){ctx.VALUE_ACTIVE=sh._valuePlan;const inSession=WASH_SESSION>0&&ctx.WASH_LAST&&(ctx.WASH_LAST.L===L||(WASH_SESSION>1&&sameWash(ctx.WASH_LAST.layer,layer)));ctx.WASH_LAST={L,layer};if(!inSession)ctx.VALUE_OWN_CONTACT.clear();const scriptSitting=Boolean(layer._script)&&sh===layer.shapes[0]&&L>L_START;/* a painting script's wet session is a new sitting: the sheet dries first (the script's wait: dry), also before a passage laid into its own wet bed */if((!T.intoWet&&!inSession)||scriptSitting){clock('dry',()=>dry(ctx.sheet,30000,O,{levelMax:140,dt:2}));const base=measurePaperDry(ctx.sheet);if(L>L_START&&base.dry)checkInkHeld('the next dry sheet');if(SCRIPT_CHECK?.pending&&base.dry)SCRIPT_CHECK.measure(render(),'next dry sheet',inkedCells());JSONL.append(path.join(out,'value-commands.jsonl'),JSON.stringify({kind:'dry-base',intent:ctx.VALUE_ACTIVE.id,paper:base})+'\n');check('target-value pass needs fully dry base',base.dry,{intent:ctx.VALUE_ACTIVE.id,waterMax:base.waterMax,saturationMax:base.saturationMax});}}
+  // the drawing's later phases (drawing-phases.mjs): the lines this wash needs go down first, on dry paper; and what
+  // the last phase laid is read for movement once a wash has gone over it and dried
+  if (PHASE_HELD && PHASE_K > PHASE_HELD.k) { const base = measurePaperDry(ctx.sheet); if (base.dry) readPhaseHeld(); }
+  if (ctx.DRAWING_PHASE_RUN) await ctx.DRAWING_PHASE_RUN.before(PHASE_K, { intoWet: Boolean(T.intoWet) });
   // one passage for the dry-paper gate: its reach is looked over once, before its first lane (passage-dry-gate.mjs)
   ctx.VALUE_PASSAGE = sh._valuePlan ? {} : null;
   // what this passage's own instrument delivers on scrap (instrument-cal.mjs); the charge below is divided by it
@@ -822,6 +843,9 @@ for (let L = L_START; L < ctx.layers.length; L++) {
   JSONL.flush();
   await awareBoundary({ kind: 'pass', L });
 }
+// the drawing's phases due after the last wash (detail no wash claims, a stage the plan does not have), then the record
+if (ctx.DRAWING_PHASE_RUN) { await ctx.DRAWING_PHASE_RUN.finish(); ctx.DRAWING_PHASE_RUN.write(); }
+if (PHASE_HELD) { clock('dry', () => dry(ctx.sheet, 30000, O, { levelMax: 140, dt: 2 })); if (PHASE_HELD.k < Infinity) readPhaseHeld(); else PHASE_HELD = null; }
 // a painting of one pass never reached a second dry sheet: the drawing's hold is read on the finished sheet, dried
 if ((INK_HOLD && !INK_HOLD.checked) || (GRAPHITE_HOLD && !GRAPHITE_HOLD.checked)) { clock('dry', () => dry(ctx.sheet, 30000, O, { levelMax: 140, dt: 2 })); checkInkHeld('the finished sheet, dried'); }
 if (TECH_CAL) { console.log(`technique calibration: ${TECH_CAL.history().length} reads; charge factors ${JSON.stringify(Object.fromEntries(Object.entries(TECH_CAL.factors()).map(([k, v]) => [k, +v.toFixed(2)])))}`); fs.writeFileSync(path.join(out, 'technique-cal.json'), JSON.stringify({ kind: 'sheet gain against ledger charge, per technique; no target reads', history: TECH_CAL.history() }, null, 1)); }

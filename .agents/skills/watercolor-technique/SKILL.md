@@ -11,7 +11,7 @@ Choose each technique from the target, then check that the simulator executed it
 
 ## Default order: drawing, dry, then wash
 
-Draw first. The painter draws the lines of a prepared drawing file (`--drawingfile`) as they are, before the washes; with no file it draws no line. Pencil is the default medium. `--inkrecipe wash` or `--outlinemedium ink` draws in ink. A closing pass needs its own line file (`--drawinglast`) or a finish stage. `--inkfast auto` (the default) sets black ink before the washes and leaves sepia soluble.
+Draw first. The painter draws the lines of a prepared drawing file (`--drawingfile`) as they are: a pen drawing whole before the washes, a pencil drawing in phases with them (its lay-in first, each other line just before the wash that needs it, on dry paper); with no file it draws no line. Pencil is the default medium. `--inkrecipe wash` or `--outlinemedium ink` draws in ink. A closing pass needs its own line file (`--drawinglast`) or a finish stage. `--inkfast auto` (the default) sets black ink before the washes and leaves sepia soluble.
 
 1. Choose the drawing medium from the source, and write it in the plan. If the target shows line, draw silhouettes, landmarks, structural junctions and selected texture lines in ink; ink alone is usually best. If the target shows no line, draw the same structure lightly in graphite so it disappears under the washes.
 2. Let the ink dry and set. Inspect the executed drawing on the sheet; planned paths do not prove that ink reached the paper.
