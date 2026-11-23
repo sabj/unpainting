@@ -77,7 +77,7 @@ export function grainSurface(height, w, h, mmPerCell, reliefOf, { grainMm = GRAI
 export const grainField = (height, w, h, mmPerCell, grainMm = GRAIN_MM) => gaussianField(height, w, h, grainMm / mmPerCell);
 
 // the cell the slide's rate was fitted on: the painter's own sheets, 0.26 mm a cell (1086 cells on 282 mm)
-export const SLIDE_REF_MM = 0.26;
+const SLIDE_REF_MM = 0.26;
 /**
  * The slide's rate on a sheet of `mmPerCell`. On the grain field the slope between neighbours is the field's gradient
  * times the cell, and a grain that moves goes a cell: the rate a grain leaves a cell is slope over distance, so the
