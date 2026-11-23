@@ -4,6 +4,7 @@ import {invalidatePaperCertificate} from '../../src/media/paper-certificate.mjs'
 import {EpochCells} from '../../src/paint/epoch-cells.mjs';
 import {check} from '../../src/media/checks.mjs';
 import {createScriptColourCheck} from '../painter/script-colour-check.mjs';
+import {eraseStep} from '../painter/erase-step.mjs';
 import {isMarkPassage, pressedRadius} from '../../src/paint/methods/mark-swatch.mjs';
 import {inkMoved, INK_MOVED_MOST} from '../../src/paint/methods/ink-held.mjs';
 import {splitLoadsFeathered} from '../../src/paint/methods/brushes.mjs';
@@ -96,7 +97,7 @@ const awareUnsupported = () => [
     [GOUACHE_LIGHTS, 'gouache lights'], [ctx.FRAMER, 'async frame worker'],
 ].filter(([on]) => on).map(([, name]) => name);
 const awareRemaining = from => ctx.layers.slice(from).map((l, k) => ({
-  pass: from + k + 1, value: l.value, pigment: PIGS[l.pigment]?.name ?? l.pigment, order: l._order?.phase ?? null,
+  pass: from + k + 1, value: l.value, pigment: PIGS[l.pigment]?.name ?? l.pigment, order: l._order?.phase ?? null, stage: l.shapes.reduce((a, sh) => Math.max(a, Number(sh._valuePlan?.stage) || 0), 0),
   passages: l.shapes.length, areaShare: +(l.shapes.reduce((a, sh) => a + (sh.area ?? 0), 0) / n).toFixed(4),
   techniques: l.shapes.reduce((a, sh) => { const t = sh._valuePlan ? valueTechnique(sh._valuePlan).name : '?'; a[t] = (a[t] ?? 0) + 1; return a; }, {}) }));
 const awareCounts = () => { let s = 0, p = 0; if (MARKTAPE) for (const m of MARKTAPE) { if (m.k === 's') s++; else if (m.k === 'P') p++; } return { strokes: s, penLines: p }; };
@@ -223,6 +224,8 @@ const checkInkHeld = when => {
 };
 for (let L = L_START; L < ctx.layers.length; L++) {
   const layer = ctx.layers[L];
+  // an erase passage of a script or an edited plan: the pencil rubbed out where it passes (tools/painter/erase-step.mjs)
+  if (layer._erase) { await eraseStep(ctx, L, { dry, O, out, JSONL, shoot, MARKTAPE, cellMm: num('sheetmm', DEFAULT_SHEET_MM) / W2 }); continue; }
   colourMass('before-pass', {pass:L+1,value:layer.value,pigment:layer.pigment});
   if (opt('feedback', '1') !== '0') {
     if (FEEDBACK_LAG && FEEDBACK_BASE && !FEEDBACK_FRESH) {

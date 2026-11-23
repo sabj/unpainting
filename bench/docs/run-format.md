@@ -1,5 +1,7 @@
 # Run format
 
+0.4 note, 22 November 2026. A 0.4 try records, beside the fields below: the level and the try within it; the budget terms in force (rendering units, steps, the six-hour safety stop); usage (tokens, provider cost, machine minutes, rendering units spent, steps); tool use (shell commands, scripts written and run, pictures opened, plan and look calls, refusals, attempts to reach outside the folder); the film snapshots; how much the try changed from the one before; and the judge version and route. The exact field names are set by the harness when the 0.4 schema is frozen: planned, not final. The fields and the V1 to V5 round names below are history, and 0.4 results are a new series.
+
 A try is one model session that paints the requested targets. The rounds are V1 to V5. Every try is one folder: `runs/<round dir>/<model key>/<try>/`.
 
 - Round dirs: `v1-naive`, `v2-skill`, `v3-informed`, `v4-pipeline`, `v5-self-study`.

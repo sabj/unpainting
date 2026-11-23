@@ -157,3 +157,26 @@ test('each passage says how much of its sitting\'s wet paint already lies under 
   assert.ok(by.p2.script.underFilm > 0, 'the film of p1 under it');
   assert.equal(by.p3.script.underShare, 0, 'p1 and p2 have dried under the glaze');
 });
+
+test('a passage\'s small strokes are laid when its sitting is over, after the passage that goes into it while damp', () => {
+  const wet = { id: 'wet', what: 'wet touches', stage: 2, kind: 'strokes', brush: 'rig', paper: 'wet', paint: { pigments: { umber: 1 }, dilution: 'medium' }, strokes: [{ brush: 'r8', points: [[20, 40, 0.2], [20.5, 40, 0.2]] }, { points: [[30, 40, 1], [70, 40, 1], [70, 42, 1], [30, 42, 1]] }] };
+  const into = { id: 'in', what: 'into it, damp', stage: 2, kind: 'strokes', brush: 'r8', into: 'wet', wait: 'damp', paint: { pigments: { umber: 1 }, dilution: 'strong' }, strokes: [{ points: [[32, 41, 0.8], [60, 41, 0.8]] }] };
+  const next = { ...wall, id: 'next', stage: 3 };
+  const p = plan(script([wet, into, next]));
+  assert.deepEqual(p.instructions.map(q => q.script.passage), ['wet', 'in', 'wet-small', 'next']);
+  assert.equal(p.instructions[1].move, 'beside damp');
+  // one sitting holds all three; the wash after it is another
+  assert.deepEqual(p.layers.map(l => l.shapes.length), [3, 1]);
+});
+
+test('a look plans what is small as the final sheet will: the same strokes are small at half the cells', () => {
+  // a rigger's stroke 4 mm long covers about 5 mm2: more than forty cells of the final sheet, fewer than forty of the look's
+  const tiny = { id: 'wet', what: 'wet touches', stage: 2, kind: 'strokes', brush: 'rig', paper: 'wet', paint: { pigments: { umber: 1 }, dilution: 'medium' },
+    strokes: [{ points: [[20, 40, 1], [24, 40, 1]] }, { points: [[30, 40, 1], [70, 40, 1], [70, 42, 1], [30, 42, 1]] }] };
+  const at = (w, finalWidth) => quiet(() => planScriptWashes({ script: script([tiny]), k: pigments.length, w, h: w * 3 / 4, pigments, sheetWidthMm: 80, ...(finalWidth ? { finalWidth } : {}) }));
+  const full = at(320), look = at(160, 320);
+  assert.deepEqual(look.summary.smallStrokesLaidDry ?? [], full.summary.smallStrokesLaidDry ?? []);
+  assert.deepEqual(look.instructions.map(q => [q.script.passage, q.strokes.length]), full.instructions.map(q => [q.script.passage, q.strokes.length]));
+  assert.deepEqual(full.summary.smallStrokesLaidDry ?? [], []); assert.equal(at(160).summary.smallStrokesLaidDry.length, 1, 'planned alone, the look calls it small');
+  assert.throws(() => at(160, 100), /finalwidth/);
+});

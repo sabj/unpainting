@@ -13,10 +13,13 @@ import {createDeliveryCal} from '../../src/paint/methods/delivery-cal.mjs';
 import {drawMaterial, sourceDrawingCaps} from '../../src/paint/methods/material-profiles.mjs';
 import {valueTechnique, estimatePaper, targetValueMap} from '../../src/paint/methods/value-shared.mjs';
 import {planStudyWashes} from '../../src/paint/methods/study-washes.mjs';
+import {studyShapesDoc} from '../../src/paint/methods/study-shapes-out.mjs';
 import {planScriptWashes} from '../../src/paint/methods/script-washes.mjs';
 import {monoPaints} from '../../src/paint/methods/mono-mix.mjs';
 import {loadStudies} from '../painter/study-load.mjs';
 import {splitPlanEdit,planEditStep} from '../painter/plan-edit-step.mjs';
+import {readPlanFile,writePlanFile,planHash} from '../../src/paint/methods/plan-file.mjs';
+import {shrinkPlan} from '../../src/paint/methods/plan-shrink.mjs';
 import {studyThingMasks} from '../painter/thing-masks.mjs';
 import {washStrokeHold, LANE_OVERLAP, FLAT_OVERLAP} from '../../src/paint/methods/wash-strokes.mjs';
 import {smallestBrushMm} from '../../src/paint/methods/light-reserves.mjs';
@@ -86,7 +89,7 @@ export async function sheetAndBrushes(ctx) {
 const { WASH_FLAT_SPLAY, ENTRY_FILE, JSONL, opt, num, optTrack, NATIVE_PAINT_MODE, SPEED_PAPER, 
   SPEED_CONTACT, SPEED_VALUE_CACHE, SPEED_UNIFORM_PAPER, measurePaper, VALUE_CONTACT_WORK, SPEED_GPU_OPTICS, 
   SPEED_PROFILE, root, out, RUN_CACHE, VALUE_CONFIG, VALUE_COUNTS, 
-  WASH_SESSION, phaseMark, w, h, n, createBrush, physicalStroke: untracedStroke, candidateContact, TONE_MODE, 
+  WASH_SESSION, phaseMark, w, h, n, FINAL_W, createBrush, physicalStroke: untracedStroke, candidateContact, TONE_MODE, 
   SHEET_TONE, CALIBRATED_PLAN, PAPER_RULE, paperRGB, WASH_SPLAT_SETTINGS, CODE_HASH, PIGS, SMALL, 
   setClip, COLOUR_TRACE, OUTLINE, STAGE_PLAN, REQUESTED_DRAW_MEDIUM, INK_WIDTH_FLOOR_MM, INK_DAMP, 
   STYLE_INK_DEFAULT, INK_PROFILE, GRAPHITE_PROFILE, INK, GRAPHITE, SHEET_PIGS, GRAPHITE_AT } = ctx;
@@ -206,7 +209,7 @@ const pencilDraw=(target,gs,pigment,options)=>{
  // --washplan script:FILE.json: the washes are a painting script written by an author (script-washes.mjs,
  // docs/painting-script.md): passages in painting order, each laid in whole strokes; no study is read
  const SCRIPT=WASH_PLAN.startsWith('script:')?JSON.parse(fs.readFileSync(path.resolve(root,WASH_PLAN.slice(7)),'utf8')):null;
- if(SCRIPT)valueOptions.touchLeastMm2=TOUCH_LEAST_MM2;
+ if(SCRIPT){valueOptions.touchLeastMm2=TOUCH_LEAST_MM2;valueOptions.finalWidth=FINAL_W;}
  // --thingmasks RECEIPT.json (default auto: IMAGE.named-sam.json beside the source, when there is one): the source's named
  // forms (a reviewed SAM id map bound to the source by its receipt) for the study wash plan; --things names the label file
  // the receipt must match. No receipt: no named forms, and the plan is as it was without them.
@@ -221,15 +224,30 @@ const pencilDraw=(target,gs,pigment,options)=>{
  const paper=estimatePaper(valueOptions.rgb,w,h,valueOptions.density);valueOptions.inkValue=targetValueMap(paper?Float32Array.from(valueOptions.density,v=>Math.max(0,v-paper.density)):valueOptions.density);}
  const planValues=SCRIPT?planScriptWashes:planStudyWashes;
  const valueStarted=performance.now();
- if(SPEED_VALUE_CACHE){
+ // --planfile own|FILE: a look (--finalwidth) is painted from the final painting's own plan, kept by its plan-only run
+ // (src/paint/methods/plan-file.mjs), brought onto this sheet's cells (plan-shrink.mjs): the code planner reads its shapes
+ // on the cell grid, so planned again for a look it is another plan. Default own: this run plans for itself.
+ const PLAN_FROM=opt('planfile','own');
+ if(PLAN_FROM!=='own'){
+  if(SCRIPT)throw Error('--planfile: a painting script is its own plan at any size; no plan file is read for it');
+  const kept=readPlanFile(path.resolve(root,PLAN_FROM)),note=kept.note,names=PIGS.map(p=>p.name??p.key??null);
+  if(note.w!==FINAL_W||FINAL_W===w)throw Error(`--planfile: the plan was made on ${note.w} cells across; this sheet is ${w} cells and says its final is ${FINAL_W} (--finalwidth). A look names its final, and the plan is the final's`);
+  if(Math.abs(note.h/note.w-h/w)>2/w)throw Error(`--planfile: the plan's sheet is ${note.w} x ${note.h} cells, not the shape of this one (${w} x ${h})`);
+  if(Math.abs(note.sheetWidthMm-valueOptions.sheetWidthMm)>0.5)throw Error(`--planfile: the plan is for a sheet ${note.sheetWidthMm} mm wide, this one is ${valueOptions.sheetWidthMm} mm`);
+  if(JSON.stringify(note.pigments)!==JSON.stringify(names))throw Error(`--planfile: the plan was mixed from ${note.pigments.join(', ')}; this painting has ${names.join(', ')} (give the plan's paints: --paints ${note.paints?note.paints.join(','):'...'} --paintsextend 0)`);
+  ctx.VALUE_PLAN=shrinkPlan(kept.plan,{w:note.w,h:note.h},{w,h,sheetWidthMm:valueOptions.sheetWidthMm});
+  console.log(`wash plan: the final painting's own plan (${note.washes} washes planned on ${note.w} x ${note.h} cells, plan hash ${note.hash}) brought onto this look's ${w} x ${h} cells; plan hash here ${planHash(ctx.VALUE_PLAN)}`);
+  fs.writeFileSync(path.join(out,'plan-of-final.json'),JSON.stringify({from:note,here:{w,h,washes:ctx.VALUE_PLAN.instructions.length,hash:planHash(ctx.VALUE_PLAN)},washesWithNoCellHere:ctx.VALUE_PLAN.instructions.filter(q=>!(q.area>0)).map(q=>q.id)},null,1)+'\n');
+ }else if(SPEED_VALUE_CACHE){
   const saved=await cachedStep({...RUN_CACHE,name:'value-plan',code:CODE_HASH,track:optTrack,inputs:valueOptions},async()=>({plan:planValues(valueOptions)}));
   ctx.VALUE_PLAN=saved.value.plan;
  }else ctx.VALUE_PLAN=planValues(valueOptions);
- if(WASH_PLAN&&!SCRIPT)ctx.VALUE_PLAN=planEditStep({plan:ctx.VALUE_PLAN,file:PLAN_EDIT?path.resolve(root,PLAN_EDIT):null,out,ctx:{w,h,k:PIGS.length,pigments:PIGS,paperRGB,sheetWidthMm:valueOptions.sheetWidthMm,kitMm:valueOptions.washKitMm,mono:valueOptions.mono,seed:num('seed',0)}});
+ if(WASH_PLAN&&!SCRIPT&&PLAN_FROM==='own')ctx.VALUE_PLAN=planEditStep({plan:ctx.VALUE_PLAN,file:PLAN_EDIT?path.resolve(root,PLAN_EDIT):null,out,ctx:{w,h,k:PIGS.length,pigments:PIGS,paperRGB,sheetWidthMm:valueOptions.sheetWidthMm,kitMm:valueOptions.washKitMm,mono:valueOptions.mono,seed:num('seed',0)}});
  SPEED_PROFILE?.add('setup:value-plan',performance.now()-valueStarted);
  ctx.layers=ctx.VALUE_PLAN.layers;ctx.steps=5;
  // --washsession 2: within each band step, a region's pigment passes follow one another, so its wash is charged with
  // all its pigments in one wet session (the planner lists them pigment by pigment).
+ if((WASH_SESSION>1||num('darkfirst',0)>0)&&ctx.layers.some(l=>l._erase))throw Error('--washsession 2 and --darkfirst regroup the passes and would move an erase passage out of its place in the order; paint a plan with an erase without them');
  if(WASH_SESSION>1){const step=l=>l.shapes[0]?._valuePlan?.id?.split('/')[1]??String(l.value),first=new Map();ctx.layers.forEach((l,i)=>{const g=step(l)+'|'+l._valuePhase;if(!first.has(g))first.set(g,i);});
   ctx.layers=ctx.layers.map((l,i)=>({l,i,g:first.get(step(l)+'|'+l._valuePhase),r:l._order?.region??0})).sort((a,b)=>a.g-b.g||(a.l._valuePhase==='shadow'?a.i-b.i:a.r-b.r||a.l.pigment-b.l.pigment||a.i-b.i)).map(q=>q.l);}
  // --darkfirst: shadow-phase layers (shadow glazes, deep accents) before the middle layers, light first still
@@ -250,6 +268,8 @@ const pencilDraw=(target,gs,pigment,options)=>{
    {const pal=[[230,159,0],[86,180,233],[0,158,115],[240,228,66],[0,114,178],[213,94,0],[204,121,167],[120,120,120]],img=Buffer.alloc(n*3);for(let i=0;i<n;i++){const c=pal[field.rank[i]%pal.length];img[3*i]=c[0];img[3*i+1]=c[1];img[3*i+2]=c[2];}await sharp(img,{raw:{width:w,height:h,channels:3}}).png().toFile(path.join(out,'subject-order.png'));}
    console.log(`subject order ${so}: ${ctx.layers.length} passes; ${r.summary.map(q=>`${q.subject} ${(100*q.share).toFixed(0)}% passes ${q.first}-${q.last}`).join(', ')}`);}}
  ctx.HOLD=ctx.VALUE_PLAN.protectedCells;
+ // the block-in study's flat shapes as the planner read them, before they become washes, written out as data (study-shapes-out.mjs)
+ if(ctx.VALUE_PLAN.studyShapes)fs.writeFileSync(path.join(out,'study-shapes.json'),JSON.stringify(studyShapesDoc(ctx.VALUE_PLAN.studyShapes))+'\n');
  fs.writeFileSync(path.join(out,'value-plan.json'),JSON.stringify({stage:'executable target-value plan before physical instruments',style:ctx.VALUE_PLAN.style,target:opt('image'),caps:[.16,.32,.50,.75,1],peakDensity:ctx.VALUE_PLAN.value.peak,geometry:ctx.VALUE_PLAN.geometry,omittedReservedOrSpeckDemand:ctx.VALUE_PLAN.omittedDemand,lights:ctx.VALUE_PLAN.lightShapes,explicitLights:VALUE_CONFIG?.reserves??[],mixes:ctx.VALUE_PLAN.mixes,summary:ctx.VALUE_PLAN.summary,passes:ctx.VALUE_PLAN.instructions,drawing:'sparse structure first; lighter selective closing ink after dry gate'},null,2));
  // --valuemaps 1: the value plan as maps for diagnosis (value band per cell, colour region, reserved lights) and every
  // passage's cells in paint order, to value-maps.json.gz. Read by nothing in the painter.
@@ -258,6 +278,8 @@ const pencilDraw=(target,gs,pigment,options)=>{
   fs.writeFileSync(path.join(out,'value-maps.json.gz'),zlib.gzipSync(JSON.stringify({w,h,caps,band,value:Array.from(vv,v=>+v.toFixed(3)),labels:Array.from(ctx.VALUE_PLAN.regions.labels),protected:ctx.VALUE_PLAN.protectedCells?Array.from(ctx.VALUE_PLAN.protectedCells):[],passes})));}
  console.log(ctx.VALUE_PLAN.mixes?`wash plan: ${ctx.layers.length} mixes, ${ctx.VALUE_PLAN.instructions.length} washes in ${ctx.VALUE_PLAN.summary.stages} stages`:`target values: ${ctx.layers.length} pigment/region passes, ${ctx.VALUE_PLAN.instructions.length} connected shapes; five light-to-dark bands; shadows never split by region`);
  if(num('valuepreviewonly',0)){
+  // the plan itself is kept for looks (plan-file.mjs): a look is this plan painted on fewer cells
+  if(PLAN_FROM==='own'&&!SCRIPT){const kept=writePlanFile(out,{plan:ctx.VALUE_PLAN,w,h,sheetWidthMm:valueOptions.sheetWidthMm,pigments:PIGS});console.log(`plan kept for looks: ${kept.washes} washes, plan hash ${kept.hash}`);}
   const preview=await writeValuePreview({plan:ctx.VALUE_PLAN,out,w,h,pigments:PIGS,paperRGB,target:path.resolve(root,opt('image')),photo:VALUE_CONFIG?.photo,subject:VALUE_CONFIG?.subject??'subject',name:VALUE_CONFIG?.name,root,opening:opt('drawingfile',''),closing:opt('drawinglast',''),variant:opt('valuevariant','lighttodark'),version:opt('valueversion','W4'),sheetMm:num('sheetmm', DEFAULT_SHEET_MM)});
   fs.writeFileSync(path.join(out,'compile-result.json'),JSON.stringify(preview,null,2));console.log('CPU preview',preview.board,preview.seconds);
   const values=await writePlanValueCheck({plan:ctx.VALUE_PLAN,out,w,h,pigments:PIGS,paperRGB,rgb:ctx.px});
@@ -711,7 +733,8 @@ const scrapSwatches = (techniques, drySwatch, { damp = false } = {}) => {
       // The swatch is at least sixteen brush widths across: on a fine sheet fifty cells were 13 mm, two lanes of a 7 mm
       // round that never got past landing on its tip. Its scrap's cells grow to fit (the brush lays the same paint a
       // millimetre at any cell size).
-      const sheetMm = PAPER_OPTS.mmPerCell ?? 0, brush = swatchBrush(), mm = sheetMm > 0 ? Math.max(sheetMm, 32 * brush.radius * sheetMm / (SWATCH.x1 - SWATCH.x0)) : 0;
+      // (a look's scrap is the final sheet's: no finer than the final's cells, look-scale.mjs)
+      const sheetMm = PAPER_OPTS.mmPerCell ?? 0, brush = swatchBrush(), mm = sheetMm > 0 ? Math.max(sheetMm * w / FINAL_W, 32 * brush.radius * sheetMm / (SWATCH.x1 - SWATCH.x0)) : 0;
       const radius = mm > 0 ? brush.radius * sheetMm / mm : brush.radius, flat = brush.flat;
       const paths = swatchLanes(radius, { overlap: lap ?? (flat ? FLAT_OVERLAP : LANE_OVERLAP) }), cover = sweepCover(paths, mask, SW, SH);
       const under = opt('undercover', '1') !== '0' ? 1 / Math.max(num('underfloor', 0.4), Math.min(1, cover)) : 1;
@@ -771,7 +794,7 @@ const dampWait = (scrap, cells) => waitBesideDamp({ observe: () => measurePaper(
 // A mark of a passage laid beside damp (mark.damp) is tried over a damp wash, laid first in lanes of a round an eighth
 // of the swatch wide.
 const scrapMark = (T, mark) => {
-  const sheetMm = PAPER_OPTS.mmPerCell ?? 0, L = markLayout(mark, sheetMm);
+  const sheetMm = PAPER_OPTS.mmPerCell ?? 0, L = markLayout(mark, sheetMm * w / FINAL_W);
   const opts = (r, T) => ({ flat: false, radius: r, bristles: Math.max(12, Math.ceil(r * 2)), capacity: 100, belly: 12, feed: 0.4, give: 0.9, free: num('washfree', 0.4), film: 0.25, splay: WASH_FLAT_SPLAY, stiffness: 8, wetMix: MIX(T), bridge: washBridge(T, T.bridge), bridgeSoft: T.bridgeSoft, seed: 11 });
   const contactOf = (scrap, pts, r, T) => { const b = createBrush(opts(r, T)); dipBrush(b, { water: WET(T), conc: [0] }); const c = candidateContact(b, scrap, pts, { upright: UPRIGHT, clip: null, neighborRadius: 0, includeTouched: false }); return c.cells.filter(i => c.primaryMask[i]); };
   // a mark laid into wet goes into a bed wider than itself (the wet passage it is laid in), wetted along the mark's path
@@ -792,7 +815,7 @@ const scrapMark = (T, mark) => {
   return { ...r, lift: liftShare(before, thicknessTotals(scrap)[DAMP_CHANNEL.under], L.mask.reduce((a, v) => a + v, 0) / ((SWATCH.x1 - SWATCH.x0) * (SWATCH.y1 - SWATCH.y0))) };
 };
 const gradedReading = g => (g ? { all: g.all, escape: g.escape, edge: g.edge } : null);
-const CAL_RESULT = await cachedStep({...RUN_CACHE,name:'calibration',enabled:RUN_CACHE.enabled,code:CODE_HASH,track:optTrack,inputs:{pigment:PIGS[0],O,PAPER_OPTS,GCHUNK,BRUSH,swatchBrush:swatchBrush(),UPRIGHT,LOADED_CONTACT,WASH_SPLAT_SETTINGS,settles:Boolean(ctx.VALUE_PLAN),physical:PB?{cfg:PB.cfg,mmPerCell:PB.mmPerCell}:null}},async () => {
+const CAL_RESULT = await cachedStep({...RUN_CACHE,name:'calibration',enabled:RUN_CACHE.enabled,code:CODE_HASH,track:optTrack,inputs:{pigment:PIGS[0],O,PAPER_OPTS,GCHUNK,BRUSH,finalWidth:FINAL_W,swatchBrush:swatchBrush(),UPRIGHT,LOADED_CONTACT,WASH_SPLAT_SETTINGS,settles:Boolean(ctx.VALUE_PLAN),physical:PB?{cfg:PB.cfg,mmPerCell:PB.mmPerCell}:null}},async () => {
   const out = {};
   for (const { technique: T, plain, graded } of scrapSwatches(STOCK_TECHNIQUES, dry)) {
     out[T.name] = chargeFactor(plain.delivered);
@@ -861,7 +884,7 @@ const instrumentOf = (T, sh = null) => {
 // every instrument the value plan names is tried on scrap before the first wash
 if (ctx.VALUE_PLAN) {
   const planned = [...new Map(ctx.layers.flatMap(l => (l.shapes ?? []).filter(sh => sh._valuePlan).map(sh => [sh, valueTechnique(sh._valuePlan)])).filter(([, T]) => ownSwatch(T)).map(([, T]) => [instrumentKey(T), T])).values()];
-  const saved = await cachedStep({...RUN_CACHE,name:'instrument-calibration',code:CODE_HASH,track:optTrack,inputs:{pigment:PIGS[0],O,PAPER_OPTS,GCHUNK,BRUSH,swatchBrush:swatchBrush(),UPRIGHT,LOADED_CONTACT,WASH_SPLAT_SETTINGS,physical:PB?{cfg:PB.cfg,mmPerCell:PB.mmPerCell}:null,stock:CAL_RESULT.value,instruments:planned.map(instrumentKey)}},async () => {
+  const saved = await cachedStep({...RUN_CACHE,name:'instrument-calibration',code:CODE_HASH,track:optTrack,inputs:{pigment:PIGS[0],O,PAPER_OPTS,GCHUNK,BRUSH,finalWidth:FINAL_W,swatchBrush:swatchBrush(),UPRIGHT,LOADED_CONTACT,WASH_SPLAT_SETTINGS,physical:PB?{cfg:PB.cfg,mmPerCell:PB.mmPerCell}:null,stock:CAL_RESULT.value,instruments:planned.map(instrumentKey)}},async () => {
     for (const T of planned) INSTRUMENT_CAL.of(T);
     return INSTRUMENT_CAL.entries();
   });

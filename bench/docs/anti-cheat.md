@@ -1,12 +1,15 @@
 # Anti-cheat
 
+Updated 22 November 2026. In 0.4 the anti-cheat reading is kept beside the scores as a reference. It never changes a score. The sandbox is also closed: the model's shell has no internet, one fixed toolbox, and no way to read outside its own folder, and attempts are recorded. The look counts and the 100-look hard mode below are history from rounds V1 to V5.
+
 Cheating here means hill-climbing toward the photo: repeatedly changing strokes to reduce image error. This includes fitting strokes pixel by pixel or keeping a stroke only when it improves the match.
 
 - Models can look at the target and at their own painting as often as they like, the way a painter glances at a reference.
 - Their code may not read the target's pixels. Node scripts that import the painting toolkit given to models or the guard (a check that blocks image reads), and Python scripts started with the benchmark runner's environment, block and log image reads. Separate Node processes are not automatically guarded. A blocked read disqualifies the run.
 - Every painting also gets a cheat-risk score: how closely its fine detail copies the photo, whether its stages go light to dark and broad to fine like a person's would, and how much of it is tiny strokes.
-- In V4 and V5 a look is stepping back from the board: three while painting and one at the end, a revision only after a look, and no target in any look in a strict run (`bench/v4v5/README.md`).
-- Gentle mode applies these checks. Hard mode adds a budget of about 100 looks per painting, so a model can't hill-climb by eye either.
+- In 0.4 a look is rendering, measured and not limited ([rules](rules.md#budgets-measured-not-limited)). No look shows the target.
+- Retries are self-study: a model gets no score and no critique, and its last try counts, not its best ([levels](levels.md#retries-are-self-study)). That removes the main route to hill climbing across tries.
+- Gentle mode applies these checks. Hard mode, with a look budget, is history (see the end of this page).
 
 ## Gentle mode
 
@@ -23,7 +26,7 @@ Gentle mode is the default. The published tries use it. A try is one model sessi
 
 `scripts/run.mjs --dry-run` repeats a small version of this check on every dry run: a script tries to read a target, and the run records whether it was blocked and logged (`dryRunGuardProbe` in `run.json`).
 
-## Hard mode
+## Hard mode (history)
 
 Hard mode is gentle mode with a budget of looks: about 100 looks at the target per painting. Past the budget a look returns nothing and the refusal is counted. Hard mode is opt-in. The published tries use gentle mode. `scripts/run.mjs` does not implement hard mode; each runner needs its own look counter. A hard-mode `run.json` sets `settings.mode` to `hard` and `settings.lookBudget` to the budget.
 

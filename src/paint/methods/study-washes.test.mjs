@@ -1,4 +1,5 @@
 import test from 'node:test';
+import { studyShapesDoc } from './study-shapes-out.mjs';
 import assert from 'node:assert/strict';
 import { planStudyWashes, nestParents } from './study-washes.mjs';
 import { laneFill } from './sweep-fill.mjs';
@@ -37,6 +38,9 @@ test('the study\'s flat shapes: three painted, the white left as paper, each one
   assert.equal(washes.filter(q => !/glaze/.test(q.thing)).length, 1);
   assert.ok(washes.filter(q => /shadow, glaze/.test(q.thing)).length >= 2 && washes.filter(q => /glaze/.test(q.thing) && !/shadow/.test(q.thing)).length >= 2, washes.map(q => q.thing).join(' | '));
   assert.ok(p.mixes.every(m => m.mix.length === pigments.length));
+  // the shapes as read, before they become washes, come back with the plan for writing out (study-shapes-out.mjs): a label for every plan cell, a colour and a cell count for every shape
+  const r = p.studyShapes; assert.equal(r.label.length, r.pw * r.ph); assert.equal(r.shapes.length, p.summary.shapes); assert.equal(r.shapes.reduce((a, x) => a + x.cells, 0), r.pw * r.ph); assert.equal(r.shapes.filter(x => x.light).length, p.summary.paperShapes);
+  assert.equal(studyShapesDoc(r).shapes.filter(x => !x.paper && x.polygons.length).length, 3);
 });
 
 test('wash within wash: the wall is laid first and carried under its shadow; the shadow goes over it dry; the door is last', () => {
@@ -320,4 +324,41 @@ test('a white of the block-in that the richer studies tint is washed in their co
   // colours and stages; the wall's wash now runs a little over the painted sky's edge)
   const others = pl => pl.instructions.filter(q => !blue(q)).map(q => [q.colour, q.stage]);
   assert.ok(others(off).length >= 2); assert.deepEqual(others(p), others(off));
+});
+
+test('a tinted white AND a form read into colours of its own, in one plan: the white is washed as without the form\'s setting, the form is read as without the white', () => {
+  // the sky is white in the block-in and pale blue in the richer studies (so the block-in is read a second time); the
+  // wall under it is a named form in two near tones, which its own clusters and join keep apart and the study's join merges
+  const field = [128, 150, 110], w = 320, h = 200;
+  const picture = sky => { const rgb = new Uint8ClampedArray(w * h * 3); for (let i = 0; i < w * h; i++) { const x = (i % w) / 2, y = ((i / w) | 0) / 2; rgb.set(x >= 20 && x < 140 && y >= 10 && y < 90 ? (y < 50 ? sky : x < 80 ? [236, 218, 186] : [226, 206, 172]) : field, i * 3); } return { w, h, rgb }; };
+  const blockIn = picture([255, 255, 255]), rich = picture([196, 214, 236]);
+  const masks = { width: w, height: h, ids: Uint8Array.from({ length: w * h }, (_, i) => { const x = (i % w) / 2, y = ((i / w) | 0) / 2; return x >= 20 && x < 140 && y >= 50 && y < 90 ? 1 : 0; }), names: ['a wall'], kinds: ['building'], provenance: { schema: 'named-sam-v1' } };
+  const run = ({ read = null, forms = null } = {}) => { const log = console.log; console.log = () => {}; try { return planStudyWashes({ k: pigments.length, w, h, studies: [{ rgb: blockIn.rgb, file: 'block-in', ...(read ? { read } : {}), ...(forms ? { forms } : {}) }, { rgb: rich.rgb, file: 'middle', minMm2: 4 }, { rgb: rich.rgb, file: 'fine', minMm2: 2 }], paperRGB: PAPER, pigments, sheetWidthMm: 160, washBrushMm: 5, washKitMm: [38, 25.4, 7, 5], thingMasks: masks }); } finally { console.log = log; } };
+  const own = { 1: { clusters: 6, join: 2 } };
+  const white = run(), both = run({ forms: own }), form = run({ read: { whites: 2 }, forms: own }), neither = run({ read: { whites: 2 } });
+  const blue = q => q.colour[2] > q.colour[0] + 10, inWall = q => q.forms?.[0]?.kind === 'building' && q.forms[0].share > 0.8, told = qs => qs.map(q => [q.colour, q.stage]);
+  // the white: washed, the same area, the same blue washes, with the form's setting or without
+  assert.ok(both.summary.whitesWashedMm2 > 0.9 * 120 * 40); assert.equal(both.summary.whitesWashedMm2, white.summary.whitesWashedMm2);
+  assert.ok(both.instructions.some(blue)); assert.deepEqual(told(both.instructions.filter(blue)), told(white.instructions.filter(blue)));
+  // the form: its own colours give the wall's darker half a wash of its own over the wall's wash, where the study's colours
+  // leave the wall one wash; the same washes with the white or without (the wall's wash runs a little over the sky's edge)
+  assert.equal(neither.instructions.filter(inWall).length, 1); assert.equal(form.instructions.filter(inWall).length, 2);
+  assert.deepEqual(told(both.instructions.filter(inWall)), told(form.instructions.filter(inWall)));
+  // nothing left bare by the two together, and no colour that neither reading has
+  assert.ok(both.summary.reservedShare < 0.02 && both.summary.paintedShare > 0.97, `${both.summary.reservedShare} ${both.summary.paintedShare}`);
+  const seen = new Set([...told(white.instructions), ...told(form.instructions)].map(String));
+  for (const t of told(both.instructions)) assert.ok(seen.has(String(t)), `a wash of neither reading: ${t}`);
+});
+
+test('a re-read white INSIDE a form read into colours of its own takes one of the form\'s colours; the rest of the sheet is as it was (Codex Astra\'s case)', () => {
+  // 40 x 10 cells on 40 mm, grey columns: form 1 holds 100, 130 and a white the richer study shows as 120; outside it, 80
+  const w = 40, h = 10, grey = cols => { const rgb = new Uint8ClampedArray(w * h * 3); for (let i = 0; i < w * h; i++) rgb.fill(cols[Math.floor((i % w) / 10)], i * 3, i * 3 + 3); return rgb; };
+  const masks = { width: w, height: h, ids: Uint8Array.from({ length: w * h }, (_, i) => (i % w < 30 ? 1 : 0)), names: ['a wall'], kinds: ['building'], provenance: { schema: 'named-sam-v1' } };
+  const run = whites => { const log = console.log; console.log = () => {}; try { return planStudyWashes({ k: pigments.length, w, h, studies: [{ rgb: grey([100, 130, 255, 80]), file: 'block-in', minMm2: 1, read: { clusters: 4, join: 1, hue: 0, shapes: 0, formbase: 0, whites }, forms: { 1: { clusters: 2 } } }, { rgb: grey([100, 130, 120, 80]), file: 'middle', read: { lay: 0 } }], paperRGB: [255, 255, 255], pigments, sheetWidthMm: 40, washBrushMm: 1, washKitMm: [5, 1], thingMasks: masks }); } finally { console.log = log; } };
+  const off = run(2), on = run(0.7), colourAt = (p, x) => p.regions.regions[p.regions.labels[5 * w + x] - 1].colour;
+  assert.equal(off.summary.whitesWashedMm2, 0); assert.equal(on.summary.whitesWashedMm2, 100);
+  assert.deepEqual(colourAt(on, 25), [130, 130, 130], 'the re-read cells take a colour of the form\'s own two, not the study\'s');
+  assert.deepEqual(colourAt(on, 15), [130, 130, 130]); assert.deepEqual(colourAt(on, 5), [100, 100, 100]);
+  assert.deepEqual(colourAt(on, 35), [80, 80, 80]); assert.deepEqual(colourAt(off, 35), [80, 80, 80]);
+  assert.ok(on.regions.labels.every(id => id >= 1 && id <= on.regions.regions.length), 'no cell without a shape');
 });

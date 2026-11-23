@@ -1,4 +1,5 @@
-// The tools a choice may use beside its kind (choice.mjs): its own choice of the drawing's lines (lines-edit.mjs), its
+// The tools a choice may use beside its kind (choice.mjs): its own choice of the drawing's lines, lines of its own and
+// the drawing's medium (lines-edit.mjs), its
 // own named forms (forms-edit.mjs), and planner settings inside single named forms. This module reads what they work
 // on once (toolsBase), checks a choice's tools against it without writing anything (resolveTools: what the session's
 // broker calls for every plan), and writes them out as the files and run settings the painter takes (writeTools).
@@ -36,7 +37,7 @@ export async function toolsBase(spec) {
  * Throws with the reason, said for the author.
  */
 export function resolveTools(tools, base) {
-  const record = {}, said = [], sets = [];
+  const record = {}, said = [], sets = [], warnings = [...(tools.warnings ?? [])];
   let forms = null, formsNow = base.forms, listing = base.listing, lines = null;
   if (tools.formsEdit) {
     if (!base.mask) throw new Error('forms edit: this subject has no named forms to edit');
@@ -44,11 +45,11 @@ export function resolveTools(tools, base) {
     formsNow = forms.forms; record.forms = { file: tools.forms ?? null, ...forms.record, now: forms.forms.map(f => ({ id: f.id, name: f.name, kind: f.kind })) }; said.push(`Your forms: ${formsLine(forms.record)}.`);
     if (base.vectors) listing = linesListing(base.vectors, { mask: { ids: forms.ids, width: base.mask.width, height: base.mask.height }, forms: formsNow });
   }
-  if (tools.linesEdit) {
+  if (tools.linesEdit || tools.medium) {
     if (!base.vectors) throw new Error('lines edit: this subject\'s drawing has no vector strokes to choose from');
     // (the line file is not needed to check an edit: only the strokes are chosen)
-    lines = applyLinesEdit(base.vectors, { lines: [] }, tools.linesEdit, listing);
-    record.lines = { file: tools.lines ?? null, ...lines.record }; said.push(`Your lines: ${linesLine(lines.record)}.`);
+    lines = applyLinesEdit(base.vectors, { lines: [] }, tools.linesEdit ?? null, listing, { medium: tools.medium ?? null });
+    record.lines = { file: tools.lines ?? null, ...lines.record }; said.push(`Your drawing: ${linesLine(lines.record)}.`); warnings.push(...lines.warnings);
   }
   if (tools.perForm) {
     if (!formsNow.length) throw new Error('"perForm": this subject has no named forms');
@@ -63,7 +64,7 @@ export function resolveTools(tools, base) {
     }
     record.perForm = list; said.push(`Per form: ${list.length} settings in ${tools.perForm.length} forms (${tools.perForm.map(([n]) => n).join(', ')}).`);
   }
-  return { forms, formsNow, listing, lines, sets, record, said: said.join(' ') };
+  return { forms, formsNow, listing, lines, sets, record, warnings, said: said.join(' ') };
 }
 
 /**
@@ -72,14 +73,14 @@ export function resolveTools(tools, base) {
  * record, said, receipt, mask, forms, opening, closing, order}.
  */
 export async function writeTools(dir, tools, base) {
-  const got = resolveTools(tools, base), sets = [...got.sets], out = { record: got.record, said: got.said, formsNow: got.formsNow };
+  const got = resolveTools(tools, base), sets = [...got.sets], out = { record: got.record, said: got.said, warnings: got.warnings, formsNow: got.formsNow };
   if (tools.formsEdit) {
     const f = await writeFormsEdit({ dir: path.join(dir, 'forms'), receipt: base.receipt, edit: tools.formsEdit, sheet: base.sheet, source: base.source });
     sets.push(['masks', f.receipt]); Object.assign(out, { receipt: f.receipt, mask: f.mask });
   }
-  if (tools.linesEdit) {
-    const l = writeLinesEdit({ dir: path.join(dir, 'lines'), stem: base.stem, edit: tools.linesEdit, listing: got.listing });
-    sets.push(...l.sets); Object.assign(out, { opening: l.opening, closing: l.closing, order: l.order });
+  if (tools.linesEdit || tools.medium) {
+    const l = writeLinesEdit({ dir: path.join(dir, 'lines'), stem: base.stem, edit: tools.linesEdit ?? null, listing: got.listing, medium: tools.medium ?? null });
+    sets.push(...l.sets); Object.assign(out, { opening: l.opening, closing: l.closing, order: l.order, laidAs: l.laidAs });
   }
   return { ...out, sets };
 }

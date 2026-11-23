@@ -1,8 +1,8 @@
-// The finishing step of a session (the owner: "ask them to self assess"): before a model may hand in it takes a look
-// and writes self-review.md: the five worst differences between its dried sheet and the subject, each with where it
-// is in millimetres and what it would do, and one last line saying how many of them are major. While a major fault
-// remains and time remains it must go on; it may hand in early only by saying none remains. No score is shown and no
-// one judges the review: it is the model's own. This module reads the file and says whether the session may end.
+// A session's own review of its last sheet (the owner: "ask them to self assess"): the brief invites the model to
+// take a last look and write self-review.md, the five worst differences between its dried sheet and the subject, each
+// with where it is in millimetres and what it would do, and one last line saying how many of them are major. It is
+// the model's own judgment: no score is shown, nobody marks it, and it is never a gate. A session hands in when it
+// chooses to. This module reads the file for the record (was one written, of which look, how many faults it names).
 //
 //   # Self-review of look 7
 //   1. (120, 210 mm) the near eye is a flat brown patch, the subject's has a dark upper lid and a light iris: ...
@@ -10,13 +10,8 @@
 //   Major faults remaining: none        (or a number)
 // A major fault: a form not built, a value far off, a colour wrong, an area left bare that the subject paints.
 
-/** Minutes of its own time a session must still have for the harness to send it back to work. */
-export const LEAST_MINUTES_LEFT = 8;
-/** How many times a session is sent back, at most. */
-export const MOST_RETURNS = 3;
-
 /**
- * A self-review read: {ok: it lets the session end, why: what is wrong with it or what it says remains, look: the look
+ * A self-review read: {ok: a full review of the last look that names no major fault, why: what it lacks or says remains, look: the look
  * it reviews, items: the differences it lists, major: 'none' | a count | null}. `text` is self-review.md or null;
  * `looks` how many looks the session has taken (the review must be of the last one).
  */
@@ -32,16 +27,4 @@ export function readSelfReview(text, looks) {
   if (major == null) return { ...base, ok: false, why: 'its last line must say "Major faults remaining: none" or "Major faults remaining: <how many>"' };
   if (major !== 'none') return { ...base, ok: false, why: `it says ${major} major fault${major === 1 ? '' : 's'} remain${major === 1 ? 's' : ''}` };
   return { ...base, ok: true, why: null };
-}
-
-/** The words that send a session back to work, or null when it may end. `minutesLeft` of its own time. */
-export function returnPrompt(review, { minutesLeft, turn }) {
-  if (review.ok || minutesLeft < LEAST_MINUTES_LEFT || turn > MOST_RETURNS) return null;
-  return `You stopped with about ${Math.floor(minutesLeft)} of your minutes left, and your painting is not handed in yet: ${review.why}.
-
-The finishing step (TASK.md, "Before you stop") is not done. Do it now, in this folder, where all your files still are:
-1. Take a look at your present choice (\`./unpaint look\`) and open its \`beside.png\`: your dried sheet beside the subject.
-2. Write \`self-review.md\`: first line \`# Self-review of look N\` (N the look you just took), then the FIVE worst differences between your dried sheet and the subject, numbered, each with where it is in millimetres, what differs, and what you would do about it; last line \`Major faults remaining: none\` or \`Major faults remaining: <how many>\`. A major fault is a form not built, a value far off, a colour wrong, or an area left bare that the subject paints.
-3. If a major fault remains, put it right (change your choice, plan, look), then review again. Hand in early only when your review of your LAST look says none remains.
-No score is shown to you and nobody marks the review: it is your own judgment of your own sheet. Use the time you have.`;
 }

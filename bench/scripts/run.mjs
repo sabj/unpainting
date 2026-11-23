@@ -10,7 +10,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { BENCH, REPO, V2, PUBLIC_CROPS, CROP_ORDER, roundById, loadCrops, loadModels } from './lib.mjs';
+import { BENCH, REPO, V2, PUBLIC_CROPS, CROP_ORDER, roundById, loadCrops, loadLevelOneCrops, loadModels } from './lib.mjs';
 import { KEYS } from './runners.mjs';
 import { preflight, scorePython } from './preflight.mjs';
 import { runDoctor } from '../../src/paint/doctor.mjs';
@@ -35,7 +35,7 @@ for (let i = 0; i < argv.length; i++) {
 
 const DRY = has('dry-run');
 const round = roundById(opt('round', 'V4'));
-if (!round || !['V4', 'V5'].includes(round.id)) fail('--round must be V4 or V5 (V1 to V3 are published history and can no longer be run)');
+if (!round || !['V3', 'V4', 'V5'].includes(round.id)) fail('--round must be V3, V4 or V5 (V1 and V2 are published history and can no longer be run)');
 if (['V4', 'V5'].includes(round.id)) fail((await import('./pipeline/round45.mjs')).RETIRED_V45);
 let profile;
 try { profile = profileForRound(round.id, opt('profile')); } catch (e) { fail(e.message); }
@@ -53,16 +53,17 @@ if (opt('dry-key') && (!DRY || !models.some(m => m.key === dryKey))) fail('--dry
 const model = DRY ? { key: dryKey, name: 'Scripted dry run', id: 'dry-run', effort: 'n/a', runner: 'dry-run' }
   : models.find(m => m.key === opt('model')) || fail(`--model must be one of ${models.map(m => m.key).join(', ')}`);
 
-const cropSpecs = Object.fromEntries(loadCrops().map(c => [c.task, c]));
+// level 1 (the V3 round) also paints its own full-size targets (bench/v3/crops.json), which are not in the public suite
+const cropSpecs = Object.fromEntries([...loadCrops(), ...(round.id === 'V3' ? loadLevelOneCrops() : [])].map(c => [c.task, c]));
 const crops = (opt('crops') ? opt('crops').split(',') : round.targets ?? PUBLIC_CROPS).map(s => s.trim()).filter(Boolean);
 const PRIVATE = process.env.BENCH_PRIVATE_CROPS ? path.resolve(process.env.BENCH_PRIVATE_CROPS) : null;
 for (const c of crops) {
-  if (!CROP_ORDER.includes(c)) fail(`unknown crop ${c}`);
+  if (!CROP_ORDER.includes(c) && !cropSpecs[c]?.base) fail(`unknown crop ${c}`);
   if (!cropSpecs[c].distributed && !PRIVATE) fail(`crop ${c} is not distributed; set BENCH_PRIVATE_CROPS to a folder with ${c}.png and ${c}-coarse.json`);
 }
 crops.sort((a, b) => CROP_ORDER.indexOf(a) - CROP_ORDER.indexOf(b));
-const targetOf = c => (cropSpecs[c].distributed ? path.join(V2, cropSpecs[c].file) : path.join(PRIVATE, `${c}.png`));
-const coarseOf = c => (cropSpecs[c].distributed ? path.join(V2, cropSpecs[c].coarseFile) : path.join(PRIVATE, `${c}-coarse.json`));
+const targetOf = c => (cropSpecs[c].distributed ? path.join(cropSpecs[c].base ?? V2, cropSpecs[c].file) : path.join(PRIVATE, `${c}.png`));
+const coarseOf = c => (cropSpecs[c].distributed ? path.join(cropSpecs[c].base ?? V2, cropSpecs[c].coarseFile) : path.join(PRIVATE, `${c}-coarse.json`));
 for (const c of crops) for (const f of [targetOf(c), coarseOf(c)]) if (!fs.existsSync(f)) fail(`missing ${f}`);
 
 const python = scorePython(opt('python'));
@@ -98,7 +99,9 @@ const outRoot = path.resolve(opt('out', path.join(BENCH, 'work', DRY ? 'dry-run'
   if (skills && !['painting-planner', 'watercolor-technique'].every(k => fs.existsSync(path.join(skills, k, 'SKILL.md')))) fail('--skills must hold painting-planner/SKILL.md and watercolor-technique/SKILL.md');
   const runOpts = { round, model, tries, crops, dry: DRY, outRoot, force: has('force') || DRY, gpu: opt('gpu', DRY ? 'off' : 'on'), dryWidth: Number(opt('dry-width', 96)), fromTry, strictVerdict: has('strict-verdict'), noTargetLooks: opt('notargetlooks') === '1', profile, python, skills };
   try {
-    await (await import('./pipeline/round45.mjs')).runPipeline(runOpts);
+    // V3 (level 1): the toolkit round, one session a target in attempts (v3.mjs); V4 and V5: the pipeline rounds
+    if (round.id === 'V3') { if (fromTry > 1) fail('--from-try applies to V4 and V5; V3 runs every target through all its attempts'); await (await import('./v3.mjs')).runV3(runOpts); }
+    else await (await import('./pipeline/round45.mjs')).runPipeline(runOpts);
   } catch (e) { fail(e.stack || e.message); }
   process.exit(process.exitCode ?? 0);
 }

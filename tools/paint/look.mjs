@@ -2,10 +2,11 @@
 // through drying, on a sheet of fewer cells so that it takes minutes, and the dried sheet is what the model is shown
 // (session.mjs counts it; cli.mjs runs it; plan-data.mjs measures and draws it). Pure: nothing is read or run here.
 //
-// The size. A script is written in millimetres, so the same script on half the cells is the same plan painted
-// coarser. The code planner reads its shapes on the cell grid: tuned by settings it is planned again for the small
-// sheet (broader shapes than the final sheet will have; the look says so); its plan edited wash by wash exists on
-// the full grid only, so a look at an edited plan is painted at full size and takes as long as a painting.
+// The size. Every look is painted on half the cells across. A script is written in millimetres, so the same script on
+// half the cells is the same plan painted coarser. The code planner reads its shapes on the cell grid, so its plan
+// (as it stands, tuned by settings, or edited wash by wash) is never planned again for the small sheet: the look is
+// painted from the plan the choice was planned with at the final size, brought onto the look's cells
+// (src/paint/methods/plan-file.mjs, plan-shrink.mjs). The same washes, the same edit, a quarter of the cells.
 
 /** The share of the run's cells across a look is painted at, and the least cells a sheet is painted on. */
 export const LOOK_SHARE = 0.5, LEAST_CELLS = 16;
@@ -14,14 +15,22 @@ export const LOOK_JOBS = 2;
 /** Plans, looks and paintings at once in one plan-mode command: each holds 13 to 18 GB. */
 export const HEAVY_JOBS = 4;
 
-/** The cells across of a look's sheet for a choice of this kind ('settings' | 'script' | 'plan') on a run of `cells`. */
-export function lookCells(cells, kind) {
-  return kind === 'plan' ? cells : Math.max(LEAST_CELLS, Math.round(cells * LOOK_SHARE));
+/** The cells across of a look's sheet on a run of `cells`, whatever the kind of choice. */
+export function lookCells(cells) {
+  return Math.max(LEAST_CELLS, Math.round(cells * LOOK_SHARE));
 }
 
-/** The run's --set list for a look's painting: the same, with the cells across of the look. */
-export function lookSets(sets, cells, kind) {
-  return [...sets.filter(([k]) => k !== 'width'), ['width', String(lookCells(cells, kind))]];
+/** Whether a look at a choice of this kind ('settings' | 'script' | 'plan') is painted from the plan file of its full-size plan. */
+export const lookFromPlan = kind => kind !== 'script';
+
+/**
+ * The run's --set list for a look's painting: the same, with the cells across of the look and, when the look is smaller
+ * than the painting, the painting's own cells (finalwidth: the painter then reckons what it reckons from the cells
+ * across, its swatches first, as the final painting will; src/paint/methods/look-scale.mjs).
+ */
+export function lookSets(sets, cells) {
+  const small = lookCells(cells);
+  return [...sets.filter(([k]) => k !== 'width' && k !== 'finalwidth'), ['width', String(small)], ...(small < cells ? [['finalwidth', String(cells)]] : [])];
 }
 
 /**
@@ -40,5 +49,17 @@ export function lookFault(done, results) {
 /** How the look was painted, in words for its numbers and the record: its size against the final sheet's. */
 export function lookSizeNote({ cells, fullCells, cellMm, kind }) {
   if (cells === fullCells) return `painted at the final size, ${cells} cells across`;
-  return `painted small, ${cells} cells across (${cellMm} mm a cell) where the final painting has ${fullCells}: the same sheet in millimetres, coarser grain${kind === 'settings' ? '; the code planner planned again for the small sheet, so its shapes are a little broader here than they will be' : ''}`;
+  return `painted small, ${cells} cells across (${cellMm} mm a cell) where the final painting has ${fullCells}: the same sheet in millimetres, coarser grain${lookFromPlan(kind) ? '; the washes are the final plan\'s own, wash for wash' : ''}`;
+}
+
+/**
+ * Why a look that stopped partway cannot be shown, or null when it can. A painter stopped at a stage writes no
+ * backend.json (that is written when a painting ends), so the backend is read from what it said when it started:
+ * `log` is its log. It is shown only when the sheet ran on the GPU and nothing in the log says it left it.
+ */
+export function stoppedLookFault(log) {
+  const line = /^sheet backend: (\S+)/m.exec(log ?? '');
+  if (!line) return 'the painter did not say which backend its sheet ran on, so the look is not shown';
+  if (line[1] !== 'gpu' || /fall(s|ing|en)? back to the CPU|fell back|backend: cpu/i.test(log)) return `the painting did not stay on the GPU (the painter's log: ${line[0]}), so it is not shown`;
+  return null;
 }

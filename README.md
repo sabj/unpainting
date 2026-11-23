@@ -118,14 +118,46 @@ Everything runs on a basic machine. A GPU, including a local one through WebGPU,
 
 ## Benchmark
 
-[unpaint-bench](bench/README.md) tests how well AI models paint, in five rounds, V1 to V5, with more help each time.
+[unpaint-bench](bench/README.md) tests how well AI models paint, and how much of that is the model and how much is the code that helps it. The reference is "Auto", the code planner alone.
 
-- V1 to V3: the model writes scripts that lay every stroke, within about 15 minutes and 2,500 strokes. V2 adds technique guides, V3 the model's earlier attempts.
-- V4 and V5: the model writes a plan and the painter turns it into strokes. V5 adds feedback from the previous try. Both are retired in 0.4; tag v0.3.2 replays them. A V6 task is drafted in [bench/v6/TASK.md](bench/v6/TASK.md).
+**0.4 is a new series.** Its scores are not comparable with the rounds before it.
 
-The leaderboard uses painter V096, sim 100 and judges J1, from releases 0.1.0 and 0.1.1 ([changelog](CHANGELOG.md), [versions](docs/versions.md)). It has not been rerun for 0.3.0. The 0.2.0 and 0.2.1 releases replayed only the Opus 5.5 V5 plans ([0.2.0 comparison](docs/release-performance-0.2.0.md)).
+The ladder:
 
-Models ran at their highest reasoning setting.
+- L0: nothing but the picture, a brush and a pen. Defined, not run.
+- L1: L0 plus harness tips (technique guides and worked examples).
+- L2: prepared inputs, including Auto's plan. One go.
+- L3: L2, then one retry.
+- L4: L3, then one more retry, with many resources: Auto's finished painting and the studies' flat shapes as data.
+
+How it is run and scored:
+
+- A model may draw its own lines, choose pen, pencil or none, and choose waterproof or soluble ink.
+- A retry is self-study: the model sees its own painting, replay and stroke map, and writes its own assessment. It never gets a score or a critique.
+- Budgets are measured, not limited: rendering units and steps, with the clock only a safety stop. Cost and tool use are recorded.
+- Judges read how human the making looks, from the painting in progress, and how good and how like the original it is. A combined number is shown too. The original is scored as well, and a painting's result is its share of the original's score.
+- Judges run locally. Hosted judging (OpenRouter or Together), a container for replication, and the OpenAI models are planned, not in 0.4's first run.
+
+<p align="center"><a href="docs/auto-vs-model.md"><img src="docs/img/auto-vs-model-banner.webp" width="720" alt="Mittens: the picture, Auto's painting, and a model's painting at level 2"></a></p>
+
+<p align="center">Mittens: the picture, Auto, a model at L2.</p>
+
+<p align="center"><a href="docs/auto-vs-model.md#the-forehead-stripes"><img src="docs/img/auto-vs-model-place-stripes.webp" width="720" alt="The forehead stripes: the model's long wet strokes against Auto's jigsaw shapes of short dry strokes"></a></p>
+
+<p align="center">Forehead stripes: the model on top, Auto below.</p>
+
+- [Auto against a model](docs/auto-vs-model.md): one cat, step by step, and what a model may change at each level.
+- [Painting script](docs/painting-script.md): how a model writes its passages.
+- [Levels](bench/docs/levels.md): what each level is given.
+- [Rules](bench/docs/rules.md): the workspace and the budgets.
+- [Scoring](bench/docs/scoring.md): human-ness in the making, and quality against the original.
+- [Release notes](CHANGELOG.md#040-not-released).
+
+Results: to be added from the release-candidate run.
+
+### History: rounds V1 to V5
+
+The earlier rounds (V1 to V5, 2,500 strokes or an 85-minute clock, look counts) are published as a record. They ran painter V096, sim 100 and judges J1, in releases 0.1.0 and 0.1.1, at the highest reasoning setting. They are not comparable with 0.4. V4 and V5 are retired in 0.4; tag v0.3.2 replays them.
 
 | Round | What the model gets | Subjects | Top model | Score (% of target) | Raw / 10 |
 |---|---|---:|---|---:|---:|

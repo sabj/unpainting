@@ -125,6 +125,11 @@ function parts(lab, w, h) {
  * whites): the first reading's colours stand (`centres`), every other cell keeps the colour it had, and only the re-read
  * `cells` (a mask) may open colours of their own. Without this a pale sky read into the block-in moved every cluster a
  * little and the whole sheet's shapes with them.
+ * With `forms` too (not decided by either author; read by Codex Astra, 22 Nov, sound with these limits): a form given
+ * colours of its own is read again whole from the grid as it then is, so a re-read cell inside it takes one of the
+ * form's own colours and the form's other cells may change colour with it; outside such forms a cell that was not
+ * re-read starts from the colour it had, though the joins after may still move a shape. The `centres` returned are the
+ * study's own colours to start a second reading from, not the table the shapes' `cluster` numbers index.
  */
 function studyShapes(rgb, pw, ph, paperRGB, { sliverCells, most = 0, clusters: K = CLUSTERS, join: J = CLUSTER_JOIN, keep: KD = KEEP_DARK, hue: HK = KEEP_HUE, forms = null, again = null }) {
   const pn = pw * ph, L = new Float32Array(pn), A = new Float32Array(pn), B = new Float32Array(pn);
@@ -977,6 +982,8 @@ export function planStudyWashes({ k, w, h, studies, flat = false, density = null
   console.log(`study washes: whites of the block-in washed because every richer study tints them: ${whitesWashed.length ? whitesWashed.map(v => `${v.toFixed(0)} mm2`).join(', ') : 'none'}`);
   if (named) console.log(`study washes: named forms on the plan grid: ${named.forms.filter(f => f.cells).map(f => `${f.name} [${f.kind}] ${(100 * f.cells / pn).toFixed(1)}%`).join(', ')}; ${(100 * named.ids.reduce((a, v) => a + (v ? 0 : 1), 0) / pn).toFixed(1)}% in no named form`);
   console.log(`study washes: ${clusters} colours, ${shapes.length} block-in shapes (${summary.paperShapes} left as paper, ${(100 * reservedShare).toFixed(1)}% of the sheet); ${washes} washes (${byStage[0]} first, ${byStage[2]} over a lighter wash, ${byStage[3]} accents), ${nested} nested, ${softJoins} laid against a damp neighbour, ${formBaseCount} base washes of named forms, ${dabbed} in dabs, 0 charges, ${glazes} glazes; ${strokeCount} strokes`);
-  return { opticsReport: null, paper: null, style: null, layers, instructions, protectedCells: null, value: inkValue ?? { values: density ?? new Float32Array(n) }, regions, omittedDemand: 0, lightShapes, summary, mixes, polygons,
+  // the block-in's shapes as read above, for writing out as data (study-shapes-out.mjs): what is already computed, read back by nothing here
+  const shapesRead = { pw, ph, cellMm: mmX, label, shapes: shapes.map((sh, i) => ({ colour: sh.colour, cells: sh.cells.length, paper: sh.paper, light: isLight(i), parent: parent[i] })), named: named ? { ids: named.ids, forms: named.forms.map(f => ({ id: f.id, name: f.name, kind: f.kind })) } : null };
+  return { opticsReport: null, paper: null, style: null, layers, instructions, protectedCells: null, value: inkValue ?? { values: density ?? new Float32Array(n) }, regions, omittedDemand: 0, lightShapes, summary, mixes, polygons, studyShapes: shapesRead,
     geometry: 'Washes from a stack of block-in studies, coarse to fine: the block-in\'s flat shapes, each one mix, lightest and largest first, a darker shape of like hue laid over its lighter one (wash within wash), close values laid against each other damp, broken masses in dabs, the darkest small shapes last; each richer study adds only where it is darker or stronger than what is laid. Whites left as paper.' };
 }

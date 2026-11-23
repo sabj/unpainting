@@ -4,6 +4,8 @@ Every painting records release, painter and sim versions and a commit. Benchmark
 
 ## The four versions
 
+0.4 note: 0.4 benchmark scores are a new series. They are not comparable with scores from earlier releases, and the judge setup for 0.4 (local judges, human-ness rubric, original scored too) is recorded with each result. The J1 and J2 notes below describe the earlier series.
+
 - Release: plain semver in `package.json`, such as `0.1.0`. Each release gets an annotated git tag, `v<release>`, on the main commit that ships it. [CHANGELOG.md](../CHANGELOG.md) lists what each release changed.
 - Painter: the internal V number, such as `V096`. It covers planning, the recipe, methods and techniques (`src/paint`). A painter change takes the next V number. Development candidates may append `-dev`, such as `V097-dev`.
 - Judges: `judgeVersion`, starting at `J1`. A new panel, rubric or image protocol gets a new J number. Scores from different J versions are not compared. J1 uses Kimi-K3, GLM-5.3-Flash and Qwen3.5-9B, rubric `bench-v3-median5`, five calls per judge with the median, and native-size images. All published scores are J1. J2 keeps the J1 panel, rubric and images, but every judge needs all five calls valid, and a reply repaired from text does not count ([scoring](../bench/docs/scoring.md)). J2 is used for test gates; no published score is J2.
@@ -22,6 +24,7 @@ Every painting records release, painter and sim versions and a commit. Benchmark
 | 0.3.1 candidate, not released | V104 | 104 | J1 |
 | 0.3.2 candidate | V105 | 104 | J1 |
 | 0.4.0-rc.1, not released | V107-dev | 105 | J1 |
+| 0.4.0-rc.2, the frozen benchmark version | V107-dev | 105 | J1 |
 
 V100 sets the drawing medium to pencil by default. Ink comes from a plan, `--outlinemedium ink`, or the automatic stage choice on a run with no prepared drawing. Sim 102 makes brush water volume consistent across resolution and prepares wet beds before wet-in-wet passages. V101 adds the opt-in `--inkrecipe wash` and `auto`, and fixes the automatic stage choice so it adds ink stages only when ink is asked for. V102 and sim 103 add the full source-stroke pen-and-wash tracer, 1-pigment `--inkres` fine sheet, pass-boundary wash sessions, fingerprinted setup/value-plan caching, paper-state certificates, lower-layer compaction and 10-binding fused GPU step kernels. The 0.3.0 timing charts use development checkpoint `5e91484` against frozen control `41e6868`; that control includes post-0.2.1 changes and is not the published `v0.2.1` tag (`1cc2c08`). Final visual checks use engine commit `efbf8b7`. Each render's own record names the commit that made it. Benchmark scores keep their original version stamps. Sim 100 is the first sim number; it was estimated from earlier simulation revisions.
 

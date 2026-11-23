@@ -10,7 +10,11 @@
 //   "lines": "my-lines.json"       which lines of the drawing are drawn before the washes, after them, or not, and how dark
 //   "forms": "my-forms.json"       the named forms merged, split, renamed or given another kind (a settings choice)
 //   "perForm": {"cat face": {"study1.clusters": 24, "study3.lay": 1}}    planner settings inside one named form (a settings choice)
+//   "medium": "pencil" | "pen" | "none"   the medium of the drawing, whatever the source shows (any kind of choice)
+// A choice is refused only when it cannot be read or the painter cannot lay it. A value that may spoil the painting
+// (a per-form setting outside its usual range) is taken as written and listed in the choice's `warnings`.
 import crypto from 'node:crypto';
+import { DRAWING_MEDIA } from './lines-edit.mjs';
 
 /** The planner settings a session lists, with their meaning in plain words. `per`: one for each study, or the first only. */
 export const SETTINGS = Object.freeze([
@@ -43,7 +47,7 @@ export const FORM_SETTINGS = Object.freeze([
 ]);
 
 /** Settings a session may not change: the locked inputs, the guard, and what the harness sets itself. */
-const LOCKED = new Set(['drawing', 'drawingorder', 'drawinglast', 'drawinglastmin', 'drawinglastlogic', 'width', 'sheetmm', 'masks', 'heapmb', 'targetguard', 'notargetlooks', 'valueplan', 'plan', 'seed', 'mode', 'video', 'runcache', 'canarystop', 'brushes', 'valuemaps', 'marks']);
+const LOCKED = new Set(['drawing', 'width', 'finalwidth', 'planfile', 'sheetmm', 'masks', 'heapmb', 'targetguard', 'notargetlooks', 'valueplan', 'plan', 'seed', 'mode', 'video', 'runcache', 'canarystop', 'brushes', 'valuemaps', 'marks']);
 const NAME = /^[a-z][a-z0-9]*(\.[a-z]+)?$/;
 
 /** The settings with this subject's present values: [{set, now, meaning}], `set` being the key a choice writes. */
@@ -67,13 +71,15 @@ export function readChoice(given) {
   const tools = readTools(given, FILE);
   const got = readKind(given, why, FILE);
   if (got.kind !== 'settings' && (tools.forms || tools.perForm)) throw new Error(`choice.json: "forms" and "perForm" change what the code planner plans, so they go with kind "settings"; ${got.kind === 'script' ? 'a script is laid as written' : 'an edited plan is an edit of the plan made from the forms as given'}`);
-  return tools.lines || tools.forms || tools.perForm ? { ...got, tools } : got;
+  const { warnings, ...mine } = tools;
+  return { ...got, ...(mine.lines || mine.forms || mine.perForm || mine.medium ? { tools: mine } : {}), warnings };
 }
 
 /** The tools of a choice beside its kind: {lines, forms (file names or null), perForm ([[form name, [[study, planner key, value]]]] or null)}. */
 function readTools(given, FILE) {
   for (const k of ['lines', 'forms']) if (given[k] != null && (typeof given[k] !== 'string' || !FILE.test(given[k]))) throw new Error(`choice.json: "${k}" names its file in this folder: {"${k}": "my-${k}.json"}`);
-  let perForm = null;
+  if (given.medium != null && !DRAWING_MEDIA.includes(given.medium)) throw new Error(`choice.json: "medium" is the drawing's medium, one of ${DRAWING_MEDIA.join(', ')}`);
+  let perForm = null; const warnings = [];
   if (given.perForm != null) {
     if (typeof given.perForm !== 'object' || Array.isArray(given.perForm)) throw new Error('choice.json: "perForm" is an object, a named form to its settings: {"cat face": {"study1.clusters": 24}}');
     perForm = Object.entries(given.perForm).map(([form, set]) => {
@@ -81,13 +87,14 @@ function readTools(given, FILE) {
       return [form, Object.entries(set).map(([k, v]) => {
         const m = /^study([1-9])\.([a-z]+)$/.exec(k), s = m && FORM_SETTINGS.find(x => x.name === m[2]);
         if (!s || (s.studies === 'first' && m[1] !== '1') || (s.studies === 'later' && m[1] === '1')) throw new Error(`choice.json: "perForm", ${form}: "${k}" is not a setting of a form (study1.${FORM_SETTINGS.filter(x => x.studies !== 'later').map(x => x.name).join(', study1.')}; for a later study N: ${FORM_SETTINGS.filter(x => x.studies !== 'first').map(x => `studyN.${x.name}`).join(', ')})`);
-        if (typeof v !== 'number' || !(v >= s.min && v <= s.max)) throw new Error(`choice.json: "perForm", ${form}: "${k}" is a number from ${s.min} to ${s.max}`);
+        if (typeof v !== 'number' || !Number.isFinite(v)) throw new Error(`choice.json: "perForm", ${form}: "${k}" is a number (usually ${s.min} to ${s.max})`);
+        if (!(v >= s.min && v <= s.max)) warnings.push(`"perForm", ${form}: "${k}" is ${v}, outside the usual ${s.min} to ${s.max}; it is given to the planner as you wrote it, and the planner says so if it cannot use it`);
         return [Number(m[1]), s.to, v];
       }).sort((a, b) => a[0] - b[0] || a[1].localeCompare(b[1]))];
     }).sort((a, b) => a[0].localeCompare(b[0]));
     if (!perForm.length) perForm = null;
   }
-  return { lines: given.lines ?? null, forms: given.forms ?? null, perForm, perFormGiven: perForm ? given.perForm : null };
+  return { lines: given.lines ?? null, forms: given.forms ?? null, perForm, perFormGiven: perForm ? given.perForm : null, ...(given.medium != null ? { medium: given.medium } : {}), warnings };
 }
 
 function readKind(given, why, FILE) {
@@ -116,7 +123,7 @@ function readKind(given, why, FILE) {
 /** One word for what a checked choice is, as the record and the sheet say it. */
 export function choiceKind(choice) {
   const kind = choice.kind === 'script' ? 'own script' : choice.kind === 'plan' ? 'edited plan' : choice.sets.length ? 'settings' : null, t = choice.tools;
-  const with_ = t ? [t.lines && 'its choice of lines', t.forms && 'its own forms', t.perForm && 'settings per form'].filter(Boolean) : [];
+  const with_ = t ? [t.lines && 'its choice of lines', t.medium && `the drawing ${t.medium === 'none' ? 'left out' : `in ${t.medium}`}`, t.forms && 'its own forms', t.perForm && 'settings per form'].filter(Boolean) : [];
   return kind ? `${kind}${with_.length ? ` with ${with_.join(', ')}` : ''}` : with_.length ? `the code planner with ${with_.join(', ')}` : 'nothing changed';
 }
 

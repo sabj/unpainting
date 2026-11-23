@@ -2,7 +2,7 @@
 // settings, and the plain block printed before it starts. Pure: no file is read or written here.
 
 /** Options the harness sets itself; --set may not change them. */
-const OWNED = new Set(['image', 'width', 'sheetmm', 'drawingfile', 'washplan', 'out', 'gpu', 'valuepreviewonly', 'allowdirty', 'thingmasks', 'things']);
+const OWNED = new Set(['image', 'width', 'sheetmm', 'drawingfile', 'washplan', 'out', 'gpu', 'valuepreviewonly', 'allowdirty', 'thingmasks', 'things', 'planfile']);
 /** Heap for the painter (MB): a full sheet's plan does not fit node's default. */
 const HEAP_MB = { plan: 13312, paint: 18432 };
 
@@ -19,8 +19,10 @@ const INK = Object.freeze({ waterproof: '1', soluble: '0', default: null });
  * known: the painter's option names (scanOptions); script: {file, paints} when an author wrote the wash plan;
  * edit: {file} when an author edited the code planner's plan (the studies are read as always, then the edit applied);
  * dirty: the checkout has uncommitted changes (the painter refuses those unless told).
+ * planOf: {file, paints} for a look painted from the final's own plan (src/paint/methods/plan-file.mjs): the plan's file
+ * and its paints, which the look is mixed from as the final is.
  */
-export function buildCommand(spec, { mode, out, known, script = null, edit = null, dirty = false, segEnv = {} }) {
+export function buildCommand(spec, { mode, out, known, script = null, edit = null, dirty = false, segEnv = {}, planOf = null }) {
   const settings = [], opts = new Map(spec.options);
   const set = (name, value, why) => { const was = opts.get(name) ?? null; if (was !== value) settings.push({ name, value, default: was ?? '(painter default)', why }); if (value === null) opts.delete(name); else opts.set(name, value); };
   if ((opts.get('targetguard') ?? 'gentle') !== 'gentle') throw new Error(`subject ${spec.id}: the record asks for --targetguard ${opts.get('targetguard')}; this command paints in gentle mode only`);
@@ -41,6 +43,7 @@ export function buildCommand(spec, { mode, out, known, script = null, edit = nul
   // a script's first washes are broad and wet: over a pen drawing they lift ink that still rewets (the painter stops: "the
   // first wash moved N% of the pen's ink"), so a script is laid over ink that was set first, as pen and wash is done
   if (script && !opts.has('inkfast')) opts.set('inkfast', '1');
+  if (planOf) { if (script) throw new Error('a look at a script is planned from the script, not from a plan file'); opts.set('paints', planOf.paints.join(',')); opts.set('paintsextend', '0'); opts.set('planfile', planOf.file); }
   const masksRead = Boolean(spec.masks?.receipt && !script && known?.has('thingmasks'));
   const argv = [...opts].flatMap(([k, v]) => [`--${k}`, v]);
   argv.push('--washplan', script ? `script:${script.file}` : `${edit ? `edit:${edit.file},` : ''}${washPlanOf(spec.studies)}`, '--drawingfile', spec.drawing.abs);
@@ -71,7 +74,7 @@ export function describeRun(run) {
   studies.forEach((st, i) => row(`study ${i + 1}`, `${st.path}, ${st.role}, shapes from ${st.floorMm2 ?? '?'} mm2${Object.entries(st.read).map(([k, v]) => `, ${k} ${v}`).join('')}`));
   row('masks', masks.receipt ? `${masks.forms.length} named forms (${masks.forms.map(f => f.name).join(', ')}) from ${masks.receipt} (${masks.from === 'set' ? '--set masks' : 'the named-forms folder'}); ${masks.read ? 'given to the planner' : 'shown to the author and on the sheet: ' + masks.whyNotRead}` : `none (${masks.none})`);
   row('labels', s.labels ? `${s.labels}${s.labelCount ? `, ${s.labelCount} things` : ''}` : 'none');
-  row('author', author.key === 'auto' ? 'the code planner alone (the control)' : ['script', 'edit', 'choice'].includes(author.cli) ? author.label : author.work === 'session' ? `${author.name}${author.effort ? `, ${author.effort} effort` : ''} (${author.id}, through ${author.cli}): ${author.from ? 'what its earlier session handed over is painted; no model is called' : `a working session with a shell in its own folder, ${author.minutesMost} min of its own time, ${author.looksMost > 0 ? `${author.looksMost} looks` : 'looks without limit'} (each a small real painting of its plan, dried); it starts from the code planner's plan`}` : `${author.name}${author.effort ? `, ${author.effort} effort` : ''} (${author.id}, one read-only reply through ${author.cli}): ${author.label}`);
+  row('author', author.key === 'auto' ? 'the code planner alone (the control)' : ['script', 'edit', 'choice'].includes(author.cli) ? author.label : author.work === 'session' ? `${author.name}${author.effort ? `, ${author.effort} effort` : ''} (${author.id}, through ${author.cli}): ${author.from ? 'what its earlier session handed over is painted; no model is called' : `a working session with a shell in its own folder, level ${author.level ?? 'L2'}, try ${author.tryNumber ?? 1}; the benchmark's budget for the try: ${author.budget?.looks ?? '?'} rendering units (looks, each a small real painting of its plan, dried), ${author.budget?.steps ?? '?'} steps, a safety stop at ${author.budget?.safetyMinutes ?? '?'} min, ${author.budget?.reverts ?? '?'} returns to an earlier choice; its work is measured, not capped; it starts from the code planner's prepared plan`}` : `${author.name}${author.effort ? `, ${author.effort} effort` : ''} (${author.id}, one read-only reply through ${author.cli}): ${author.label}`);
   row('mode', `${run.mode === 'plan' ? 'plan only, CPU' : 'full painting, GPU'}; ${run.studiesMode === 'author' ? 'open tools (the author may brief and review its own studies)' : 'locked inputs'}; target guard gentle`);
   if (s.deviations.length) for (const d of s.deviations) row('DIFFERS', `${d.what}: ${d.now} (the record: ${d.record})`);
   if (run.settings.length) for (const d of run.settings) row('setting', `${d.name} = ${d.value ?? 'painter default'} (default ${d.default})`);

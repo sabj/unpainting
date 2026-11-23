@@ -91,9 +91,9 @@ test('a grid: subjects down, authors across', async () => {
 
 test('a working session is said in one plain line: what it handed over, looks, minutes, tool calls', () => {
   const base = { looks: [{}, {}], looksMost: 4, ownMinutes: 31.4, minutesMost: 85, toolCallsTotal: 57, ended: 'done' };
-  assert.equal(sessionLine({ session: { ...base, submitted: { kind: 'settings', settings: { 'study1.shapes': '60', floors: '8,4,2' } } } }), 'changed 2 planner settings: study1.shapes=60, floors=8,4,2 · 2 of 4 looks · 31 of 85 min · 57 tool calls');
+  assert.equal(sessionLine({ session: { ...base, submitted: { kind: 'settings', settings: { 'study1.shapes': '60', floors: '8,4,2' } } } }), 'changed 2 planner settings: study1.shapes=60, floors=8,4,2 · 2 looks · 31 min its own · 57 tool calls');
   assert.match(sessionLine({ session: { ...base, submitted: { kind: 'settings', settings: {} } } }), /^changed nothing: this is the code planner's plan · /);
   assert.match(sessionLine({ session: { ...base, submitted: { kind: 'plan', settings: {}, edit: { auto: 120, untouched: 90, untouchedShare: 0.75, changed: 12, moved: 2, merged: 3, mergedFrom: 14, dropped: 2, added: 4 } } } }), /^edited the code planner's plan: 90 of its 120 washes untouched \(75%\), 12 changed, 2 moved, 14 merged into 3, 2 left out, 4 of its own added · /);
-  assert.match(sessionLine({ passages: 21, session: { ...base, ended: 'time limit', submitted: { kind: 'script', settings: {}, note: 'the session ran out of time' } } }), /^wrote its own script \(21 passages\) · .* · STOPPED BY THE CLOCK · the session ran out of time$/);
+  assert.match(sessionLine({ passages: 21, session: { ...base, wallMinutes: 61.2, ended: 'reached the benchmark\'s resource budget', budgetReached: { what: '60 minutes of wall time' }, submitted: { kind: 'script', settings: {} } } }), /^wrote its own script \(21 passages\) · 2 looks · 61 min on the clock, 31 min its own · REACHED THE BUDGET \(60 minutes of wall time\) · 57 tool calls$/);
   assert.equal(sessionLine({}), 'working session: not run');
 });

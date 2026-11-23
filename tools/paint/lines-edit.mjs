@@ -13,10 +13,14 @@
 //     {"where": {"ids": [12, 13]}, "weight": 0.5} ]}
 // Every stroke starts as the painter lays it today: before the washes, at its own darkness. Rules are applied in
 // order and a later rule wins. `where` holds conditions that must all be true.
-// Lines after the washes need an ink drawing: the painter lays a pencil drawing before the washes only (its rule,
-// src/paint/subject-medium.mjs: graphite is a preparatory drawing, and a subject without pen lines is given none), and
-// takes any closing drawing out of a pencil run. So "after" on a pencil drawing is refused here, with that reason,
-// and never asked of the painter to be dropped in silence.
+// An author may also draw lines of its own ("own": points in millimetres, pen or pencil, a width, a darkness, before or
+// after the washes) and choose the medium of the whole drawing (pencil, pen, none) whatever the source shows.
+// Only a file that cannot be read is refused. A choice that may spoil the drawing (pencil over the dry washes, a
+// weight far outside the usual, a rule that matches nothing) is laid as written and listed as a warning: a mistake
+// reaches the sheet as a mistake.
+// How it is laid: a drawing all in pencil and all before the washes is a pencil file. Anything else is an ink file
+// whose pencil strokes are marked graphite (the painter's lay-in route); a closing file that holds pencil says so
+// (pencilAfterWashes), and the painter then lays its graphite over the dry washes (tools/plate/drawing.mjs).
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -55,38 +59,46 @@ export function linesListing(vectors, { mask = null, forms = [] } = {}) {
   });
   const count = k => strokes.reduce((a, s) => ({ ...a, [s[k] ?? 'none']: (a[s[k] ?? 'none'] ?? 0) + 1 }), {});
   const ink = vectors.medium === 'ink';
-  return { format: 'lines 1', sheet: { widthMm: vectors.sheetMm, heightMm: vectors.heightMm }, medium: vectors.medium, linesAfterTheWashes: ink,
-    note: `Every stroke is drawn before the washes at its own darkness unless your rules say otherwise. ${ink ? 'This is an ink drawing: its ink lines may also be drawn after the washes ("do": "after").' : 'This is a pencil drawing: the painter lays pencil before the washes only, so "after" is not offered for it; you may choose, drop and weight its lines.'}`,
+  return { format: 'lines 1', sheet: { widthMm: vectors.sheetMm, heightMm: vectors.heightMm }, medium: vectors.medium, linesAfterTheWashes: true,
+    note: `Every stroke is drawn before the washes at its own darkness unless your rules say otherwise. This is ${ink ? 'an ink' : 'a pencil'} drawing as prepared; the medium is yours to change ("medium" in choice.json: pencil, pen or none), any line may be drawn after the washes ("do": "after"), and you may draw lines of your own ("own").`,
     counts: { strokes: strokes.length, tagged: count('tagged'), part: count('part'), form: count('form') }, strokes };
 }
 
+/** A problem of form: the file cannot be read as a choice of lines at all. Everything else is a warning. */
+const OWN_MEDIA = ['pen', 'pencil'], WHEN = ['before', 'after'];
+/** The media an author may choose for the drawing, whatever the source shows. */
+export const DRAWING_MEDIA = Object.freeze(['pencil', 'pen', 'none']);
+
 /**
- * A lines edit checked against the listing: the rules, each {test(stroke), do, weight}. Throws with the reason.
+ * A lines edit checked against the listing: the rules, each {test(stroke), do, weight}. Throws only when the file
+ * cannot be read (its form); a choice that may spoil the drawing is laid as written and told in `warnings`.
  */
-export function checkLinesEdit(edit, listing) {
+export function checkLinesEdit(edit, listing, warnings = []) {
   const at = 'lines edit';
-  if (!edit || typeof edit !== 'object' || Array.isArray(edit)) throw new Error(`${at}: one JSON object, {"format": "${LINES_EDIT_FORMAT}", "rules": [...]}`);
+  if (!edit || typeof edit !== 'object' || Array.isArray(edit)) throw new Error(`${at}: one JSON object, {"format": "${LINES_EDIT_FORMAT}", "rules": [...], "own": [...]}`);
   if (edit.format !== LINES_EDIT_FORMAT) throw new Error(`${at}: "format" is "${LINES_EDIT_FORMAT}"`);
-  if (!Array.isArray(edit.rules) || !edit.rules.length) throw new Error(`${at}: "rules" lists what to change, in order; with none, leave "lines" out of choice.json`);
-  if (edit.rules.length > 200) throw new Error(`${at}: at most 200 rules`);
+  const rules = edit.rules ?? [], own = edit.own ?? [];
+  if (!Array.isArray(rules) || !Array.isArray(own)) throw new Error(`${at}: "rules" and "own" are lists`);
+  if (!rules.length && !own.length) throw new Error(`${at}: "rules" lists what to change of the drawing's lines and "own" the lines you draw yourself; with neither, leave "lines" out of choice.json`);
   const ids = new Set(listing.strokes.map(s => s.id)), have = Object.fromEntries(WORDS.map(k => [k, new Set(listing.strokes.map(s => String(s[k] ?? 'none')))]));
-  return edit.rules.map((r, i) => {
+  return rules.map((r, i) => {
     const who = `${at}, rule ${i + 1}`;
     if (!r || typeof r !== 'object') throw new Error(`${who}: an object with "where" and "do" or "weight"`);
     if (r.do == null && r.weight == null) throw new Error(`${who}: give "do" (${DO.join(', ')}) or "weight" (a factor on the line's darkness), or both`);
     if (r.do != null && !DO.includes(r.do)) throw new Error(`${who}: "do" is "before" (drawn before the washes), "after" (drawn over the dry washes) or "drop" (not drawn)`);
     const weight = r.weight == null ? null : Number(r.weight);
-    if (weight != null && !(weight >= WEIGHT[0] && weight <= WEIGHT[1])) throw new Error(`${who}: "weight" is a factor from ${WEIGHT[0]} to ${WEIGHT[1]} on the line's darkness (1: as drawn)`);
+    if (weight != null && !(Number.isFinite(weight) && weight > 0)) throw new Error(`${who}: "weight" is a number above 0, a factor on the line's darkness (1: as drawn)`);
+    if (weight != null && !(weight >= WEIGHT[0] && weight <= WEIGHT[1])) warnings.push(`${who}: a weight of ${weight} is outside the usual ${WEIGHT[0]} to ${WEIGHT[1]}; it is laid as you wrote it (a line never goes past black)`);
     const w = r.where ?? {}, tests = [];
     if (typeof w !== 'object' || Array.isArray(w)) throw new Error(`${who}: "where" is an object of conditions; {} is every line`);
     for (const [k, v] of Object.entries(w)) {
       if (k === 'ids' || k === 'object') {
         const list = (Array.isArray(v) ? v : [v]).map(Number); if (!list.length || list.some(x => !Number.isInteger(x))) throw new Error(`${who}: "${k}" is a number or a list of numbers`);
-        if (k === 'ids') { const none = list.filter(x => !ids.has(x)); if (none.length) throw new Error(`${who}: there is no line ${none.slice(0, 5).join(', ')} in drawing/lines.json`); }
+        if (k === 'ids') { const none = list.filter(x => !ids.has(x)); if (none.length) warnings.push(`${who}: there is no line ${none.slice(0, 5).join(', ')} in drawing/lines.json; the rule changes the others it names`); }
         const set = new Set(list); tests.push(s => set.has(k === 'ids' ? s.id : s.object));
       } else if (WORDS.includes(k)) {
         const list = (Array.isArray(v) ? v : [v]).map(String), none = list.filter(x => !have[k].has(x));
-        if (none.length) throw new Error(`${who}: no line has ${k} "${none[0]}" (the drawing has: ${[...have[k]].join(', ')})`);
+        if (none.length) warnings.push(`${who}: no line has ${k} "${none[0]}" (the drawing has: ${[...have[k]].join(', ')})`);
         const set = new Set(list); tests.push(s => set.has(String(s[k] ?? 'none')));
       } else if (BOUNDS[k]) {
         const [field, sign] = BOUNDS[k], x = Number(v); if (!Number.isFinite(x)) throw new Error(`${who}: "${k}" is a number`);
@@ -97,60 +109,125 @@ export function checkLinesEdit(edit, listing) {
   });
 }
 
+/** A line of even width as the closed outline the painter lays: the path offset half its width to each side (mm). */
+export function lineOutline(points, widthMm) {
+  const P = points.filter((p, i) => !i || p[0] !== points[i - 1][0] || p[1] !== points[i - 1][1]), r = widthMm / 2, left = [], right = [];
+  if (P.length < 2) { const [x, y] = P[0]; return [[x - r, y - r], [x + r, y - r], [x + r, y + r], [x - r, y + r]]; }
+  P.forEach((p, i) => {
+    const a = P[Math.max(0, i - 1)], b = P[Math.min(P.length - 1, i + 1)], dx = b[0] - a[0], dy = b[1] - a[1], L = Math.hypot(dx, dy) || 1, nx = -dy / L, ny = dx / L;
+    left.push([+(p[0] + nx * r).toFixed(3), +(p[1] + ny * r).toFixed(3)]); right.push([+(p[0] - nx * r).toFixed(3), +(p[1] - ny * r).toFixed(3)]);
+  });
+  return [...left, ...right.reverse()];
+}
+
 /**
- * The drawing with an edit applied. `vectors` and `lines`: the record's STEM-vectors.json and STEM-lines.json
- * documents. Returns {order: 'first' | 'both' | 'last' | 'none' (the painter's --drawing), opening, closing (each
- * {vectors, lines} or null), state (id -> {do, weight}), record}. Nothing given is altered; no stroke's shape changes.
+ * The lines an author draws itself ("own" in a lines edit), checked: [{points, medium: 'pen' | 'pencil', widthMm,
+ * dark, when: 'before' | 'after'}]. Each is a path in sheet millimetres. Throws only when a line cannot be read;
+ * a line that may spoil the drawing (off the sheet, very wide, pencil over the dry washes) is drawn and told in `warnings`.
  */
-export function applyLinesEdit(vectors, lines, edit, listing) {
-  const rules = checkLinesEdit(edit, listing), state = new Map(), matched = rules.map(() => 0);
+export function checkOwnLines(own, sheet, warnings = []) {
+  return (own ?? []).map((o, i) => {
+    const who = `lines edit, own line ${i + 1}`;
+    if (!o || typeof o !== 'object' || Array.isArray(o)) throw new Error(`${who}: an object {"points": [[x, y], ...], "medium": "pen" | "pencil", "widthMm": 0.4, "dark": 0.8, "when": "before" | "after"}`);
+    const P = o.points;
+    if (!Array.isArray(P) || P.length < 2 || P.some(p => !Array.isArray(p) || p.length < 2 || !p.slice(0, 2).every(v => typeof v === 'number' && Number.isFinite(v)))) throw new Error(`${who}: "points" is two or more points [x, y] in sheet millimetres`);
+    const medium = o.medium ?? 'pencil', when = o.when ?? 'before', widthMm = o.widthMm == null ? 0.4 : Number(o.widthMm), dark = o.dark == null ? 0.7 : Number(o.dark);
+    if (!OWN_MEDIA.includes(medium)) throw new Error(`${who}: "medium" is "pen" or "pencil"`);
+    if (!WHEN.includes(when)) throw new Error(`${who}: "when" is "before" (before the washes) or "after" (over the dry washes)`);
+    if (!(Number.isFinite(widthMm) && widthMm > 0)) throw new Error(`${who}: "widthMm" is the line's width in millimetres, above 0`);
+    if (!(Number.isFinite(dark) && dark >= 0)) throw new Error(`${who}: "dark" is the line's darkness, 0 (nothing) to 1 (black)`);
+    const points = P.map(p => [Number(p[0]), Number(p[1])]);
+    if (points.every(([x, y]) => x < 0 || x > sheet.widthMm || y < 0 || y > sheet.heightMm)) warnings.push(`${who}: every point lies off the sheet (${sheet.widthMm} by ${sheet.heightMm} mm); nothing of it will show`);
+    if (widthMm > 3) warnings.push(`${who}: ${widthMm} mm is wider than any pen or pencil draws (about 0.2 to 1 mm); it is laid that wide`);
+    if (dark > 1) warnings.push(`${who}: a darkness of ${dark} is past black; it is laid black`);
+    if (dark === 0) warnings.push(`${who}: a darkness of 0 draws nothing`);
+    if (medium === 'pencil' && when === 'after') warnings.push(`${who}: pencil over the dry washes sits grey on top of the paint and hardly shows over a dark wash; it is drawn as you wrote it`);
+    return { points, medium, widthMm, dark: Math.min(1, dark), when };
+  });
+}
+
+/**
+ * The drawing with an author's choice applied. `vectors` and `lines`: the record's STEM-vectors.json and
+ * STEM-lines.json documents; `edit` a lines edit (rules on the drawing's lines, lines of the author's own) or null;
+ * `medium` 'pencil' | 'pen' | 'none' (the drawing's lines all in that medium, or none of them drawn) or null (as the
+ * drawing has them). Returns {order: 'first' | 'both' | 'last' | 'none' (the painter's --drawing), opening, closing
+ * (each {vectors, lines} or null), laidAs ('pencil' | 'ink' | null: the medium the files declare), state (id -> {do,
+ * weight}), record, warnings}. Nothing given is altered; no prepared stroke's shape changes.
+ */
+export function applyLinesEdit(vectors, lines, edit, listing, { medium = null } = {}) {
+  if (medium != null && !DRAWING_MEDIA.includes(medium)) throw new Error(`"medium" is one of ${DRAWING_MEDIA.join(', ')}`);
+  if (!edit && medium == null) throw new Error('lines edit: neither lines nor a medium is chosen');
+  const warnings = [], rules = edit ? checkLinesEdit(edit, listing, warnings) : [], state = new Map(), matched = rules.map(() => 0);
+  const own = edit ? checkOwnLines(edit.own, { widthMm: vectors.sheetMm, heightMm: vectors.heightMm }, warnings) : [];
   for (const s of listing.strokes) {
     const st = { do: 'before', weight: 1 };
     rules.forEach((r, i) => { if (!r.test(s)) return; matched[i]++; if (r.do) st.do = r.do; if (r.weight != null) st.weight = r.weight; });
     state.set(s.id, st);
   }
-  const none = matched.findIndex(m => !m); if (none >= 0) throw new Error(`lines edit, rule ${none + 1}: no line matches its "where"; drop the rule or correct it`);
-  const after = listing.strokes.filter(s => state.get(s.id).do === 'after').length;
-  if (after && vectors.medium !== 'ink') throw new Error(`lines edit: ${after} lines are to be drawn after the washes, but this drawing is pencil. The painter lays a pencil drawing before the washes only (graphite is a preparatory drawing; a subject without pen lines is given none), so they would not be drawn. Draw them "before" (a "weight" above 1 makes them darker), or drop them`);
-  const whole = vectors.medium === 'ink' ? 'ink' : 'graphite', layin = vectors.medium === 'ink' ? vectors.strokes.filter(s => (s.medium ?? whole) === 'graphite' && state.get(s.seq).do === 'after') : [];
-  if (layin.length) throw new Error(`lines edit: ${layin.length} of the lines you draw after the washes are the pencil lay-in of an ink drawing (tagged "layin"); the closing pen lays ink only. Draw them before the washes, or drop them`);
+  matched.forEach((m, i) => { if (!m) warnings.push(`lines edit, rule ${i + 1}: no line matches its "where"; the rule changes nothing`); });
+  const whole = vectors.medium === 'ink' ? 'ink' : 'graphite', as = medium === 'pencil' ? 'graphite' : medium === 'pen' ? 'ink' : null;
+  const mediumOf = s => as ?? s.medium ?? whole, drawn = s => medium !== 'none' && state.get(s.seq).do !== 'drop';
+  const pencilAfter = vectors.strokes.filter(s => drawn(s) && state.get(s.seq).do === 'after' && mediumOf(s) === 'graphite').length;
+  if (pencilAfter) warnings.push(`lines edit: ${pencilAfter} of the drawing's lines are drawn in pencil over the dry washes; pencil there sits grey on top of the paint and hardly shows over a dark wash. They are drawn as you wrote them`);
+  if (medium === 'none' && rules.length) warnings.push('lines edit: the medium is "none", so none of the drawing\'s own lines is drawn and your rules change nothing; your own lines are drawn');
+  if (medium === 'pen' && whole === 'graphite') { const soft = vectors.strokes.filter(s => drawn(s) && s.drop).length; if (soft) warnings.push(`the medium is pen on a drawing made in pencil: ${soft} of its lines are hatching, tone or texture, and in ink they are laid as dark as drawn; drop or pale them if that is not what you want`); }
+  // what is drawn, in the drawing's order and then the author's own lines in theirs: each with its time and its medium
+  let seq = vectors.strokes.reduce((m, s) => Math.max(m, s.seq), 0);
+  const all = [
+    ...vectors.strokes.filter(drawn).map(s => { const st = state.get(s.seq); return { s, when: st.do, weight: st.weight, m: mediumOf(s) }; }),
+    ...own.map(o => ({ when: o.when, weight: 1, m: o.medium === 'pen' ? 'ink' : 'graphite',
+      s: { seq: ++seq, line: null, part: 'own', phase: 'own', object: -1, unit: -1, dark: o.dark, path: o.points, widths: o.points.map(() => o.widthMm), drawn: 'path', outline: [lineOutline(o.points, o.widthMm)], own: true } })),
+  ];
+  const anyAfter = all.some(x => x.when === 'after'), laidAs = !all.length ? null : all.every(x => x.m === 'graphite') && !anyAfter ? 'pencil' : 'ink', wholeNow = laidAs === 'ink' ? 'ink' : 'graphite';
   const part = which => {
-    const strokes = vectors.strokes.filter(s => state.get(s.seq).do === which).map(s => { const k = state.get(s.seq).weight; return k === 1 ? s : { ...s, dark: +Math.min(1, s.dark * k).toFixed(4), darkAsDrawn: s.dark }; });
-    if (!strokes.length) return null;
+    const mine = all.filter(x => x.when === which); if (!mine.length) return null;
+    // a stroke is the record's own unless its darkness is weighted or the file's medium no longer says what it is drawn in
+    const strokes = mine.map(({ s, weight, m }) => { const k = weight, keep = k === 1 && (s.medium ?? (laidAs === vectors.medium ? m : null)) === m && !s.own; return keep ? s : { ...s, ...(k === 1 ? {} : { dark: +Math.min(1, s.dark * k).toFixed(4), darkAsDrawn: s.dark }), medium: m }; });
     // the line file beside the strokes: the lines these strokes were fitted to (a stroke's `line` is its line's seq)
-    const keep = new Set(strokes.map(s => (s.line == null ? null : Math.floor(s.line)))), all = keep.has(null) || (lines.lines ?? []).some(g => g.seq == null);
-    return { vectors: { ...vectors, strokes, source: `${vectors.source ?? ''}; the author's choice of its lines (${which} the washes)`, mediumMap: undefined }, lines: { ...lines, lines: all ? lines.lines : lines.lines.filter(g => keep.has(Math.floor(g.seq))) } };
+    const keep = new Set(strokes.map(s => (s.line == null ? null : Math.floor(s.line)))), every = keep.has(null) || (lines.lines ?? []).some(g => g.seq == null);
+    const pencilOver = which === 'after' && strokes.some(s => (s.medium ?? wholeNow) === 'graphite');
+    return { vectors: { ...vectors, medium: laidAs, strokes, source: `${vectors.source ?? ''}; the author's choice of its lines (${which} the washes)`, mediumMap: undefined, ...(pencilOver ? { pencilAfterWashes: true } : {}) }, lines: { ...lines, medium: laidAs, lines: every ? lines.lines : lines.lines.filter(g => keep.has(Math.floor(g.seq))) } };
   };
-  const opening = part('before'), closing = part('after'), by = k => listing.strokes.filter(s => state.get(s.id).do === k);
-  const mm = list => Math.round(list.reduce((a, s) => a + s.lengthMm, 0)), weighted = listing.strokes.filter(s => state.get(s.id).do !== 'drop' && state.get(s.id).weight !== 1);
+  const opening = part('before'), closing = part('after'), by = k => listing.strokes.filter(s => (medium === 'none' ? 'drop' : state.get(s.id).do) === k);
+  const mm = list => Math.round(list.reduce((a, s) => a + s.lengthMm, 0)), weighted = listing.strokes.filter(s => medium !== 'none' && state.get(s.id).do !== 'drop' && state.get(s.id).weight !== 1);
+  const ownMm = o => o.points.reduce((a, p, i) => (i ? a + Math.hypot(p[0] - o.points[i - 1][0], p[1] - o.points[i - 1][1]) : 0), 0);
   const record = { strokes: listing.strokes.length, before: by('before').length, after: by('after').length, dropped: by('drop').length, lengthMm: { before: mm(by('before')), after: mm(by('after')), dropped: mm(by('drop')) },
-    weighted: weighted.length, darker: weighted.filter(s => state.get(s.id).weight > 1).length, paler: weighted.filter(s => state.get(s.id).weight < 1).length, rules: edit.rules.map((r, i) => ({ where: r.where ?? {}, do: r.do ?? null, weight: r.weight ?? null, lines: matched[i] })) };
-  return { order: opening && closing ? 'both' : opening ? 'first' : closing ? 'last' : 'none', opening, closing, state, record };
+    weighted: weighted.length, darker: weighted.filter(s => state.get(s.id).weight > 1).length, paler: weighted.filter(s => state.get(s.id).weight < 1).length, rules: (edit?.rules ?? []).map((r, i) => ({ where: r.where ?? {}, do: r.do ?? null, weight: r.weight ?? null, lines: matched[i] })),
+    ...(own.length ? { own: { lines: own.length, pen: own.filter(o => o.medium === 'pen').length, pencil: own.filter(o => o.medium === 'pencil').length, before: own.filter(o => o.when === 'before').length, after: own.filter(o => o.when === 'after').length, lengthMm: Math.round(own.reduce((a, o) => a + ownMm(o), 0)) } } : {}),
+    ...(medium != null || laidAs !== vectors.medium ? { medium: { chosen: medium, theDrawingIs: vectors.medium, laidAs } } : {}),
+    ...(warnings.length ? { warnings } : {}) };
+  return { order: opening && closing ? 'both' : opening ? 'first' : closing ? 'last' : 'none', opening, closing, laidAs, state, record, warnings };
 }
 
 /** One line for a record. */
 export function linesLine(r) {
-  return `of the drawing's ${r.strokes} lines ${r.before} are drawn before the washes, ${r.after} after them, ${r.dropped} not at all; ${r.weighted} weighted (${r.darker} darker, ${r.paler} paler)`;
+  const own = r.own ? `; ${r.own.lines} lines of your own (${r.own.pen} pen, ${r.own.pencil} pencil; ${r.own.before} before the washes, ${r.own.after} after them)` : '';
+  const medium = r.medium ? `; the drawing is laid ${r.medium.laidAs == null ? 'not at all' : r.medium.laidAs === 'pencil' ? 'in pencil' : 'as a pen drawing (ink, with any pencil lines of it in graphite)'}${r.medium.chosen ? ` (you chose "${r.medium.chosen}"; the prepared drawing is ${r.medium.theDrawingIs})` : ''}` : '';
+  return `of the drawing's ${r.strokes} lines ${r.before} are drawn before the washes, ${r.after} after them, ${r.dropped} not at all; ${r.weighted} weighted (${r.darker} darker, ${r.paler} paler)${own}${medium}`;
 }
 
 /**
- * An edit of the record's drawing written as stems of its own in `dir`: opening-lines.json and opening-vectors.json,
- * and closing-* when lines are drawn after the washes. `stem`: the record's drawing stem (absolute). Returns {order,
- * opening, closing (absolute stems or null), record, sets: the run settings that paint it}.
+ * A choice of the record's drawing written as stems of its own in `dir`: opening-lines.json and opening-vectors.json,
+ * and closing-* when lines are drawn after the washes. `stem`: the record's drawing stem (absolute); `edit` a lines
+ * edit or null; `medium` the chosen medium or null. Returns {order, opening, closing (absolute stems or null), laidAs,
+ * record, warnings, sets: the run settings that paint it}.
  */
-export function writeLinesEdit({ dir, stem, edit, listing }) {
+export function writeLinesEdit({ dir, stem, edit, listing, medium = null }) {
   const vectors = JSON.parse(fs.readFileSync(`${stem}-vectors.json`, 'utf8')), lines = JSON.parse(fs.readFileSync(`${stem}-lines.json`, 'utf8'));
-  const got = applyLinesEdit(vectors, lines, edit, listing); fs.mkdirSync(dir, { recursive: true });
+  const got = applyLinesEdit(vectors, lines, edit, listing, { medium }); fs.mkdirSync(dir, { recursive: true });
   const put = (name, part) => { if (!part) return null; const to = path.join(dir, name); fs.writeFileSync(`${to}-vectors.json`, JSON.stringify(part.vectors)); fs.writeFileSync(`${to}-lines.json`, JSON.stringify(part.lines)); return to; };
   const opening = put('opening', got.opening), closing = put('closing', got.closing);
-  fs.writeFileSync(path.join(dir, 'lines-edit.json'), JSON.stringify({ edit, of: { vectorsSha256: sha256(fs.readFileSync(`${stem}-vectors.json`)) }, record: got.record }, null, 1) + '\n');
+  fs.writeFileSync(path.join(dir, 'lines-edit.json'), JSON.stringify({ edit, medium, of: { vectorsSha256: sha256(fs.readFileSync(`${stem}-vectors.json`)) }, record: got.record }, null, 1) + '\n');
   const sets = [];
-  if (opening) sets.push(['drawing', opening]);
+  // a closing drawing alone still names an opening file: the painter reads the medium of the run from it, and lays none of it (order last)
+  if (opening ?? closing) sets.push(['drawing', opening ?? closing]);
   if (closing) sets.push(['drawinglast', closing], ['drawinglastmin', '0']);
   if (got.order !== 'first') sets.push(['drawingorder', got.order]);
+  // the medium the files declare is the run's: a pencil drawing chosen as pen needs the pen's ink on the sheet, and the other way round
+  if (got.laidAs && got.laidAs !== vectors.medium) sets.push(['outlinemedium', got.laidAs === 'ink' ? 'ink' : 'graphite']);
   // a choice of an ink drawing's lines is laid over ink that was set first, as pen and wash is done and as a script is
   // (command.mjs): with most of the pen's lines left out, the first washes lift a larger share of what is left than the
   // painter allows of ink that still rewets, and it stops. The run's own inkfast, when it names one, stands.
-  if (vectors.medium === 'ink' && opening) sets.push(['inkfast', '1']);
-  return { order: got.order, opening, closing, record: got.record, sets };
+  if (got.laidAs === 'ink' && opening) sets.push(['inkfast', '1']);
+  return { order: got.order, opening, closing, laidAs: got.laidAs, record: got.record, warnings: got.warnings, sets };
 }

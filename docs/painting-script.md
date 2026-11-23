@@ -72,6 +72,35 @@ ribbon as wide as its pressure, in its paint, each passage multiplied over the l
 stroke's start and an arrow at its end; with `--stages` and `--order`, the same after each stage and after 5 to 100% of
 the passages.
 
+## A real passage
+
+Passage "crown" from a model's script for Mittens (gpt-6-astra at level 2, 22 Nov 2026, commit `66690c4f`). Its two
+outlines are cut short here.
+
+```json
+{ "id": "crown", "what": "Honey shadow near the parting of the brow", "stage": 3, "kind": "wash",
+  "paint": { "pigments": { "sienna": 2, "ochre": 2, "umber": 0.3 }, "swatch": "#f4ddcb", "dilution": "pale" },
+  "brush": "10", "paper": "wet", "edges": "lost", "wait": "dry",
+  "handling": { "mark": "sweep", "direction": -65, "hold": "side", "start": "belly", "load": "loaded", "speed": "medium" },
+  "regions": [ [[91.14, 149.9], [90.57, 147.48], "... 54 points"], [[139.76, 164.95], "... 72 points"] ],
+  "why": "Honey shadow near the parting of the brow." }
+```
+
+| Part | In "crown" |
+|---|---|
+| Shape | two outlines, in sheet millimetres |
+| Paint | burnt sienna 2, yellow ochre 2, burnt umber 0.3 (parts); pale |
+| Brush | the script's 10 mm round |
+| Paper | wet: clean water is laid first |
+| Into | none; a passage on damp paper names one, such as `"into": "headlight"` |
+| Wait | dry: the sheet dries before it |
+| Strokes | sweeps with the side of the brush, pulled up and to the right (-65 degrees) |
+| Stage | 3, shadows and glazes |
+
+<img src="img/auto-vs-model-model-zoom.webp" width="60%" alt="The passage crown as painted: 17 clean-water strokes, then 14 numbered paint strokes along the stripes and brow">
+
+As painted: 17 clean-water strokes, then 14 paint strokes. More of this script: [Auto against a model](auto-vs-model.md).
+
 ## What it adds to the plan format
 
 The wash plan becomes a file a model writes (`bench/v6/TASK.md`, "not yet executable": the wash plan was computed inside

@@ -417,6 +417,10 @@ if(opt('inkhue','profile')==='source')console.log(INK_HUE?`ink hue from the targ
 // sheet: the lay-in is laid in graphite before the ink, in the opening pen (drawing.mjs layExactVectors; from 3e27d30c)
 const DRAWING_DOC=(()=>{const base=opt('drawingfile','');if(!base||opt('drawing','first')==='none')return null;const f=(base.endsWith('-lines.json')?base.slice(0,-'-lines.json'.length):base)+'-vectors.json';return fs.existsSync(f)?JSON.parse(fs.readFileSync(f,'utf8')):null;})();
 const LAYIN_GRAPHITE=DRAWING_DOC?.medium==='ink'&&DRAWING_DOC.strokes.some(q=>q.medium==='graphite'&&!q.wash);
+// A closing drawing that holds pencil strokes and says so (pencilAfterWashes: an author's own choice, tools/paint/lines-edit.mjs)
+// needs graphite on the sheet too: its pencil is laid over the dry washes (drawing.mjs layExactVectors).
+const CLOSING_DOC=(()=>{const base=opt('drawinglast','');if(!base||!['last','both'].includes(opt('drawing','first')))return null;const f=(base.endsWith('-lines.json')?base.slice(0,-'-lines.json'.length):base)+'-vectors.json';return fs.existsSync(f)?JSON.parse(fs.readFileSync(f,'utf8')):null;})();
+const PENCIL_AFTER=CLOSING_DOC?.pencilAfterWashes===true&&CLOSING_DOC.strokes.some(q=>q.medium==='graphite'&&!q.wash);
 const INK={...INK_PROFILE.pigment,omega:INK_FAST?60:INK_PROFILE.pigment.omega,K:(INK_K_DECLARED??INK_HUE?.K??INK_PROFILE.pigment.K).map(v=>v*num('inkkscale',1))};
 console.log('drawing material profiles:',JSON.stringify({ink:{...INK_PROFILE,pigment:INK,rewets:INK.omega<60},graphite:GRAPHITE_PROFILE}));
 // --outlinemedium graphite: pen-first outlines in pencil, not ink; graphite is a neutral grey, waterproof and light.
@@ -432,9 +436,9 @@ const GRAPHITE_OWN = PENCIL ? (({ strength, ...pig }) => pig)(PENCIL.pig) : (STA
   ? GRAPHITE_PROFILE.pigment
   : null;
 // (graphite only for an ink drawing's lay-in: LAYIN_ONLY, so nothing else in the run draws in pencil)
-const LAYIN_ONLY = !GRAPHITE_OWN && LAYIN_GRAPHITE && DRAWS_FIRST && opt('drawing', 'first') !== 'none';
+const LAYIN_ONLY = !GRAPHITE_OWN && ((LAYIN_GRAPHITE && DRAWS_FIRST && opt('drawing', 'first') !== 'none') || PENCIL_AFTER);
 const GRAPHITE = GRAPHITE_OWN ?? (LAYIN_ONLY ? GRAPHITE_PROFILE.pigment : null);
-if (LAYIN_ONLY) console.log(`pencil lay-in: ${DRAWING_DOC.strokes.filter(q => q.medium === 'graphite').length} strokes of the ink drawing are graphite, laid before the ink`);
+if (LAYIN_ONLY) console.log(`pencil lay-in: ${LAYIN_GRAPHITE && DRAWS_FIRST ? DRAWING_DOC.strokes.filter(q => q.medium === 'graphite').length : 0} strokes of the ink drawing are graphite, laid before the ink${PENCIL_AFTER ? `; ${CLOSING_DOC.strokes.filter(q => q.medium === 'graphite').length} pencil strokes are laid over the dry washes` : ''}`);
 // --wickfloor f: least share of a granulating paint's water-borne pigment the pores take, 0..0.9, so peaks stay pale. Default 0.
 // A comma list sets it per pigment in palette order; the last value carries on, 0 leaves a pigment alone.
 const WICK_FLOORS = String(opt('wickfloor', '0')).split(',').map(v => Math.min(0.9, Math.max(0, Number(v) || 0)));

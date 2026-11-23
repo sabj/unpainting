@@ -1,43 +1,63 @@
-# Rules (protocol v2)
+# Rules (0.4)
 
-Every round, V1 to V5, has the same rules. The painting toolkit given to models is in [../v2/kit/](../v2/kit/). Its guard, a check that blocks image reads, enforces the read rules.
+Updated 22 November 2026. The 2,500-stroke, 15-minute and 85-minute rules of rounds V1 to V5 are history; see [the end of this page](#history). For what each level is given, see [levels](levels.md).
 
 ## The task
 
-Paint each target as a person with a brush and pen would, using only the simulator's marks through `bench/kit.mjs`. The model sees the targets as images in its prompt and may look at them again with its own image tool.
+Paint the subject as a person with a brush and pen would, through the simulator. The model sees the subject as an image and may look at it again with its own image tool.
 
-## Budget
+## What a model may change
 
-- 2,500 counted strokes per painting, brush and pen together. The toolkit refuses the stroke after the budget.
-- About 15 minutes per painting, stated in the brief.
-- The session is stopped after 85 minutes (5,100 s), so a model must finish each painting before the next.
-- Open models also stop at a $2.40 spend cap.
-- One GPU job at a time, and the GPU or nothing: when another of the session's processes holds the GPU, or the GPU cannot be used, `kit.open` stops and names what holds it. It paints on the CPU only when asked by name (`kit.open(task, { gpu: false })`). Until 22 November 2026 it took the CPU silently when the GPU was busy.
+More freedom than before, and mistakes are allowed.
 
-## Materials
+- Its own drawn lines.
+- The drawing medium: pen, pencil or none.
+- Pen ink: waterproof or soluble (at L2 to L4 a model's own pen lines are waterproof unless its settings say `inkfast` 0).
+- Erasing: the kit's eraser at L1; an erase passage in its own script or edited plan at L2 to L4.
+- At L2 and above: Auto's settings, Auto's plan, the pencil lines Auto keeps, the named forms (merge, cut, rename), the paints (up to 14), or a whole script of its own.
+- Where a choice only risks a worse painting, the harness gives a warning, not a refusal. It refuses only to protect the sheet or the rules.
 
-- Paper: cold press (textured), one sheet cell per target pixel, 0.259 mm a cell. The paper seed, the number that controls repeatable texture, is the try number. A try is one model session that paints the requested targets.
-- Brush paints: ultramarine, cerulean, hansa, ochre, sienna, umber, rose and sap green, mixed through `kit.mix()`. The sum of pigment concentrations in a brush mix may be at most 2.
-- Pen inks: sepia and lamp black, pen only. The sum of pigment concentrations in a pen mix may be at most 8.
-- One adjustable brush (radius, bristles, flat, belly, feed, give, splay, stiffness) and one dip pen. Masking fluid and blotting are available.
-- Water moves only when the simulation advances. `kit.dryAll` dries the sheet.
+## What is fixed
 
-## What a script may read
+- The paper, the simulator, the paint box and the brush physics.
+- The subject and, at each level, the inputs listed in [levels](levels.md).
+- The judges and the scoring.
+- A model is never given a score, a verdict or an outside critique.
 
-- No image file, except the frames the toolkit wrote under `bench/out/`. Node scripts are guarded only after importing the toolkit or guard. The benchmark runner configures the Python guard through `PYTHONPATH`; a separate Node process is not automatically guarded.
-- For planning, `kit.coarse(task)`: at most 24 x 24 cells, an 8-color palette and a lightness value per grid cell.
-- Any source file in the worktree, to learn how the brush, pen and sheet behave.
+## The session's workspace
+
+- Every attempt and retry has its own fresh folder and branch. Earlier ones are handed over as read-only reference.
+- The model has a shell in its own folder and may write and run any code it likes.
+- It cannot reach outside its folder. The one exception is the model tool's own sign-in, which the owner accepted for the first run on his machine. The container for replication is planned, not in 0.4's first run.
+- The shell has no internet and one fixed, pre-installed toolbox, the same for every model. Only the model tool itself reaches its own provider, through a gate on the machine that passes the provider's hosts and refuses every other. Installs fail. Each attempt is recorded.
+- The model may not read the subject's pixels with code. See [anti-cheat](anti-cheat.md).
+
+## Budgets: measured, not limited
+
+- Looks are rendering. Rendering is charged in a machine-independent unit: the painter's own count of brush sweeps plus dry calls. One full look of Auto's plan is 1.00. The model chooses where and when to spend it: to a stage, or in a region.
+- Steps: 1,000, as a runaway guard.
+- The clock is a safety stop only: six hours.
+- The target for resource management is about 60 minutes per session, covering the model's thinking and its looks. A session that reaches it hands in what it has and is marked so. The owner wants to tighten this. The harness records the actual terms in each run's record.
+- Not counted on the model's clock: Auto's prepared inputs and plan (they are free), the filmed full-size final, and judging.
 
 ## What is recorded
 
-- Approximate stage frames at 10, 25, 50 and 75% of counted strokes, using the next available snapshot taken every 25 counts. These snapshots are taken before the counted stroke executes. Runs under 25 strokes have no early stages. The 100% stage is the final image.
-- The share of small strokes (radius under 1.5 mm), short strokes (under 3x the brush width) and dots (under the brush width). The toolkit records these and does not refuse them.
-- Every blocked image read, every toolkit refusal, and the scripts the model wrote.
+- Usage: tokens, provider cost, machine minutes, rendering units, steps.
+- Tool use: shell commands, scripts written and run, pictures opened, plan and look calls, refusals met, attempts to reach outside the folder or the internet.
+- Film: snapshots of the painting in progress, taken at many stops, and the replay.
+- How much each attempt changed from the last, and a flag when it is identical or nearly so.
+- The budget terms in force.
 
 ## Disqualification
 
-A try is disqualified only for reading target pixels: a blocked read in the guard log, or a script that names the target files or the guard. One published try was disqualified: Gemini 4 Argon (Medium) V3 try 2, for one blocked target read. A high cheat-risk score is not a disqualification; see [anti-cheat.md](anti-cheat.md).
+A try is disqualified only for reading the subject's pixels with code. A high anti-cheat reading is not a disqualification; see [anti-cheat](anti-cheat.md).
 
-## Modes
+## History
 
-Gentle mode is the default and the mode in the published results. Hard mode adds a look budget. See [anti-cheat.md](anti-cheat.md).
+Rounds V1 to V5 (releases 0.1.0 and 0.1.1) had these rules. They no longer apply.
+
+- 2,500 counted strokes per painting, and about 15 minutes per painting.
+- A session stopped after 85 minutes (V3 to V5), and open models after a $2.40 cap.
+- A look count: three looks while painting and one at the end in V4 and V5; about 100 in hard mode.
+- A fixed paint box with `kit.mix()` limits, one brush, one dip pen, and `kit.coarse()` as the only way to read the target.
+- Gentle and hard mode.
