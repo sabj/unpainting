@@ -40,6 +40,10 @@ RESULTS: to be filled from the frozen run.
 - A test run with three tries at L3 and L4 comes first, to decide whether the scored run keeps three or scopes back to one.
 - New page: [Auto against a model](docs/auto-vs-model.md).
 
+## 0.4.0-rc.2
+
+The frozen version of the 0.4 benchmark (tag `v0.4.0-rc.2`): 0.4.0-rc.1 below, plus the benchmark entry above and every look painted at half size from the final's own plan. The 0.4.0-rc.1 name was never tagged.
+
 ## 0.4.0-rc.1 (not released)
 
 Painter **V107-dev**, simulator **105**, judges **J1**. Changes are against 0.2.1, the last release. There was no 0.3.3 release. Assembled on 2026-11-19.
