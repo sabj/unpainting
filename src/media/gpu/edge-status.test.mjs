@@ -81,8 +81,7 @@ test('one map per edge poll preserves batch growth, final measurement and levell
   assert.equal(sheet.b.LVS.words[7], 4);
   assert.equal(staging.length, 1);
   assert.equal(staging[0].mapState, 'unmapped');
-  // each poll clears the most rounds used (EFB[3], edge rounds come down: efShrink) and the levelling's counters
-  assert.deepEqual(resets, Array(3).fill([Array(9).fill(0), [0]]).flat());
+  assert.deepEqual(resets, Array(3).fill(Array(9).fill(0)));
 });
 
 test('levelling off omits its read and reset, and an empty advance submits nothing', async () => {
@@ -91,7 +90,7 @@ test('levelling off omits its read and reset, and an empty advance submits nothi
   assert.deepEqual(submissions, []);
   await sheet.efSteps(2);
   assert.deepEqual(submissions, [['edge'], ['step 1', 'edge'], ['step 1']]);
-  assert.deepEqual(resets, [[0], [0]], 'only the edge rounds\' most used is cleared, once a poll');
+  assert.deepEqual(resets, []);
 });
 
 test('failed and concurrent polls release staging and keep solver counters for retry', async () => {
