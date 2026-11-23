@@ -49,18 +49,3 @@ export function penContactLookahead(pen,path,spacing,count,w,h){
     pending.shift();return bounds;
   };
 }
-
-// The section brush (tuft-section.mjs) ahead of step (k, t): the hand's next `count` places, each with room for the
-// widest tuft it may lay there (`reach` half-widths of its radius, plus `pad` cells). The tuft trails behind the hand, over
-// cells its earlier footprints asked for already; a footprint that falls outside still widens the window as before.
-export function sectionContactLookahead(brush,path,{k,t,spacing,count,w,h,reach=1.45,pad=3}){
-  let bounds=null;
-  for(let j=0;j<count&&k<path.length;){
-    const a=path[k-1],b=path[k],seg=Math.hypot(b.x-a.x,b.y-a.y)||1e-6;
-    if(t>seg){t-=seg;k++;continue;}
-    const u=t/seg,radius=a.r===undefined?brush.radius:a.r+((b.r??a.r)-a.r)*u,R=reach*radius+pad;
-    bounds=add(bounds,box(a.x+(b.x-a.x)*u,a.y+(b.y-a.y)*u,R,R,w,h));
-    t+=spacing;j++;
-  }
-  return bounds;
-}
