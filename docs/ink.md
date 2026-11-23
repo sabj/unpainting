@@ -63,7 +63,7 @@ Black opening ink sets before the washes by default; sepia stays soluble. `drawi
 
 The pens draw on a sheet near 2160 px wide: `--inkres` is 4 at 540 px, 2 at 1080 px, 1 from 2400 px. The saved `drawing-opening.png`, `painting.png` and frames are N times the painting's width.
 
-A pencil drawing laid from a drawing file is drawn on the same fine sheet at the same N (0.4 rc3; `pencilInkResArgs` in `src/paint/methods/ink-recipe.mjs`), its graphite carried down into the painting's sheet as the pen's ink is: washes lie over it there, and every eraser (the prep erase, an erase passage, `--pencilerase`) rubs it there and takes the same share off the fine sheet (`src/paint/methods/fine-erase.mjs`). Beside ink the pencil has its own channel on the fine sheet. Before rc3 the pencil was laid on the painting's own coarser cells, where a line finer than a cell was widened to a cell and read broken and fuzzy.
+A drawing laid from a drawing file, pencil or a pen chosen without the wash recipe, is drawn on the same fine sheet at the same N (0.4 rc3; `drawingInkResArgs` in `src/paint/methods/ink-recipe.mjs`), its graphite carried down into the painting's sheet as the pen's ink is: washes lie over it there, and every eraser (the prep erase, an erase passage, `--pencilerase`) rubs it there and takes the same share off the fine sheet (`src/paint/methods/fine-erase.mjs`). Beside ink the pencil has its own channel on the fine sheet. Before rc3 the pencil was laid on the painting's own coarser cells, where a line finer than a cell was widened to a cell and read broken and fuzzy.
 
 With `--drawingonly 1` the wash recipe lays the drawing alone on dry paper, in near-black drawing ink with the flexible drawing nib, one opening pen.
 

@@ -27,6 +27,7 @@ import {longShare} from '../../src/crop/gestures.mjs';
 import {fillReserved} from '../../src/crop/lights.mjs';
 import {erasePrep} from '../../src/paint/methods/pencil-erase.mjs';
 import {followErase} from '../../src/paint/methods/fine-erase.mjs';
+import {strokesToLay} from '../../src/paint/methods/drawing-default.mjs';
 import {makeMopLanes} from '../../src/paint/methods/mop-lanes.mjs';
 import {sealAtBirth, sealTargetMaps} from '../guard/seal-maps.mjs';
 
@@ -203,7 +204,15 @@ function vectorFile(key = 'drawingfile') {
 // the opening drawing's frames as a share of the washes' --frames; a closing pen is filmed at the same pace. What is
 // laid is the same as in one step. Without the film the drawing is one step, as before.
 async function layExactVectors(file, { closing = false } = {}) {
-  const doc = JSON.parse(fs.readFileSync(file, 'utf8')), sheetMm = PB?.mm ?? num('sheetmm', DEFAULT_SHEET_MM);
+  const bytes = fs.readFileSync(file), whole = JSON.parse(bytes.toString('utf8')), sheetMm = PB?.mm ?? num('sheetmm', DEFAULT_SHEET_MM);
+  // the strokes laid: an author's choice exactly, else Auto's default from the drawing's medium and tags (drawing-default.mjs)
+  const chosen = strokesToLay(whole), doc = { ...whole, strokes: chosen.strokes };
+  console.log(`drawing ${closing ? 'after the washes' : 'before the washes'}: ${chosen.strokes.length} of ${whole.strokes.length} strokes of ${path.basename(file)}, ${chosen.rule}`);
+  // the painter's own record of what it laid, for the drawing harness (tools/drawing-harness): ids and their hash
+  const ids = chosen.strokes.map(q => q.seq);
+  fs.writeFileSync(path.join(out, closing ? 'drawing-laid-closing.json' : 'drawing-laid.json'), JSON.stringify({ file: path.basename(file), fileSha256: crypto.createHash('sha256').update(bytes).digest('hex'),
+    medium: whole.medium, chosen: whole.chosen ?? null, rule: chosen.rule, when: closing ? 'after' : 'before', strokes: whole.strokes.length, laid: ids.length, left: chosen.left.length,
+    laidSha256: crypto.createHash('sha256').update(ids.join(',')).digest('hex'), laidIds: ids }) + '\n');
   if (Math.abs(doc.sheetMm - sheetMm) > 0.01 * sheetMm) throw new Error(`ink vectors: ${path.basename(file)} is for a ${doc.sheetMm} mm sheet, this sheet is ${sheetMm} mm`);
   // a pencil drawing is laid in graphite, an ink drawing in ink, each on the fine sheet when there is one (--inkres: set
   // for a pencil drawing as for a pen's, ink-recipe.mjs drawingInkRes), carried down onto the painting's sheet
@@ -230,7 +239,7 @@ async function layExactVectors(file, { closing = false } = {}) {
     const batches = FRAME_POLICY.film ? drawingBatches(DRAWING_ORDER === 'forms' ? bigFormsFirst(strokes) : strokes, pace * drawingTimeMm(strokes), { given: DRAWING_ORDER === 'forms' }) : [{ strokes, done: 1 }];
     for (const b of batches) {
       const q = lay(b.strokes); for (const k of Object.keys(sum)) sum[k] += q[k] ?? 0;
-      if (FRAME_POLICY.film) { ctx.STAGE = { stage: closing ? 'ink' : 'drawing', step, batch: ++filmed, of: filmedOf, strokes: sum.strokes, laying: true }; await shoot(); }
+      if (FRAME_POLICY.film) { ctx.STAGE = { stage: closing ? 'ink' : 'drawing', step, batch: ++filmed, of: filmedOf, strokes: sum.strokes, laying: true, ids: b.strokes.map(q => q.seq) }; await shoot(); }
     }
     return sum;
   };
@@ -262,6 +271,8 @@ async function layExactVectors(file, { closing = false } = {}) {
     if (fineSheet) { INKRES.changed(); INKRES.carry(); } else { layersChanged(sheet); sheet._gpu?.cpuWroteAll?.(); }
     return q;
   }, pencil ? 'pencil' : 'pen');
+  // a drawing that inked nothing is a sheet too coarse for its lines: said, never passed over
+  if (r.strokes && !r.cells) throw new Error(`ink vectors: ${r.strokes} strokes of ${path.basename(file)} inked no cell of the ${w} x ${h} sheet (${(sheetMm / w).toFixed(2)} mm cells): the lines are too fine for it`);
   fs.copyFileSync(file, path.join(out, closing ? 'ink-vectors-closing.json' : 'ink-vectors.json'));
   ctx.drawnCount += r.strokes;
   console.log(`ink vectors: ${r.strokes} strokes laid exactly from ${path.basename(file)} (${pencil ? 'graphite' : 'ink'}) on a ${w} x ${h} sheet (${(sheetMm / w).toFixed(3)} mm cells), ${r.cells} cells inked${fill < 1 ? `, ${r.fills} fills at ${fill} inside` : ''}${r.widened ? `, ${r.widened} lines finer than a cell laid a cell wide` : ''}; no tracer, no pen gestures`);

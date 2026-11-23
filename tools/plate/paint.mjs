@@ -208,14 +208,22 @@ const inkedCells = () => { const t = thickness(ctx.sheet)[PIGS.length]; if (!t) 
 // the pen is set before any wash: the ink's whole thickness (every dried layer and what is wet, never the top layer
 // alone, which empties at each dry) is held as it was before the first wash, and once the sheet is next dry the first
 // wash must have moved none of it out of its cells (ink-held.mjs); more than INK_MOVED_MOST stops the run
-let INK_HOLD = null;
+let INK_HOLD = null, GRAPHITE_HOLD = null;
 if (ctx.VALUE_PLAN && L_START === 0) {
   const before = Float32Array.from(thickness(ctx.sheet)[PIGS.length] ?? []); let t = 0; for (let i = 0; i < before.length; i++) t += before[i];
+  // (the pen's fine sheet, --inkres, carries its ink down onto this sheet, so it is held here too)
   if (t > 0) INK_HOLD = { before, checked: false };
-  else if (INKRES) console.log(`INK HELD NOT CHECKED: the pen is on its own fine sheet (--inkres ${INKRES.N}), which no wash touches; nothing on the painting sheet to hold`);
   else console.log('ink held: no pen on the sheet before the first wash; nothing to check');
+  // the pencil likewise: graphite is fixed under the washes; how much of it the first wash moved is recorded
+  // (graphite-held.json) for the drawing harness, which holds it to its stated amount
+  if (ctx.GRAPHITE) { const g = Float32Array.from(thickness(ctx.sheet)[ctx.GRAPHITE_AT] ?? []); if (g.some(v => v > 0)) GRAPHITE_HOLD = { before: g, checked: false }; }
 }
 const checkInkHeld = when => {
+  if (GRAPHITE_HOLD && !GRAPHITE_HOLD.checked) {
+    const g = inkMoved(GRAPHITE_HOLD.before, thickness(ctx.sheet)[ctx.GRAPHITE_AT]); GRAPHITE_HOLD.checked = true;
+    console.log(`pencil held: the first wash moved ${(100 * g.moved).toFixed(3)}% of the pencil's graphite out of its cells, ${(100 * g.lost).toFixed(3)}% off the sheet (${when})`);
+    fs.writeFileSync(path.join(out, 'graphite-held.json'), JSON.stringify({ moved: g.moved, lost: g.lost, when }));
+  }
   if (!INK_HOLD || INK_HOLD.checked) return;
   const r = inkMoved(INK_HOLD.before, thickness(ctx.sheet)[PIGS.length]); INK_HOLD.checked = true;
   console.log(`ink held: the first wash moved ${(100 * r.moved).toFixed(2)}% of the pen's ink out of its cells, ${(100 * r.lost).toFixed(2)}% off the sheet (${when})`);
@@ -810,6 +818,8 @@ for (let L = L_START; L < ctx.layers.length; L++) {
   JSONL.flush();
   await awareBoundary({ kind: 'pass', L });
 }
+// a painting of one pass never reached a second dry sheet: the drawing's hold is read on the finished sheet, dried
+if ((INK_HOLD && !INK_HOLD.checked) || (GRAPHITE_HOLD && !GRAPHITE_HOLD.checked)) { clock('dry', () => dry(ctx.sheet, 30000, O, { levelMax: 140, dt: 2 })); checkInkHeld('the finished sheet, dried'); }
 if (TECH_CAL) { console.log(`technique calibration: ${TECH_CAL.history().length} reads; charge factors ${JSON.stringify(Object.fromEntries(Object.entries(TECH_CAL.factors()).map(([k, v]) => [k, +v.toFixed(2)])))}`); fs.writeFileSync(path.join(out, 'technique-cal.json'), JSON.stringify({ kind: 'sheet gain against ledger charge, per technique; no target reads', history: TECH_CAL.history() }, null, 1)); }
 if (DELIVERY) { const hst = DELIVERY.history(); console.log(`delivery calibration: ${hst.length} reads; kept of charge ${JSON.stringify(hst.at(-1)?.kept ?? [])}; charge factors ${DELIVERY.factors().map(v => v.toFixed(2)).join(', ')}`); fs.writeFileSync(path.join(out, 'delivery-cal.json'), JSON.stringify({ kind: 'sheet against ledger, per pigment; no target reads', history: hst }, null, 1)); }
 if (FEEDBACK_LAG) console.log(`feedback: ${feedbackStats.read} passes read the sheet, ${feedbackStats.predicted} predicted it from the last read and the ledger`);

@@ -24,6 +24,7 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
+import { autoDraws } from '../../src/paint/methods/drawing-default.mjs';
 
 export const LINES_EDIT_FORMAT = 'lines-edit 1';
 const DO = ['before', 'after', 'drop'], WEIGHT = [0.1, 4];
@@ -60,7 +61,7 @@ export function linesListing(vectors, { mask = null, forms = [] } = {}) {
   const count = k => strokes.reduce((a, s) => ({ ...a, [s[k] ?? 'none']: (a[s[k] ?? 'none'] ?? 0) + 1 }), {});
   const ink = vectors.medium === 'ink';
   return { format: 'lines 1', sheet: { widthMm: vectors.sheetMm, heightMm: vectors.heightMm }, medium: vectors.medium, linesAfterTheWashes: true,
-    note: `Every stroke is drawn before the washes at its own darkness unless your rules say otherwise. This is ${ink ? 'an ink' : 'a pencil'} drawing as prepared; the medium is yours to change ("medium" in choice.json: pencil, pen or none), any line may be drawn after the washes ("do": "after"), and you may draw lines of your own ("own").`,
+    note: `Every stroke starts as the painter lays it on its own: before the washes at its own darkness${ink ? '' : ', except the strokes tagged drop (hatching, tone, texture), which a pencil lay-in leaves for the washes: they start dropped, and {"where": {"tagged": "drop"}, "do": "before"} draws them'}; your rules change that. This is ${ink ? 'an ink' : 'a pencil'} drawing as prepared; the medium is yours to change ("medium" in choice.json: pencil, pen or none), any line may be drawn after the washes ("do": "after"), and you may draw lines of your own ("own").`,
     counts: { strokes: strokes.length, tagged: count('tagged'), part: count('part'), form: count('form') }, strokes };
 }
 
@@ -159,8 +160,10 @@ export function applyLinesEdit(vectors, lines, edit, listing, { medium = null } 
   if (!edit && medium == null) throw new Error('lines edit: neither lines nor a medium is chosen');
   const warnings = [], rules = edit ? checkLinesEdit(edit, listing, warnings) : [], state = new Map(), matched = rules.map(() => 0);
   const own = edit ? checkOwnLines(edit.own, { widthMm: vectors.sheetMm, heightMm: vectors.heightMm }, warnings) : [];
+  // every line starts as Auto lays it (drawing-default.mjs): on a pencil drawing the lines tagged drop start dropped
+  const startsAs = new Map(vectors.strokes.map(s => [s.seq, autoDraws(s, vectors.medium) ? 'before' : 'drop']));
   for (const s of listing.strokes) {
-    const st = { do: 'before', weight: 1 };
+    const st = { do: startsAs.get(s.id) ?? 'before', weight: 1 };
     rules.forEach((r, i) => { if (!r.test(s)) return; matched[i]++; if (r.do) st.do = r.do; if (r.weight != null) st.weight = r.weight; });
     state.set(s.id, st);
   }
@@ -186,7 +189,7 @@ export function applyLinesEdit(vectors, lines, edit, listing, { medium = null } 
     // the line file beside the strokes: the lines these strokes were fitted to (a stroke's `line` is its line's seq)
     const keep = new Set(strokes.map(s => (s.line == null ? null : Math.floor(s.line)))), every = keep.has(null) || (lines.lines ?? []).some(g => g.seq == null);
     const pencilOver = which === 'after' && strokes.some(s => (s.medium ?? wholeNow) === 'graphite');
-    return { vectors: { ...vectors, medium: laidAs, strokes, source: `${vectors.source ?? ''}; the author's choice of its lines (${which} the washes)`, mediumMap: undefined, ...(pencilOver ? { pencilAfterWashes: true } : {}) }, lines: { ...lines, medium: laidAs, lines: every ? lines.lines : lines.lines.filter(g => keep.has(Math.floor(g.seq))) } };
+    return { vectors: { ...vectors, medium: laidAs, strokes, chosen: 'lines edit', source: `${vectors.source ?? ''}; the author's choice of its lines (${which} the washes)`, mediumMap: undefined, ...(pencilOver ? { pencilAfterWashes: true } : {}) }, lines: { ...lines, medium: laidAs, lines: every ? lines.lines : lines.lines.filter(g => keep.has(Math.floor(g.seq))) } };
   };
   const opening = part('before'), closing = part('after'), by = k => listing.strokes.filter(s => (medium === 'none' ? 'drop' : state.get(s.id).do) === k);
   const mm = list => Math.round(list.reduce((a, s) => a + s.lengthMm, 0)), weighted = listing.strokes.filter(s => medium !== 'none' && state.get(s.id).do !== 'drop' && state.get(s.id).weight !== 1);

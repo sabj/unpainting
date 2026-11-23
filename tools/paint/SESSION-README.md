@@ -21,8 +21,10 @@ INPUT_LIST
   work on a copy.
 - `auto/settings.json`: the planner's settings, their present values, and what each does.
 - `drawing/lines.json`: every line of the drawing as a row you can choose by (see "Choosing the drawing's lines").
-  `drawing/all-lines.png` shows every line the painter lays today. `inputs/drawing.png` shows fewer: it leaves out
-  the lines tagged `drop` (hatching, tone, texture), which the painter lays all the same unless you drop them.
+  `drawing/all-lines.png` shows every line the painter lays on its own. On a pencil drawing that leaves out the lines
+  tagged `drop` (hatching, tone, texture) other than contours (part `outline`) and lay-in strokes (phase `layin`): a
+  pencil lay-in places the forms and the washes model them. On a pen drawing
+  every line is laid, the `drop` ones too, since there the lines carry the modelling.
 - `mine/`: after a plan or a look of a choice that names lines or forms of your own: `mine/drawing.png` (your lines:
   grey before the washes, black after them), `mine/forms.png`, `mine/forms-ids.png`, `mine/forms.json` (your forms).
 - `own-script-brief.md`: the brief for writing your own painting script (the format, the kit, the paints).
@@ -109,8 +111,9 @@ and the drawing is as prepared; `drawing/lines.json` says at its top which that 
 **The prepared lines.** `drawing/lines.json` lists every line: `id`, `part` (outline, inner, small, texture, hatch,
 tone, fill), `phase`, `object`, `tagged` (`ink`: a drawn pen line; `layin`: a pale contour that places a form; `drop`:
 hatching, tone or texture the drawing's maker would leave out), `dark` (0 to 1), `lengthMm`, `widthMm`, `boxMm`, and
-`form` (the named form most of it lies in, or `none`). Every line starts as the painter lays it today: before the
-washes, at its own darkness, the `drop` ones too. Write your rules to a file and name it in `choice.json` beside your
+`form` (the named form most of it lies in, or `none`). Every line starts as the painter lays it on its own: before
+the washes, at its own darkness; on a pencil drawing the `drop` ones other than contours (part `outline`) and lay-in strokes (phase `layin`) start
+dropped (`{"where": {"tagged": "drop"}, "do": "before"}` draws them), on a pen drawing they are drawn. Write your rules to a file and name it in `choice.json` beside your
 kind of choice: `{"kind": "settings", "settings": {}, "lines": "my-lines.json"}`.
 
 ```json
@@ -143,8 +146,9 @@ What to know:
 - Ink set before the washes stays put under them; pencil is pale and the washes cover it. Pen over dry washes is the
   crisp closing line. Pencil over dry washes is laid too, but it sits grey on top of the paint and hardly shows over
   a dark wash: the answer warns you, and it is drawn if you leave it.
-- Choosing `"pen"` for a drawing prepared in pencil lays its lines in ink as dark as they are drawn, hatching and
-  texture included (they are tagged `drop`); the answer warns you. Drop or pale them if that is not what you want.
+- Choosing `"pen"` for a drawing prepared in pencil lays its lines in ink as dark as they are drawn. Its hatching and
+  texture (tagged `drop`) start dropped as on any pencil drawing; if your rules draw them, in ink they are as dark as
+  drawn and the answer warns you.
 - With lines or a medium of your own on a pen drawing the ink is set before the washes (`inkfast` 1, as for your own
   script), unless your settings say otherwise.
 - `./unpaint plan` checks the file, counts what it does and lists its warnings; `mine/drawing.png` shows the result

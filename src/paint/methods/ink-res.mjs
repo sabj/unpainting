@@ -13,7 +13,7 @@ import { drawGestures } from '../../media/draw.mjs';
 import { renderLayers } from '../../media/km.mjs';
 import { TAPE } from '../../media/brush.mjs';
 
-export const isGraphitePigment = p => /graphite|pencil/i.test(p?.kind ?? p?.name ?? '');
+const isGraphitePigment = p => /graphite|pencil/i.test(p?.kind ?? p?.name ?? '');
 
 export function makeInkRes({ N, W2, H2, paperOpts, pigments, main, inkAt = 0, graphiteAt = null, gain = 1, pad: opt_pad = null, paper: cachedPaper = null }) {
   if (!Number.isFinite(N)) return null;

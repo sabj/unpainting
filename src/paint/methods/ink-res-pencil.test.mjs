@@ -7,7 +7,7 @@ import { createSheet, thickness } from '../../media/sheet.mjs';
 import { makeInkRes } from './ink-res.mjs';
 import { layVectors, inkForDarkness } from './ink-vectors.mjs';
 import { renderLayers } from '../../media/km.mjs';
-import { pencilInkResArgs } from './ink-recipe.mjs';
+import { drawingInkResArgs } from './ink-recipe.mjs';
 
 const ink = { name: 'sepia ink', K: [0.4, 0.48, 0.62], S: [0.02, 0.02, 0.02], rho: 0.05, omega: 1.4, gamma: 0 };
 const graphite = { name: 'graphite HB', K: [0.22, 0.22, 0.23], S: [0.02, 0.02, 0.02], rho: 0.05, omega: 60, gamma: 0 };
@@ -90,12 +90,11 @@ test('a fine pencil line is continuous on the fine sheet where the painting\'s o
   assert.equal(f.breaks, 0);
 });
 
-test('a pencil drawing from a file is put on the fine sheet at the pen\'s resolution, unless told or already fine', () => {
-  assert.deepEqual(pencilInkResArgs(['--width', '1086', '--drawingfile', 'd'], { pencil: true }), ['--inkres', '2']);
-  assert.deepEqual(pencilInkResArgs(['--width', '540', '--drawinglast', 'd'], { pencil: true }), ['--inkres', '4']);
-  assert.deepEqual(pencilInkResArgs(['--width', '1462', '--drawingfile', 'd'], { pencil: true }), [], 'already at the pen\'s fineness');
-  assert.deepEqual(pencilInkResArgs(['--width', '1086', '--drawingfile', 'd', '--inkres', '1'], { pencil: true }), []);
-  assert.deepEqual(pencilInkResArgs(['--width', '1086', '--drawingfile', 'd'], { pencil: false }), []);
-  assert.deepEqual(pencilInkResArgs(['--width', '1086', '--drawingfile', 'd', '--drawing', 'none'], { pencil: true }), []);
-  assert.deepEqual(pencilInkResArgs(['--width', '1086'], { pencil: true }), []);
+test('a drawing from a file, pencil or pen, is put on the fine sheet at the pen\'s resolution, unless told or already fine', () => {
+  assert.deepEqual(drawingInkResArgs(['--width', '1086', '--drawingfile', 'd']), ['--inkres', '2']);
+  assert.deepEqual(drawingInkResArgs(['--width', '540', '--drawinglast', 'd']), ['--inkres', '4']);
+  assert.deepEqual(drawingInkResArgs(['--width', '1462', '--drawingfile', 'd']), [], 'already at the pen\'s fineness');
+  assert.deepEqual(drawingInkResArgs(['--width', '1086', '--drawingfile', 'd', '--inkres', '1']), []);
+  assert.deepEqual(drawingInkResArgs(['--width', '1086', '--drawingfile', 'd', '--drawing', 'none']), []);
+  assert.deepEqual(drawingInkResArgs(['--width', '1086']), []);
 });

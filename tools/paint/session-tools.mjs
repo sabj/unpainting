@@ -9,6 +9,7 @@ import path from 'node:path';
 import sharp from 'sharp';
 import { linesListing, applyLinesEdit, writeLinesEdit, linesLine } from './lines-edit.mjs';
 import { applyFormsEdit, writeFormsEdit, formsLine } from './forms-edit.mjs';
+import { strokesToLay } from '../../src/paint/methods/drawing-default.mjs';
 
 /**
  * What a run's tools work on, read once: the record's drawing (its strokes and lines), the reviewed forms (id map,
@@ -90,7 +91,7 @@ export function linesPictureDoc(vectors, before = [], after = []) {
   return { ...vectors, medium: 'pencil', strokes: [...before.map(s => ({ ...s, drop: false, medium: 'graphite' })), ...after.map(s => ({ ...s, drop: false, medium: 'ink', dark: 1 }))] };
 }
 
-/** The drawing with every stroke the painter lays, none left out: for the picture of the lines as they are laid today. */
+/** The drawing with every stroke the painter lays on its own (drawing-default.mjs; on a pencil lay-in not the strokes tagged drop): the picture of the lines as Auto lays them. */
 export function allLinesDoc(vectors) {
-  return { ...vectors, strokes: vectors.strokes.map(s => ({ ...s, drop: false })) };
+  return { ...vectors, strokes: strokesToLay(vectors).strokes.map(s => ({ ...s, drop: false })) };
 }
