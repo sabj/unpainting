@@ -71,15 +71,22 @@ test('places: one painting a worker, a claim held while its process lives, waiti
   fs.mkdirSync(path.join(dir, 'waiting'));
   for (const [id, since] of [['b', 2], ['a', 1], ['c', 3]]) fs.writeFileSync(path.join(dir, 'waiting', `${id}.json`), JSON.stringify({ id, pid: process.pid, since }));
   assert.deepEqual(['a', 'b', 'c'].map(id => waitRank(dir, id)), [0, 1, 2]);
+  fs.writeFileSync(path.join(dir, 'waiting', 'f.json'), JSON.stringify({ id: 'f', pid: process.pid, since: 9, kind: 'painting' }));
+  assert.equal(waitRank(dir, 'f'), 0, 'a painting does not wait behind looks: they wait for other places');
 });
 
-test('the places a job may take: this Mac first, a ready pod with the commit and time left, then the mini', () => {
+test('the places a job may take: a look this Mac then the mini; a full-size painting a ready pod with the commit and time left', () => {
   const now = 1e12, pods = [{ name: 'p1', ready: true, trees: { abcdef12: '/t' }, limit: now / 1000 + 3600, ip: '1.2.3.4', port: 22, rate: 0.89 }, { name: 'p2', ready: true, trees: { abcdef12: '/t' }, limit: now / 1000 + 600 }, { name: 'p3', ready: false, trees: { abcdef12: '/t' } }, { name: 'p4', ready: true, trees: { other000: '/t' }, limit: now / 1000 + 9999 }];
-  const got = places({ pods, mini: { host: 'mini', slots: 2 }, local: 1, commit: 'abcdef1234', now });
-  assert.deepEqual(got.map(p => p.slot), ['local-0', 'pod-p1', 'mini-0', 'mini-1']);
-  assert.equal(got[1].worker.tree, '/t');
-  assert.deepEqual(places({ pods, mini: { host: 'mini' }, local: 0, commit: 'abcdef1234', now, only: ['pod'] }).map(p => p.slot), ['pod-p1']);
+  assert.deepEqual(places({ pods, mini: { host: 'mini', slots: 2 }, local: 1, commit: 'abcdef1234', now }).map(p => p.slot), ['local-0', 'mini-0', 'mini-1']);
+  const got = places({ pods, mini: { host: 'mini', slots: 2 }, local: 1, commit: 'abcdef1234', kind: 'painting', now });
+  assert.deepEqual(got.map(p => p.slot), ['pod-p1']); assert.equal(got[0].worker.tree, '/t');
+  assert.deepEqual(places({ pods, mini: { host: 'mini' }, local: 2, commit: 'abcdef1234', now, only: ['mini'] }).map(p => p.slot), ['mini-0', 'mini-1']);
   assert.equal(costOf({ kind: 'pod', rate: 0.89 }, 3600), 0.89); assert.equal(costOf({ kind: 'mini' }, 3600), 0);
+});
+
+test('a full-size painting with no pods daemon running fails at once, saying how to start it', async () => {
+  const dir = tmp(), job = { command: { cmd: 'node', args: ['--out', path.join(dir, 'out')] }, cwd: dir, logFile: path.join(dir, 'x.log'), out: path.join(dir, 'out'), commit: 'a'.repeat(40), kind: 'painting' };
+  await assert.rejects(paintOnPool(job, { dir, env: {}, local: async () => assert.fail('not here'), pollMs: 5 }), /pods daemon is not running.*render-pool-pods\.py/);
 });
 
 test('a worker failure is tried once more and then fails loudly; a painter\'s own exit is never retried', async () => {

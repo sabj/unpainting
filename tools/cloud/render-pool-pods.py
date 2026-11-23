@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """render-pool-pods.py POOL_DIR [--cap N] [--hours H] [--helper render-batch.py]: the pods of the render pool
-(tools/paint/render-pool.mjs). One pod a live session, never more than --cap (default 10, UNPAINT_POOL_CAP), none
-when no session is live: it reads POOL_DIR/clients/<pid>.json (each command painting through the pool says how many
-sessions it runs, and its commit), rents or deletes pods to match, gives each pod a checkout of every live commit, and
-writes POOL_DIR/pods.json, which the sessions read to find a free pod. A pod whose place is claimed
+(tools/paint/render-pool.mjs). Pods paint the full-size paintings (finals, prepared Auto paintings); looks go to the
+Macs. One pod a painting waiting or painting on a pod, never more than --cap (default 10, UNPAINT_POOL_CAP), none
+when there is none: it reads POOL_DIR/waiting/*.json and POOL_DIR/claims/pod-*.json, rents or deletes pods to match,
+gives each pod a checkout of every commit asked for (waiting jobs and live clients), and writes POOL_DIR/pods.json,
+which the sessions read to find a free pod. A pod whose place is claimed
 (POOL_DIR/claims/pod-<name>.json) is never deleted under its painting. Every pod also deletes itself at its limit
 (self-destruct.sh), so a crash of this process leaves nothing running past it.
   Stop: touch POOL_DIR/STOP-PODS (every pod is deleted and this ends). Log: POOL_DIR/pods.log.
@@ -53,6 +54,20 @@ def live_clients():
         if alive(int(c["pid"])):
             out.append((int(c["pid"]), int(c.get("sessions", 1)), c["commit"]))
     return out
+
+
+def painting_demand():
+    """(paintings waiting for a pod or on one now, the commits they need)."""
+    n, commits = 0, set()
+    for f in list((POOL / "waiting").glob("*.json")) + list((POOL / "claims").glob("pod-*.json")):
+        try:
+            w = json.loads(f.read_text())
+        except Exception:
+            continue
+        if alive(int(w["pid"])) and (f.parent.name == "claims" or w.get("kind") == "painting"):
+            n += 1
+            if w.get("commit"): commits.add(w["commit"])
+    return n, commits
 
 
 def claimed(name):
@@ -182,7 +197,7 @@ def main():
             if STOP.exists():
                 for p in list(st["pods"]): drop(p, "STOP-PODS")
                 save(); log("stopped by STOP-PODS"); break
-            clients = live_clients(); live = sum(c[1] for c in clients); commits = sorted({c[2] for c in clients})
+            clients = live_clients(); live, wanted = painting_demand(); commits = sorted(wanted | ({c[2] for c in clients} if wanted else set()))
             past = now - t0 > A.hours * 3600
             target = 0 if past else min(A.cap, live)
             st["target"], st["live"] = target, live
@@ -193,7 +208,7 @@ def main():
                 if not commits: break
                 with lock: st["adding"] += 1
                 n += 1; threading.Thread(target=add_pod, args=(commits[0], n), daemon=True).start()
-                log("adding a pod: live sessions", live, "target", target, "have", len(usable))
+                log("adding a pod: paintings wanting a pod", live, "target", target, "have", len(usable))
             for p in [p for p in st["pods"] if p["ready"]]:
                 for c in commits:
                     if c[:8] not in p["trees"]:
@@ -204,7 +219,7 @@ def main():
             for p in sorted(st["pods"], key=lambda p: p["created"]):
                 if claimed(p["name"]): continue
                 if p["limit"] - now <= 45 * 60: drop(p, "near its limit")
-                elif extra > 0: drop(p, "more pods than live sessions"); extra -= 1
+                elif extra > 0: drop(p, "more pods than paintings"); extra -= 1
             save()
             if past and not st["pods"] and not st["adding"]:
                 log("past its hours and no pod left: ending"); break
