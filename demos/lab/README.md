@@ -2,7 +2,7 @@
 
 Paint by hand on simulated paper. **[Open it](https://sabj.github.io/unpainting/demos/lab/)**
 
-0.4.0-rc.1. The sheet's cell size follows the paper's size on screen: about one cell to a device pixel, up to 0.125 mm a cell with WebGPU and 0.42 mm on the CPU, which is what each keeps interactive. The Cell size menu picks another, and the status line shows the cells, the millimetres per cell, the screen pixels per cell and the frame time. Paint Lab has its own WebGPU flow solver and runs brush contact on the CPU; `?physics=cpu` steps the painter's own `sheet.js` instead.
+0.4.0-rc1. The sheet's cell size follows the paper's size on screen: about one cell to a device pixel, up to 0.125 mm a cell with WebGPU and 0.42 mm on the CPU, which is what each keeps interactive. The Cell size menu picks another, and the status line shows the cells, the millimetres per cell, the screen pixels per cell and the frame time. Paint Lab has its own WebGPU flow solver and runs brush contact on the CPU; `?physics=cpu` steps the painter's own `sheet.js` instead.
 
 <img src="../thumbs/lab-paint.webp" width="480" alt="A heart painted wet in rose, then a blue arrow glazed over it and yellow feathers run into the wet shaft">
 
