@@ -124,13 +124,27 @@ fn ef_apply(@builtin(global_invocation_id) gid: vec3<u32>) {
   EFS[i] = vec4<f32>(own.x, own.y, pending, own.w + (water - wn));
   if (ROUND + 1u < atomicLoad(&EFB[1])) { efCandidate(i, b, ROUND + 1u, wn); }
 }
+// (gathered in the workgroup first, then one global atomic a workgroup: the same counts and bounds, without every wet
+// cell of the sheet contending for the same five words)
+var<workgroup> efWa: array<atomic<u32>, 5>;
 @compute @workgroup_size(256)
-fn ef_watch(@builtin(global_invocation_id) gid: vec3<u32>) {
-  let i = gid.x; if (i >= u.n || efHalted()) { return; }
-  if (M[i] == 1u || EVER[i] == 1u) { atomicAdd(&EFB[5], 1u); }
-  if (M[i] == 1u || S[i] > 0.02 * PAPER[i].x) {
-    let x = i % u.w; let y = i / u.w;
-    atomicMin(&EFB[6], x); atomicMin(&EFB[7], y); atomicMax(&EFB[8], x); atomicMax(&EFB[9], y);
+fn ef_watch(@builtin(global_invocation_id) gid: vec3<u32>, @builtin(local_invocation_index) li: u32) {
+  if (li == 0u) { atomicStore(&efWa[0], 0u); atomicStore(&efWa[1], 0xffffffffu); atomicStore(&efWa[2], 0xffffffffu); atomicStore(&efWa[3], 0u); atomicStore(&efWa[4], 0u); }
+  workgroupBarrier();
+  let i = gid.x;
+  if (i < u.n && !efHalted()) {
+    if (M[i] == 1u || EVER[i] == 1u) { atomicAdd(&efWa[0], 1u); }
+    if (M[i] == 1u || S[i] > 0.02 * PAPER[i].x) {
+      let x = i % u.w; let y = i / u.w;
+      atomicMin(&efWa[1], x); atomicMin(&efWa[2], y); atomicMax(&efWa[3], x); atomicMax(&efWa[4], y);
+    }
+  }
+  workgroupBarrier();
+  if (li == 0u) {
+    let c = atomicLoad(&efWa[0]); if (c > 0u) { atomicAdd(&EFB[5], c); }
+    if (atomicLoad(&efWa[1]) != 0xffffffffu) {
+      atomicMin(&EFB[6], atomicLoad(&efWa[1])); atomicMin(&EFB[7], atomicLoad(&efWa[2])); atomicMax(&EFB[8], atomicLoad(&efWa[3])); atomicMax(&EFB[9], atomicLoad(&efWa[4]));
+    }
   }
 }
 // the wet mask, the footprint, the damp pores (sheet.mjs wetBoxes) and surface water of eight cells a word: bit 1 M,
