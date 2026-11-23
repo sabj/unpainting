@@ -21,7 +21,7 @@ import { checkPlanEdit, editLine } from '../../src/paint/methods/plan-edit.mjs';
 import { planNumbers, planSummary, numbersText, washesText, planPicture, lookPicture, stagesPicture } from './plan-data.mjs';
 import { lookSets, lookFault, stoppedLookFault, lookSizeNote, LOOK_JOBS, HEAVY_JOBS } from './look.mjs';
 import { toolUseOf, listFiles } from './tool-use.mjs';
-import { PROVIDER_HOSTS, startGate, makeToolbox, toolsText } from './session-net.mjs';
+import { PROVIDER_HOSTS, startGate as startNetGate, makeToolbox, toolsText } from './session-net.mjs';
 import { DEFAULT_LOOKS, DEFAULT_WALL_MINUTES, DEFAULT_GRACE_MINUTES, DEFAULT_STEPS, safeRead, writeSession, sessionServer, SIGN_IN_EXPOSURE, finalChoice, sessionCall, readTranscript, reachedOutside, ownFolderOf, ownPictures, runSession } from './session.mjs';
 import { DEFAULT_REVERTS } from './reverts.mjs';
 import { levelOf, handedAt } from './levels.mjs';
@@ -72,7 +72,7 @@ const passesOf = file => (JSON.parse(fs.readFileSync(file, 'utf8')).passes ?? []
 async function closedRoutes(author) {
   if (!PROVIDER_HOSTS[author.cli]) return { gate: null, toolbox: null, done: async () => null };
   const python = process.env.PAINTER_SEG_PYTHON ?? segEnv.PAINTER_SEG_PYTHON ?? path.join(ROOT, '.venv-seg', 'bin', 'python');
-  const toolbox = makeToolbox(python), gate = await startGate(PROVIDER_HOSTS[author.cli]);
+  const toolbox = makeToolbox(python), gate = await startNetGate(PROVIDER_HOSTS[author.cli]);
   return { gate, toolbox, done: async () => { await gate.stop(); fs.rmSync(toolbox.dir, { recursive: true, force: true }); return { gated: true, passed: gate.passed, refused: gate.refused }; } };
 }
 const segEnv = { ...segEnvFor(ROOT), W2_CACHE_DIR: cacheDirFor(process.env.W2_CACHE_DIR || path.join(ROOT, 'work', 'cache'), switches) };

@@ -70,3 +70,8 @@ test('a gated Claude session: the whole command under the profile with its own s
   assert.deepEqual(c.signIn, ['/home/x/Library/Keychains']); assert.match(c.closed, /the model tool's own secret and list keychain entry names; accepted by the owner/);
   assert.ok(allowed('api.anthropic.com', PROVIDER_HOSTS.claude)); assert.ok(!allowed('mcp-proxy.anthropic.com', PROVIDER_HOSTS.claude));
 });
+
+test('the command line itself parses (a name clash there passes every unit test and stops every run)', () => {
+  const here = path.dirname(new URL(import.meta.url).pathname);
+  for (const f of ['cli.mjs', 'session.mjs', 'session-net.mjs', 'tool-use.mjs', 'look-cost.mjs']) execFileSync(process.execPath, ['--check', path.join(here, f)]);
+});
