@@ -47,7 +47,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   const command = keptCommand(fs.readFileSync(file, 'utf8'), out), r = renderer(process.env, { root, codeState: () => ({ commit: full, dirty: false }) });
   r.register(sessions);
   fs.mkdirSync(path.dirname(path.resolve(out)), { recursive: true });
-  const t = Date.now(), got = await r.paint(command, { cwd: root, logFile: `${path.resolve(out)}.log`, until: until == null ? null : Number(until), pauseDir: `${path.resolve(out)}.pause`, kind: until == null ? 'look' : 'look stopped at a stage', onLine: () => {} });
+  const t = Date.now(), got = await r.paint(command, { cwd: root, logFile: `${path.resolve(out)}.log`, until: until == null ? null : Number(until), pauseDir: `${path.resolve(out)}.pause`, kind: until == null ? 'operator look' : 'operator look stopped at a stage', onLine: () => {} });
   let work = null; try { const passes = (JSON.parse(fs.readFileSync(path.join(out, 'value-plan.json'), 'utf8')).passes ?? []).map(p => ({ layer: p.layer ?? null })); work = paintedWork({ sweeps: got.stopped ? got.stopped.strokes : sweepsInLog(fs.readFileSync(`${path.resolve(out)}.log`, 'utf8')), passes, passesDone: got.stopped?.passesDone ?? null }); } catch (e) { work = { fault: e.message }; }
   console.log(JSON.stringify({ out: path.resolve(out), exit: got.done.exit, signal: got.done.signal, seconds: Math.round((Date.now() - t) / 1000), work, stopped: got.stopped ? { passesDone: got.stopped.passesDone, strokes: got.stopped.strokes, sheet: got.stopped.sheet } : null, render: got.render }));
   process.exit(got.done.exit === 0 || got.done.exit === 3 ? 0 : 1);

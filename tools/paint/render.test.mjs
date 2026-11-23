@@ -62,17 +62,27 @@ test('the worker\'s environment keeps what changes the painting and none of this
 
 test('places: one painting a worker, a claim held while its process lives, waiting jobs in their order', () => {
   const dir = tmp();
-  assert.equal(claim(dir, 'pod-a', { job: 1 }), true); assert.equal(claim(dir, 'pod-a', { job: 2 }), false);
+  assert.equal(claim(dir, 'pod-a', { job: 1, kind: 'look' }), true); assert.equal(claim(dir, 'pod-a', { job: 2, kind: 'look' }), false);
   markStarted(dir, 'pod-a'); assert.ok(claims(dir)['pod-a'].started);
-  assert.equal(claim(dir, 'mini-0', { job: 3, pid: 999999 }, () => true), true);
+  assert.equal(claim(dir, 'mini-0', { job: 3, pid: 999999, kind: 'look' }, () => true), true);
   assert.deepEqual(Object.keys(claims(dir, pid => pid === process.pid)), ['pod-a']);
-  assert.equal(claim(dir, 'mini-0', { job: 4 }, pid => pid === process.pid), true, 'a dead process\'s claim is cleared');
-  release(dir, 'pod-a'); assert.equal(claim(dir, 'pod-a', { job: 5 }), true);
+  assert.equal(claim(dir, 'mini-0', { job: 4, kind: 'look' }, pid => pid === process.pid), true, 'a dead process\'s claim is cleared');
+  release(dir, 'pod-a'); assert.equal(claim(dir, 'pod-a', { job: 5, kind: 'look' }), true);
   fs.mkdirSync(path.join(dir, 'waiting'));
   for (const [id, since] of [['b', 2], ['a', 1], ['c', 3]]) fs.writeFileSync(path.join(dir, 'waiting', `${id}.json`), JSON.stringify({ id, pid: process.pid, since }));
   assert.deepEqual(['a', 'b', 'c'].map(id => waitRank(dir, id)), [0, 1, 2]);
   fs.writeFileSync(path.join(dir, 'waiting', 'f.json'), JSON.stringify({ id: 'f', pid: process.pid, since: 9, kind: 'painting' }));
   assert.equal(waitRank(dir, 'f'), 0, 'a painting does not wait behind looks: they wait for other places');
+});
+
+test('benchmark jobs go first: an operator\'s job takes a place only while none waits, and one at a time', () => {
+  const dir = tmp(); fs.mkdirSync(path.join(dir, 'waiting'));
+  assert.equal(claim(dir, 'mini-0', { job: 'p1', kind: 'profile' }), true);
+  assert.equal(claim(dir, 'mini-1', { job: 'p2', kind: 'operator look' }), false, 'one operator job in the whole pool');
+  release(dir, 'mini-0');
+  fs.writeFileSync(path.join(dir, 'waiting', 'b.json'), JSON.stringify({ id: 'b', pid: process.pid, since: 1, kind: 'painting' }));
+  assert.equal(claim(dir, 'mini-0', { job: 'p3', kind: 'profile' }), false, 'a benchmark job is waiting');
+  assert.equal(claim(dir, 'mini-0', { job: 'b', kind: 'painting' }), true);
 });
 
 test('the places a job may take: a look this Mac then the mini; a full-size painting a ready pod with the commit and time left', () => {
