@@ -640,7 +640,7 @@ function sectionStroke(brush, sheet, path, { spacing = 0.7, between, lift = true
         exchangeCell(sheet, i, hr, capL[j], keep * capL[j], aa, contact, hb[j], g, buf);
         // the lane's head follows what it gave or took
         sat[j] = hr.water / (capL[j] || 1); hb[j] = headOf(sat[j], keep, Hb);
-      });
+      }, band + 0.5);
     }
     steps++; if (between) between(steps);
     t += spacing; brush.travel += spacing; sheet.clock++;

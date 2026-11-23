@@ -35,3 +35,19 @@ test('the flat footprint visits every cell with the same distance and place acro
     for (const [i, v] of want) assert.deepEqual(got.get(i), v, `cell ${i} of shape ${t}`);
   }
 });
+
+test('with a cut, the footprint visits exactly the cells within it, with the same distance and place across', () => {
+  let seed = 11; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  for (let t = 0; t < 120; t++) {
+    // flats with one blade length (as the brush lays them) and with tapering ones, along and across the blade; rounds
+    const flat = t % 3 !== 2, S = 6, pts = [], rad = [], ang = rnd() * Math.PI, a0 = 1 + rnd() * 30, st = rnd() * 6, ca = t % 2 ? ang + Math.PI / 2 : rnd() * 6;
+    let x = 90 + rnd() * 20, y = 90 + rnd() * 20;
+    for (let j = 0; j < S; j++) { pts.push(x, y); rad.push(t % 4 === 0 ? 0.5 + rnd() * 30 : a0); x += st * Math.cos(ca); y += st * Math.sin(ca); }
+    const g = { pts, S, rad, flat, bx: Math.cos(ang), by: Math.sin(ang), thick: Math.max(0.5, 0.12 * a0) }, cut = 0.5 + rnd() * 4;
+    const all = new Map(), within = new Map();
+    footprint({ ...g }, 200, 200, 3, (i, d, across) => { if (d <= cut) all.set(i, [d, across]); });
+    footprint({ ...g }, 200, 200, 3, (i, d, across) => { if (d <= cut) within.set(i, [d, across]); }, cut);
+    assert.equal(within.size, all.size, `shape ${t}`);
+    for (const [i, v] of all) assert.deepEqual(within.get(i), v, `cell ${i} of shape ${t}`);
+  }
+});
