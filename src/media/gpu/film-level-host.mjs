@@ -14,7 +14,7 @@ export const levelBudget = () => ({ iters: 128, subs: 64, boxes: 16, total: null
 /** Bytes of each buffer for a w x h sheet of n cells and `ntiles` 16x16 tiles; the per-cell fields only with `on`. */
 export function levelBuffers(w, h, n, ntiles, on) {
   const cell = on ? n * 16 : 16;
-  return { LVT: ntiles * 32, LVX: lvxWords(w, h, ntiles) * 4, LVS: (16 + 2 * LV_BMAX) * 4, LVR: ntiles * 8, LVA: cell, LVB: cell, LVF: cell, LVP: on ? n * 8 : 16 };
+  return { LVT: ntiles * 32, LVX: lvxWords(w, h, ntiles) * 4, LVS: (16 + 2 * LV_BMAX) * 4, LVR: ntiles * 32, LVA: cell, LVB: cell, LVF: cell, LVP: on ? n * 8 : 16 };
 }
 
 /** The levelling's uniforms for a step of dt on mm cells (film-level.mjs levelFilm). `o.tiltX`, `o.tiltY`: sheet.tilt. */
@@ -41,10 +41,12 @@ export function encodeLevel(run, o, mm, lv, tiles) {
   run('lv_init', tiles);
   for (let r = 0; r < relax; r++) run('lv_dist', tiles, { LVMEN: r === relax - 1 ? 1 : 0 });
   run('lv_rhs', tiles); run('lv_cg0', boxes);
+  // two dispatches an iteration: the box sums between them are taken in the tile kernels (film-level-wgsl.mjs lv_cg_a)
   for (let it = 0; it < lv.iters; it++) {
-    const par = { LVPAR: it & 1 };
-    run('lv_cg_a', tiles, par); run('lv_cg_b', boxes); run('lv_cg_c', tiles, par); run('lv_cg_d', boxes);
+    const par = it === 0 ? { LVPAR: 0, LVK0: 1 } : { LVPAR: it & 1 };
+    run('lv_cg_a', tiles, par); run('lv_cg_c', tiles, par);
   }
+  if (lv.iters > 0) run('lv_cg_d', boxes, { LVPAR: (lv.iters - 1) & 1 });
   run('lv_flux', tiles); run('lv_out', tiles); run('lv_subs', boxes);
   for (let r = 0; r < lv.subs; r++) { run('lv_s1', tiles, { LVROUND: r }); run('lv_s2', tiles, { LVROUND: r }); }
 }

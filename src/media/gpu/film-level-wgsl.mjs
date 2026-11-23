@@ -40,9 +40,10 @@ export const filmLevelWgsl = ({ channel = 'klAt', count = 'u.nAct' } = {}) => `
 @group(0) @binding(55) var<storage, read_write> LVB: array<vec4<f32>>;   // d, r, z, q
 @group(0) @binding(56) var<storage, read_write> LVP: array<f32>;         // p, two planes in turn
 @group(0) @binding(57) var<storage, read_write> LVF: array<vec4<f32>>;   // west face flux (+x), north face flux (+y), water scale, meniscus distance
-@group(0) @binding(58) var<storage, read_write> LVR: array<f32>;         // two partial sums per LT tile
+@group(0) @binding(58) var<storage, read_write> LVR: array<f32>;         // per LT tile 8: pq, then rr and rz for even and odd iterations
 override LVPAR: u32 = 0u;
 override LVROUND: u32 = 0u;
+override LVK0: bool = false;
 override LVMEN: bool = false;
 const LV_BMAX: u32 = ${LV_BMAX}u;
 const LV_NONE: u32 = 0xffffffffu;
@@ -335,15 +336,16 @@ fn lv_rhs(@builtin(workgroup_id) wid: vec3<u32>, @builtin(num_workgroups) nw: ve
     lvSum[li] = bb; lvSum2[li] = rz;
     workgroupBarrier();
     lvReduce2(li);
-    if (li == 0u) { LVR[2u * j] = lvSum[0]; LVR[2u * j + 1u] = lvSum2[0]; }
+    if (li == 0u) { LVR[8u * j + 3u] = lvSum[0]; LVR[8u * j + 4u] = lvSum2[0]; }
     workgroupBarrier();
   }
 }
-// one workgroup a box: the sums of its tiles' partials (slot s), left in lvSum[0] and lvSum2[0]
-fn lvBoxSums(b: u32, li: u32) {
+// The sums over box b's tiles of their partials in slots sa and sc of LVR, left in lvSum[0] and lvSum2[0]: always in the
+// same order, so every workgroup that sums a box gets the same floats.
+fn lvBoxSums(b: u32, li: u32, sa: u32, sc: u32) {
   let B = lvBX(b); let off = LVX[B + 7u]; let n = LVX[B + 8u];
   var a = 0.0; var c = 0.0;
-  for (var q = li; q < n; q += 256u) { a += LVR[2u * (off + q)]; c += LVR[2u * (off + q) + 1u]; }
+  for (var q = li; q < n; q += 256u) { a += LVR[8u * (off + q) + sa]; c += LVR[8u * (off + q) + sc]; }
   lvSum[li] = a; lvSum2[li] = c;
   workgroupBarrier();
   lvReduce2(li);
@@ -358,7 +360,7 @@ fn lv_cg0(@builtin(workgroup_id) wid: vec3<u32>, @builtin(num_workgroups) nw: ve
     let B = lvBX(b);
     if (li == 0u) { lvBox = select(0u, 1u, lvActive(b) && LVX[B + 8u] > 0u); }
     if (workgroupUniformLoad(&lvBox) == 0u) { if (li == 0u) { LVX[B + 14u] = 0u; } continue; }
-    lvBoxSums(b, li);
+    lvBoxSums(b, li, 3u, 4u);
     if (li == 0u) {
       let bb = lvSum[0]; let tol = max(1e-24, 1e-12 * bb);
       LVX[B + 9u] = 0u; LVX[B + 10u] = 0u; LVX[B + 11u] = bitcast<u32>(lvSum2[0]); LVX[B + 12u] = bitcast<u32>(tol); LVX[B + 13u] = 0u;
@@ -369,17 +371,39 @@ fn lv_cg0(@builtin(workgroup_id) wid: vec3<u32>, @builtin(num_workgroups) nw: ve
   }
 }
 fn lvRunning(b: u32) -> bool { return lvState(b) == 1u; }
+// Each CG iteration k is two dispatches, lv_cg_a and lv_cg_c (LVPAR = k & 1); lv_cg_d closes the last one. A box's
+// alpha and beta come from the sums of its tiles' partials, which every workgroup holding one of the box's tiles takes
+// itself (lvBoxSums, in one order, so the same floats) instead of a per-box dispatch between them. Iteration k's rr and rz
+// partials are in LVR slots 1 + 2 LVPAR and 2 + 2 LVPAR, so the next iteration reads them while it writes its own; the
+// workgroup holding the box's first tile writes the box's words (LVX), which no other workgroup reads in the same dispatch.
+var<workgroup> lvGo: u32;
+var<workgroup> lvCoef: f32;
 @compute @workgroup_size(16, 16)
 fn lv_cg_a(@builtin(workgroup_id) wid: vec3<u32>, @builtin(num_workgroups) nw: vec3<u32>, @builtin(local_invocation_id) lid: vec3<u32>, @builtin(local_invocation_index) li: u32) {
   if (li == 0u) { lvCount = LVX[1]; }
   let count = workgroupUniformLoad(&lvCount);
-  let po = LVPAR * u.n; let pn = (1u - LVPAR) * u.n;
+  let po = LVPAR * u.n; let pn = (1u - LVPAR) * u.n; let prev = 1u - LVPAR;
   for (var j = wid.x; j < count; j += nw.x) {
     let t = LVX[lvLT() + j];
     if (li == 0u) { let bx = LVX[lvTR(((t / u.tw) / 2u) * lvTw32() + (t % u.tw) / 2u) + 7u]; lvBox = select(LV_NONE, bx, lvRunning(bx)); }
     let b = workgroupUniformLoad(&lvBox);
     if (b == LV_NONE) { continue; }
-    let beta = bitcast<f32>(LVX[lvBX(b) + 10u]);
+    var beta = bitcast<f32>(LVX[lvBX(b) + 10u]);
+    if (!LVK0) {
+      // the close of iteration k - 1 (as lv_cg_d): beta, and whether the box is done
+      lvBoxSums(b, li, 1u + 2u * prev, 2u + 2u * prev);
+      if (li == 0u) {
+        let B = lvBX(b); let rr = lvSum[0]; let next = lvSum2[0];
+        let it = LVX[B + 13u] + 1u; let met = rr <= bitcast<f32>(LVX[B + 12u]); let done = met || f32(it) >= u.lvIt;
+        lvCoef = next / bitcast<f32>(LVX[B + 11u]); lvGo = select(1u, 0u, done);
+        if (j == LVX[B + 7u]) {
+          LVX[B + 10u] = bitcast<u32>(lvCoef); atomicMax(&LVS[3], it);
+          if (done) { LVX[B + 14u] = 3u; if (!met) { atomicAdd(&LVS[4], 1u); } }
+        }
+      }
+      if (workgroupUniformLoad(&lvGo) == 0u) { continue; }
+      beta = lvCoef;
+    }
     var pq = 0.0;
     let c = lvCellOf(t, lid);
     if (c.z != 0u) {
@@ -395,21 +419,7 @@ fn lv_cg_a(@builtin(workgroup_id) wid: vec3<u32>, @builtin(num_workgroups) nw: v
     lvSum[li] = pq; lvSum2[li] = 0.0;
     workgroupBarrier();
     lvReduce2(li);
-    if (li == 0u) { LVR[2u * j] = lvSum[0]; }
-    workgroupBarrier();
-  }
-}
-@compute @workgroup_size(256)
-fn lv_cg_b(@builtin(workgroup_id) wid: vec3<u32>, @builtin(num_workgroups) nw: vec3<u32>, @builtin(local_invocation_index) li: u32) {
-  let nb = lvBoxCount(li);
-  for (var b = wid.x; b < nb; b += nw.x) {
-    if (li == 0u) { lvBox = select(0u, 1u, lvRunning(b)); }
-    if (workgroupUniformLoad(&lvBox) == 0u) { continue; }
-    lvBoxSums(b, li);
-    if (li == 0u) {
-      let B = lvBX(b); let pq = lvSum[0];
-      if (!(pq > 0.0)) { LVX[B + 14u] = 3u; } else { LVX[B + 9u] = bitcast<u32>(bitcast<f32>(LVX[B + 11u]) / pq); }
-    }
+    if (li == 0u) { LVR[8u * j] = lvSum[0]; }
     workgroupBarrier();
   }
 }
@@ -417,13 +427,24 @@ fn lv_cg_b(@builtin(workgroup_id) wid: vec3<u32>, @builtin(num_workgroups) nw: v
 fn lv_cg_c(@builtin(workgroup_id) wid: vec3<u32>, @builtin(num_workgroups) nw: vec3<u32>, @builtin(local_invocation_id) lid: vec3<u32>, @builtin(local_invocation_index) li: u32) {
   if (li == 0u) { lvCount = LVX[1]; }
   let count = workgroupUniformLoad(&lvCount);
-  let pn = (1u - LVPAR) * u.n;
+  let pn = (1u - LVPAR) * u.n; let prev = 1u - LVPAR;
   for (var j = wid.x; j < count; j += nw.x) {
     let t = LVX[lvLT() + j];
     if (li == 0u) { let bx = LVX[lvTR(((t / u.tw) / 2u) * lvTw32() + (t % u.tw) / 2u) + 7u]; lvBox = select(LV_NONE, bx, lvRunning(bx)); }
     let b = workgroupUniformLoad(&lvBox);
     if (b == LV_NONE) { continue; }
-    let alpha = bitcast<f32>(LVX[lvBX(b) + 9u]);
+    // alpha (as lv_cg_b did): this iteration's pq over the box's last rz
+    lvBoxSums(b, li, 0u, 2u + 2u * prev);
+    if (li == 0u) {
+      let B = lvBX(b); let pq = lvSum[0]; let rz = lvSum2[0];
+      lvCoef = rz / pq; lvGo = select(0u, 1u, pq > 0.0);
+      if (j == LVX[B + 7u]) {
+        if (!(pq > 0.0)) { LVX[B + 14u] = 3u; }
+        else { LVX[B + 9u] = bitcast<u32>(lvCoef); LVX[B + 11u] = bitcast<u32>(rz); LVX[B + 13u] = LVX[B + 13u] + select(1u, 0u, LVK0); }
+      }
+    }
+    if (workgroupUniformLoad(&lvGo) == 0u) { continue; }
+    let alpha = lvCoef;
     var rr = 0.0; var rz = 0.0; var has = false; var v = vec4<f32>(0.0); var diag = 1.0; var cp = vec4<f32>(0.0); var i = 0u;
     let c = lvCellOf(t, lid);
     if (c.z != 0u) {
@@ -438,17 +459,18 @@ fn lv_cg_c(@builtin(workgroup_id) wid: vec3<u32>, @builtin(num_workgroups) nw: v
     lvSum[li] = rr; lvSum2[li] = rz;
     workgroupBarrier();
     lvReduce2(li);
-    if (li == 0u) { LVR[2u * j] = lvSum[0]; LVR[2u * j + 1u] = lvSum2[0]; }
+    if (li == 0u) { LVR[8u * j + 1u + 2u * LVPAR] = lvSum[0]; LVR[8u * j + 2u + 2u * LVPAR] = lvSum2[0]; }
     workgroupBarrier();
   }
 }
+// the close of the last iteration (LVPAR its parity)
 @compute @workgroup_size(256)
 fn lv_cg_d(@builtin(workgroup_id) wid: vec3<u32>, @builtin(num_workgroups) nw: vec3<u32>, @builtin(local_invocation_index) li: u32) {
   let nb = lvBoxCount(li);
   for (var b = wid.x; b < nb; b += nw.x) {
     if (li == 0u) { lvBox = select(0u, 1u, lvRunning(b)); }
     if (workgroupUniformLoad(&lvBox) == 0u) { continue; }
-    lvBoxSums(b, li);
+    lvBoxSums(b, li, 1u + 2u * LVPAR, 2u + 2u * LVPAR);
     if (li == 0u) {
       let B = lvBX(b); let rr = lvSum[0]; let next = lvSum2[0];
       LVX[B + 10u] = bitcast<u32>(next / bitcast<f32>(LVX[B + 11u])); LVX[B + 11u] = bitcast<u32>(next);
