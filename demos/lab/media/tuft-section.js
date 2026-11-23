@@ -112,8 +112,9 @@ function coneDist(X, Y, h, r1, r2) {
 }
 // Signed distance to a box of half-extents (a, b) with corners rounded at rc.
 function boxDist(u, v, a, b, rc) {
-  const qx = Math.abs(u) - a + rc, qy = Math.abs(v) - b + rc;
-  return Math.hypot(Math.max(qx, 0), Math.max(qy, 0)) + Math.min(Math.max(qx, qy), 0) - rc;
+  const qx = Math.abs(u) - a + rc, qy = Math.abs(v) - b + rc, mx = qx > 0 ? qx : 0, my = qy > 0 ? qy : 0;
+  // hypot only off a corner: with one part 0 it is the other exactly (Math.hypot is slow)
+  return (my === 0 ? mx : mx === 0 ? my : Math.hypot(mx, my)) + Math.min(Math.max(qx, qy), 0) - rc;
 }
 
 /**
@@ -168,7 +169,11 @@ function flatFootprint(g, w, X0, Y0, X1, Y1, visit) {
     const px = x + 0.5, py = y + 0.5;
     let best = Infinity, across = 0;
     for (let q = 0; q < sub.length; q += 3) {
-      const dx = px - sub[q], dy = py - sub[q + 1], a = sub[q + 2], u = dx * bx + dy * by, v = dx * nx + dy * ny;
+      const dx = px - sub[q], dy = py - sub[q + 1], a = sub[q + 2];
+      // the blade lies within its box's circumcircle: one that cannot come nearer than the nearest so far is passed over
+      // (with a margin over rounding, so the result is the same)
+      if (Math.sqrt(dx * dx + dy * dy) - Math.sqrt(a * a + thick * thick) - 1e-6 >= best) continue;
+      const u = dx * bx + dy * by, v = dx * nx + dy * ny;
       const d = boxDist(u, v, a, thick, Math.min(thick, a));
       if (d < best) { best = d; across = a > 1e-6 ? Math.max(-1, Math.min(1, u / a)) : 0; }
     }

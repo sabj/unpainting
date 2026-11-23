@@ -14,6 +14,7 @@ import {strokePlanBudget,strokePlanShader,planMiB} from './stroke-plan-budget.mj
 import { runStrokePrefixDiagnostic } from './stroke-prefix-diagnostic.mjs';
 import { GpuTimestamps } from './gpu-timestamps.mjs';
 import { flowTime, poreTime } from '../flow-time.mjs';
+import { timeChunks, DRY_TAIL_CHUNK_DT, levelEvery, DRY_LEVEL_ITERS } from '../time-chunks.mjs';
 import { SIZING } from '../sizing.mjs';
 import { settleSpeed, settleDiffusion } from '../settling.mjs';
 import { BrushReadbacks } from './brush-readbacks.mjs';
@@ -166,7 +167,7 @@ export class GpuSheet {
     const ordinarySource=process.env.GPU_DEMAND_READBACK==='1'?this.demandShaderSource:this.demandShaderSource.replace(/@compute[^\n]*\nfn upload_metadata_rect[\s\S]*?\n}/,'').replace(/^@group\(0\) @binding\(43\).*$/m,'');
     const module = d.createShaderModule({ code: ordinarySource });
     this.module = module;
-    this.p = {}; this.bgl = {}; this.uses = {};
+    this.p = {}; this.bgl = {}; this.uses = {}; this.lvPipes = null;
     for (const name of info.entries) {
       const use = [0, ...info.uses(name).filter(b => b !== 0)]; this.uses[name] = use;
       this.bgl[name] = d.createBindGroupLayout({ entries: use.map(binding => ({ binding, visibility: GPUShaderStage.COMPUTE, buffer: { type: kind[binding] === 'uniform' ? 'uniform' : kind[binding] === 'storage, read' ? 'read-only-storage' : 'storage' } })) });
@@ -270,6 +271,12 @@ export class GpuSheet {
     q.writeBuffer(this.b.EFB, 0, new Uint32Array([b]));
     ef.count = L[0]; ef.boxes = b; this.efWriteRounds(); ef.key = key;
   }
+  efShrink(used, down) {
+    const ef = this.ef, recent = ef.recent ??= []; recent.push(used); if (recent.length > 16) recent.shift();
+    this.device.queue.writeBuffer(this.b.EFB, 12, new Uint32Array([0]));
+    const r = Math.max(4, Math.ceil(1.5 * Math.max(...recent)));
+    if (down && recent.length >= 4 && r < ef.rounds) { ef.rounds = r; this.efWriteRounds(); }
+  }
   efWriteRounds() { this.device.queue.writeBuffer(this.b.EFB, 4, new Uint32Array([this.ef.rounds])); }
   /** One step's feed, encoded in the step's pass: reset, the first substep's length, then the rounds of substeps. */
   efEncode(pass) {
@@ -302,20 +309,24 @@ export class GpuSheet {
     const d = this.device, B = this.b, size = levelBuffers(this.w, this.h, this.n, this.ntiles, on);
     const mk = bytes => d.createBuffer({ size: Math.max(16, bytes), usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST });
     for (const k of B.LVX ? ['LVA', 'LVB', 'LVF', 'LVP'] : Object.keys(size)) { B[k]?.destroy(); B[k] = mk(size[k]); }
-    this.lvBig = on; this.lv ??= levelBudget();
+    this.lvBig = on; this.lv ??= levelBudget(); this.lv.tracksWrites = true;
     if (this.bg) for (const name of Object.keys(this.bg)) if (name.startsWith('lv_')) this.bg[name] = d.createBindGroup({ layout: this.bgl[name], entries: this.uses[name].map(binding => ({ binding, resource: { buffer: this.bufFor(this.names[binding]) } })) });
   }
   lvMm(o = this.o) { return o.mmPerCell > 0 ? o.mmPerCell : (this.mmPerCell > 0 ? this.mmPerCell : 0.3); }
   /** pipeline `name` with the levelling's overrides */
   lvPipe(name, constants) {
+    // by the overrides object first (film-level-host.mjs makes each once): no key is built for a dispatch
+    const byName = this.lvPipes ??= new Map(), seen = byName.get(name) ?? byName.set(name, new Map()).get(name), hit = seen.get(constants);
+    if (hit) return hit;
     const key = `${name}#${JSON.stringify(constants)}`;
     if (!this.p[key]) this.p[key] = this.device.createComputePipeline({ label: key, layout: this.device.createPipelineLayout({ bindGroupLayouts: [this.bgl[name]] }), compute: { module: this.module, entryPoint: name, constants } });
-    return this.p[key];
+    seen.set(constants, this.p[key]); return this.p[key];
   }
   /** One step's boxes and levelling, encoded after the step's tile list. */
   lvEncode(pass) {
     if (!this.lv || !this.b?.LVX) return;   // (a sheet stood up without its buffers, as the scheduling tests make one)
     const tiles = this.persistent ? this.workers : Math.max(1, Math.min(this.cap, this.ntiles));
+    if (this.lv.since === 0) this.lv.epoch = this.epoch; else if (this.lv.epoch !== this.epoch) this.lv.epoch = -1;
     encodeLevel((name, groups, constants = null) => { pass.setPipeline(constants ? this.lvPipe(name, constants) : this.p[name]); pass.setBindGroup(0, this.bg[name]); pass.dispatchWorkgroups(groups); }, this.o, this.lvMm(), this.lv, tiles);
   }
   /** The levelling's budgets brought up to what the last steps needed (film-level-host.mjs adaptLevel). */
@@ -323,11 +334,11 @@ export class GpuSheet {
     if (!this.lvBig || !levelOn(this.o)) return;
     const v = status ?? new Uint32Array(await this.readWords('LVS', 48));
     this.device.queue.writeBuffer(this.b.LVS, 12, new Uint32Array(9));
-    if (adaptLevel(this.lv, v)) this.setOptions({});
+    if (adaptLevel(this.lv, v, this.lv.epoch !== this.epoch)) this.setOptions({});
   }
   /** The levelling's counts since the sheet was made (the most CG iterations and substeps a step used, the solves and
    *  boxes that got less than they needed), and the budgets now. */
-  levelStats() { const { iters, subs, boxes, total } = this.lv ?? {}; return { ...(total ?? {}), budget: { iterations: iters, subs, boxes } }; }
+  levelStats() { const { iters, subs, boxes, total, lightSteps } = this.lv ?? {}; return { ...(total ?? {}), lightSteps, budget: { iterations: iters, subs, boxes } }; }
 
   bufFor(name) { return name === 'u' ? this.b.U : name === 'rc' ? this.b.RC : name === 'PACK' ? this.pack() : this.b[name]; }
   pack() { return this.b.PACK ?? (this.b.PACK = this.device.createBuffer({ size: 16, usage: GPUBufferUsage.STORAGE })); }
@@ -345,7 +356,7 @@ export class GpuSheet {
     set('p3', this.resident ? (this.persistent ? 2 : 1) : 0); set('cap', this.cap); set('hasTop', this.hasTop ? 1 : 0); set('holdOn', Number.isFinite(o.hold ?? Infinity) ? 1 : 0);
     const requestedDt = o.dt ?? 1;
     if (!Number.isFinite(requestedDt) || requestedDt < 0) throw new RangeError('dt must be finite and nonnegative');
-    this.timeChunks = Math.max(1, Math.ceil(requestedDt / 2));
+    this.timeChunks = timeChunks(requestedDt, this.chunkDt);
     const dt = requestedDt / this.timeChunks, sub = { ...o, dt };
     this.flowTime = flowTime(sheet, sub); this.poreTime = poreTime(sheet, sub);
     const fraction = this.flowTime.fraction;
@@ -769,7 +780,11 @@ export class GpuSheet {
       if (st[4]) { this.ef.stale = true; this.ef.batch = 1; } else this.ef.batch = Math.min(EF_BATCH, 2 * (this.ef.batch ?? 1));
       // a step used most of the rounds it had: give it more before one runs short (the last round takes all the time left)
       // (washes at 0.1 mm cells take up to 12 substeps a step; a quarter of the rounds are kept spare)
-      if (st[3] > 0.75 * this.ef.rounds && this.ef.rounds < EF_RMAX) { this.ef.rounds = Math.min(EF_RMAX, 2 * this.ef.rounds); this.efWriteRounds(); }
+      const grow = st[3] > 0.75 * this.ef.rounds && this.ef.rounds < EF_RMAX;
+      if (grow) { this.ef.rounds = Math.min(EF_RMAX, 2 * this.ef.rounds); this.efWriteRounds(); }
+      // and back down to half as many again as the most the last 16 reads used (no fewer than 4): every round encoded is two
+      // dispatches a step, used or not. EFB[3] is cleared after each read, so it is the most since the last.
+      this.efShrink(st[3], !grow);
       if (this.ef.stale) await this.efRefresh();
       const k = Math.min(this.ef.batch, steps - done);
       batch = this.device.createCommandEncoder();
@@ -1004,19 +1019,21 @@ export class GpuSheet {
   // schedule's decisions fall at the same steps however it is split: the level check at multiples of 25 from `level` on and
   // at levelMax, the faster time from then on.
   dryBegin(max = 40000, O = this.o, { level = 60, levelMax = 4000, levelTol = 0.02, dt = 2, analyticTail = false, allowWet = false } = {}) {
-    const oLevel = O.dt ?? 1; this.setOptions({ dt: oLevel });
+    const oLevel = O.dt ?? 1; this.chunkDt = undefined; if (this.lv) { this.lv.hold = false; this.lv.cap = analyticTail ? DRY_LEVEL_ITERS : 0; if (this.lv.cap) this.lv.iters = Math.min(this.lv.iters, this.lv.cap); } this.setOptions({ dt: oLevel });
     if (analyticTail) dt *= FAST_DRY_DT_SCALE;
-    this.dryS = { analyticTail, allowWet, t: 0, fast: false, done: false, max, level, levelMax, levelTol, dt, oLevel, fastChunk:50,chunkOverride:process.env.GPU_FAST_DRY_CHUNK == null ? null : fastDryChunk(process.env.GPU_FAST_DRY_CHUNK),counterReads:0,counterReadMs:0,fastIterations:0,fastChunks:0 };
+    this.dryS = { analyticTail, every: levelEvery(analyticTail), allowWet, t: 0, fast: false, done: false, max, level, levelMax, levelTol, dt, oLevel, fastChunk:50,chunkOverride:process.env.GPU_FAST_DRY_CHUNK == null ? null : fastDryChunk(process.env.GPU_FAST_DRY_CHUNK),counterReads:0,counterReadMs:0,fastIterations:0,fastChunks:0 };
   }
   /** Returns { t, done }: steps taken so far, and whether the sheet was found dry (no step after that changes it). */
   async dryAdvance(until = Infinity) {
     const S = this.dryS; let nextSurface = null;
     while (S.t < S.max && S.t < until && !S.done) {
-      if (!S.fast && S.t >= S.level && (S.t >= S.levelMax || (S.t % 25 === 0 && (nextSurface ?? await this.surfaceLevel()) < S.levelTol))) { S.fast = true; S.fastAt = S.t; this.setOptions({ dt: S.dt }); }
+      // the faster time once the surface is level, or once no wet cell holds surface water (the last steps read had no level
+      // tile: the surface then measures only the paper's relief, which no step levels)
+      if (!S.fast && S.t >= S.level && (S.t >= S.levelMax || (S.t % S.every === 0 && (this.lv?.light || (nextSurface ?? await this.surfaceLevel()) < S.levelTol)))) { S.fast = true; S.fastAt = S.t; S.fastBy = this.lv?.light ? 'no film' : 'level'; if (S.analyticTail) { this.chunkDt = DRY_TAIL_CHUNK_DT; if (this.lv) this.lv.hold = true; } this.setOptions({ dt: S.dt }); }
       let stop = S.max;
       if (!S.fast) {
         if (S.t < S.levelMax) stop = Math.min(stop, S.levelMax);
-        stop = Math.min(stop, Math.max(Math.floor(S.t / 25) * 25 + 25, Math.ceil(S.level / 25) * 25));
+        stop = Math.min(stop, Math.max(Math.floor(S.t / S.every) * S.every + S.every, Math.ceil(S.level / S.every) * S.every));
       } else {
         S.fastChunk = S.chunkOverride ?? adaptiveFastDryChunk(S, this.ntiles);
         S.maxFastChunk = Math.max(S.maxFastChunk ?? 0, S.fastChunk);
@@ -1026,7 +1043,7 @@ export class GpuSheet {
       if (this.efOn) await this.efSteps(chunk, true); else this.step(chunk, 25, true);
       S.t += chunk;if(S.fast){S.fastIterations+=chunk;S.fastChunks++;}
       // fold the next surface-level query into the counter readback; it sees the same post-step state
-      const needLevel=this.resident && !S.fast && S.t>=S.level && S.t<S.levelMax && S.t%25===0;
+      const needLevel=this.resident && !S.fast && S.t>=S.level && S.t<S.levelMax && S.t%S.every===0;
       if(needLevel)this.encodeLevel();
       const readStarted=performance.now(),c = await this.counters();S.counterReads++;S.counterReadMs+=performance.now()-readStarted;this.noteCount(c[0]);
       S.lastWetCounter=c[1]; if (!this.efOn) await this.lvAdapt?.();
@@ -1069,8 +1086,8 @@ export class GpuSheet {
     if (process.env.DRY_TRACE2) console.error(`DRYT t=${S.t} fastAt=${S.fastAt} level=${S.level} levelMax=${S.levelMax} dt=${S.dt} tail=${S.analyticTail} tailUsed=${!!S.analyticTailUsed} adaptive=${!!S.adaptiveUsed} damp=${!!S.dampOnly} dampAt=${S.dampAt} cnt=${S.lastCounters?.[0]} hist=${(S.hist??[]).join(",")}`);
     let c;if(this.resident&&S.lastCounters&&S.lastEpoch===this.epoch)c=S.lastCounters;else{const readStarted=performance.now();c=await this.counters();S.counterReads++;S.counterReadMs+=performance.now()-readStarted;} this.lastStillWet = 0; if (c[1] !== 0) { if (!S.allowWet) throw new Error(`Sheet is still wet after dry() limit of ${S.max} steps`); this.lastStillWet = c[1]; this.evaporateInPlace(); }
     this.lastDryZero = !!(S.analyticTailUsed || c[1] !== 0);
-    this.setOptions({ dt: S.oLevel });
-    const m=this.dryTelemetry??(this.dryTelemetry={calls:0,counterReads:0,counterReadMs:0,fastIterations:0,fastChunks:0});m.calls++;m.counterReads+=S.counterReads;m.counterReadMs+=S.counterReadMs;m.fastIterations+=S.fastIterations;m.fastChunks+=S.fastChunks;m.fastChunk=S.fastChunk;m.maxFastChunk=Math.max(m.maxFastChunk??0,S.maxFastChunk??0);m.lastWetCounter=c[1];m.analyticTailCalls=(m.analyticTailCalls??0)+(S.analyticTailUsed?1:0);
+    this.chunkDt = undefined; if (this.lv) { this.lv.hold = false; this.lv.cap = 0; } this.setOptions({ dt: S.oLevel });
+    const m=this.dryTelemetry??(this.dryTelemetry={calls:0,counterReads:0,counterReadMs:0,fastIterations:0,fastChunks:0});m.calls++;m.counterReads+=S.counterReads;m.counterReadMs+=S.counterReadMs;m.fastIterations+=S.fastIterations;m.fastChunks+=S.fastChunks;m.fastChunk=S.fastChunk;m.maxFastChunk=Math.max(m.maxFastChunk??0,S.maxFastChunk??0);m.lastWetCounter=c[1];m.analyticTailCalls=(m.analyticTailCalls??0)+(S.analyticTailUsed?1:0);m.fastByNoFilm=(m.fastByNoFilm??0)+(S.fastBy==='no film'?1:0);m.levelSteps=(m.levelSteps??0)+(S.fastAt??S.t);
     return S.t;
   }
   /**
