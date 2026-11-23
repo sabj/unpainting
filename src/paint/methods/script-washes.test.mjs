@@ -180,3 +180,11 @@ test('a look plans what is small as the final sheet will: the same strokes are s
   assert.deepEqual(full.summary.smallStrokesLaidDry ?? [], []); assert.equal(at(160).summary.smallStrokesLaidDry.length, 1, 'planned alone, the look calls it small');
   assert.throws(() => at(160, 100), /finalwidth/);
 });
+
+test('a stroke written point by point may give the hand speed at each point (mm/s); without one it is laid as before', () => {
+  const at = (pts) => passageStrokes({ id: 'v', kind: 'strokes', brush: 'r8', strokes: [{ points: pts }] }, brushes)[0].points;
+  const plain = at([[10, 10, 0.2], [20, 12, 1], [30, 10, 0.1]]), fast = at([[10, 10, 0.2, 20], [20, 12, 1, 60], [30, 10, 0.1, 900]]);
+  assert.deepEqual(plain.map(q => q.length), [3, 3, 3], 'no speed given: three numbers a point, as before');
+  assert.deepEqual(fast.map(q => q.slice(0, 3)), plain, 'the speed changes nothing else of the stroke');
+  assert.deepEqual(fast.map(q => q[3]), [20, 60, 400], 'the speed is carried to the brush, held to 2 to 400 mm/s');
+});

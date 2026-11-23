@@ -48,7 +48,7 @@ Code: `src/paint/methods/script-washes.mjs` (the plan), `src/paint/methods/scrip
 | `kind` | `wash` (overlapping strokes of a brush sized to it, about a third of its width, unless `brush` is named), `strokes` (a few separate strokes), `touches` (short marks scattered like a hand), `lines` (the point along each of `paths`) |
 | `region` / `regions` | loose polygons (mm) that place the strokes; a guide to the hand, never a clip |
 | `paths` | polylines the point follows, for `lines` |
-| `strokes` | strokes written one by one: `{points: [[x, y, pressure], ...]}`, or `{from|at: [x, y], direction, lengthMm, pressure: [...], path}`; a stroke may name its own `brush` |
+| `strokes` | strokes written one by one: `{points: [[x, y, pressure], ...]}` (a point may add the hand's speed there in mm/s: `[x, y, pressure, speed]`), or `{from|at: [x, y], direction, lengthMm, pressure: [...], path}`; a stroke may name its own `brush` |
 | `count`, `character` | for groups: how many, and `size` (even, varied), `spread` (scattered, clustered, along a line), `denser` (top, bottom, left, right, edges, middle) |
 | `paint` | pigment parts; `swatch` (or `dilution`: very pale, pale, medium, strong, rich, dark) is the mix as one wash on white paper, and sets its strength |
 | `paper` | `dry`; `wet` (clean water first, or with `into` into the wet passage just before); `damp` with `into` (laid beside the passage just before as it loses its shine) |

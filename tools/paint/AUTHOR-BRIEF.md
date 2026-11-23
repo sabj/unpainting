@@ -81,6 +81,37 @@ What holds physically, and what painters usually do:
   outline-and-fill; rows, grids or even spacing; thousands of specks; warm or dark blobs that belong to nothing.
   If you do one of these on purpose, that is your choice.
 
+## Shaping a form with the brush (advice)
+
+A brush is as wide as it is pressed, and a stroke changes as it travels. Use that to make a form in one stroke, or in
+two or three, instead of outlining a shape and filling it with an even wash. A flat, evenly toned patch standing in
+for a form is the commonest thing that makes a sheet look made by a machine.
+
+One stroke, one form. Write the points along the form, with the pressure at each: low where the brush lands on its
+point or lifts off, high where it presses onto its belly. (`r10` here is a brush the script names in `brushes`:
+`{ "r10": { "shape": "round", "widthMm": 10 } }`.)
+
+- A leaf or a petal: land on the point, press through the middle, lift back to the point, along a slight curve:
+  `{ "kind": "strokes", "brush": "r10", "strokes": [ { "points": [[40, 60, 0.05], [46, 55, 0.6], [53, 52, 1.0],
+  [60, 52, 0.8], [66, 55, 0.3], [70, 59, 0.05]] } ] }`
+- A wet belly and a dry, broken tail: slow where it is pressed, fast as it lifts:
+  `[[40, 80, 0.9, 20], [55, 82, 0.8, 30], [70, 83, 0.4, 120], [82, 83, 0.2, 200]]`
+- A wedge of shadow: `"handling": { "mark": "wedge" }` (a flat pressed hard where it is darkest, lifted as it goes).
+- A comma or a hook: `"mark": "comma"` or `"hook"`. A fold of cloth, a curling ribbon: `"mark": "ribbon"`.
+- Paper sparkling through a dry stroke: `"mark": "drag"` or `"flying-white"`, `"handling": { "load": "dry",
+  "speed": "fast" }`.
+
+Two or three strokes, a whole form. Lay them side by side, each following the form, the later ones `into` the earlier
+with `wait: "none"` so they join soft. A rock: a pale stroke over its top, a darker one along its middle, the darkest
+along its foot, pressed on the shadow side and lifted out along the ground as its cast shadow. A mass of foliage: four
+or five leaf strokes fanned from the root, each its own length and press (`"mark": "leaf-group"`, or written one by
+one). A sleeve: two or three strokes down the arm, each following a fold, the darkest in the crook.
+
+A wash or strokes: a wash (`kind: "wash"`, the painter's overlapping lanes) for what is big, flat and quiet: sky,
+ground, water, a wall, the first light over a whole figure. Shaped strokes (`kind: "strokes"`) for anything with a
+shape of its own (a leaf, a fold, a rock, a hull, a sleeve, the wedge of a shadow), for shadows and for darks. Many
+good sheets use few washes and many shaped strokes. A passage of only `sweep` marks lays only even slabs.
+
 ## What you write, in this order
 
 Answer with ONE JSON object and nothing else (no words before or after it, no code fence). Its keys come in this
@@ -210,7 +241,12 @@ A passage:
   edge, the dark under a sill, a gate bar, a reflection. Make the path TURN where the stroke turns and the pressure
   SWELL where the brush presses and THIN where it lifts: a streak may land on the point, swell, drag and flick off at an
   angle; a branch thins as it goes out; a shadow edge presses hard on its found side. A group of many small touches is
-  given instead as `region`, `count` and `character`, and the painter scatters them. A form's base wash is usually `kind: "wash"`.
+  given instead as `region`, `count` and `character`, and the painter scatters them. A point may carry a fourth
+  number, the hand's speed there in mm/s (about 20 slow and wet, 60 usual, 150 and over fast and dry, which breaks up);
+  without it the brush keeps its own pace. A stroke written point by point is laid with a round belly of its brush's
+  width; a flat's blade comes from the named marks below (`sweep`, `wedge`, `ribbon`, `drag`, `edge`).
+  A form may be laid as a wash or as a few shaped strokes; both are normal. Choose by the form (see "Shaping a form
+  with the brush").
   Write strokes in the order a hand would travel: finish one area before the next, neighbours after each other, long
   strokes before short; the replay is watched.
 - `handling.mark`: name a mark from the vocabulary of real brush marks below. The painter lays each stroke you place
@@ -280,7 +316,8 @@ A passage:
   a pale passage.
 - **Layer count and checkpoints**: the script has `stage` (1 to 5) and `glaze` numbering only. Nothing counts layers
   at a spot for you, and a checkpoint is its stage.
-- **How the brush meets the paper**: `handling.hold`, `start`, `pressure`, `mark`.
+- **How the brush meets the paper**: `handling.hold`, `start`, `pressure`, `mark`; in a written stroke, the pressure
+  and the hand's speed at each point. A flat's blade angle cannot be written point by point.
 
 ## Before you answer
 

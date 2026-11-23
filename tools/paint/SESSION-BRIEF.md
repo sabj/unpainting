@@ -20,7 +20,8 @@ What you have to work with, all of it yours to use:
 - The three studies, coarse to fine. Study 3, the fine study, is close to the subject itself in shape, value and
   colour.
 - **The drawing, and it is yours.** Its medium: pencil, pen, or no drawing at all, whatever the subject seems to be
-  drawn in (`"medium"` in `choice.json`). Its prepared lines: which are drawn before the washes, which after them
+  drawn in (`"medium"` in `choice.json`). No drawing is a normal choice: the prepared drawing is offered, not
+  required. Its prepared lines: which are drawn before the washes, which after them
   over the dry paint, which not at all, and how dark each is. And lines of your own: drawn where you put them, point
   by point, in pen or pencil, at the width and darkness you give, before or after the washes (`"lines"` beside any
   choice; `README.md`).

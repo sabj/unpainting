@@ -195,9 +195,16 @@ export function lines(paths, { widthMm, pressure = PRESSURES.medium, hold = 'upr
   });
 }
 
-/** A stroke given point by point in the script ([x, y, pressure] each), laid as written with a hand's small waver. */
+/** The slowest and fastest hand speed (mm/s) a written point may give; the mark library's own run 6 to about 180. */
+const SPEED_LEAST = 2, SPEED_MOST = 400;
+
+/** A stroke given point by point in the script ([x, y, pressure] each, or [x, y, pressure, speed] with the hand's speed
+ *  there in mm/s), laid as written with a hand's small waver. A point without a speed leaves it to the brush. */
 export function written(points, { widthMm, rng }) {
-  return { kind: 'sweep', radiusMm: round3(widthMm / 2), points: points.map(([x, y, p]) => pt(x + rng.range(-0.06, 0.06), y + rng.range(-0.06, 0.06), (p ?? 0.7) * rng.range(0.96, 1.04))) };
+  return { kind: 'sweep', radiusMm: round3(widthMm / 2), points: points.map(([x, y, p, v]) => {
+    const q = pt(x + rng.range(-0.06, 0.06), y + rng.range(-0.06, 0.06), (p ?? 0.7) * rng.range(0.96, 1.04));
+    return Number.isFinite(v) && v > 0 ? [...q, round3(Math.max(SPEED_LEAST, Math.min(SPEED_MOST, v)))] : q;
+  }) };
 }
 
 /**
