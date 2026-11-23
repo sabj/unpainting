@@ -10,7 +10,10 @@
 // The geometry depends on the footprint (cells the wash has wet) and on the boxes round the wet and damp cells. Each
 // step ef_watch counts the one and bounds the other, and ef_watch_end compares them with what they were when the
 // geometry was made (EFB[10..15)) and raises EFB[4] when they differ, so the host makes it again (stepfull efSteps).
-// EFB[5..10): this step's footprint count and wet box x0, y0, x1, y1.
+// EFB[5..10): this step's footprint count and wet box x0, y0, x1, y1. EFB[15]: the latest round any cell offered a
+// substep for this step (efCandidate). A box is active in round r > 0 only if round r - 1's substep was offered (else that
+// round took all its time), so rounds past EFB[15] + 1 leave at once (efLate): the rounds encoded past the need cost
+// almost nothing, and no box's sums change.
 export const EF_RMAX = 32;
 export const EF_BMAX = 256;
 // The host shader names its pigment list (`channel(a)` the a-th pigment worked on, `count` of them) and defines
@@ -39,11 +42,16 @@ fn efSub(b: u32, r: u32) -> f32 {
 }
 fn efCandidate(i: u32, b: u32, r: u32, water: f32) {
   let g = EFG[i]; let rate = g.w + g.x;
-  if (rate > 0.0 && water > 2.0 * u.wetEps) { atomicMin(&EFB[efBox(b) + 1u + r], bitcast<u32>(0.5 * water / rate)); }
+  if (rate > 0.0 && water > 2.0 * u.wetEps) {
+    atomicMin(&EFB[efBox(b) + 1u + r], bitcast<u32>(0.5 * water / rate));
+    if (r > atomicLoad(&EFB[15])) { atomicMax(&EFB[15], r); }
+  }
 }
+fn efLate(r: u32) -> bool { return r > atomicLoad(&EFB[15]) + 1u; }
 @compute @workgroup_size(256)
 fn ef_reset(@builtin(local_invocation_index) li: u32) {
   if (efHalted()) { return; }
+  if (li == 0u) { atomicStore(&EFB[15], 0u); }
   let words = atomicLoad(&EFB[0]) * (EF_RMAX + 1u);
   for (var q = li; q < words; q += 256u) { atomicStore(&EFB[16u + q], select(0x7f800000u, 0u, q % (EF_RMAX + 1u) == 0u)); }
 }
@@ -56,7 +64,7 @@ fn ef_begin(@builtin(global_invocation_id) gid: vec3<u32>) {
 }
 @compute @workgroup_size(256)
 fn ef_prep(@builtin(global_invocation_id) gid: vec3<u32>) {
-  let q = gid.x; if (q >= EFL[0] || efHalted()) { return; }
+  let q = gid.x; if (q >= EFL[0] || efLate(ROUND) || efHalted()) { return; }
   let i = EFL[1u + 2u * q]; let b = EFL[2u + 2u * q];
   if (!efActive(b, ROUND)) { return; }
   atomicMax(&EFB[3], ROUND + 1u);
@@ -77,7 +85,7 @@ fn ef_prep(@builtin(global_invocation_id) gid: vec3<u32>) {
 }
 @compute @workgroup_size(256)
 fn ef_apply(@builtin(global_invocation_id) gid: vec3<u32>) {
-  let q = gid.x; if (q >= EFL[0] || efHalted()) { return; }
+  let q = gid.x; if (q >= EFL[0] || efLate(ROUND) || efHalted()) { return; }
   let i = EFL[1u + 2u * q]; let b = EFL[2u + 2u * q];
   if (!efActive(b, ROUND)) { return; }
   let sub = efSub(b, ROUND);
