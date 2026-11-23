@@ -166,7 +166,7 @@ export class GpuSheet {
     const ordinarySource=process.env.GPU_DEMAND_READBACK==='1'?this.demandShaderSource:this.demandShaderSource.replace(/@compute[^\n]*\nfn upload_metadata_rect[\s\S]*?\n}/,'').replace(/^@group\(0\) @binding\(43\).*$/m,'');
     const module = d.createShaderModule({ code: ordinarySource });
     this.module = module;
-    this.p = {}; this.bgl = {}; this.uses = {};
+    this.p = {}; this.bgl = {}; this.uses = {}; this.lvPipes = null;
     for (const name of info.entries) {
       const use = [0, ...info.uses(name).filter(b => b !== 0)]; this.uses[name] = use;
       this.bgl[name] = d.createBindGroupLayout({ entries: use.map(binding => ({ binding, visibility: GPUShaderStage.COMPUTE, buffer: { type: kind[binding] === 'uniform' ? 'uniform' : kind[binding] === 'storage, read' ? 'read-only-storage' : 'storage' } })) });
@@ -308,9 +308,12 @@ export class GpuSheet {
   lvMm(o = this.o) { return o.mmPerCell > 0 ? o.mmPerCell : (this.mmPerCell > 0 ? this.mmPerCell : 0.3); }
   /** pipeline `name` with the levelling's overrides */
   lvPipe(name, constants) {
+    // by the overrides object first (film-level-host.mjs makes each once): no key is built for a dispatch
+    const byName = this.lvPipes ??= new Map(), seen = byName.get(name) ?? byName.set(name, new Map()).get(name), hit = seen.get(constants);
+    if (hit) return hit;
     const key = `${name}#${JSON.stringify(constants)}`;
     if (!this.p[key]) this.p[key] = this.device.createComputePipeline({ label: key, layout: this.device.createPipelineLayout({ bindGroupLayouts: [this.bgl[name]] }), compute: { module: this.module, entryPoint: name, constants } });
-    return this.p[key];
+    seen.set(constants, this.p[key]); return this.p[key];
   }
   /** One step's boxes and levelling, encoded after the step's tile list. */
   lvEncode(pass) {
