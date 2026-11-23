@@ -152,7 +152,7 @@ What to know:
   can be rubbed out with an erase passage in your own script or added to an edited plan, anywhere in the order:
   `{ "own": { "id": "e1", "kind": "erase", "stage": 1, "widthMm": 3, "strokes": [{ "points": [[x, y, 1], [x, y, 1]] }] } }`
   (or a `region` with `handling.pressure`). Before the first wash a firm rub takes most of the pencil off; after a wash
-  has dried it takes far less (about a fifth under a pale wash, under a tenth under a dark one). The eraser needs dry
+  has dried it takes far less (about a fifth under a pale wash, a twentieth under a medium one, less under a dark one). The eraser needs dry
   paper: leave its `wait` at `dry`. `./unpaint plan` says what each erase will take.
 
 ## Your own named forms

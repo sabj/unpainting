@@ -27,9 +27,9 @@ test('an erase passage is checked plainly, and its strokes are its own or lanes 
   assert.ok(lanes.every(s => s.points.every(q => q[2] === 0.6)), 'lanes rub at the passage pressure');
 });
 
-test('what an eraser takes is the kit eraser\'s: most from bare paper, about a fifth under a pale wash, under a tenth under a dark one', () => {
+test('what an eraser takes is the kit eraser\'s: most from bare paper, about a fifth under a pale wash, a twentieth under a medium one', () => {
   const t = eraserTakes(1);
-  assert.equal(t.bare, 0.85); assert.ok(t.underPale > 0.15 && t.underPale < 0.25, `${t.underPale}`); assert.ok(t.underDark < 0.1, `${t.underDark}`); assert.equal(t.paint, 0.02);
+  assert.equal(t.bare, 0.85); assert.ok(t.underPale > 0.15 && t.underPale < 0.25, `${t.underPale}`); assert.ok(t.underMedium > 0.03 && t.underMedium < 0.06, `${t.underMedium}`); assert.equal(t.paint, 0.02);
   assert.ok(eraserTakes(0.3).bare < 0.3);
 });
 
@@ -48,7 +48,7 @@ test('a script places an erase anywhere in its order: its own pass, its strokes 
   assert.equal(q[0].erase.warning, null); assert.match(q[1].erase.warning, /WARNING, erase e2: it follows a passage laid wet with wait "none"/);
   assert.ok(said.some(l => /WARNING, erase e2/.test(l)));
   const text = eraseSaid(got.instructions);
-  assert.match(text, /e1 \(1 stroke, 3 mm eraser, pressure 1\) takes off about 85% of the pencil where it passes bare paper, about 19% under a pale dried wash and 8% under a dark one, and 2% of the paint/);
+  assert.match(text, /e1 \(1 stroke, 3 mm eraser, pressure 1\) takes off about 85% of the pencil where it passes bare paper, about 19% under a pale dried wash, 4% under a medium one and less under a dark one, and 2% of the paint/);
   assert.match(text, /100% of its path lies on paint planned before it/);
   const s = planSummary({ passes: got.instructions, summary: got.summary });
   assert.deepEqual([s.erases.passages, s.erases.strokes], [2, 2]); assert.equal(s.erases.said, text);

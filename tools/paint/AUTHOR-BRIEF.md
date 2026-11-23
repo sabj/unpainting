@@ -257,7 +257,7 @@ A passage:
   be rubbed out. An erase passage takes no paint or brush: `"widthMm"` (the eraser, 0.5 to 10, default 3) and either
   `strokes` with the pressure at each point (1 a firm rub) or a `region` rubbed in lanes at `handling.pressure`. Put it
   anywhere in the order. Before the first wash a firm rub takes most of the pencil off; once a wash over the line has
-  dried it takes far less (about a fifth under a pale wash, under a tenth under a dark one). The eraser needs dry
+  dried it takes far less (about a fifth under a pale wash, a twentieth under a medium one, less under a dark one). The eraser needs dry
   paper: leave its `wait` at `dry`, or the painter stops rather than rub wet paper.
 
 ## What the script can and cannot express (write only what is listed here; invent no fields)

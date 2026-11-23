@@ -15,8 +15,9 @@ import { rubOut, graphiteKeep, paintKeep } from '../../media/kit-graphite.mjs';
 const ERASER_MM = Object.freeze([0.5, 10]);
 /** The width when the passage names none (mm): a kneaded eraser pinched to an edge. */
 const DEFAULT_MM = 3;
-/** A pale and a dark dried wash, as paint laid over the graphite (the sheet's amount per cell; kit TIPS 25). */
-const PALE_FILM = 0.17, DARK_FILM = 0.45;
+/** Paint laid over the graphite (the sheet's amount per cell): a pale dried wash (kit TIPS 25: 19% came off under it) and a
+ *  medium one (an umber and ochre wash at dilution medium in the session painter, mittens-closeup look, 22 Nov: 4 to 5%). */
+const PALE_FILM = 0.17, MEDIUM_FILM = 1.0;
 const WAITS = new Set(['dry', 'damp', 'none']);
 
 const pressureOf = p => { const v = p.handling?.pressure ?? 1; return typeof v === 'number' ? v : Array.isArray(v) ? Math.max(...v.map(Number)) : NaN; };
@@ -44,10 +45,10 @@ export function eraseStrokes(p, seed = 0) {
   return sweeps(polys, { widthMm, deg: Number(p.handling?.direction ?? 0) || 0, pressure: pressureOf(p), lights: [], rng, hand: 0 }).map(s => ({ ...s, kind: 'rub', points: s.points.map(q => [q[0], q[1], pressureOf(p)]) }));
 }
 
-/** What one pass at pressure p takes: shares of the graphite from bare paper, from under a pale and a dark dried wash, and of the paint. */
+/** What one pass at pressure p takes: shares of the graphite from bare paper, from under a pale and a medium dried wash, and of the paint. */
 export function eraserTakes(p) {
   const r = v => +(1 - v).toFixed(2);
-  return { bare: r(graphiteKeep(p, 0)), underPale: r(graphiteKeep(p, PALE_FILM)), underDark: r(graphiteKeep(p, DARK_FILM)), paint: r(paintKeep(p)) };
+  return { bare: r(graphiteKeep(p, 0)), underPale: r(graphiteKeep(p, PALE_FILM)), underMedium: r(graphiteKeep(p, MEDIUM_FILM)), paint: r(paintKeep(p)) };
 }
 
 /**
@@ -69,7 +70,7 @@ export function eraseSaid(instructions) {
   const list = (instructions ?? []).filter(q => q.kind === 'erase');
   if (!list.length) return '';
   return ` ${list.length} erase${list.length > 1 ? 's' : ''}: ${list.map(q => { const e = q.erase, t = e.takes;
-    return `${q.script.passage} (${q.strokes.length} stroke${q.strokes.length > 1 ? 's' : ''}, ${e.widthMm} mm eraser, pressure ${e.pressure}) takes off about ${Math.round(100 * t.bare)}% of the pencil where it passes bare paper, about ${Math.round(100 * t.underPale)}% under a pale dried wash and ${Math.round(100 * t.underDark)}% under a dark one, and ${Math.round(100 * t.paint)}% of the paint; ${Math.round(100 * e.overPaintShare)}% of its path lies on paint planned before it${e.warning ? `. ${e.warning}` : ''}`; }).join('; ')}. A second pass takes as much again of what is left.`;
+    return `${q.script.passage} (${q.strokes.length} stroke${q.strokes.length > 1 ? 's' : ''}, ${e.widthMm} mm eraser, pressure ${e.pressure}) takes off about ${Math.round(100 * t.bare)}% of the pencil where it passes bare paper, about ${Math.round(100 * t.underPale)}% under a pale dried wash, ${Math.round(100 * t.underMedium)}% under a medium one and less under a dark one, and ${Math.round(100 * t.paint)}% of the paint; ${Math.round(100 * e.overPaintShare)}% of its path lies on paint planned before it${e.warning ? `. ${e.warning}` : ''}`; }).join('; ')}. A second pass takes as much again of what is left.`;
 }
 
 /**
