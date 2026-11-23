@@ -72,3 +72,15 @@ export function grainSurface(height, w, h, mmPerCell, reliefOf, { grainMm = GRAI
   if (!reliefOf) throw new Error('grain-field: the paper has no relief seed and preset (paper-relief.mjs)');
   return { grainH: gaussianField(height, w, h, grainMm / mmPerCell), unit: grainUnit(reliefOf, grainMm) };
 }
+
+// the cell the slide's rate was fitted on: the painter's own sheets, 0.26 mm a cell (1086 cells on 282 mm)
+export const SLIDE_REF_MM = 0.26;
+/**
+ * The slide's rate on a sheet of `mmPerCell`. On the grain field the slope between neighbours is the field's gradient
+ * times the cell, and a grain that moves goes a cell: the rate a grain leaves a cell is slope over distance, so the
+ * fitted rate is scaled by (SLIDE_REF_MM / mmPerCell)^2 and grains roll the same millimetres on any grid (a puddle on
+ * 0.13 mm cells granulated 30% more than on 0.26 mm without it). A sheet without units keeps the rate it is given.
+ */
+export const slideRate = (slide, mmPerCell) => (mmPerCell > 0 ? slide * (SLIDE_REF_MM / mmPerCell) ** 2 : slide);
+/** The height step between neighbours a grain rests on (repose, a slope) on a sheet of `mmPerCell`: it grows with the cell. */
+export const reposeStep = (repose, mmPerCell) => (mmPerCell > 0 ? repose * (mmPerCell / SLIDE_REF_MM) : repose);
