@@ -63,3 +63,6 @@ export function writePrepared(folder, record) {
   fs.mkdirSync(folder, { recursive: true });
   fs.writeFileSync(path.join(folder, 'prepared.json'), JSON.stringify({ schema: 'unpaint-paint/prepared@1', ...record }, null, 1) + '\n');
 }
+
+/** The settings a prepare adds so level 4's automatic painting keeps its frames for the replay sheet (work-sheets.mjs needs two or more); none below level 4. Video and frames are outside the prepared key. */
+export const preparedFilm = level => (level?.autoPainting ? [['video', '1'], ['frames', '48']] : []);

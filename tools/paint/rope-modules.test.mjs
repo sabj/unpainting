@@ -9,7 +9,7 @@ import { readSeen, seenAsk, logReads, LEAST_SAID } from './seen.mjs';
 import { LEVELS, levelOf, handedAt, DEFAULT_RETRIES } from './levels.mjs';
 import { usageOf, usageLine } from './usage.mjs';
 import { handedOverRecord, checkHandedOver, checkChoice, filesOf } from './parity.mjs';
-import { preparedRoot, preparedKey, prepareCommand, readPrepared, writePrepared } from './prepared.mjs';
+import { preparedRoot, preparedKey, prepareCommand, readPrepared, writePrepared, preparedFilm } from './prepared.mjs';
 import { SHEET_FILES, spread, orderColour, arrowsSvg, writeWorkSheets } from './work-sheets.mjs';
 
 const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'rope-test-'));
@@ -126,4 +126,10 @@ test('the sheets of a finished painting: beside the subject, the frames in order
     fs.rmSync(path.join(plate, 'f0000.png')); for (let i = 0; i < 4; i++) await sharp({ create: { width: 80, height: 60, channels: 3, background: '#ffffff' } }).webp().toFile(path.join(plate, `f000${i}.webp`));
     assert.equal((await writeWorkSheets(run, to, { whose: 'x' }))[1].name, SHEET_FILES.replay);
   } finally { for (const d of [run, to]) fs.rmSync(d, { recursive: true, force: true }); }
+});
+
+test('a level 4 prepare paints the automatic painting with its frames kept, and the prepared key does not change for it', () => {
+  assert.deepEqual(preparedFilm(levelOf('L4')), [['video', '1'], ['frames', '48']]); assert.deepEqual(preparedFilm(levelOf('L2')), []);
+  const key = sets => preparedKey({ id: 'm', commit: 'abc', sets });
+  assert.equal(key(preparedFilm(levelOf('L4'))), key([]));
 });

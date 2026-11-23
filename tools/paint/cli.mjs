@@ -29,7 +29,7 @@ import { usageOf, usageLine } from './usage.mjs';
 import { shapesData, namesShapes, resolveNumbered } from './study-shapes.mjs';
 import { paintThroughStage, stoppedText } from './stage-look.mjs';
 import { lookCost, regionBox, scriptInRegion } from './look-cost.mjs';
-import { preparedRoot, preparedKey, prepareCommand, readPrepared, writePrepared, SHAPES_FILE, WASHES_FILE } from './prepared.mjs';
+import { preparedRoot, preparedKey, prepareCommand, readPrepared, writePrepared, preparedFilm, SHAPES_FILE, WASHES_FILE } from './prepared.mjs';
 import crypto from 'node:crypto';
 import { writeWorkSheets } from './work-sheets.mjs';
 import { logReads } from './seen.mjs';
@@ -74,6 +74,8 @@ let registry, specs, authors, qwen = null, level, terms = null; const refused = 
 try {
   registry = loadRegistry();
   level = levelOf(req.level);
+  // level 4's automatic painting is handed with its replay: it is painted with its film's frames kept (outside the prepared key)
+  if (req.prepare) for (const [k, v] of preparedFilm(level)) if (!req.sets.some(([g]) => g === k)) req.sets.push([k, v]);
   if (process.env.UNPAINT_SESSION_PREVIOUS || process.env.UNPAINT_SESSION_TRY) throw new Error('UNPAINT_SESSION_PREVIOUS and UNPAINT_SESSION_TRY are gone: name the previous try on the command line (--level L3|L4 --previous <its run folder>)');
   // a model works as a session (the default) or answers in one reply; its column is named for what it does
   authors = req.authors.map(a => authorOf(a, ownAuthors, models)).map(a => (a.cli && !['script', 'edit', 'choice'].includes(a.cli) ? { ...a, work: req.work, brief: req.work === 'reply' ? briefName(BRIEF_FILE) : null } : a));
