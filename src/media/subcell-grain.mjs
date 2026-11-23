@@ -37,29 +37,52 @@ export function subcellLayers(layers, pigments, paper, N, { gain = SUBCELL_GAIN 
   // cell stepped at every cell's edge, and the steps showed as squares at zoom)
   const zref = gaussianField(z, FW, FH, N);
   const gg = pigments.map(p => Math.max(0, (p.gamma ?? 0) * gain));
-  // bilinear weights between cell centres, clamped at the sheet's edge
+  // bilinear weights between cell centres, clamped at the sheet's edge, applied a pixel row at a time (rowOf, along)
   const ax = axis(FW, w, N), ay = axis(FH, h, N);
-  const bil = (a, x, y) => { const X0 = ax.i0[x], X1 = ax.i1[x], Y0 = ay.i0[y] * w, Y1 = ay.i1[y] * w, fx = ax.t[x], fy = ay.t[y]; return (a[Y0 + X0] * (1 - fx) + a[Y0 + X1] * fx) * (1 - fy) + (a[Y1 + X0] * (1 - fx) + a[Y1 + X1] * fx) * fy; };
-  const cellOf = (x, y) => ((y / N) | 0) * w + ((x / N) | 0);
-  const sum = new Float64Array(w * h), f = new Float64Array(w * h), base = new Float64Array(FW * FH);
+  const cxOf = Int32Array.from({ length: FW }, (_, x) => (x / N) | 0), cyOf = Int32Array.from({ length: FH }, (_, y) => (y / N) | 0);
+  const row = new Float64Array(w);
+  // a[] interpolated along pixel row y between its two cell rows, for cells cx0..cx1 (into row): the bilinear in two steps
+  const rowOf = (a, y, cx0, cx1) => { const Y0 = ay.i0[y] * w, Y1 = ay.i1[y] * w, fy = ay.t[y]; for (let c = cx0; c <= cx1; c++) row[c] = a[Y0 + c] * (1 - fy) + a[Y1 + c] * fy; };
+  const along = x => row[ax.i0[x]] * (1 - ax.t[x]) + row[ax.i1[x]] * ax.t[x];
+  const sum = new Float64Array(w * h), f = new Float64Array(w * h), base = new Float32Array(FW * FH);
+  // the granulating weight exp(g (zRef - z) / unit) over the whole picture, once for each granulation the paints have
+  const weights = new Map();
+  const weightOf = g => {
+    if (!(g > 0)) return null;
+    if (!weights.has(g)) { const a = new Float32Array(FW * FH); for (let q = 0; q < a.length; q++) a[q] = Math.exp((g * (zref[q] - z[q])) / unit); weights.set(g, a); }
+    return weights.get(g);
+  };
   return layers.map(layer => layer.map((cells, k) => {
     const out = new Float32Array(FW * FH);
-    for (let y = 0; y < FH; y++) for (let x = 0; x < FW; x++) { const q = y * FW + x; base[q] = bil(cells, x, y) * (gg[k] > 0 ? Math.exp((gg[k] * (zref[q] - z[q])) / unit) : 1); }
+    // only the cells that hold pigment and one cell about them (the farthest an interpolation reaches): every other
+    // pixel is 0 and every other cell's factor 0 after the first pass, as on the whole sheet, so the result is the same
+    let cx0 = w, cx1 = -1, cy0 = h, cy1 = -1;
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (cells[y * w + x] > 0) { if (x < cx0) cx0 = x; if (x > cx1) cx1 = x; if (y < cy0) cy0 = y; if (y > cy1) cy1 = y; }
+    if (cx1 < 0) return out;
+    cx0 = Math.max(0, cx0 - 1); cy0 = Math.max(0, cy0 - 1); cx1 = Math.min(w - 1, cx1 + 1); cy1 = Math.min(h - 1, cy1 + 1);
+    const px0 = cx0 * N, px1 = (cx1 + 1) * N, py0 = cy0 * N, py1 = (cy1 + 1) * N;
+    const wt = weightOf(gg[k]);
+    const rx0 = Math.max(0, cx0 - 1), rx1 = Math.min(w - 1, cx1 + 1);
+    for (let cy = cy0; cy <= cy1; cy++) sum.fill(0, cy * w + cx0, cy * w + cx1 + 1);
+    // the first pass, with every factor 1, is the base itself: its sums are taken as it is laid
+    for (let y = py0; y < py1; y++) { rowOf(cells, y, rx0, rx1); const r = cyOf[y] * w; for (let x = px0, q = y * FW + px0; x < px1; x++, q++) { base[q] = wt ? along(x) * wt[q] : along(x); sum[r + cxOf[x]] += base[q]; } }
     // each cell's pigment, put right by a factor that is itself interpolated between cells, so it has no steps
-    const pass = () => { sum.fill(0); for (let y = 0; y < FH; y++) for (let x = 0; x < FW; x++) { const q = y * FW + x; out[q] = base[q] * bil(f, x, y); sum[cellOf(x, y)] += out[q]; } };
-    f.fill(1);
-    for (let it = 0; it < SMOOTH_PASSES; it++) { pass(); for (let c = 0; c < w * h; c++) { const want = cells[c] * N * N; f[c] = sum[c] > 0 ? f[c] * Math.sqrt(want / sum[c]) : want > 0 ? f[c] * 2 : 0; } }
+    const pass = () => {
+      for (let cy = cy0; cy <= cy1; cy++) sum.fill(0, cy * w + cx0, cy * w + cx1 + 1);
+      for (let y = py0; y < py1; y++) { rowOf(f, y, rx0, rx1); const r = cyOf[y] * w; for (let x = px0, q = y * FW + px0; x < px1; x++, q++) { out[q] = base[q] * along(x); sum[r + cxOf[x]] += out[q]; } }
+    };
+    // each cell's factor is what its own pixels need, interpolated between cells; a cell with no pigment, 0
+    for (let cy = 0; cy < h; cy++) { const r = cy * w; if (cy < cy0 || cy > cy1) f.fill(0, r, r + w); else { f.fill(0, r, r + cx0); f.fill(0, r + cx1 + 1, r + w); } }
+    for (let cy = cy0; cy <= cy1; cy++) for (let cx = cx0; cx <= cx1; cx++) { const c = cy * w + cx, want = cells[c] * N * N; f[c] = sum[c] > 0 ? want / sum[c] : want > 0 ? 2 : 0; }
     pass();
     // what is left of each cell's error is put right in the cell itself: each cell's pixels carry its own mass exactly
-    for (let y = 0; y < FH; y++) for (let x = 0; x < FW; x++) {
-      const c = cellOf(x, y), q = y * FW + x;
+    for (let y = py0; y < py1; y++) for (let x = px0, q = y * FW + px0, r = cyOf[y] * w; x < px1; x++, q++) {
+      const c = r + cxOf[x];
       out[q] = sum[c] > 0 ? (out[q] * cells[c] * N * N) / sum[c] : cells[c];
     }
     return out;
   }));
 }
-// how many times the interpolated factor is put right before the last exact pass (8 leaves under 1% to the last)
-const SMOOTH_PASSES = 8;
 function axis(F, n, N) {
   const i0 = new Int32Array(F), i1 = new Int32Array(F), t = new Float64Array(F);
   for (let x = 0; x < F; x++) { const u = Math.min(n - 1, Math.max(0, (x + 0.5) / N - 0.5)), a = Math.floor(u); i0[x] = a; i1[x] = Math.min(n - 1, a + 1); t[x] = u - a; }
