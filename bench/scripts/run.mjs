@@ -10,7 +10,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { BENCH, REPO, V2, PUBLIC_CROPS, CROP_ORDER, roundById, loadCrops, loadModels } from './lib.mjs';
+import { BENCH, REPO, V2, PUBLIC_CROPS, CROP_ORDER, roundById, loadCrops, loadLevelOneCrops, loadModels } from './lib.mjs';
 import { KEYS } from './runners.mjs';
 import { preflight, scorePython } from './preflight.mjs';
 import { runDoctor } from '../../src/paint/doctor.mjs';
@@ -53,16 +53,17 @@ if (opt('dry-key') && (!DRY || !models.some(m => m.key === dryKey))) fail('--dry
 const model = DRY ? { key: dryKey, name: 'Scripted dry run', id: 'dry-run', effort: 'n/a', runner: 'dry-run' }
   : models.find(m => m.key === opt('model')) || fail(`--model must be one of ${models.map(m => m.key).join(', ')}`);
 
-const cropSpecs = Object.fromEntries(loadCrops().map(c => [c.task, c]));
+// level 1 (the V3 round) also paints its own full-size targets (bench/v3/crops.json), which are not in the public suite
+const cropSpecs = Object.fromEntries([...loadCrops(), ...(round.id === 'V3' ? loadLevelOneCrops() : [])].map(c => [c.task, c]));
 const crops = (opt('crops') ? opt('crops').split(',') : round.targets ?? PUBLIC_CROPS).map(s => s.trim()).filter(Boolean);
 const PRIVATE = process.env.BENCH_PRIVATE_CROPS ? path.resolve(process.env.BENCH_PRIVATE_CROPS) : null;
 for (const c of crops) {
-  if (!CROP_ORDER.includes(c)) fail(`unknown crop ${c}`);
+  if (!CROP_ORDER.includes(c) && !cropSpecs[c]?.base) fail(`unknown crop ${c}`);
   if (!cropSpecs[c].distributed && !PRIVATE) fail(`crop ${c} is not distributed; set BENCH_PRIVATE_CROPS to a folder with ${c}.png and ${c}-coarse.json`);
 }
 crops.sort((a, b) => CROP_ORDER.indexOf(a) - CROP_ORDER.indexOf(b));
-const targetOf = c => (cropSpecs[c].distributed ? path.join(V2, cropSpecs[c].file) : path.join(PRIVATE, `${c}.png`));
-const coarseOf = c => (cropSpecs[c].distributed ? path.join(V2, cropSpecs[c].coarseFile) : path.join(PRIVATE, `${c}-coarse.json`));
+const targetOf = c => (cropSpecs[c].distributed ? path.join(cropSpecs[c].base ?? V2, cropSpecs[c].file) : path.join(PRIVATE, `${c}.png`));
+const coarseOf = c => (cropSpecs[c].distributed ? path.join(cropSpecs[c].base ?? V2, cropSpecs[c].coarseFile) : path.join(PRIVATE, `${c}-coarse.json`));
 for (const c of crops) for (const f of [targetOf(c), coarseOf(c)]) if (!fs.existsSync(f)) fail(`missing ${f}`);
 
 const python = scorePython(opt('python'));

@@ -81,6 +81,15 @@ export const readJson = f => JSON.parse(fs.readFileSync(f, 'utf8'));
 export const writeJson = (f, v) => { fs.mkdirSync(path.dirname(f), { recursive: true }); fs.writeFileSync(f, JSON.stringify(v, null, 1) + '\n'); };
 
 /** Crop specs from bench/v2/crops.json, each with its display name. */
+/** Level 1's own targets (bench/v3/crops.json): full-size subjects of the 0.4 rounds, painted freehand by v3.mjs. They are
+ *  not in the public suite: nothing that reads loadCrops() (the leaderboard, the routine suite, the V4/V5 subjects) sees
+ *  them. Each carries `base`, the folder its `file` and `coarseFile` are relative to. */
+export function loadLevelOneCrops() {
+  const base = path.join(BENCH, 'v3'), f = path.join(base, 'crops.json');
+  return fs.existsSync(f) ? readJson(f).crops.map(c => ({ ...c, name: c.name || c.task, base })) : [];
+}
+let LEVEL_ONE_TASKS = null;
+const levelOneTasks = () => (LEVEL_ONE_TASKS ??= new Set(loadLevelOneCrops().map(c => c.task)));
 export function loadCrops() {
   return readJson(path.join(V2, 'crops.json')).crops.map(c => ({ ...c, name: c.name || c.task }));
 }
@@ -191,7 +200,7 @@ export function validateRun(run) {
   need(run.guard && Number.isInteger(run.guard.blockedImageReads), 'guard.blockedImageReads must be an integer');
   need(run.crops && typeof run.crops === 'object', 'crops must be an object (empty when nothing was painted)');
   for (const [k, c] of Object.entries(run.crops || {})) {
-    need(CROP_ORDER.includes(k), `crop ${k} is not a benchmark crop`);
+    need(CROP_ORDER.includes(k) || (run.round === 'V3' && levelOneTasks().has(k)), `crop ${k} is not a benchmark crop`);   // level 1's own targets are run records of the V3 round only
     const cap = pipeline ? Infinity : BUDGET.strokes;
     need(c.strokes == null || (Number.isInteger(c.strokes) && c.strokes >= 0 && c.strokes <= cap), `crops.${k}.strokes must be 0..${cap}`);
     if (pipeline) need(c.pipeline && typeof c.pipeline.outcome === 'string', `crops.${k}.pipeline is required in V4 and V5`);

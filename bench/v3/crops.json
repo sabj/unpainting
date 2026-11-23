@@ -1,0 +1,73 @@
+{
+ "_about": "Level 1's own targets: full-size subjects of the 0.4 rounds, painted freehand with the toolkit (bench/scripts/v3.mjs). They are NOT part of the public suite (bench/v2/crops.json), its leaderboard or its routine runs. Files are relative to bench/v3/.",
+ "crops": [
+  {
+   "task": "mittens-closeup",
+   "name": "Mittens close-up",
+   "width": 300,
+   "height": 400,
+   "coarse": {
+    "cols": 24,
+    "rows": 32
+   },
+   "style": "watercolor sketch over faint pencil, no ink: an orange cat's face, close up",
+   "medium": "pencil",
+   "source": "watercolour sketch made by an image generator from the owner's photograph",
+   "distributed": true,
+   "file": "targets/mittens-closeup.png",
+   "coarseFile": "targets/mittens-closeup-coarse.json",
+   "licence": "noncommercial project use; local branch only, not distributed"
+  },
+  {
+   "task": "mittens-closeup-full",
+   "name": "Mittens close-up, full size",
+   "width": 1086,
+   "height": 1448,
+   "coarse": {
+    "cols": 24,
+    "rows": 32
+   },
+   "style": "watercolor sketch over faint pencil, no ink: an orange cat's face, close up",
+   "medium": "pencil",
+   "source": "watercolour sketch made by an image generator from the owner's photograph",
+   "distributed": true,
+   "file": "targets/mittens-closeup-full.png",
+   "coarseFile": "targets/mittens-closeup-full-coarse.json",
+   "licence": "noncommercial project use; local branch only, not distributed"
+  },
+  {
+   "task": "white-ships-full",
+   "name": "White Ships, full size",
+   "width": 768,
+   "height": 548,
+   "coarse": {
+    "cols": 24,
+    "rows": 17
+   },
+   "style": "pure watercolor, no ink: white sailing ships moored side by side, masts, rigging and reflections (after Sargent)",
+   "medium": "pencil",
+   "source": "John Singer Sargent, White Ships, 1908, Brooklyn Museum; public domain",
+   "distributed": true,
+   "file": "targets/white-ships-full.png",
+   "coarseFile": "targets/white-ships-full-coarse.json",
+   "licence": "public domain"
+  },
+  {
+   "task": "h36-full",
+   "name": "Yale Rosewalk, full size",
+   "width": 1224,
+   "height": 816,
+   "coarse": {
+    "cols": 24,
+    "rows": 16
+   },
+   "style": "loose ink-and-watercolor field sketch, ink led: a college walk with a gate and dappled shade",
+   "medium": "pen",
+   "source": "the owner's own artwork (h36)",
+   "distributed": true,
+   "file": "targets/h36-full.png",
+   "coarseFile": "targets/h36-full-coarse.json",
+   "licence": "noncommercial project use; local branch only, not distributed"
+  }
+ ]
+}
