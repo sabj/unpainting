@@ -26,6 +26,7 @@ import {backendLine} from '../../src/media/gpu/backend-record.mjs';
 import {renderLayers} from '../../src/media/km.mjs';
 import {measureLine} from '../../src/paint/methods/pencil-line.mjs';
 import {penEndPosition, eraseFactor} from '../../src/paint/methods/pencil-stage.mjs';
+import {followErase} from '../../src/paint/methods/fine-erase.mjs';
 import {retimeRun, codeForImage, concatList, phaseAt, phaseShares, PHASES, labelFrames} from '../../src/paint/film-timeline.mjs';
 import {dilate} from '../../src/raster.js';
 import {intermediates} from '../../src/eval/composite.mjs';
@@ -74,8 +75,10 @@ if (!AWARE_SKIP_POST && PENCIL && num('pencilerase', 0) > 0) {
   for (const L of layersOf(ctx.sheet)) for (let j = 0; j < PIGS.length; j++) { const a = L[j], q = kk[j]; for (let i = 0; i < N2; i++) paint[i] += a[i] * q; }
   const f = eraseFactor(keep, paint, { bare: num('pencilbare', 0.85), under: num('pencilunder', 0.5), clean: num('pencilclean', 0.08) });
   let before = 0, after = 0;
-  for (const L of [ctx.sheet.G, ctx.sheet.D, ctx.sheet.P, ...ctx.sheet.layers]) { const a = L[GRAPHITE_AT]; for (let i = 0; i < N2; i++) { before += a[i]; a[i] *= f[i]; after += a[i]; } }
-  layersChanged(ctx.sheet);
+  followErase(INKRES, ctx.sheet, GRAPHITE_AT, () => {
+    for (const L of [ctx.sheet.G, ctx.sheet.D, ctx.sheet.P, ...ctx.sheet.layers]) { const a = L[GRAPHITE_AT]; for (let i = 0; i < N2; i++) { before += a[i]; a[i] *= f[i]; after += a[i]; } }
+    layersChanged(ctx.sheet);
+  });
   console.log(`pencil erase: ${(100 * (1 - after / Math.max(1e-9, before))).toFixed(1)}% of the graphite lifted, ${(100 * keep.reduce((a, v) => a + (v ? 1 : 0), 0) / N2).toFixed(1)}% of the sheet kept as the finish's line`);
   ctx.STAGE = { stage: 'lift', step: 'pencil erased' };ctx.NATIVE_CAPTURE?.('pencil-erased');
   await shoot();

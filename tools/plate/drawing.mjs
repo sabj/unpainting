@@ -26,6 +26,7 @@ import {applyResist} from '../../src/media/sheet.mjs';
 import {longShare} from '../../src/crop/gestures.mjs';
 import {fillReserved} from '../../src/crop/lights.mjs';
 import {erasePrep} from '../../src/paint/methods/pencil-erase.mjs';
+import {followErase} from '../../src/paint/methods/fine-erase.mjs';
 import {makeMopLanes} from '../../src/paint/methods/mop-lanes.mjs';
 import {sealAtBirth, sealTargetMaps} from '../guard/seal-maps.mjs';
 
@@ -204,11 +205,13 @@ function vectorFile(key = 'drawingfile') {
 async function layExactVectors(file, { closing = false } = {}) {
   const doc = JSON.parse(fs.readFileSync(file, 'utf8')), sheetMm = PB?.mm ?? num('sheetmm', DEFAULT_SHEET_MM);
   if (Math.abs(doc.sheetMm - sheetMm) > 0.01 * sheetMm) throw new Error(`ink vectors: ${path.basename(file)} is for a ${doc.sheetMm} mm sheet, this sheet is ${sheetMm} mm`);
-  // a pencil drawing is laid in graphite on the painting's sheet; ink on the pen's fine sheet when there is one
+  // a pencil drawing is laid in graphite, an ink drawing in ink, each on the fine sheet when there is one (--inkres: set
+  // for a pencil drawing as for a pen's, ink-recipe.mjs drawingInkRes), carried down onto the painting's sheet
   const pencil = doc.medium === 'pencil';
-  if (pencil && GRAPHITE_AT == null) throw new Error(`ink vectors: ${path.basename(file)} is a pencil drawing but this run has no graphite (--outlinemedium graphite)`);
-  const fineSheet = INKRES && !pencil;
-  const sheet = fineSheet ? INKRES.fine : ctx.sheet, w = fineSheet ? INKRES.width : W2, h = fineSheet ? INKRES.height : H2, at = fineSheet ? 0 : pencil ? GRAPHITE_AT : PIGS.length;
+  if (pencil && !GRAPHITE) throw new Error(`ink vectors: ${path.basename(file)} is a pencil drawing but this run has no graphite (--outlinemedium graphite)`);
+  const onFine = c => Boolean(INKRES && INKRES.channels.includes(c)), chan = pencil ? GRAPHITE_AT : PIGS.length;
+  const fineSheet = onFine(chan);
+  const sheet = fineSheet ? INKRES.fine : ctx.sheet, w = fineSheet ? INKRES.width : W2, h = fineSheet ? INKRES.height : H2, at = fineSheet ? INKRES.channel(chan) : chan;
   if (!fineSheet) coherent(sheet);
   const pig = sheet.pigments[at], white = Buffer.alloc(3, 255);
   const darkOf = t => { const ink = renderLayers([[Float32Array.of(t)]], [pig], white, 1, 1); return 1 - (ink[0] + ink[1] + ink[2]) / 765; };
@@ -244,9 +247,14 @@ async function layExactVectors(file, { closing = false } = {}) {
     const gp = ctx.sheet.pigments[GRAPHITE_AT], gDark = t => { const c = renderLayers([[Float32Array.of(t)]], [gp], white, 1, 1); return 1 - (c[0] + c[1] + c[2]) / 765; };
     if (!ctx.sheet.D[GRAPHITE_AT]) throw new Error('ink vectors: the pencil lay-in has no graphite layer on the sheet');
     coherent(ctx.sheet);
-    const g = await inBatches(layin, sub => { coherent(ctx.sheet); const q = layVectors({ ...doc, strokes: sub }, ctx.sheet.D[GRAPHITE_AT], W2, H2, sheetMm / W2, inkForDarkness(gDark), { fill }); layersChanged(ctx.sheet); ctx.sheet._gpu?.cpuWroteAll?.(); return q; }, 'pencil lay-in');
+    // on the fine sheet beside the ink when there is one, as the pencil drawing is
+    const gFine = onFine(GRAPHITE_AT);
+    const g = await inBatches(layin, sub => {
+      if (gFine) { const q = layVectors({ ...doc, strokes: sub }, INKRES.fine.D[INKRES.channel(GRAPHITE_AT)], INKRES.width, INKRES.height, sheetMm / INKRES.width, inkForDarkness(gDark), { fill }); INKRES.changed(); INKRES.carry(); return q; }
+      coherent(ctx.sheet); const q = layVectors({ ...doc, strokes: sub }, ctx.sheet.D[GRAPHITE_AT], W2, H2, sheetMm / W2, inkForDarkness(gDark), { fill }); layersChanged(ctx.sheet); ctx.sheet._gpu?.cpuWroteAll?.(); return q;
+    }, 'pencil lay-in');
     ctx.drawnCount += g.strokes;
-    console.log(`pencil lay-in: ${g.strokes} graphite strokes laid ${pencilOver ? 'over the dry washes' : 'before the ink'}, ${g.cells} cells`);
+    console.log(`pencil lay-in: ${g.strokes} graphite strokes laid ${pencilOver ? 'over the dry washes' : 'before the ink'}, ${g.cells} cells${gFine ? ` on the fine sheet (--inkres ${INKRES.N})` : ''}`);
   }
   const r = await inBatches(graphiteMarked ? doc.strokes.filter(q => q.medium !== 'graphite') : doc.strokes, sub => {
     if (!fineSheet) coherent(sheet);
@@ -339,7 +347,7 @@ if (!ctx.RESUMING && PEN_FIRST && opt('draw', '1') !== '0' && DRAWING !== 'none'
   console.log(`pen first: source line ${(100 * SOURCE_INK).toFixed(1)}% of cells`);
   const before = thickness(ctx.sheet).map(a => Float32Array.from(a));
   await drawPass(null, { first: true });
-  if (PREP_ERASE && STAGE_PLAN?.files.prep && GRAPHITE) erasePrep({ sheet: ctx.sheet, k: GRAPHITE_AT, dabs: PREP_ERASE, strength: num('preperase', 0.85), SC, w, W2, layersChanged, log: console.log });
+  if (PREP_ERASE && STAGE_PLAN?.files.prep && GRAPHITE) followErase(INKRES, ctx.sheet, GRAPHITE_AT, () => erasePrep({ sheet: ctx.sheet, k: GRAPHITE_AT, dabs: PREP_ERASE, strength: num('preperase', 0.85), SC, w, W2, layersChanged, log: console.log }));
   ctx.INK_THK = thickness(ctx.sheet).map((a, j) => Float32Array.from(a, (v, i) => Math.max(0, v - before[j][i])));
   await sharp(INKRES ? INKRES.compose(view()) : render(), { raw: { width: OUT_W, height: OUT_H, channels: 3 } }).png().toFile(path.join(out, 'drawing-opening.png'));
 }

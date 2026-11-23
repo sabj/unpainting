@@ -9,7 +9,7 @@ The pen drawing, in `methods/` unless noted ([how it paints](../../docs/how-it-p
 - `line-source.mjs` (here): the one line source, the drawing file.
 - `ink-lines-file.mjs`, `ink-lines.mjs`, `ink-recipe.mjs`: the target's line darkness for the pen's load, and the `--inkrecipe` flags.
 - `drawing-stages.mjs`, `drawing-file.mjs`, `drawing-hand.mjs`: the opening and closing stages, and the hand plan.
-- `ink-match.mjs`, `ink-res.mjs`, `fine-material.mjs`, `material-profiles.mjs`: the ink load and the pen on the fine sheet.
+- `ink-match.mjs`, `ink-res.mjs`, `fine-erase.mjs`, `fine-material.mjs`, `material-profiles.mjs`: the ink load, the pen and the pencil on the fine sheet, and the eraser followed there.
 
 ## Painting
 

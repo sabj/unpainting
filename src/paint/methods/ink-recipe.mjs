@@ -47,3 +47,17 @@ export function inkRecipeArgs(name, argv) {
   }
   return flags;
 }
+
+/**
+ * A pencil drawing is drawn on the fine sheet the pen draws on, at the same --inkres (washInkRes: near 2160 px across), so
+ * a pencil line is as continuous as an ink line of the same weight (the owner, 22 Nov: "why isnt pencil executed the same
+ * way as ink"). The flags to add for a run whose drawing is pencil laid from a drawing file; none when --inkres is given,
+ * when there is no drawing, or when the painting is already that fine (N of 1).
+ */
+export function pencilInkResArgs(argv, { pencil }) {
+  const last = k => { const i = argv.lastIndexOf(k); return i >= 0 ? argv[i + 1] : undefined; };
+  if (!pencil || argv.includes('--inkres') || last('--drawing') === 'none' || !(last('--drawingfile') || last('--drawinglast'))) return [];
+  const n = washInkRes(last('--width') ?? 700);
+  return n > 1 ? ['--inkres', String(n)] : [];
+}
+

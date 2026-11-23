@@ -2,40 +2,52 @@ import { census } from '../../media/census.mjs';
 import { certifyZeroPaper, certifyDryFixed, hasZeroPaperCertificate, invalidatePaperCertificate } from '../../media/paper-certificate.mjs';
 // Pipeline: inking, stage 6 (pen on the fine sheet).
 // --inkres N: the pens draw on their own sheet at N times the painting's resolution, so thin lines keep their taper.
-// New ink is averaged down onto the painting's sheet as pigment, so later glazes lie over it. The fine sheet has no
-// water flow. Output: paint upsampled, each pixel scaled by fine over coarse ink reflectance per channel. DOM free.
+// A pencil drawing is drawn there too (graphiteAt: the pencil's own channel beside the ink, or the only channel when the
+// sheet has no ink), so a pencil line is as continuous as an ink line of the same weight.
+// New ink and graphite are averaged down onto the painting's sheet as pigment, so later glazes lie over them and the
+// eraser lifts them there; erased() takes the same lift back on the fine sheet. The fine sheet has no water flow.
+// Output: paint upsampled, each pixel scaled by fine over coarse drawing reflectance per channel. DOM free.
 import { makePaper } from '../../media/paper.mjs';
-import { createSheet, fix, coherent } from '../../media/sheet.mjs';
+import { createSheet, fix, coherent, layersChanged } from '../../media/sheet.mjs';
 import { drawGestures } from '../../media/draw.mjs';
 import { renderLayers } from '../../media/km.mjs';
 import { TAPE } from '../../media/brush.mjs';
 
-export function makeInkRes({ N, W2, H2, paperOpts, pigments, main, inkAt = 0, gain = 1, pad: opt_pad = null, paper: cachedPaper = null }) {
+export const isGraphitePigment = p => /graphite|pencil/i.test(p?.kind ?? p?.name ?? '');
+
+export function makeInkRes({ N, W2, H2, paperOpts, pigments, main, inkAt = 0, graphiteAt = null, gain = 1, pad: opt_pad = null, paper: cachedPaper = null }) {
   if (!Number.isFinite(N)) return null;
   N = Math.round(N);
   if (!(N > 1)) return null;
-  const WH = W2 * N, HH = H2 * N, nH = WH * HH, nL = W2 * H2, K = 1;
+  const WH = W2 * N, HH = H2 * N, nH = WH * HH, nL = W2 * H2;
   const paper = cachedPaper ?? makePaper(WH, HH, { ...paperOpts, scale: (paperOpts.scale ?? 1) * N });
   if (!Number.isInteger(inkAt) || !pigments[inkAt]) throw new Error('Invalid fine-sheet ink channel');
-  const finePigments = [pigments[inkAt]];
+  if (graphiteAt != null && (!Number.isInteger(graphiteAt) || !isGraphitePigment(pigments[graphiteAt]))) throw new Error(`fine sheet: channel ${graphiteAt} is not the pencil's graphite`);
+  // the painting's channels the fine sheet carries: the pen's (or the pencil's, when it is the only drawing channel), then
+  // the pencil's beside the ink
+  const chans = graphiteAt == null || graphiteAt === inkAt ? [inkAt] : [inkAt, graphiteAt], K = chans.length;
+  const finePigments = chans.map(c => pigments[c]);
   const fine = createSheet(paper, finePigments);
+  /** The fine sheet's channel for the painting's channel `c`; a channel the fine sheet does not carry is refused. */
+  const channel = c => { const k = chans.indexOf(c); if (k < 0) throw new Error(`fine sheet: the painting's channel ${c} is not drawn on it (it carries ${chans.join(', ')})`); return k; };
   function remapInk(ink) {
     if (ink == null) return null;
     if (ink.length !== pigments.length) throw new Error('Fine-sheet ink concentration length');
     for (let k = 0; k < ink.length; k++) if (k !== inkAt && ink[k] !== 0) throw new Error('Only inkAt may deposit on the fine sheet');
-    return [ink[inkAt]];
+    return chans.map(c => ink[c]);
   }
-  let materialVersion = 0, totalVersion = -1, total, renderVersion = -1, inkH, inkL;
+  let materialVersion = 0, renderVersion = -1, inkH, inkL;
+  const totalVersion = new Array(K).fill(-1), total = new Array(K).fill(null);
   const changed = () => { materialVersion++; };
   // strokes go on the mark tape tagged with N, so a replay of the tape treats them the same way
-  if (main._tape) { fine._tape = main._tape; fine._tapeRes = N; fine._tapePigmentMap = { count: pigments.length, indices: [inkAt] }; }
+  if (main._tape) { fine._tape = main._tape; fine._tapeRes = N; fine._tapePigmentMap = { count: pigments.length, indices: chans }; }
   // what has been carried down to the painting's sheet, per pigment, so the next call carries only what is new
   const seen = finePigments.map(() => new Float32Array(nH)), inkLo = finePigments.map(() => new Float32Array(nL));
   const white = Buffer.alloc(nL * 3, 255), whiteH = Buffer.alloc(nH * 3, 255);
-  const totalBuf = new Float32Array(nH), carryAdd = new Float32Array(nL);
+  const totalBuf = finePigments.map(() => new Float32Array(nH)), carryAdd = new Float32Array(nL);
   const fineTotal = k => {
-    if (totalVersion === materialVersion) return total;
-    const out = totalBuf, G = fine.G[k], D = fine.D[k], P = fine.P[k], layers = fine.layers;
+    if (totalVersion[k] === materialVersion) return total[k];
+    const out = totalBuf[k], G = fine.G[k], D = fine.D[k], P = fine.P[k], layers = fine.layers;
     if (layers.length === 0) {
       for (let i = 0; i < nH; i++) out[i] = G[i] + D[i] + P[i];
     } else {
@@ -43,8 +55,8 @@ export function makeInkRes({ N, W2, H2, paperOpts, pigments, main, inkAt = 0, ga
       for (const L of layers) { const a = L[k]; for (let i = 0; i < nH; i++) out[i] += a[i]; }
       for (let i = 0; i < nH; i++) out[i] += G[i] + D[i] + P[i];
     }
-    totalVersion = materialVersion;
-    return total = out;
+    totalVersion[k] = materialVersion;
+    return total[k] = out;
   };
   let stats = { calls: 0, ms: 0 };
 
@@ -150,7 +162,7 @@ export function makeInkRes({ N, W2, H2, paperOpts, pigments, main, inkAt = 0, ga
       }
       if (!any) continue;
       wrote = true;
-      const inv = 1 / (N * N), D = main.D[inkAt], G = main.G[inkAt], L = inkLo[k], M = main.M;
+      const inv = 1 / (N * N), D = main.D[chans[k]], G = main.G[chans[k]], L = inkLo[k], M = main.M;
       for (let i = 0; i < nL; i++) {
         const ai = add[i];
         if (ai) {
@@ -224,7 +236,7 @@ export function makeInkRes({ N, W2, H2, paperOpts, pigments, main, inkAt = 0, ga
     ensureComposeTables();
     const rowLen = WH * 3;
     if (renderVersion !== materialVersion) {
-      inkH = renderLayers([[fineTotal(0)]], finePigments, whiteH, nH, 1);
+      inkH = renderLayers([finePigments.map((_, k) => fineTotal(k))], finePigments, whiteH, nH, 1);
       inkL = renderLayers([inkLo], finePigments, white, nL, 1);
       invInkL ??= new Float32Array(nH * 3);
       let r0 = hBuf0, r1 = hBuf1, cy0 = -1, cy1 = -1;
@@ -284,9 +296,29 @@ export function makeInkRes({ N, W2, H2, paperOpts, pigments, main, inkAt = 0, ga
 
   // Actual deposited ink on the pen's own grid, on white. No upsampling or geometry replay.
   function nativeInk() {
-    const isGraphite = /graphite|pencil/i.test(pigments[inkAt]?.kind ?? pigments[inkAt]?.name ?? '');
-    if (isGraphite) return { width: WH, height: HH, pixels: Buffer.alloc(WH * HH * 3, 255) };
-    return { width: WH, height: HH, pixels: renderLayers([[fineTotal(0)]], finePigments, whiteH, nH, 1) };
+    if (isGraphitePigment(pigments[inkAt])) return { width: WH, height: HH, pixels: Buffer.alloc(WH * HH * 3, 255) };
+    return { width: WH, height: HH, pixels: renderLayers([[fineTotal(0)]], [finePigments[0]], whiteH, nH, 1) };
+  }
+
+  /** The pencil the eraser lifted on the painting's sheet, lifted on the fine sheet too: `before` and `after` are the
+   *  painting's graphite (channel c) per cell either side of the rub. Each fine cell keeps after / before of its pencil,
+   *  so the fine line shows what the painting's sheet still holds. Returns the coarse cells changed. */
+  function erased(c, before, after) {
+    const k = channel(c);
+    if (!isGraphitePigment(finePigments[k])) throw new Error(`fine sheet: erased() follows the pencil's graphite, not channel ${c}`);
+    if (before.length !== nL || after.length !== nL) throw new Error('fine sheet: erased() takes the painting\'s graphite per cell before and after');
+    const planes = [fine.G[k], fine.D[k], fine.P[k], ...fine.layers.map(L => L[k])], S = seen[k], Lo = inkLo[k];
+    let cells = 0;
+    for (let yl = 0; yl < H2; yl++) for (let xl = 0; xl < W2; xl++) {
+      const i = yl * W2 + xl, b = before[i];
+      if (!(b > 0)) continue;
+      const f = Math.max(0, Math.min(1, after[i] / b));
+      if (f >= 1 - 1e-7) continue;
+      cells++; Lo[i] *= f;
+      for (let dy = 0; dy < N; dy++) { const row = (yl * N + dy) * WH + xl * N; for (let dx = 0; dx < N; dx++) { const j = row + dx; for (const a of planes) a[j] *= f; S[j] *= f; } }
+    }
+    if (cells) { layersChanged(fine); changed(); renderVersion = -1; }
+    return cells;
   }
 
   function exportState() {
@@ -299,9 +331,9 @@ export function makeInkRes({ N, W2, H2, paperOpts, pigments, main, inkAt = 0, ga
     Object.assign(fine,st.fields);
     seen.forEach((v,k)=>v.set(st.seen[k])); inkLo.forEach((v,k)=>v.set(st.inkLo[k]));
     wetOn=st.wetOn;Object.assign(stats,st.stats);
-    changed();totalVersion=-1;renderVersion=-1;
+    changed();totalVersion.fill(-1);renderVersion=-1;
   }
-  return { N, width: WH, height: HH, draw, settle, compose, composeFine, nativeInk, carry, wet, stats, fine, remapInk, changed, exportState, importState };
+  return { N, width: WH, height: HH, draw, settle, compose, composeFine, nativeInk, carry, wet, stats, fine, remapInk, changed, exportState, importState, channel, channels: chans, erased };
 }
 
 
@@ -309,7 +341,6 @@ export function makeInkRes({ N, W2, H2, paperOpts, pigments, main, inkAt = 0, ga
 export function renderInkProof({ thickness, pigments, inkAt, width, height }) {
   if (!Number.isInteger(inkAt) || !pigments[inkAt] || thickness[inkAt]?.length !== width * height)
     throw new Error('Ink proof requires a valid native ink channel');
-  const isGraphite = /graphite|pencil/i.test(pigments[inkAt]?.kind ?? pigments[inkAt]?.name ?? '');
-  if (isGraphite) return { width, height, pixels: Buffer.alloc(width * height * 3, 255) };
+  if (isGraphitePigment(pigments[inkAt])) return { width, height, pixels: Buffer.alloc(width * height * 3, 255) };
   return { width, height, pixels: renderLayers([[thickness[inkAt]]], [pigments[inkAt]], Buffer.alloc(width * height * 3, 255), width * height, 1) };
 }
