@@ -18,9 +18,10 @@ OPENROUTER_NAMES = {"moonshotai/Kimi-K3": "moonshotai/kimi-k3", "zai-org/GLM-5.3
 HOSTED = {"together": ("https://api.together.xyz/v1/chat/completions", "TOGETHER_API_KEY"),
           "openrouter": ("https://openrouter.ai/api/v1/chat/completions", "OPENROUTER_API_KEY")}
 LABEL = {"local": "J3-local-3x", "together": "J4-together-3x", "openrouter": "J4-openrouter-3x"}
-# JUDGE_HOSTED_PANEL=open3 (openrouter only): the local panel's three open-weight models, hosted, so anyone can replicate locally
-OPEN3_PANEL = ("Qwen/Qwen3.8-Flash-Next", "Qwen/Qwen3.8-27B", "google/gemma-4-31b-it")
-OPEN3_NAMES = {"Qwen/Qwen3.8-Flash-Next": "qwen/qwen3.8-flash", "Qwen/Qwen3.8-27B": "qwen/qwen3.8-27b", "google/gemma-4-31b-it": "google/gemma-4-31b-it"}
+# JUDGE_HOSTED_PANEL=open3 (openrouter only): three open-weight models, hosted with zero data retention, that can also be run
+# locally. Qwen3.8-Flash-Next is not in it: its only host (23 Nov 2026) offers no zero-data-retention endpoint (HTTP 404).
+OPEN3_PANEL = ("zai-org/GLM-5.3-Flash", "Qwen/Qwen3.8-27B", "google/gemma-4-31b-it")
+OPEN3_NAMES = {"zai-org/GLM-5.3-Flash": "z-ai/glm-5.3-flash", "Qwen/Qwen3.8-27B": "qwen/qwen3.8-27b", "google/gemma-4-31b-it": "google/gemma-4-31b-it"}
 OPEN3_LABEL = "J3-open-3x-hosted"
 
 

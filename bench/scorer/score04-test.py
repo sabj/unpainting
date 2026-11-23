@@ -232,7 +232,7 @@ class Route(unittest.TestCase):
             return io.BytesIO(json.dumps({"choices": [{"message": {"content": "ok"}}]}).encode())
         for m in J.OPEN3_PANEL:
             J.post(cfg, m, [{"type": "text", "text": "hi"}], opener=opener)
-        self.assertEqual([b["model"] for b in seen], ["qwen/qwen3.8-flash", "qwen/qwen3.8-27b", "google/gemma-4-31b-it"])
+        self.assertEqual([b["model"] for b in seen], ["z-ai/glm-5.3-flash", "qwen/qwen3.8-27b", "google/gemma-4-31b-it"])
         self.assertTrue(all(b["provider"]["zdr"] for b in seen))
         with self.assertRaises(J.RouteError):
             J.settings({**env, "JUDGE_ROUTE": "together", "TOGETHER_API_KEY": "k"})
