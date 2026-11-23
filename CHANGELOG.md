@@ -4,7 +4,7 @@ Releases use semver. Each release records its painter and simulator versions ([v
 
 ## 0.4.0 (not released)
 
-Release candidate `v0.4.0-rc.3` (0.4 rc3): the ladder as the owner set it on 22 Nov (L2 and L3 get the code planner's inputs, not its plan). `v0.4.0-rc.2` was the first frozen version, run once as a harness proof under the old L2. Painter **V107-dev**, simulator **105**. An earlier, untagged state was named 0.4.0-rc.1; its entry is kept below as history. 0.4 scores are a new series, not comparable with rounds V1 to V5.
+Release candidate `v0.4.0-rc.5` (0.4 rc5): the ladder and budget as the owner set them on 23 Nov. Every level hands in its own script; level 4 adds the studies' traced shapes and nothing of Auto. A look has a fixed price (a half-size whole look 0.3, never under 0.2), the budget for one try is 3.0, and how a model paints is recorded, never charged; one water-step guard stops a runaway painting. A finished session is never thrown away: its final waits for a place. `v0.4.0-rc.3` and `rc.4` ran the 22 Nov ladder; `v0.4.0-rc.2` was the first frozen version, run once as a harness proof under the old L2. Painter **V107-dev**, simulator **105**. An earlier, untagged state was named 0.4.0-rc.1; its entry is kept below as history. 0.4 scores are a new series, not comparable with rounds V1 to V5.
 
 Results: to be added from the release-candidate run.
 
