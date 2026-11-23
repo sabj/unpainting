@@ -34,6 +34,7 @@ import {unmix} from '../../src/crop/pigments.mjs';
 import {dropMask} from '../../src/crop/blockin.mjs';
 import {washPaths, brushedWashPaths, invalidateFlowField, sweepCover, footprintSpread, sweepCount, containPaths, openEdgeShare, softArcs, soften} from '../../src/media/wash.mjs';
 import {wetsLaneByLane} from '../../src/paint/methods/prewet-order.mjs';
+import {outlineWater} from '../../src/paint/methods/clean-water.mjs';
 import {lanesOfPath, sweptPath} from '../../src/paint/methods/zigzag-lanes.mjs';
 import {distanceToZero} from '../../src/raster.js';
 import {components, removeSmall, dilate, erode, closeLocal} from '../../src/raster.js';
@@ -488,15 +489,18 @@ for (let L = L_START; L < ctx.layers.length; L++) {
     const shapeCells = sh._valuePlan?.passageMaterial?.move === 'wet on wet' || (ownBed && sh._valuePlan.move === 'wet on wet') ? up(MASK).reduce((a, v, i) => (v && !ctx.sheet.resist?.[i] && a.push(i), a), []) : null;
     const shapePaper = shapeCells?.length ? measurePaper(ctx.sheet, shapeCells, SPEED_PAPER) : null;
     const needPrewet = !shapePaper || shapePaper.moistShare < 0.7;
+    // the water goes down with the brush that lays the paint (a wash plan's lanes are rounds): a flat, square across its
+    // path, left the bed as square-ended bands and the dried wash took their steps and notches (clean-water.mjs)
     const wetLane = pts => {
       const r = vectorPaths ? Math.max(...pts.map(p => p.r)) : sh._valuePlan?.brush?.sizeMm?sh._valuePlan.brush.sizeMm/(2*(num('sheetmm', DEFAULT_SHEET_MM)/W2)):Math.max(SC, Math.max(...pts.map(p => p.r)));
-      const wet = createBrush({ flat: true, radius: r, bristles: Math.max(12, Math.ceil(r * 2)), capacity: 100, belly: 12, feed: 0.4, give: 0.9, free: 0.4, film: 0.25, depositDepth: shapePaper?.saturationMax >= 0.5 ? 0.1 : 0, splay: 0.03, stiffness: 8, seed: 900 + ctx.laid + SEED });
+      const wet = createBrush({ flat: pts[0]?.round != null ? !pts[0].round : true, radius: r, bristles: Math.max(12, Math.ceil(r * 2)), capacity: 100, belly: 12, feed: 0.4, give: 0.9, free: 0.4, film: 0.25, depositDepth: shapePaper?.saturationMax >= 0.5 ? 0.1 : 0, splay: 0.03, stiffness: 8, seed: 900 + ctx.laid + SEED });
       productionDip(wet, { water: num('prewetwater', shapeCells ? .55 : 1), conc: PIGS.map(() => 0) });
       stroke(wet, ctx.sheet, pts, { upright: UPRIGHT });
     };
     // a passage wetted along its own lanes is wetted lane by lane just ahead of the brush, as its scrap swatch is (prewet-order.mjs)
     if (needPrewet && wetsLaneByLane({ intoWet: Boolean(T.intoWet), wetsOwnLanes: wetOver === paths, preparesOwnBed: ownBed })) wetEachLane = wetLane;
-    else if (needPrewet) for (const pts of wetOver) { ctx.WET_TRACE?.lane(); wetLane(pts); }
+    // a wash plan's shape wetted whole is wetted to its outline: a round runs round it first, then the lanes
+    else if (needPrewet) for (const pts of (vectorPaths && wetOver === paths ? [...outlineWater(up(MASK), W2, H2, { mmPerCell: num('sheetmm', DEFAULT_SHEET_MM) / W2, laneRadius: Math.max(...paths.flat().map(p => p.r)) }), ...wetOver] : wetOver)) { ctx.WET_TRACE?.lane(); wetLane(pts); }
   }
   // how many of this graded wash's sweeps lie over each cell, so each is charged for its share (sweepCount)
   const useGradedCal = Boolean(sh.graded || sh._valuePlan);

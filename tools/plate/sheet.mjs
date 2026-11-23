@@ -774,7 +774,7 @@ const scrapSwatches = (techniques, drySwatch, { damp = false } = {}) => {
   // load and transfer are in millimetres, so a scrap with no physical scale ran it at the reference 0.26 mm a cell and
   // calibrated a 64-cell picture's 2.3 mm cells as if they were a tenth the size (forms carried 162% of the plan).
   const envOf = (square = plainSquare) => { const { under, flat: _flat, paperOptions, ...lanes } = square; return { ...lanes, pigment: PIGS[0], physics: O, paperOptions: paperOptions ?? { ...PAPER_OPTS, seed: 5 }, charge: want * num('strength', 2.2) * under, upright: UPRIGHT, water: WET, dip, stroke, step, dry: drySwatch, settle,
-    waterBrush: r => createBrush({ flat: true, radius: r, bristles: Math.max(12, Math.ceil(r * 2)), capacity: 100, belly: 12, feed: 0.4, give: 0.9, free: 0.4, film: 0.25, seed: 5 }),
+    waterBrush: r => createBrush({ flat: square.flat, radius: r, bristles: Math.max(12, Math.ceil(r * 2)), capacity: 100, belly: 12, feed: 0.4, give: 0.9, free: 0.4, film: 0.25, seed: 5 }),
     paintBrush: (r, T) => createBrush(paintOpts(r, T)), prepareBed }; };
   return techniques.map(T => {
     const env = envOf(squareOf(T));
