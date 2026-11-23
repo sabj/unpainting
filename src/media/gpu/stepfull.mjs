@@ -33,6 +33,10 @@ const FAST_DRY_DT_SCALE = Math.max(0.01, envNum('GPU_FAST_DRY_DT_SCALE', 2));
 const onesCache = new Map(), ONES = n => onesCache.get(n) ?? (onesCache.set(n, new Float32Array(n).fill(1)), onesCache.get(n));
 // the most steps the edge feed runs between looks at whether its geometry has moved (efSteps)
 const EF_BATCH = Math.max(1, envNum('GPU_EDGE_BATCH', 25));
+// Between strokes' flows (advance, not a dry), a moved outline remakes the feed's geometry only once this many steps have
+// passed since it was last made: the geometry (a pressure solve over the whole wet box, about 200 ms at full size) then
+// trails the wash's front by a few steps while it is being painted. A dry remakes it at once, as the CPU sheet does.
+const EF_STROKE_LAG = 8;
 const SPARSE_ALL = typeof process === 'undefined' || process.env.GPU_SPARSE_ALL !== '0';
 const KEEP = []; // Dawn's instance, adapter and device must stay reachable or the GC frees them under the running device
 
@@ -800,8 +804,9 @@ export class GpuSheet {
       // a step used most of the rounds it had: give it more before one runs short (the last round takes all the time left)
       // (washes at 0.1 mm cells take up to 12 substeps a step; a quarter of the rounds are kept spare)
       if (st[3] > 0.75 * this.ef.rounds && this.ef.rounds < EF_RMAX) { this.ef.rounds = Math.min(EF_RMAX, 2 * this.ef.rounds); this.efWriteRounds(); }
-      if (this.ef.stale) await this.efRefresh();
-      const k = Math.min(this.ef.batch, steps - done);
+      const lagging = !measure && this.ef.count > 0 && (this.ef.steps ?? 0) - (this.ef.madeAt ?? -Infinity) < EF_STROKE_LAG;
+      if (this.ef.stale && !lagging) { await this.efRefresh(); this.ef.madeAt = this.ef.steps ?? 0; }
+      const k = Math.min(this.ef.batch, steps - done); this.ef.steps = (this.ef.steps ?? 0) + k;
       batch = this.device.createCommandEncoder();
       this.encodeSteps(batch, k, measure && done + k === steps); done += k;
     }
