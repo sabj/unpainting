@@ -37,7 +37,7 @@ function seed({ ws, crop, spec, view, tries, dry }) {
   const p = readJson(path.join(V3, 'prompts.json'));
   fs.writeFileSync(path.join(b, 'BRIEF.md'), fill(sayLimit(fs.readFileSync(path.join(V3, 'BRIEF.md'), 'utf8')), {
     CROP: crop, SIZE: `${spec.width} x ${spec.height}`, STYLE: spec.style, TARGET: view,
-    ATTEMPTS: fill(tries === 2 ? p.attemptsExact : p.attemptsUpTo, { TRIES: tries }),
+    ATTEMPTS: tries === 1 ? p.attemptsOne : fill(tries === 2 ? p.attemptsExact : p.attemptsUpTo, { TRIES: tries }),
   }));
   if (dry) {
     fs.copyFileSync(path.join(BENCH, 'scripts', 'dry-painter.mjs'), path.join(b, 'paint.mjs'));
@@ -68,10 +68,13 @@ async function collect({ ws, crop, n, raw, view, turn }) {
   const cf = path.join(b, 'attempts', `a${n}-changed.txt`);
   const changed = fs.existsSync(cf) ? (fs.readFileSync(cf, 'utf8').trim().split('\n')[0] || '').slice(0, 400) : '';
   let stats = null; try { stats = readJson(path.join(dst, 'stats.json')); } catch { /* no stats: the attempt did not finish */ }
+  // the paintings it ran (the only thing charged at level 1: kit.mjs), and a runaway stop if the guard made one
+  let paintingsRun = 0; try { paintingsRun = fs.readFileSync(path.join(b, 'out', 'kitlog.jsonl'), 'utf8').split('\n').filter(l => l.includes('"ev":"run"') && l.includes(`"task":${JSON.stringify(crop)}`)).length; } catch { /* none */ }
+  let runaway = null; try { runaway = readJson(path.join(dst, 'runaway.json')); } catch { /* no stop */ }
   const keep = path.join(raw, `a${n}`);
   fs.rmSync(keep, { recursive: true, force: true }); fs.cpSync(dst, keep, { recursive: true });
   return { n, final: fs.existsSync(final), finished: fs.existsSync(path.join(out, 'stats.json')), stats,
-    min: minutes(turn.seconds), killed: turn.killed, exit: turn.code, changed: changed || null };
+    min: minutes(turn.seconds), killed: turn.killed, exit: turn.code, changed: changed || null, paintingsRun, runaway };
 }
 
 /** One target's attempts 1..tries. Every attempt starts in a worktree of its own and a model session of its own (the
@@ -172,8 +175,8 @@ export async function runV3({ round, model, tries, crops, dry, outRoot, force })
         seed: s.seed ?? null, sheet: s.sheet ?? null, strokeLog: logged ? `${r.crop}-strokes.jsonl.gz` : null,
         strokes: s.strokes ?? null, minutes: s.seconds != null ? Math.round(s.seconds / 6) / 10 : null, smallShare: s.smallShare ?? null,
         shortStrokes: s.shortStrokes ?? null, dotStrokes: s.dotStrokes ?? null, copyHF: null, images: { final: `${r.crop}.webp`, stages },
-        // rendering work, counted the same on any machine (the kit's kit.work()); recorded beside the score, never a cap below the budget
-        work: s.work ?? null,
+        // measured work (the kit's kit.work()), recorded beside the score and never charged; the paintings run are the charge (budget 3)
+        work: s.work ?? null, paintingsRun: a.paintingsRun ?? null, runawayStop: a.runaway ? a.runaway.msg : null,
         painterNote: n > 1 ? a.changed : null, score: null, progression: null, attempt: { n, minutes: a.min, killedAtCap: a.killed, exitCode: a.exit },
       };
     }
@@ -183,7 +186,7 @@ export async function runV3({ round, model, tries, crops, dry, outRoot, force })
       schema: RUN_SCHEMA, benchmark: 'unpaint-bench', protocol: 'v2', round: round.id, ...VERSION_STAMP,
       painter: { key: model.key, name: model.name, id: model.id, effort: model.effort, runner: model.runner },
       planner: null, evaluators: { scoreJudges: [], progressionJudges: [] }, try: n,
-      settings: { mode: 'gentle', strokeBudget: BUDGET.strokes, minutesPerCrop: SAID_MIN, sessionCapMin: ATTEMPT_MIN, lookBudget: null, crops, learnsBetweenTries: true, attemptsPerSession: tries },
+      settings: { mode: 'gentle', strokeBudget: BUDGET.strokes, minutesPerCrop: SAID_MIN, sessionCapMin: ATTEMPT_MIN, lookBudget: null, paintingsPerAttempt: 3, crops, learnsBetweenTries: tries > 1, attemptsPerSession: tries },
       session: { minutes: +min.toFixed(1), tokens: tokens || null, costUSD: null, exitCode: null, killedAtCap: killed },
       guard: { blockedImageReads: violations, kitRejections: 0, auditHits: hits },
       crops: cropsOut, ...(Object.keys(notes).length ? { notPainted: notes } : {}),

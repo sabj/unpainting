@@ -10,10 +10,15 @@
 // The water: the kit moves it for you. While a brush or pen is on the paper the sheet steps for the brush time that
 //   passed, on the main painter's cadence (src/media/water-clock.mjs); a script gives no `between` and calls no step.
 //   kit.wait(sheet, moments) lets time pass with the brush off the paper; kit.dryAll(sheet) dries the sheet.
-// Rendering work: every brush sweep, drying and water step is counted, the same on any machine. kit.work() gives the
-//   running total; the units are the levels 2 to 4 units (tools/paint/look-cost.mjs workUnits: brush sweeps plus dryings,
-//   over one full painting of the automatic plan of the subject = 1.00). Budget BENCH_UNITS (default 5): measured and
-//   generous; the kit stops a painting only at the limit; recorded beside the score in stats.json.
+// What is charged: the paintings you run. Each run of a script that lays anything (kit.open, then a mark, to finish or
+//   to a stop) is one full-size painting of the whole sheet, at a fixed price of 1, whatever is in it (the levels 2 to 4
+//   price of a full-size look; the kit cannot price part of a run, since it does not know the script's whole). Budget
+//   BENCH_RUNS (default 3, the owner's 3 paintings' worth a try) per attempt, counted in out/kitlog.jsonl; the run past
+//   it is refused before it lays anything. Nothing else is charged: sweeps, dryings, waits,
+//   water steps and seconds are measured and recorded beside the score (kit.work(), stats.json), never budgeted.
+// One guard, as resource management: a painting that takes more than BENCH_STEP_CEILING (default 10) times the water
+//   steps of the automatic painting of its subject is stopped as a runaway, with a plain message; recorded as a stop
+//   (out/<task>/runaway.json), never scored.
 // Rules the kit enforces (it throws, and you may retry within your budget):
 // - No image files may be read (the targets are in your prompt; your own frames are readable under bench/out/).
 // - Paint only from the box: conc must come from kit.mix() over BRUSH_PAINTS (brush) or INK (pen); total at most 2 (brush), 8 (pen).
@@ -51,7 +56,6 @@ import * as GR from '../src/media/kit-graphite.mjs';
 import { BOX, boxPigment } from '../src/crop/box.mjs';
 import { attachGpu } from '../src/media/gpu/link.mjs';
 import { waterClock } from '../src/media/water-clock.mjs';
-import { workUnits, DEFAULT_LOOK_UNITS } from '../tools/paint/look-cost.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 export const PROTOCOL = 'v2';
@@ -65,7 +69,8 @@ const KEYS = BOX.map(p => p.key);
 // the graphite grades sit in two pans of the box that no kit call can mix
 const GRAPHITE_PAN = Object.freeze({ HB: 'cadred', '2B': 'paynes' }), GRAPHITE = Object.values(GRAPHITE_PAN).map(k => KEYS.indexOf(k));
 export const { DEFAULTS, applyResist, liftResist, blot } = S;
-export const UNITS = Number(process.env.BENCH_UNITS) > 0 ? Number(process.env.BENCH_UNITS) : DEFAULT_LOOK_UNITS;
+export const RUNS = Number(process.env.BENCH_RUNS) > 0 ? Number(process.env.BENCH_RUNS) : 3;
+export const STEP_CEILING = Number(process.env.BENCH_STEP_CEILING) > 0 ? Number(process.env.BENCH_STEP_CEILING) : 10;
 const LOCK = path.resolve(HERE, '../../.bench-gpu.lock');
 const SLOTS = path.resolve(HERE, '../../.bench-slots'), NSLOTS = 6;
 // A few render processes may run at once: open() waits for one of NSLOTS slots, held until the process exits.
@@ -166,7 +171,7 @@ export async function open(task, { seed = +(process.env.BENCH_SEED || 1), gpu = 
   st = { work, advance, clock: waterClock(advance), unit: unitOf(task), O, log, logWritten: false, seed, task, out, sheet, pigments, W, H, strokes: 0, pen: 0, pencil: 0, erase: 0, small: 0, short: 0, dots: 0, frames: 0, snaps: [], film: [], t0: Date.now(), backend: sheet._gpu ? 'gpu' : 'cpu', paperRGB: [240, 237, 228], pending: Promise.resolve() };
   logLine({ ev: 'open', protocol: PROTOCOL, task, seed, W, H, mmPerCell: MM, paper: { toothScale: 0.2, coldPress: true }, backend: st.backend, t0: st.t0 });
   process.on('exit', flushLog); // a script that dies before finish() keeps the strokes it laid
-  console.error(`kit v2: ${task} ${W}x${H}, ${st.backend}, budget ${BUDGET} strokes; rendering budget ${UNITS} units${st.unit ? ` (1 unit = ${st.unit.sweeps + st.unit.dryings} brush sweeps and dryings, one full automatic painting of this subject)` : ': no unit for this sheet, work is counted, not charged'}`);
+  console.error(`kit v2: ${task} ${W}x${H}, ${st.backend}, budget ${BUDGET} strokes; this is painting ${runsSoFar(task) + 1} of the ${RUNS} you may run in this attempt (charged when it lays its first mark)`);
   return { sheet, O, W, H };
 }
 
@@ -191,7 +196,7 @@ const lenOf = pts => { let L = 0; for (let i = 1; i < pts.length; i++) L += Math
 function counted(kind) {
   if (!st) reject('call kit.open() first');
   if (used() >= BUDGET) reject(`stroke budget of ${BUDGET} used up`);
-  overBudget();
+  charge();
   st[kind === 'brush' ? 'strokes' : kind]++;
   const n = used();
   if (n % SNAP_EVERY === 0) snap(n);
@@ -247,7 +252,7 @@ export function erase(sheet, pts, { width = 12 } = {}) {
 /** Dry the whole sheet: the water settles a moment (30 steps) and the sheet is dried. One drying of the rendering work. */
 export function dryAll(sheet, O) {
   if (!st || sheet !== st.sheet) reject('dryAll(sheet): the sheet kit.open() gave');
-  overBudget();
+  charge();
   film('painting');   // wet, as the drying finds it
   for (let q = 0; q < 30; q++) st.advance();
   const r = S.dry(sheet, 30000, O ?? st.O, { levelMax: 140, dt: 14 });
@@ -260,30 +265,43 @@ export function dryAll(sheet, O) {
  *  moment is about the time a brush takes to travel 17 cells). Wet strokes merge further; nothing dries hard. */
 export function wait(sheet, moments = 20) {
   if (!st || sheet !== st.sheet) reject('wait(sheet, moments): the sheet kit.open() gave');
-  overBudget();
+  charge();
   try { st.clock.wait(moments); } catch (e) { reject(e.message); }
   st.work.waits++;
   logLine({ ev: 'wait', moments, after: used(), t: Date.now() - st.t0 });
 }
-/** The rendering work so far, counted the same on any machine, and what is left of the budget. */
+/** What this painting has asked of the simulator so far, measured the same on any machine and never charged, and the
+ *  paintings of this attempt: the only thing charged. */
 export function work() {
   if (!st) reject('call kit.open() first');
-  const w = st.work, u = st.unit, cells = st.W * st.H;
-  const units = u ? workUnits({ sweeps: st.strokes, dryings: w.dryings }, u.sweeps + u.dryings) : null;
+  const w = st.work, u = st.unit, done = runsSoFar(st.task) + (st.charged ? 0 : 1);
   return {
-    sweeps: st.strokes, penLines: st.pen, pencilLines: st.pencil, erasures: st.erase, dryings: w.dryings, waits: w.waits,
-    waterSteps: w.waterSteps, cellsStepped: w.waterSteps * cells, strokeSteps: st.clock.counts.strokeSteps,
-    units, budget: UNITS, left: units == null ? null : +(UNITS - units).toFixed(2),
-    unit: u ? { sweeps: u.sweeps, dryings: u.dryings, waterSteps: u.waterSteps ?? null, from: u.from ?? null } : null,
-    // the water steps beside the automatic painting's, on this sheet: recorded, not charged
-    steppedShare: u?.waterSteps > 0 ? +(w.waterSteps / u.waterSteps).toFixed(2) : null,
+    painting: done, paintingsBudget: RUNS, paintingsLeft: RUNS - done,
+    measured: { sweeps: st.strokes, penLines: st.pen, pencilLines: st.pencil, erasures: st.erase, dryings: w.dryings, waits: w.waits,
+      waterSteps: w.waterSteps, cellsStepped: w.waterSteps * st.W * st.H, strokeSteps: st.clock.counts.strokeSteps, seconds: Math.round((Date.now() - st.t0) / 1000) },
+    // the automatic painting of this subject, for scale, and the runaway guard: recorded, not charged
+    auto: u ? { sweeps: u.sweeps, dryings: u.dryings, waterSteps: u.waterSteps ?? null, from: u.from ?? null } : null,
+    waterStepsOverAuto: u?.waterSteps > 0 ? +(w.waterSteps / u.waterSteps).toFixed(2) : null,
+    runawayAt: u?.waterSteps > 0 ? STEP_CEILING * u.waterSteps : null,
   };
 }
-// The budget stops a painting only at its limit: the next sweep, drying or wait past it is refused; finish() always works.
-function overBudget() {
-  if (!st?.unit) return;
-  const units = workUnits({ sweeps: st.strokes, dryings: st.work.dryings }, st.unit.sweeps + st.unit.dryings);
-  if (units >= UNITS) reject(`the rendering budget of ${UNITS} units is used (${units}): nothing more can be laid; call await kit.finish(note)`);
+// The paintings of this attempt: the runs that laid a mark, counted in out/kitlog.jsonl (one workspace per attempt).
+const KITLOG = path.join(HERE, 'out', 'kitlog.jsonl');
+const runsSoFar = task => { try { return fs.readFileSync(KITLOG, 'utf8').split('\n').filter(l => l.includes('"ev":"run"') && l.includes(`"task":${JSON.stringify(task)}`)).length; } catch { return 0; } };
+// A painting is charged once, at its first mark; the run past the budget is refused. Then the runaway guard.
+function charge() {
+  if (!st.charged) {
+    const before = runsSoFar(st.task);
+    if (before >= RUNS) reject(`you have run ${before} paintings in this attempt, the budget of ${RUNS}: this one is refused before it lays anything. Your last finished painting is the one that counts`);
+    fs.appendFileSync(KITLOG, JSON.stringify({ ev: 'run', task: st.task, t: Date.now(), n: before + 1 }) + '\n');
+    st.charged = true;
+  }
+  const u = st.unit;
+  if (u?.waterSteps > 0 && st.work.waterSteps > STEP_CEILING * u.waterSteps) {
+    const msg = `this painting has taken ${st.work.waterSteps} water steps, more than ${STEP_CEILING} times the ${u.waterSteps} of the automatic painting of this subject: it is stopped as a runaway (recorded as a stop, not scored). Fewer, wetter sittings and fewer waits take far fewer steps`;
+    try { fs.writeFileSync(path.join(st.out, 'runaway.json'), JSON.stringify({ stopped: true, msg, work: work() }, null, 1)); } catch {}
+    reject(msg);
+  }
 }
 
 export function look() {

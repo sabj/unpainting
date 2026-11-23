@@ -1,4 +1,4 @@
-# Paint one crop with the watercolour simulator, in attempts (protocol v2)
+# Paint one crop with the watercolour simulator (protocol v2)
 
 You are in a fresh git worktree of a watercolour painting simulator (Node 25, ES modules). Paint the target crop as a
 person with a brush and pen would, using only the simulator's marks through `bench/kit.mjs`.
@@ -6,14 +6,12 @@ person with a brush and pen would, using only the simulator's marks through `ben
 Task `{CROP}`: {SIZE} px. Style: {STYLE}. The target is attached to the first message. You may look at it again with
 your own image viewing tool at `{TARGET}`.
 
-## Attempts
+## One attempt, up to 3 paintings
 
-{ATTEMPTS} Every attempt starts from a fresh sheet (`kit.open` gives one), in a fresh folder and a fresh session of
-its own: nothing you wrote or thought in an earlier attempt is here, except that attempt's own folder,
-`bench/attempts/a<N>/` (its scripts, final image, frames and stats, and `compare.png`: target left, your painting
-right, to look at with your own eyes). It is read-only and for reference. An attempt that repeats the one before it
-stroke for stroke is recorded as such.
-When an attempt is painted (it ends with `kit.finish`), stop: the attempt is over.
+{ATTEMPTS} You are in a fresh folder and a fresh session. Each run of your painting script that lays a mark is one
+painting on a fresh sheet (`kit.open` gives one); after a run you may look at its frames and final image under
+`bench/out/{CROP}/` and change your script. The fourth run is refused before it lays anything. When the painting you
+want is the last one completed (it ended with `kit.finish`), stop.
 
 ## Rules (protocol v2)
 
@@ -28,16 +26,15 @@ When an attempt is painted (it ends with `kit.finish`), stop: the attempt is ove
   `src/plan.js`, `src/painter.js` and similar).
 - Paint like a person: light before dark, broad before detail, washes and strokes rather than pixel fills. Stage frames
   are saved automatically at 10%, 25%, 50%, 75% and 100% of your strokes and are judged for a human-like progression.
-- Rendering work: the kit counts what your painting asks of the simulator, the same on any machine. `kit.work()` gives
-  the running total: units (your brush sweeps plus dryings, where 1 unit is what one full painting of this subject by
-  the code's automatic planner takes), and beside them the water steps the kit took for you. Budget 5 units: measured
-  and generous; the kit stops a painting only at the limit; everything is recorded beside your score. Every water step
-  moves the water over the whole sheet, so on a full-size wet sheet waits and dryings are the slowest things you can
-  ask for; `bench/TIPS.md` says what each costs.
-- Budget per attempt: at most 2,500 strokes (brush, pen, pencil and eraser together). About 30 minutes per attempt, including your
-  thinking; each attempt is stopped after 30 minutes. One painting run at a time: do not run several in parallel.
-- End each attempt with `await kit.finish(note)`. Outputs land in `bench/out/{CROP}/` (`final.png`, `frames/`,
-  `stats.json`). Rerunning overwrites them, so the last run in an attempt is the one that counts.
+- Paintings: each run of your script that lays a mark is one painting of the whole sheet, whatever is in it, and
+  counts against your budget of 3 paintings; the run past it is refused before it lays anything.
+  `kit.work()` says which painting this is and how many are left. Nothing else is budgeted: strokes, water, waits and
+  dryings are measured and recorded beside your score, never charged. A painting that takes more than 10 times the
+  water steps of the code's own painting of this subject is stopped as a runaway, with a message.
+- At most 2,500 strokes a painting (brush, pen, pencil and eraser together). About 30 minutes in all, including your
+  thinking; the session is stopped after 30 minutes. One painting run at a time: do not run several in parallel.
+- End each painting with `await kit.finish(note)`. Outputs land in `bench/out/{CROP}/` (`final.png`, `frames/`,
+  `stats.json`). Rerunning overwrites them, so the last completed run is the one that counts.
 - Work only inside this worktree. Do not commit, push or touch anything outside it.
 
 ## Skills

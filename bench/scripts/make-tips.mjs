@@ -22,13 +22,13 @@ try {
   for (const f of fs.readdirSync(TIPS).filter(f => /^\d+-.*\.mjs$/.test(f)).sort((a, b) => parseInt(a) - parseInt(b))) {
     if (only.length && !only.includes(String(parseInt(f)))) continue;
     fs.copyFileSync(path.join(TIPS, f), path.join(wb, f));
-    const t = Date.now(); execFileSync(process.execPath, [f], { cwd: wb, env: { ...process.env, BENCH_NO_FILM: '1' }, stdio: ['ignore', 'ignore', 'inherit'] });
+    const t = Date.now(); execFileSync(process.execPath, [f], { cwd: wb, env: { ...process.env, BENCH_NO_FILM: '1', BENCH_RUNS: '999' }   /* every example is its own painting, not a model's budget */, stdio: ['ignore', 'ignore', 'inherit'] });
     const stats = JSON.parse(fs.readFileSync(path.join(wb, 'out', 'tips', 'stats.json'), 'utf8'));
     if (stats.backend !== 'gpu') throw new Error(`${f}: painted on ${stats.backend}, not the GPU`);
     fs.copyFileSync(path.join(wb, 'out', 'tips', 'final.png'), path.join(TIPS, f.replace(/\.mjs$/, '.png')));
     // the stroke paths as arrows over the result, from the kit's own stroke log (bench/v3/tips/arrows.py)
     execFileSync(process.env.BENCH_SCORE_PYTHON || 'python3', [path.join(TIPS, 'arrows.py'), path.join(wb, 'out', 'tips', 'strokes.jsonl.gz'), path.join(TIPS, f.replace(/\.mjs$/, '.png')), path.join(TIPS, f.replace(/\.mjs$/, '-arrows.png'))], { stdio: 'inherit' });
-    const seconds = Math.round((Date.now() - t) / 1000), w = stats.work;
+    const seconds = Math.round((Date.now() - t) / 1000), w = stats.work.measured;
     costs[f.replace(/\.mjs$/, '')] = { sheet: [TW, TH], seconds, machine: os.cpus()[0]?.model ?? 'unknown', sweeps: w.sweeps, penLines: w.penLines, pencilLines: w.pencilLines, erasures: w.erasures, dryings: w.dryings, waits: w.waits, waterSteps: w.waterSteps, cellsStepped: w.cellsStepped, backend: stats.backend };
     fs.writeFileSync(costsFile, JSON.stringify(costs, null, 1) + '\n');
     console.log(`${f}: ${stats.strokes} strokes, ${w.dryings} dryings, ${w.waterSteps} water steps, ${seconds} s, ${stats.backend}`);
