@@ -44,7 +44,7 @@ const UNITS = new Map();
  * low-passed at `grainMm` about its millimetre mean, on a fine patch of the same paper. Fixed for a paper and
  * grainMm, so every grid measures the same hollows in the same micrometres.
  */
-function grainUnit({ seed, relief }, grainMm = GRAIN_MM) {
+export function grainUnit({ seed, relief }, grainMm = GRAIN_MM) {
   const key = JSON.stringify([seed, relief, grainMm]);
   if (!UNITS.has(key)) {
     const n = Math.round(UNIT_SIDE_MM / UNIT_MM), R = paperRelief(n, n, UNIT_MM, { seed, relief });
@@ -71,8 +71,10 @@ function boxField(a, w, h, r) {
 export function grainSurface(height, w, h, mmPerCell, reliefOf, { grainMm = GRAIN_MM } = {}) {
   if (!(mmPerCell > 0)) throw new Error('grain-field: mmPerCell must be positive (a physical sheet)');
   if (!reliefOf) throw new Error('grain-field: the paper has no relief seed and preset (paper-relief.mjs)');
-  return { grainH: gaussianField(height, w, h, grainMm / mmPerCell), unit: grainUnit(reliefOf, grainMm) };
+  return { grainH: grainField(height, w, h, mmPerCell, grainMm), unit: grainUnit(reliefOf, grainMm) };
 }
+/** A field of cell means on cells of `mmPerCell` low-passed at `grainMm`: what grainH is, on any grid. */
+export const grainField = (height, w, h, mmPerCell, grainMm = GRAIN_MM) => gaussianField(height, w, h, grainMm / mmPerCell);
 
 // the cell the slide's rate was fitted on: the painter's own sheets, 0.26 mm a cell (1086 cells on 282 mm)
 export const SLIDE_REF_MM = 0.26;

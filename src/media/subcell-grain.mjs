@@ -1,17 +1,17 @@
-// Sub-cell grain: a sheet's settled pigment spread over a finer output grid by the paper's own relief, evaluated at the
-// output pixel's scale. The paper is one field in micrometres (paper-relief.mjs), so an image N times finer than the
-// sheet reads the same paper finer, not enlarged cells: a 0.25 mm sheet shows grain in 0.2 to 0.5 mm pits, and a zoomed
-// view evaluates them again at its own pixels.
+// Sub-cell grain: a sheet's settled pigment spread over a finer output grid by the paper as granulating paint answers
+// to it, the relief low-passed at GRAIN_MM (grain-field.mjs), evaluated at the output pixel's scale. The sheet's
+// settling and slide read the same field, so the render adds the field's detail finer than a cell and no pepper the
+// physics does not make.
 //
 // Each cell keeps exactly its own pigment. Inside it, the amount at each output pixel follows a smooth interpolation of
 // the cell masses, times the granulating weight w = exp(gamma (zRef - z) / unit): deeper than the paper about it, more
 // pigment; on a crest, less, but never none (a painter sees the fibre peaks about 40% lighter, not bare). zRef is the
-// relief smoothed over about a cell, unit the relief's RMS about its millimetre mean (the hollow unit of settling), and
+// relief smoothed over about a cell, unit the field's RMS about its millimetre mean (grain-field.mjs grainUnit), and
 // gamma the pigment's granulation times SUBCELL_GAIN. A staining pigment (gamma 0) only interpolates. Each cell's total
 // is then put right by a factor interpolated between cells (no steps at the cells' edges), and exactly in the cell.
 // DOM free.
-import { paperRelief } from './paper-relief.mjs';
-import { gaussianField } from './grain-field.mjs';
+import { paperRelief, HEIGHT_SPAN_UM } from './paper-relief.mjs';
+import { gaussianField, grainField, grainUnit } from './grain-field.mjs';
 
 // how strongly a granulating pigment follows the relief inside a cell, per unit of gamma: fitted so a 30 mm ultramarine
 // puddle simulated at 0.25 and at 0.1 mm and rendered at 0.025 mm pixels has the 0.2 to 1 mm grain of the same puddle
@@ -29,7 +29,10 @@ export function subcellLayers(layers, pigments, paper, N, { gain = SUBCELL_GAIN 
   if (!(mmPerCell > 0) || !paper.reliefOf) throw new Error('subcell-grain: the paper has no physical relief (make it with makePaper and mmPerCell or coldPress)');
   const { seed, relief } = paper.reliefOf;
   if (!(N >= 1 && Number.isInteger(N))) throw new Error('subcell-grain: N must be a whole number of pixels a cell');
-  const FW = w * N, FH = h * N, R = paperRelief(FW, FH, mmPerCell / N, { seed, relief }), z = R.zUm, unit = R.hollowRmsUm;
+  // the paper as granulating paint answers to it (grain-field.mjs): the relief low-passed at GRAIN_MM, in its own unit, as
+  // the sheet's settling and slide read it; the full relief here added a pepper finer than the sheet's own physics
+  const FW = w * N, FH = h * N, R = paperRelief(FW, FH, mmPerCell / N, { seed, relief });
+  const z = grainField(R.zUm, FW, FH, mmPerCell / N), unit = grainUnit({ seed, relief }) * HEIGHT_SPAN_UM;
   // the level a pit is measured against: the relief smoothed over about a cell, not each cell's own mean (a mean per
   // cell stepped at every cell's edge, and the steps showed as squares at zoom)
   const zref = gaussianField(z, FW, FH, N);
