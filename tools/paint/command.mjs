@@ -2,7 +2,7 @@
 // settings, and the plain block printed before it starts. Pure: no file is read or written here.
 
 /** Options the harness sets itself; --set may not change them. */
-const OWNED = new Set(['image', 'width', 'sheetmm', 'drawingfile', 'washplan', 'out', 'gpu', 'valuepreviewonly', 'allowdirty', 'thingmasks', 'things']);
+const OWNED = new Set(['image', 'width', 'sheetmm', 'drawingfile', 'washplan', 'out', 'gpu', 'valuepreviewonly', 'allowdirty', 'thingmasks', 'things', 'planfile']);
 /** Heap for the painter (MB): a full sheet's plan does not fit node's default. */
 const HEAP_MB = { plan: 13312, paint: 18432 };
 
@@ -16,8 +16,10 @@ export function washPlanOf(studies) {
  * known: the painter's option names (scanOptions); script: {file, paints} when an author wrote the wash plan;
  * edit: {file} when an author edited the code planner's plan (the studies are read as always, then the edit applied);
  * dirty: the checkout has uncommitted changes (the painter refuses those unless told).
+ * planOf: {file, paints} for a look painted from the final's own plan (src/paint/methods/plan-file.mjs): the plan's file
+ * and its paints, which the look is mixed from as the final is.
  */
-export function buildCommand(spec, { mode, out, known, script = null, edit = null, dirty = false, segEnv = {} }) {
+export function buildCommand(spec, { mode, out, known, script = null, edit = null, dirty = false, segEnv = {}, planOf = null }) {
   const settings = [], opts = new Map(spec.options);
   const set = (name, value, why) => { const was = opts.get(name) ?? null; if (was !== value) settings.push({ name, value, default: was ?? '(painter default)', why }); if (value === null) opts.delete(name); else opts.set(name, value); };
   if ((opts.get('targetguard') ?? 'gentle') !== 'gentle') throw new Error(`subject ${spec.id}: the record asks for --targetguard ${opts.get('targetguard')}; this command paints in gentle mode only`);
@@ -35,6 +37,7 @@ export function buildCommand(spec, { mode, out, known, script = null, edit = nul
   // a script's first washes are broad and wet: over a pen drawing they lift ink that still rewets (the painter stops: "the
   // first wash moved N% of the pen's ink"), so a script is laid over ink that was set first, as pen and wash is done
   if (script && !opts.has('inkfast')) opts.set('inkfast', '1');
+  if (planOf) { if (script) throw new Error('a look at a script is planned from the script, not from a plan file'); opts.set('paints', planOf.paints.join(',')); opts.set('paintsextend', '0'); opts.set('planfile', planOf.file); }
   const masksRead = Boolean(spec.masks?.receipt && !script && known?.has('thingmasks'));
   const argv = [...opts].flatMap(([k, v]) => [`--${k}`, v]);
   argv.push('--washplan', script ? `script:${script.file}` : `${edit ? `edit:${edit.file},` : ''}${washPlanOf(spec.studies)}`, '--drawingfile', spec.drawing.abs);

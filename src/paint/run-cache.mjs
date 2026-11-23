@@ -130,7 +130,7 @@ export function inputHash(inputs) {
 // a large plan as one string passes V8's string limit. Each entry is its own .bin file; NAME-HASH.json indexes them by
 // the options they read.
 const MAGIC = Buffer.from('RCB2');
-function writeEntry(file, entry) {
+export function writeEntry(file, entry) {
   const blobs = [], skeleton = Buffer.from(JSON.stringify({ reads: entry.reads, logs: entry.logs, value: enc(entry.value, new Map(), blobs) }));
   const fd = fs.openSync(file, 'w');
   try {
@@ -145,7 +145,7 @@ function writeEntry(file, entry) {
     }
   } finally { fs.closeSync(fd); }
 }
-function readEntry(file) {
+export function readEntry(file) {
   const fd = fs.openSync(file, 'r');
   try {
     let at = 0;

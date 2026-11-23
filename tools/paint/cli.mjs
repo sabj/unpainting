@@ -19,7 +19,8 @@ import { authorOf, authorLabel, briefName, readScript, checkAuthored, preparePac
 import { readChoice, choiceKey, choiceKind, withChoice, settingsList } from './choice.mjs';
 import { checkPlanEdit, editLine } from '../../src/paint/methods/plan-edit.mjs';
 import { planNumbers, planSummary, numbersText, washesText, planPicture, lookPicture, stagesPicture } from './plan-data.mjs';
-import { lookSets, lookFault, stoppedLookFault, lookSizeNote, LOOK_JOBS, HEAVY_JOBS } from './look.mjs';
+import { lookSets, lookFromPlan, lookFault, stoppedLookFault, lookSizeNote, LOOK_JOBS, HEAVY_JOBS } from './look.mjs';
+import { readPlanNote, PLAN_FILE } from '../../src/paint/methods/plan-file.mjs';
 import { toolUseOf, listFiles } from './tool-use.mjs';
 import { PROVIDER_HOSTS, startGate as startNetGate, makeToolbox, toolsText } from './session-net.mjs';
 import { DEFAULT_LOOKS, DEFAULT_WALL_MINUTES, DEFAULT_GRACE_MINUTES, DEFAULT_STEPS, safeRead, writeSession, sessionServer, SIGN_IN_EXPOSURE, finalChoice, sessionCall, readTranscript, reachedOutside, ownFolderOf, ownPictures, runSession } from './session.mjs';
@@ -297,7 +298,16 @@ async function paintLookOnce(r, choice, script, plate, at, edit, compiled, ask =
   const { spec, record } = r, scriptFile = `${plate}.script.json`, editFile = `${plate}.plan-edit.json`;
   try {
     const full = await specWith(r, choice);
-    const small = await specWith(r, choice, lookSets(withChoice(req.sets, choice), full.sheet.cells, choice.kind));
+    const small = await specWith(r, choice, lookSets(withChoice(req.sets, choice), full.sheet.cells));
+    // the code planner's plan is never planned again for the small sheet: the look is painted from the plan this
+    // choice was planned with at the final size (plan-file.mjs), with that plan's paints
+    let planOf = null;
+    if (lookFromPlan(choice.kind) && small.sheet.cells < full.sheet.cells) {
+      const note = compiled?.plate ? readPlanNote(compiled.plate) : null;
+      if (!note) return { ok: false, error: 'this choice has no kept plan to paint a look from (its plan did not compile, or was made before plans were kept)' };
+      if (!note.paints) return { ok: false, error: 'the plan\'s paints are not box paints, so a look cannot be mixed as the final will be' };
+      planOf = { file: path.join(compiled.plate, PLAN_FILE), paints: note.paints };
+    }
     fs.mkdirSync(path.dirname(plate), { recursive: true });
     if (script) fs.writeFileSync(scriptFile, JSON.stringify(script, null, 1) + '\n');
     if (edit) fs.writeFileSync(editFile, JSON.stringify(edit, null, 1) + '\n');
@@ -306,7 +316,7 @@ async function paintLookOnce(r, choice, script, plate, at, edit, compiled, ask =
       // the wait for a place among the machine's GPU paintings and the start are one step at a time
       const going = await lookGate(async () => {
         await gpuPlace({ most: readJobs, running: gpuPaintCount, onWait: n => say(r, `look ${at.look}: waiting, ${n} GPU paintings are running and --jobs is ${readJobs()}`) });
-        const command = buildCommand(small, { mode: 'paint', out: plate, known, dirty: codeState(ROOT).dirty, segEnv, script: script ? { file: scriptFile, paints: script.palette } : null, edit: edit ? { file: editFile } : null });
+        const command = buildCommand(small, { mode: 'paint', out: plate, known, dirty: codeState(ROOT).dirty, segEnv, script: script ? { file: scriptFile, paints: script.palette } : null, edit: edit ? { file: editFile } : null, planOf });
         fs.writeFileSync(`${plate}.command.txt`, shellLine(command) + '\n'); started = Date.now();
         say(r, `look ${at.look} (plan ${at.plan}, ${choiceKind(choice)}): ${size}; started at ${new Date().toTimeString().slice(0, 8)}`);
         // stopped after a stage the author names: the painter's own stop at that boundary, dried (stage-look.mjs)
