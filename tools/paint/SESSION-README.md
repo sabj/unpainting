@@ -64,9 +64,9 @@ What a look's painting is, exactly:
 
 - Your own script is written in millimetres, so the look paints the same script on half the cells across: the same
   washes, strokes, water and drying, with a coarser grain than the final sheet.
-- The code planner under your settings is planned again for the small sheet, so its shapes are a little broader in
-  the look than they will be at full size, and the wash table of the look is that small plan's.
-- An edited plan exists on the full sheet only: its look is painted at full size and takes as long as a painting.
+- The code planner's plan, under your settings or edited wash by wash, is the plan you were shown, wash for wash:
+  it is planned once, at the final size, and the look paints that same plan on half the cells across, with a coarser
+  grain than the final sheet. A look at an edited plan takes minutes, as any look does.
 - The dried sheet shows what the plan's diagram cannot: brush marks, direction, soft and hard edges, how much
   pigment really lay down, blooms and back-runs, and what a later wash did to the one under it.
 

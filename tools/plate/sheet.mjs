@@ -18,6 +18,8 @@ import {planScriptWashes} from '../../src/paint/methods/script-washes.mjs';
 import {monoPaints} from '../../src/paint/methods/mono-mix.mjs';
 import {loadStudies} from '../painter/study-load.mjs';
 import {splitPlanEdit,planEditStep} from '../painter/plan-edit-step.mjs';
+import {readPlanFile,writePlanFile,planHash} from '../../src/paint/methods/plan-file.mjs';
+import {shrinkPlan} from '../../src/paint/methods/plan-shrink.mjs';
 import {studyThingMasks} from '../painter/thing-masks.mjs';
 import {washStrokeHold, LANE_OVERLAP, FLAT_OVERLAP} from '../../src/paint/methods/wash-strokes.mjs';
 import {smallestBrushMm} from '../../src/paint/methods/light-reserves.mjs';
@@ -222,11 +224,25 @@ const pencilDraw=(target,gs,pigment,options)=>{
  const paper=estimatePaper(valueOptions.rgb,w,h,valueOptions.density);valueOptions.inkValue=targetValueMap(paper?Float32Array.from(valueOptions.density,v=>Math.max(0,v-paper.density)):valueOptions.density);}
  const planValues=SCRIPT?planScriptWashes:planStudyWashes;
  const valueStarted=performance.now();
- if(SPEED_VALUE_CACHE){
+ // --planfile own|FILE: a look (--finalwidth) is painted from the final painting's own plan, kept by its plan-only run
+ // (src/paint/methods/plan-file.mjs), brought onto this sheet's cells (plan-shrink.mjs): the code planner reads its shapes
+ // on the cell grid, so planned again for a look it is another plan. Default own: this run plans for itself.
+ const PLAN_FROM=opt('planfile','own');
+ if(PLAN_FROM!=='own'){
+  if(SCRIPT)throw Error('--planfile: a painting script is its own plan at any size; no plan file is read for it');
+  const kept=readPlanFile(path.resolve(root,PLAN_FROM)),note=kept.note,names=PIGS.map(p=>p.name??p.key??null);
+  if(note.w!==FINAL_W||FINAL_W===w)throw Error(`--planfile: the plan was made on ${note.w} cells across; this sheet is ${w} cells and says its final is ${FINAL_W} (--finalwidth). A look names its final, and the plan is the final's`);
+  if(Math.abs(note.h/note.w-h/w)>2/w)throw Error(`--planfile: the plan's sheet is ${note.w} x ${note.h} cells, not the shape of this one (${w} x ${h})`);
+  if(Math.abs(note.sheetWidthMm-valueOptions.sheetWidthMm)>0.5)throw Error(`--planfile: the plan is for a sheet ${note.sheetWidthMm} mm wide, this one is ${valueOptions.sheetWidthMm} mm`);
+  if(JSON.stringify(note.pigments)!==JSON.stringify(names))throw Error(`--planfile: the plan was mixed from ${note.pigments.join(', ')}; this painting has ${names.join(', ')} (give the plan's paints: --paints ${note.paints?note.paints.join(','):'...'} --paintsextend 0)`);
+  ctx.VALUE_PLAN=shrinkPlan(kept.plan,{w:note.w,h:note.h},{w,h,sheetWidthMm:valueOptions.sheetWidthMm});
+  console.log(`wash plan: the final painting's own plan (${note.washes} washes planned on ${note.w} x ${note.h} cells, plan hash ${note.hash}) brought onto this look's ${w} x ${h} cells; plan hash here ${planHash(ctx.VALUE_PLAN)}`);
+  fs.writeFileSync(path.join(out,'plan-of-final.json'),JSON.stringify({from:note,here:{w,h,washes:ctx.VALUE_PLAN.instructions.length,hash:planHash(ctx.VALUE_PLAN)},washesWithNoCellHere:ctx.VALUE_PLAN.instructions.filter(q=>!(q.area>0)).map(q=>q.id)},null,1)+'\n');
+ }else if(SPEED_VALUE_CACHE){
   const saved=await cachedStep({...RUN_CACHE,name:'value-plan',code:CODE_HASH,track:optTrack,inputs:valueOptions},async()=>({plan:planValues(valueOptions)}));
   ctx.VALUE_PLAN=saved.value.plan;
  }else ctx.VALUE_PLAN=planValues(valueOptions);
- if(WASH_PLAN&&!SCRIPT)ctx.VALUE_PLAN=planEditStep({plan:ctx.VALUE_PLAN,file:PLAN_EDIT?path.resolve(root,PLAN_EDIT):null,out,ctx:{w,h,k:PIGS.length,pigments:PIGS,paperRGB,sheetWidthMm:valueOptions.sheetWidthMm,kitMm:valueOptions.washKitMm,mono:valueOptions.mono,seed:num('seed',0)}});
+ if(WASH_PLAN&&!SCRIPT&&PLAN_FROM==='own')ctx.VALUE_PLAN=planEditStep({plan:ctx.VALUE_PLAN,file:PLAN_EDIT?path.resolve(root,PLAN_EDIT):null,out,ctx:{w,h,k:PIGS.length,pigments:PIGS,paperRGB,sheetWidthMm:valueOptions.sheetWidthMm,kitMm:valueOptions.washKitMm,mono:valueOptions.mono,seed:num('seed',0)}});
  SPEED_PROFILE?.add('setup:value-plan',performance.now()-valueStarted);
  ctx.layers=ctx.VALUE_PLAN.layers;ctx.steps=5;
  // --washsession 2: within each band step, a region's pigment passes follow one another, so its wash is charged with
@@ -261,6 +277,8 @@ const pencilDraw=(target,gs,pigment,options)=>{
   fs.writeFileSync(path.join(out,'value-maps.json.gz'),zlib.gzipSync(JSON.stringify({w,h,caps,band,value:Array.from(vv,v=>+v.toFixed(3)),labels:Array.from(ctx.VALUE_PLAN.regions.labels),protected:ctx.VALUE_PLAN.protectedCells?Array.from(ctx.VALUE_PLAN.protectedCells):[],passes})));}
  console.log(ctx.VALUE_PLAN.mixes?`wash plan: ${ctx.layers.length} mixes, ${ctx.VALUE_PLAN.instructions.length} washes in ${ctx.VALUE_PLAN.summary.stages} stages`:`target values: ${ctx.layers.length} pigment/region passes, ${ctx.VALUE_PLAN.instructions.length} connected shapes; five light-to-dark bands; shadows never split by region`);
  if(num('valuepreviewonly',0)){
+  // the plan itself is kept for looks (plan-file.mjs): a look is this plan painted on fewer cells
+  if(PLAN_FROM==='own'&&!SCRIPT){const kept=writePlanFile(out,{plan:ctx.VALUE_PLAN,w,h,sheetWidthMm:valueOptions.sheetWidthMm,pigments:PIGS});console.log(`plan kept for looks: ${kept.washes} washes, plan hash ${kept.hash}`);}
   const preview=await writeValuePreview({plan:ctx.VALUE_PLAN,out,w,h,pigments:PIGS,paperRGB,target:path.resolve(root,opt('image')),photo:VALUE_CONFIG?.photo,subject:VALUE_CONFIG?.subject??'subject',name:VALUE_CONFIG?.name,root,opening:opt('drawingfile',''),closing:opt('drawinglast',''),variant:opt('valuevariant','lighttodark'),version:opt('valueversion','W4'),sheetMm:num('sheetmm', DEFAULT_SHEET_MM)});
   fs.writeFileSync(path.join(out,'compile-result.json'),JSON.stringify(preview,null,2));console.log('CPU preview',preview.board,preview.seconds);
   const values=await writePlanValueCheck({plan:ctx.VALUE_PLAN,out,w,h,pigments:PIGS,paperRGB,rgb:ctx.px});
