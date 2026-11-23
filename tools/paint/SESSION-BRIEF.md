@@ -83,7 +83,8 @@ Your answer is the file `choice.json` as it stands when you stop: your own paint
 is the full brief for that: the format, the kit, the paints, and painters' advice on how a watercolour is built. A
 script is laid as written.
 
-Beside it a choice may name the drawing's medium (`"medium": "pencil"`, `"pen"` or `"none"`) and your lines
+Beside it a choice may name the drawing's medium (`"medium": "pencil"`, `"pen"` or `"none"`), the pen's ink
+(`"ink": "waterproof"` or `"soluble"`) and your lines
 (`"lines": "my-lines.json"`: rules on the prepared lines, and lines of your own). Rubbing out is an erase passage in
 your script. `README.md` gives each format.
 

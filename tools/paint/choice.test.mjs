@@ -86,3 +86,11 @@ test('at every level a choice is the model\'s own script with its lines and medi
   assert.throws(() => readChoice([], { codePlan: false }), /one JSON object, \{"kind": "script"/);
   assert.equal(readChoice({ kind: 'settings', settings: {} }).kind, 'settings', 'the preflight and kept choices still read every kind');
 });
+
+test('the pen\'s ink is a choice a model sets beside its own script, at every level', () => {
+  const c = readChoice({ kind: 'script', script: 'script.json', medium: 'pen', ink: 'soluble' }, { codePlan: false });
+  assert.equal(c.tools.ink, 'soluble'); assert.equal(choiceKind(c), 'own script with the drawing in pen, soluble ink');
+  assert.equal(readChoice({ kind: 'script', script: 'script.json', ink: 'waterproof' }, { codePlan: false }).tools.ink, 'waterproof');
+  assert.throws(() => readChoice({ kind: 'script', script: 'script.json', ink: 'india' }, { codePlan: false }), /"ink" is the pen's ink, waterproof or soluble/);
+  assert.notEqual(choiceKey(readChoice({ kind: 'script', script: 's.json', ink: 'soluble' })), choiceKey(readChoice({ kind: 'script', script: 's.json' })), 'another ink is another choice');
+});

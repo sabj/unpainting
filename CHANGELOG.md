@@ -6,6 +6,8 @@ Releases use semver. Each release records its painter and simulator versions ([v
 
 Release candidate `v0.4.0-rc.5` (0.4 rc5): the ladder and budget as the owner set them on 23 Nov. Every level hands in its own script; level 4 adds the studies' traced shapes and nothing of Auto. A look has a fixed price (a half-size whole look 0.3, never under 0.2), the budget for one try is 3.0, and how a model paints is recorded, never charged; one water-step guard stops a runaway painting. A finished session is never thrown away: its final waits for a place. `v0.4.0-rc.3` and `rc.4` ran the 22 Nov ladder; `v0.4.0-rc.2` was the first frozen version, run once as a harness proof under the old L2. Painter **V107-dev**, simulator **105**. An earlier, untagged state was named 0.4.0-rc.1; its entry is kept below as history. 0.4 scores are a new series, not comparable with rounds V1 to V5.
 
+rc5 also carries the drawing work of `claude/04-rc3-drawing`: pencil drawn on the pen's fine sheet; Auto's pencil lay-in (the lines that place the forms and the features of a face, not the hatching) set into the paper before the first wash; the Kasha portrait fix (no whole-form base wash on a line-led picture); the pen's ink, waterproof or soluble, a choice at every level; the drawing harness in `npm test`.
+
 Results: to be added from the release-candidate run.
 
 ### New in the painter

@@ -47,3 +47,17 @@ export function inkRecipeArgs(name, argv) {
   }
   return flags;
 }
+
+/**
+ * A drawing laid from a drawing file, pencil or pen, is drawn on the pen's fine sheet at the wash recipe's --inkres
+ * (washInkRes: near 2160 px across), so a pencil line is as continuous as an ink line of the same weight (the owner,
+ * 22 Nov: "why isnt pencil executed the same way as ink"), and a pen drawing chosen without the wash recipe (a model's
+ * pen on a pencil subject) is not laid on the painting's coarser cells either. The flags to add; none when --inkres is
+ * given, when there is no drawing, or when the painting is already that fine (N of 1).
+ */
+export function drawingInkResArgs(argv) {
+  const last = k => { const i = argv.lastIndexOf(k); return i >= 0 ? argv[i + 1] : undefined; };
+  if (argv.includes('--inkres') || last('--drawing') === 'none' || !(last('--drawingfile') || last('--drawinglast'))) return [];
+  const n = washInkRes(last('--width') ?? 700);
+  return n > 1 ? ['--inkres', String(n)] : [];
+}

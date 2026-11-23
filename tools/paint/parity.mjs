@@ -22,7 +22,7 @@ export function handedOverRecord(folder, submitted, run = {}) {
     const f = path.join(folder, name); if (!fs.existsSync(f)) throw new Error(`handed over: ${name} (its ${role}) is not in the kept folder ${folder}`);
     return [role, { name, sha256: sha(f) }];
   }));
-  return { schema: 'unpaint-paint/handed-over@1', kind: submitted.kind, what: submitted.what, settings: submitted.settings ?? {}, perForm: submitted.tools?.perForm ?? null, medium: submitted.tools?.medium ?? null, files, from: submitted.from ?? null, ...run };
+  return { schema: 'unpaint-paint/handed-over@1', kind: submitted.kind, what: submitted.what, settings: submitted.settings ?? {}, perForm: submitted.tools?.perForm ?? null, medium: submitted.tools?.medium ?? null, ink: submitted.tools?.ink ?? null, files, from: submitted.from ?? null, ...run };
 }
 
 /**
@@ -43,7 +43,7 @@ export function checkHandedOver(folder, record) {
 /** Whether a choice read back for painting is the one the record says was handed over (kind, settings, medium, per-form settings). Throws on a difference. */
 export function checkChoice(record, choice) {
   if (!record) return;
-  const now = { kind: choice.kind, settings: Object.fromEntries(choice.sets), medium: choice.tools?.medium ?? null, perForm: choice.tools?.perFormGiven ?? null };
-  const was = { kind: record.kind, settings: record.settings ?? {}, medium: record.medium ?? null, perForm: record.perForm ?? null };
+  const now = { kind: choice.kind, settings: Object.fromEntries(choice.sets), medium: choice.tools?.medium ?? null, ink: choice.tools?.ink ?? null, perForm: choice.tools?.perFormGiven ?? null };
+  const was = { kind: record.kind, settings: record.settings ?? {}, medium: record.medium ?? null, ink: record.ink ?? null, perForm: record.perForm ?? null };
   if (JSON.stringify(now) !== JSON.stringify(was)) throw new Error(`parity: the choice read for painting (${JSON.stringify(now)}) is not the one the session handed over (${JSON.stringify(was)})`);
 }

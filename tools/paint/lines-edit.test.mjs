@@ -64,7 +64,10 @@ test('a rule that cannot be read is refused with the reason; a rule that may spo
 
 test('the medium is the author\'s: a pencil drawing in pen, a pen drawing in pencil, or no drawing', () => {
   const pencil = vectors('pencil'), pl = linesListing(pencil, { mask, forms });
-  const pen = applyLinesEdit(pencil, lines(), null, pl, { medium: 'pen' });
+  // the pencil drawing's lines start as Auto lays them: its hatching (tagged drop) is left for the washes
+  const asAuto = applyLinesEdit(pencil, lines(), null, pl, { medium: 'pen' });
+  assert.deepEqual(asAuto.opening.vectors.strokes.map(s => s.seq), [1, 2, 5]); assert.equal(asAuto.record.dropped, 2); assert.equal(asAuto.warnings.length, 0); assert.equal(asAuto.opening.vectors.chosen, 'lines edit');
+  const pen = applyLinesEdit(pencil, lines(), edit([{ where: { tagged: 'drop' }, do: 'before' }]), pl, { medium: 'pen' });
   assert.equal(pen.laidAs, 'ink'); assert.equal(pen.opening.vectors.medium, 'ink'); assert.equal(pen.opening.lines.medium, 'ink'); assert.ok(pen.opening.vectors.strokes.every(s => s.medium === 'ink')); assert.equal(pen.opening.vectors.strokes.length, 5);
   assert.match(pen.warnings[0], /the medium is pen on a drawing made in pencil: 2 of its lines are hatching, tone or texture/); assert.deepEqual(pen.record.medium, { chosen: 'pen', theDrawingIs: 'pencil', laidAs: 'ink' });
   assert.equal(pencil.strokes[0].medium, 'graphite', 'the record\'s drawing is not altered');
@@ -81,7 +84,7 @@ test('lines of the author\'s own: points, pen or pencil, a width and a darkness,
   const own = [{ points: [[10, 40], [50, 40]], medium: 'pen', widthMm: 1, dark: 0.9, when: 'after' }, { points: [[10, 45], [30, 45], [30, 48]], medium: 'pencil', widthMm: 0.4, dark: 0.3 }];
   const got = applyLinesEdit(pencil, lines(), { format: LINES_EDIT_FORMAT, own }, pl);
   assert.equal(got.order, 'both'); assert.equal(got.laidAs, 'ink', 'a pen line on a pencil drawing: an ink file, the pencil strokes marked graphite');
-  assert.deepEqual(got.opening.vectors.strokes.map(s => [s.seq, s.medium, s.part]), [[1, 'graphite', 'outline'], [2, 'graphite', 'inner'], [3, 'graphite', 'hatch'], [4, 'graphite', 'hatch'], [5, 'graphite', 'small'], [7, 'graphite', 'own']]);
+  assert.deepEqual(got.opening.vectors.strokes.map(s => [s.seq, s.medium, s.part]), [[1, 'graphite', 'outline'], [2, 'graphite', 'inner'], [5, 'graphite', 'small'], [7, 'graphite', 'own']], 'the hatching tagged drop starts dropped on a pencil drawing');
   assert.deepEqual(got.closing.vectors.strokes.map(s => [s.seq, s.medium, s.dark, s.own]), [[6, 'ink', 0.9, true]]); assert.equal(got.closing.vectors.pencilAfterWashes, undefined);
   assert.deepEqual(got.record.own, { lines: 2, pen: 1, pencil: 1, before: 1, after: 1, lengthMm: 63 }); assert.match(linesLine(got.record), /2 lines of your own \(1 pen, 1 pencil; 1 before the washes, 1 after them\); the drawing is laid as a pen drawing/);
   // the painter's own layer lays it where it was put, as wide as asked

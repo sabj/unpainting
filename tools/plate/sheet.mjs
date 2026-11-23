@@ -214,7 +214,9 @@ const pencilDraw=(target,gs,pigment,options)=>{
  // forms (a reviewed SAM id map bound to the source by its receipt) for the study wash plan; --things names the label file
  // the receipt must match. No receipt: no named forms, and the plan is as it was without them.
  const thingMasks=await studyThingMasks({root,source:opt('image'),maskOption:opt('thingmasks','auto'),labelsOption:opt('things','auto'),blockIn:Boolean(WASH_PLAN&&!SCRIPT)});
- if(thingMasks){valueOptions.thingMasks=thingMasks;console.log(`named forms: ${thingMasks.names.length} forms from a named-sam-v1 receipt (${thingMasks.names.map((n,i)=>`${n}${thingMasks.kinds[i]?` [${thingMasks.kinds[i]}]`:''}`).join(', ')})`);}
+ // (the drawing reads them too: a pencil lay-in keeps the lines of a face's named features, drawing-default.mjs)
+ ctx.THING_MASKS=thingMasks;
+ if(thingMasks&&!thingMasks.drawingOnly){valueOptions.thingMasks=thingMasks;console.log(`named forms: ${thingMasks.names.length} forms from a named-sam-v1 receipt (${thingMasks.names.map((n,i)=>`${n}${thingMasks.kinds[i]?` [${thingMasks.kinds[i]}]`:''}`).join(', ')})`);}
  // --seed: the hand of a script's washes (another seed, another hand); --handlanes a (default 1): how much of a hand is
  // in a wash's lanes (script-marks.mjs LANE_HAND: their turning, bowing, swelling and uneven lap; 0 is a ruler)
  if(SCRIPT){valueOptions.script=SCRIPT;valueOptions.seed=Math.round(num('seed',0));valueOptions.hand=Math.max(0,num('handlanes',1));const paper=estimatePaper(valueOptions.rgb,w,h,valueOptions.density);valueOptions.inkValue=targetValueMap(paper?Float32Array.from(valueOptions.density,v=>Math.max(0,v-paper.density)):valueOptions.density);}
@@ -337,7 +339,7 @@ const ABLATE = new Set(opt('ablate', '').split(',').filter(Boolean));
 // --inkres N: the pens draw on their own sheet at N times the resolution and the output is N times as wide
 // (src/paint/methods/ink-res.mjs). Default 1, off. Cannot combine with --paperscan.
 // --inkresgain: the fine pen's ink strength; the default is a power-law fit in sheet width.
-const INKRES = num('inkres', 1) > 1 ? await (async () => { if (opt('paperscan', '')) throw new Error('--inkres: not with --paperscan'); const N=Math.round(num('inkres',1)),opts={...PAPER_OPTS,scale:(PAPER_OPTS.scale??1)*N};const finePaper=(await cachedStep({...RUN_CACHE,name:'fine-paper',code:codeHash(root,[],{dependencies:['src/media/paper.mjs']}),track:optTrack,inputs:{W2:W2*N,H2:H2*N,PAPER_OPTS:opts}},async()=>makePaper(W2*N,H2*N,opts))).value; return makeInkRes({paper:finePaper, N: num('inkres', 1), W2, H2, paperOpts: PAPER_OPTS, pigments: SHEET_PIGS, inkAt: PIGS.length, main: ctx.sheet, pad: opt('inkrespad', '') === '' ? null : num('inkrespad', 0.25) * (Math.round(num('inkres', 1)) - 1), gain: num('inkresgain', 1.3 * Math.pow(540 / W2, 0.78)) }); })() : null;
+const INKRES = num('inkres', 1) > 1 ? await (async () => { if (opt('paperscan', '')) throw new Error('--inkres: not with --paperscan'); const N=Math.round(num('inkres',1)),opts={...PAPER_OPTS,scale:(PAPER_OPTS.scale??1)*N};const finePaper=(await cachedStep({...RUN_CACHE,name:'fine-paper',code:codeHash(root,[],{dependencies:['src/media/paper.mjs']}),track:optTrack,inputs:{W2:W2*N,H2:H2*N,PAPER_OPTS:opts}},async()=>makePaper(W2*N,H2*N,opts))).value; return makeInkRes({paper:finePaper, N: num('inkres', 1), W2, H2, paperOpts: PAPER_OPTS, pigments: SHEET_PIGS, inkAt: PIGS.length, graphiteAt: GRAPHITE ? GRAPHITE_AT : null, main: ctx.sheet, pad: opt('inkrespad', '') === '' ? null : num('inkrespad', 0.25) * (Math.round(num('inkres', 1)) - 1), gain: num('inkresgain', 1.3 * Math.pow(540 / W2, 0.78)) }); })() : null;
 const PEN_STATE_GATE = true, PEN_STATE_AUDIT = [];
 
 const TARGET_EDGE_FILL=new Float32Array(N2);

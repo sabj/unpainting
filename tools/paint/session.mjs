@@ -333,7 +333,7 @@ export function sessionServer({ dir, codePlan = true, sheet = null, forms = [], 
     // the look is spent before it is delivered: whatever happens to the delivery, it stays spent
     note({ look, cost: charged, quoted: charge, chargedFrom, size: lookSize, work: seenIt.painted?.work ?? null, ask: { until: ask.until, region: region ? { box: region.box, name: region.name, sheetShare: +region.share.toFixed(4), passages: region.passages, of: region.of } : null }, estimate: cost, plan: id, atSeconds, at: new Date(now()).toISOString(), what, kind: p.choice.kind, settings: entry.settings, script: p.choice.script, plan: p.choice.plan ?? null, edit: er, tools: p.tools?.record ?? null, key: p.key, marked: seenIt.marked ?? null, painted: seenIt.painted ?? null });
     entry.look = look;
-    const folder = `looks/${look}`, t = p.choice.tools, choiceText = JSON.stringify({ kind: p.choice.kind, settings: entry.settings, script: p.choice.script, plan: p.choice.plan ?? null, ...(t ? { lines: t.lines ?? undefined, forms: t.forms ?? undefined, perForm: t.perFormGiven ?? undefined, medium: t.medium ?? undefined } : {}), why: p.choice.why }, null, 1) + '\n';
+    const folder = `looks/${look}`, t = p.choice.tools, choiceText = JSON.stringify({ kind: p.choice.kind, settings: entry.settings, script: p.choice.script, plan: p.choice.plan ?? null, ...(t ? { lines: t.lines ?? undefined, forms: t.forms ?? undefined, perForm: t.perFormGiven ?? undefined, medium: t.medium ?? undefined, ink: t.ink ?? undefined } : {}), why: p.choice.why }, null, 1) + '\n';
     // kept outside the folder as it was shown, with the choice as it was looked at: what changed between looks is read from here
     if (keep) {
       try {
@@ -397,7 +397,7 @@ export function sessionServer({ dir, codePlan = true, sheet = null, forms = [], 
  */
 export function finalChoice({ present, lastGood, good = new Set(), ended, barred = () => false, codePlan = true }) {
   const say = (c, from, note) => ({ kind: c.choice.kind, what: choiceKind(c.choice), settings: Object.fromEntries(c.choice.sets), script: c.choice.script, plan: c.choice.plan ?? null, edit: c.edit?.record ?? null,
-    ...(c.choice.tools ? { tools: { lines: c.choice.tools.lines, forms: c.choice.tools.forms, perForm: c.choice.tools.perFormGiven, ...(c.choice.tools.medium ? { medium: c.choice.tools.medium } : {}), record: c.tools?.record ?? null } } : {}), ...(c.warnings?.length ? { warnings: c.warnings } : {}), why: c.choice.why, from, note });
+    ...(c.choice.tools ? { tools: { lines: c.choice.tools.lines, forms: c.choice.tools.forms, perForm: c.choice.tools.perFormGiven, ...(c.choice.tools.medium ? { medium: c.choice.tools.medium } : {}), ...(c.choice.tools.ink ? { ink: c.choice.tools.ink } : {}), record: c.tools?.record ?? null } } : {}), ...(c.warnings?.length ? { warnings: c.warnings } : {}), why: c.choice.why, from, note });
   const cut = ended === 'done' ? null : 'the session reached the benchmark\'s resource budget and was ended';
   let p = null, why = null;
   try { p = present(); } catch (e) { why = e.message; }

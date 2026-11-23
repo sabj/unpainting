@@ -63,6 +63,8 @@ Black opening ink sets before the washes by default; sepia stays soluble. `drawi
 
 The pens draw on a sheet near 2160 px wide: `--inkres` is 4 at 540 px, 2 at 1080 px, 1 from 2400 px. The saved `drawing-opening.png`, `painting.png` and frames are N times the painting's width.
 
+A drawing laid from a drawing file, pencil or a pen chosen without the wash recipe, is drawn on the same fine sheet at the same N (0.4 rc3; `drawingInkResArgs` in `src/paint/methods/ink-recipe.mjs`), its graphite carried down into the painting's sheet as the pen's ink is: washes lie over it there, and every eraser (the prep erase, an erase passage, `--pencilerase`) rubs it there and takes the same share off the fine sheet (`src/paint/methods/fine-erase.mjs`). Beside ink the pencil has its own channel on the fine sheet. Before rc3 the pencil was laid on the painting's own coarser cells, where a line finer than a cell was widened to a cell and read broken and fuzzy.
+
 With `--drawingonly 1` the wash recipe lays the drawing alone on dry paper, in near-black drawing ink with the flexible drawing nib, one opening pen.
 
 `--inkrecipe v2` sets `--inkdarkmatch 1` and `--inkdamp 0.3`. It does not turn ink on.
@@ -105,3 +107,11 @@ node tools/paint-plate.mjs --image <target> --drawingfile <stem> --inkrecipe was
 ```
 
 [running.md](running.md#main-command-line-controls) lists the other controls.
+
+Auto on a pencil drawing lays a lay-in, not the whole drawing (`src/paint/methods/drawing-default.mjs`): the lines that
+place a form (contours, lay-in strokes, inner contours of the growth, the strokes of the drawing's most important lines,
+the strokes in and round a named feature of a face), no darker than the drawing's own lay-in lines; the hatching, tone
+and texture its maker tagged drop are left for the washes. A pen drawing is laid whole. The opening pencil is set into
+the paper before the first wash (`pencil-set.mjs`): laid as a loose deposit, the first wash's scour moved 0.5 to 0.8% of
+it out of its cells on Mittens; set, 0.004%.
+

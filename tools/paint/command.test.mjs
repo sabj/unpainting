@@ -53,7 +53,7 @@ test('named forms go to the planner when the painter reads them; an authored scr
   assert.equal(buildCommand(spec({ masks }), { mode: 'plan', out: '/o', known: new Set() }).masksRead, false);
   const s = buildCommand(spec({ masks }), { mode: 'paint', out: '/o', known, script: { file: '/o/author/script.json', paints: ['ochre', 'ultramarine'] } });
   assert.equal(value(s, 'washplan'), 'script:/o/author/script.json'); assert.equal(value(s, 'paints'), 'ochre,ultramarine'); assert.equal(value(s, 'paintsextend'), '0');
-  assert.equal(s.masksRead, false); assert.ok(!s.argv.includes('--thingmasks'));
+  assert.equal(s.masksRead, false, 'the script\'s plan reads no forms'); assert.equal(value(s, 'thingmasks'), '/m/receipt.json', 'its drawing does');
   // an edited plan: the studies are read as always (the forms too), and the edit file goes first in the wash plan
   const e = buildCommand(spec({ masks }), { mode: 'paint', out: '/o', known, edit: { file: '/o/author/plan-edit.json' } });
   assert.equal(value(e, 'washplan'), `edit:/o/author/plan-edit.json,${value(c, 'washplan')}`); assert.equal(e.masksRead, true); assert.equal(value(e, 'paints'), value(c, 'paints'));
@@ -85,4 +85,13 @@ test('run folders are safe names', () => {
 test('a study setting for one named form goes into the wash plan after the study\'s own: @name#FORM=value', () => {
   const s = spec({ studies: [{ abs: '/r/a.png', floorMm2: 6, read: { clusters: 20 }, forms: { 3: { clusters: 24, floor: 3 }, 11: { formbase: 0 } } }, { abs: '/r/b.png', floorMm2: 4, read: {}, forms: { 3: { lay: 1 } } }, { abs: '/r/c.png', floorMm2: 2, read: {} }] });
   assert.equal(washPlanOf(s.studies), '/r/a.png:6@clusters=20@clusters#3=24@floor#3=3@formbase#11=0,/r/b.png:4@lay#3=1,/r/c.png:2');
+});
+
+test('the pen\'s ink is chosen by name: waterproof sets it before the washes, soluble lets it rewet, anything else is refused', () => {
+  const ink = v => buildCommand(spec({ otherSets: [['ink', v]] }), { mode: 'paint', out: '/o', known });
+  assert.equal(value(ink('waterproof'), 'inkfast'), '1');
+  assert.equal(value(ink('soluble'), 'inkfast'), '0');
+  assert.ok(!ink('default').argv.includes('--inkfast'));
+  assert.ok(!ink('waterproof').argv.includes('--ink'));
+  assert.throws(() => ink('indian'), /--set ink: waterproof, soluble, default/);
 });

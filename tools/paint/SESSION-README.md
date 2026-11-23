@@ -14,8 +14,13 @@ INPUT_LIST
 - `inputs/forms-ids.png` and `inputs/forms.json`: the named forms as data. The PNG is the sheet as a grey image whose
   pixel value is the form's number (0: no named form); the JSON lists each number, name, kind and box in mm.
 - `drawing/lines.json`: every line of the drawing as a row you can choose by (see "Choosing the drawing's lines").
-  `drawing/all-lines.png` shows every line the painter lays today. `inputs/drawing.png` shows fewer: it leaves out
-  the lines tagged `drop` (hatching, tone, texture), which the painter lays all the same unless you drop them.
+  `drawing/all-lines.png` shows every line the painter lays on its own. On a pencil drawing that leaves out the lines
+  tagged `drop` (hatching, tone, texture) other than those that place a form (contours, part `outline`; lay-in
+  strokes, phase `layin`; inner contours of the growth, part `inner` and phase `growth`; and the strokes of the
+  drawing's most important lines, a quarter of them by the line file's `contribution`, not tone or fill; and the
+  strokes in and round a named feature of a face, an eye, a nose, the lips or mouth), which it lays no darker than the drawing's own lay-in lines (the most important up to twice that): a pencil
+  lay-in places the forms and the washes model them. On a pen drawing
+  every line is laid, the `drop` ones too, since there the lines carry the modelling.
 - `mine/`: after a plan or a look of a choice that names lines of your own: `mine/drawing.png` (your lines: grey
   before the washes, black after them).
 - `own-script-brief.md`: the brief for writing your own painting script (the format, the kit, the paints).
@@ -68,7 +73,8 @@ What a look's painting is, exactly:
 | Tool | How you reach it | What is yours to decide |
 |---|---|---|
 | The paint box | `palette` in your own script | which paints the picture is mixed from (`own-script-brief.md` lists the box) |
-| The drawing's medium | `"medium": "pencil"`, `"pen"` or `"none"` beside any kind of choice (below) | what the drawing is drawn in, whatever the subject seems to be drawn in: pencil, waterproof pen, or no drawing |
+| The drawing's medium | `"medium": "pencil"`, `"pen"` or `"none"` beside your script (below) | what the drawing is drawn in, whatever the subject seems to be drawn in: pencil, pen (its ink in the next row), or no drawing |
+| The pen's ink | `"ink": "waterproof"` or `"soluble"` beside your script | waterproof: set before the washes, a wash over it moves none. soluble: it rewets and bleeds into a wash laid over it; the painter stops a painting whose first wash would move more than 2% of it. Left unsaid, your script is laid over waterproof ink |
 | The drawing's lines | `"lines": "my-lines.json"` beside any kind of choice (below) | which prepared lines are drawn before the washes, which after them over the dry paint, which not at all, and how dark each is: by named form, by kind of line, by length, width or darkness, or one by one |
 | Lines of your own | `"own"` in that same file (below) | new lines, drawn where you put them point by point: pen or pencil, their width and darkness, before or after the washes |
 | The painter itself | your own script (`own-script-brief.md`) | every passage: its shape, paint and dilution, brush and width, paper wet, damp or dry, what it is laid into, how long the sheet dries first, stroke paths, pressure and hold, the order, the lights kept as paper. Write strokes in the order a hand would travel: finish one area before the next, neighbours after each other, long strokes before short; the replay is watched |
@@ -96,9 +102,9 @@ and the drawing is as prepared; `drawing/lines.json` says at its top which that 
 **The prepared lines.** `drawing/lines.json` lists every line: `id`, `part` (outline, inner, small, texture, hatch,
 tone, fill), `phase`, `object`, `tagged` (`ink`: a drawn pen line; `layin`: a pale contour that places a form; `drop`:
 hatching, tone or texture the drawing's maker would leave out), `dark` (0 to 1), `lengthMm`, `widthMm`, `boxMm`, and
-`form` (the named form most of it lies in, or `none`). Every line starts as the painter lays it today: before the
-washes, at its own darkness, the `drop` ones too. Write your rules to a file and name it in `choice.json` beside your
-kind of choice: `{"kind": "script", "script": "script.json", "lines": "my-lines.json"}`.
+`form` (the named form most of it lies in, or `none`). Every line starts as the painter lays it on its own: before
+the washes, at its own darkness; on a pencil drawing the `drop` ones that do not place a form (see `drawing/all-lines.png` above) start dropped (`{"where": {"tagged": "drop"}, "do": "before"}` draws them), on a pen drawing they are drawn. Write your rules to a file and name it in `choice.json` beside your
+script: `{"kind": "script", "script": "script.json", "lines": "my-lines.json"}`.
 
 ```json
 { "format": "lines-edit 1",
@@ -130,9 +136,10 @@ What to know:
 - Ink set before the washes stays put under them; pencil is pale and the washes cover it. Pen over dry washes is the
   crisp closing line. Pencil over dry washes is laid too, but it sits grey on top of the paint and hardly shows over
   a dark wash: the answer warns you, and it is drawn if you leave it.
-- Choosing `"pen"` for a drawing prepared in pencil lays its lines in ink as dark as they are drawn, hatching and
-  texture included (they are tagged `drop`); the answer warns you. Drop or pale them if that is not what you want.
-- On a pen drawing the ink of your own script is set before the washes.
+- Choosing `"pen"` for a drawing prepared in pencil lays its lines in ink as dark as they are drawn. Its hatching and
+  texture (tagged `drop`) start dropped as on any pencil drawing; if your rules draw them, in ink they are as dark as
+  drawn and the answer warns you.
+- On a pen drawing the ink of your own script is set before the washes, unless your choice says `"ink": "soluble"`.
 - `./unpaint plan` checks the file, counts what it does and lists its warnings; `mine/drawing.png` shows the result
   (grey: before the washes; black: after them). The lines themselves show in a look's dried sheet.
 - Rubbing out (advice, yours to use or not): a pencil lay-in line that the paint has replaced, or a line drawn twice,

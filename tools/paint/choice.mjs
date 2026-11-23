@@ -11,6 +11,7 @@
 //   "forms": "my-forms.json"       the named forms merged, split, renamed or given another kind (a settings choice)
 //   "perForm": {"cat face": {"study1.clusters": 24, "study3.lay": 1}}    planner settings inside one named form (a settings choice)
 //   "medium": "pencil" | "pen" | "none"   the medium of the drawing, whatever the source shows (any kind of choice)
+//   "ink": "waterproof" | "soluble"        the pen's ink: set before the washes, or one a wash rewets (any kind of choice)
 // In a session (levels.mjs: no level has the code's plan) the only kind is "script": the settings and plan kinds, and "forms" and
 // "perForm", are refused with OWN_SCRIPT_ONLY.
 // A choice is refused only when it cannot be read or the painter cannot lay it. A value that may spoil the painting
@@ -18,6 +19,9 @@
 import crypto from 'node:crypto';
 import { DRAWING_MEDIA } from './lines-edit.mjs';
 import { OWN_SCRIPT_ONLY } from './levels.mjs';
+
+/** The pen's inks a choice may name (command.mjs maps them to the painter's inkfast 1 and 0). */
+export const PEN_INKS = Object.freeze(['waterproof', 'soluble']);
 
 /** The planner settings a session lists, with their meaning in plain words. `per`: one for each study, or the first only. */
 export const SETTINGS = Object.freeze([
@@ -78,7 +82,7 @@ export function readChoice(given, { codePlan = true } = {}) {
   const got = readKind(given, why, FILE);
   if (got.kind !== 'settings' && (tools.forms || tools.perForm)) throw new Error(`choice.json: "forms" and "perForm" change what the code planner plans, so they go with kind "settings"; ${got.kind === 'script' ? 'a script is laid as written' : 'an edited plan is an edit of the plan made from the forms as given'}`);
   const { warnings, ...mine } = tools;
-  return { ...got, ...(mine.lines || mine.forms || mine.perForm || mine.medium ? { tools: mine } : {}), warnings };
+  return { ...got, ...(mine.lines || mine.forms || mine.perForm || mine.medium || mine.ink ? { tools: mine } : {}), warnings };
 }
 
 /** A session's choice, at every level: the author's own script with its lines and medium (and its erase passages, in the script). */
@@ -93,6 +97,7 @@ function ownScriptOnly(given) {
 function readTools(given, FILE) {
   for (const k of ['lines', 'forms']) if (given[k] != null && (typeof given[k] !== 'string' || !FILE.test(given[k]))) throw new Error(`choice.json: "${k}" names its file in this folder: {"${k}": "my-${k}.json"}`);
   if (given.medium != null && !DRAWING_MEDIA.includes(given.medium)) throw new Error(`choice.json: "medium" is the drawing's medium, one of ${DRAWING_MEDIA.join(', ')}`);
+  if (given.ink != null && !PEN_INKS.includes(given.ink)) throw new Error(`choice.json: "ink" is the pen's ink, ${PEN_INKS.join(' or ')}`);
   let perForm = null; const warnings = [];
   if (given.perForm != null) {
     if (typeof given.perForm !== 'object' || Array.isArray(given.perForm)) throw new Error('choice.json: "perForm" is an object, a named form to its settings: {"cat face": {"study1.clusters": 24}}');
@@ -108,7 +113,7 @@ function readTools(given, FILE) {
     }).sort((a, b) => a[0].localeCompare(b[0]));
     if (!perForm.length) perForm = null;
   }
-  return { lines: given.lines ?? null, forms: given.forms ?? null, perForm, perFormGiven: perForm ? given.perForm : null, ...(given.medium != null ? { medium: given.medium } : {}), warnings };
+  return { lines: given.lines ?? null, forms: given.forms ?? null, perForm, perFormGiven: perForm ? given.perForm : null, ...(given.medium != null ? { medium: given.medium } : {}), ...(given.ink != null ? { ink: given.ink } : {}), warnings };
 }
 
 function readKind(given, why, FILE) {
@@ -137,7 +142,7 @@ function readKind(given, why, FILE) {
 /** One word for what a checked choice is, as the record and the sheet say it. */
 export function choiceKind(choice) {
   const kind = choice.kind === 'script' ? 'own script' : choice.kind === 'plan' ? 'edited plan' : choice.sets.length ? 'settings' : null, t = choice.tools;
-  const with_ = t ? [t.lines && 'its choice of lines', t.medium && `the drawing ${t.medium === 'none' ? 'left out' : `in ${t.medium}`}`, t.forms && 'its own forms', t.perForm && 'settings per form'].filter(Boolean) : [];
+  const with_ = t ? [t.lines && 'its choice of lines', t.medium && `the drawing ${t.medium === 'none' ? 'left out' : `in ${t.medium}`}`, t.ink && `${t.ink} ink`, t.forms && 'its own forms', t.perForm && 'settings per form'].filter(Boolean) : [];
   return kind ? `${kind}${with_.length ? ` with ${with_.join(', ')}` : ''}` : with_.length ? `the code planner with ${with_.join(', ')}` : 'nothing changed';
 }
 

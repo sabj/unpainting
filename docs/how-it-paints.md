@@ -96,6 +96,8 @@ The planner prepares the inputs before the first mark: a drawing file, the studi
 - `flat:` before the study list lays the same shapes as plain flat fills, for tests. `--drawingonly 1` lays no washes.
 
 **Inputs:** the registered studies. **Outputs:** shapes with a mix, an order and lanes; `plan.jpg`; `value-plan.json`.
+
+A soft named form (a face, fur, a sky, water) is begun with one pale wash over the whole form, into clean water (`src/paint/methods/form-base.mjs`, setting `@formbase`). Not on a line-led picture (pen and wash, where the drawing carries the forms): there the whole-form wash lifts pen ink that still rewets and flattens the lights the drawing leaves, so a form has a base wash only where the study's settings ask for one.
 **Controls:** `--washplan`, `--paints`.
 **Where choices live:** plan for which studies and how many layers; painter rule for the shapes, mixes and order.
 **Rules here:** a wash is a whole shape with one mix, never a per-cell map.

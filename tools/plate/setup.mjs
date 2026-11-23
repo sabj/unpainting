@@ -38,7 +38,7 @@ import {reportUnusedPlanKeys} from '../../src/paint/plan-keys.mjs';
 import {versionStamp, versionLine} from '../../src/painter-version.mjs';
 import {registerDrawingFile, lineTargetOf} from '../../src/paint/methods/drawing-registration.mjs';
 import {holdInkLines} from '../../src/paint/methods/ink-lines-file.mjs';
-import {inkRecipeArgs} from '../../src/paint/methods/ink-recipe.mjs';
+import {inkRecipeArgs, drawingInkResArgs} from '../../src/paint/methods/ink-recipe.mjs';
 import {mediumForRun} from '../../src/paint/medium-run.mjs';
 import {sourcePenShare} from '../../src/paint/methods/pen-share.mjs';
 import {subjectMediumNote} from '../../src/paint/subject-medium.mjs';
@@ -198,6 +198,9 @@ const INK_RECIPE = { recipe: INK_RECIPE_NAME };
 // the pen-and-wash recipe turns ink on, so a subject with no pen does not take it
 if (NO_PEN_SUBJECT && INK_RECIPE.recipe === 'wash') console.log(`ink recipe: wash not applied, the subject medium is ${opt('subjectmedium', 'pen')}`);
 else argv.push(...inkRecipeArgs(INK_RECIPE.recipe, argv0));
+// a drawing from a file, pencil or pen, goes on the pen's fine sheet at the pen's resolution (ink-recipe.mjs drawingInkResArgs)
+const DRAWING_FINE = drawingInkResArgs(argv);
+if (DRAWING_FINE.length) { argv.push(...DRAWING_FINE); console.log(`drawing: on the fine sheet at ${DRAWING_FINE[1]} times the painting's resolution (--inkres ${DRAWING_FINE[1]}), pencil as the pen`); }
 // The line comes only from a drawing file (src/paint/line-source.mjs): with none, the run draws no line and says so.
 const LINE_SOURCE = lineSource({ drawing: opt('drawing', 'first'), drawingFile: opt('drawingfile', ''), drawingLast: opt('drawinglast', ''), stages: opt('stages', ''), resolve: f => path.resolve(root, f) });
 if (LINE_SOURCE.warning) { console.log(LINE_SOURCE.warning); argv.push('--drawing', LINE_SOURCE.drawing); }

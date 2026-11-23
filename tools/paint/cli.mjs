@@ -259,7 +259,8 @@ async function specWith(r, choice, sets = null) {
   if (!choice.sets.length && !t && !sets) return r.spec;
   // (a setting the tools ask for only as a default gives way to the choice's or the command's own: inkfast)
   // (and where the choice names lines or a medium of its own, the drawing follows them: its drawing settings are not used; the plan answer says so)
-  const all = sets ?? withChoice(req.sets, choice), drawn = new Set(t?.order ? ['drawing', 'drawingorder', 'drawinglast', 'drawinglastmin', 'outlinemedium'] : []), given = all.filter(([k]) => !drawn.has(k)), mine = (t?.sets ?? []).filter(([k]) => k !== 'inkfast' || !given.some(([g]) => g === 'inkfast'));
+  // the pen's ink the choice names (choice.mjs "ink") is its own setting: a default the tools ask for gives way to it
+  const all = [...(sets ?? withChoice(req.sets, choice)), ...(choice.tools?.ink ? [['ink', choice.tools.ink]] : [])], drawn = new Set(t?.order ? ['drawing', 'drawingorder', 'drawinglast', 'drawinglastmin', 'outlinemedium'] : []), given = all.filter(([k]) => !drawn.has(k)), mine = (t?.sets ?? []).filter(([k]) => k !== 'inkfast' || !given.some(([g]) => g === 'inkfast' || g === 'ink'));
   return checkInputs(resolveSubject(registry, r.spec.id, { sets: [...given, ...mine], variant: r.spec.variant ? variants[r.spec.id]?.[r.spec.variant] : null, variantName: r.spec.variant }));
 }
 /** The run's record as a plan of this spec is measured: with the forms the choice made, when it made its own. */
@@ -454,7 +455,7 @@ async function sessionRun(r) {
     if (!sub || earlier.subject.id !== spec.id || earlier.author.key !== author.key) throw new Error(`--from: ${record.author.from} is not a session of ${author.name} on ${spec.id} that handed over a choice`);
     // a folder that lacks a file its choice names is refused, the file named: nothing else is painted in its place
     checkSessionFolder(record.author.from, sub);
-    const choice = readChoice({ kind: sub.kind, settings: sub.settings, script: sub.script ?? undefined, plan: sub.plan ?? undefined, lines: sub.tools?.lines ?? undefined, forms: sub.tools?.forms ?? undefined, perForm: sub.tools?.perForm ?? undefined, medium: sub.tools?.medium ?? undefined, why: sub.why });
+    const choice = readChoice({ kind: sub.kind, settings: sub.settings, script: sub.script ?? undefined, plan: sub.plan ?? undefined, lines: sub.tools?.lines ?? undefined, forms: sub.tools?.forms ?? undefined, perForm: sub.tools?.perForm ?? undefined, medium: sub.tools?.medium ?? undefined, ink: sub.tools?.ink ?? undefined, why: sub.why });
     // parity: the kept folder still holds exactly the files the session handed over, and the choice read back is that choice
     let handedOver = null; try { handedOver = JSON.parse(fs.readFileSync(path.join(record.author.from, 'author', 'handed-over.json'), 'utf8')); } catch { /* a session kept before the record was written */ }
     checkChoice(handedOver, choice);
@@ -507,8 +508,8 @@ async function sessionRun(r) {
       // the code's plan and its settings are handed at no level (levels.mjs): the folder holds no auto/
       const { prompt, pictures: handedPictures } = writeSession({ dir: cwd, tools: routes.toolbox ? toolsText(routes.toolbox.said) : undefined, packet, sheet: spec.sheet, medium: record.drawing.medium, codePlan: terms.plan, ...(terms.plan ? { auto: { picture: await planPicture({ planPreview: auto.planPreview, run: record }), washesText: washesText(auto), plan: { summary: auto.summary, washes: auto.rows }, toEdit: listing }, settings: settingsList(spec) } : {}),
         forms: record.masks.mask ? await formBoxes(record.masks.mask, record.masks.forms, W) : null, formsIds: record.masks.mask ?? null, looks: looksMost, wallMinutes: wallMost, graceMinutes: graceMost, steps: stepsMost, reverts: revertsMost, briefFile: path.join(HERE, 'SESSION-BRIEF.md'), readmeFile: path.join(HERE, 'SESSION-README.md'), handed,
-        drawing: base.listing ? { listing: base.listing, picture: await drawingPicture(allLinesDoc(base.vectors), W) } : null });
-      // nothing withheld is in the folder: the code's plan, its washes, Auto's film or stroke map (level4.mjs)
+        drawing: base.listing ? { listing: base.listing, picture: await drawingPicture(allLinesDoc(base.vectors, base.lines, base.mask ? { ...base.mask, list: base.forms } : null), W) } : null });
+      // nothing withheld is in the folder: the code's plan, its washes, anything of Auto's painting (level4.mjs)
       checkWithheld(cwd);
       // what was handed, by hash, as it lies in the session's folder: a retry's first message can be shown to carry it
       const sha = f => crypto.createHash('sha256').update(fs.readFileSync(f)).digest('hex');
