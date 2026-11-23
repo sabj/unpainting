@@ -11,6 +11,9 @@ export function washPlanOf(studies) {
   return studies.map(s => `${s.abs}${s.floorMm2 != null ? `:${s.floorMm2}` : ''}${Object.entries(s.read).map(([k, v]) => `@${k}=${v}`).join('')}${Object.entries(s.forms ?? {}).flatMap(([id, set]) => Object.entries(set).map(([k, v]) => `@${k}#${id}=${v}`)).join('')}`).join(',');
 }
 
+/** The pen's ink as a session or a command names it (`--set ink=...`, `"ink": ...` in a settings choice) and the painter's --inkfast it stands for. */
+const INK = Object.freeze({ waterproof: '1', soluble: '0', default: null });
+
 /**
  * {cmd, args, env, argv (the paint-plate options alone), settings: [{name, value, default}], medium, heapMb}.
  * known: the painter's option names (scanOptions); script: {file, paints} when an author wrote the wash plan;
@@ -25,6 +28,9 @@ export function buildCommand(spec, { mode, out, known, script = null, edit = nul
   let heapMb = HEAP_MB[mode];
   for (const [k, v] of spec.otherSets) {
     if (k === 'heapmb') { if (!(Number(v) >= 1024)) throw new Error('--set heapmb: megabytes, 1024 or more'); heapMb = Number(v); settings.push({ name: 'heapmb', value: v, default: String(HEAP_MB[mode]) }); continue; }
+    // the pen's ink, by name: waterproof (set before the washes: a wash over it moves none) or soluble (it rewets and
+    // bleeds into a wash; the painter stops a painting whose first wash moves more of it than its limit)
+    if (k === 'ink') { if (!(v in INK)) throw new Error(`--set ink: ${Object.keys(INK).join(', ')} (got "${v}")`); set('inkfast', INK[v], `the pen's ink: ${v}`); continue; }
     if (k === 'targetguard') throw new Error('--set targetguard: gentle mode stays on');
     if (OWNED.has(k)) throw new Error(`--set ${k}: the command sets this itself${k === 'gpu' || k === 'valuepreviewonly' ? ' (plan is the CPU plan, paint is the GPU painting)' : ''}`);
     if (known && !known.has(k)) throw new Error(`--set ${k}: neither a setting of this command nor a paint-plate option`);
