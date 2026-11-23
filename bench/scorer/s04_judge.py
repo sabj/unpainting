@@ -18,6 +18,10 @@ OPENROUTER_NAMES = {"moonshotai/Kimi-K3": "moonshotai/kimi-k3", "zai-org/GLM-5.3
 HOSTED = {"together": ("https://api.together.xyz/v1/chat/completions", "TOGETHER_API_KEY"),
           "openrouter": ("https://openrouter.ai/api/v1/chat/completions", "OPENROUTER_API_KEY")}
 LABEL = {"local": "J3-local-3x", "together": "J4-together-3x", "openrouter": "J4-openrouter-3x"}
+# JUDGE_HOSTED_PANEL=open3 (openrouter only): the local panel's three open-weight models, hosted, so anyone can replicate locally
+OPEN3_PANEL = ("Qwen/Qwen3.8-Flash-Next", "Qwen/Qwen3.8-27B", "google/gemma-4-31b-it")
+OPEN3_NAMES = {"Qwen/Qwen3.8-Flash-Next": "qwen/qwen3.8-flash", "Qwen/Qwen3.8-27B": "qwen/qwen3.8-27b", "google/gemma-4-31b-it": "google/gemma-4-31b-it"}
+OPEN3_LABEL = "J3-open-3x-hosted"
 
 
 class RouteError(Exception):
@@ -38,7 +42,12 @@ def settings(env=None):
     url, key_name = HOSTED[route]
     if not env.get(key_name):
         raise RouteError(f"JUDGE_ROUTE={route} needs {key_name}, and it is not set. Set it in the environment, or use JUDGE_ROUTE=local.")
-    return {"route": route, "label": LABEL[route], "url": url, "host": url.split("/")[2], "panel": list(HOSTED_PANEL),
+    panel, label = list(HOSTED_PANEL), LABEL[route]
+    if env.get("JUDGE_HOSTED_PANEL"):
+        if env["JUDGE_HOSTED_PANEL"] != "open3" or route != "openrouter":
+            raise RouteError("JUDGE_HOSTED_PANEL can only be open3, and only with JUDGE_ROUTE=openrouter")
+        panel, label = list(OPEN3_PANEL), OPEN3_LABEL
+    return {"route": route, "label": label, "url": url, "host": url.split("/")[2], "panel": panel,
             "keyName": key_name, "env": env}
 
 
@@ -48,7 +57,7 @@ def post(cfg, model, content, max_tokens=1024, num_ctx=local_route.NUM_CTX, open
     if cfg["route"] == "local":
         return local_route.post(cfg, model, messages, max_tokens=max_tokens, opener=opener, sleep=sleep, num_ctx=num_ctx, max_predict=max_tokens)
     opener = opener or urllib.request.urlopen
-    payload = {"model": OPENROUTER_NAMES[model] if cfg["route"] == "openrouter" else model, "messages": messages,
+    payload = {"model": {**OPENROUTER_NAMES, **OPEN3_NAMES}[model] if cfg["route"] == "openrouter" else model, "messages": messages,
                "max_tokens": max_tokens, "temperature": 0}
     if cfg["route"] == "openrouter":
         payload["provider"] = {"zdr": True, "data_collection": "deny"}

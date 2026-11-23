@@ -221,6 +221,22 @@ class Route(unittest.TestCase):
         with self.assertRaisesRegex(J.RouteError, "must be one of"):
             J.settings({"JUDGE_ROUTE": "elsewhere"})
 
+    def test_open_panel_on_openrouter(self):
+        env = {"JUDGE_ROUTE": "openrouter", "OPENROUTER_API_KEY": "k", "JUDGE_HOSTED_PANEL": "open3"}
+        cfg = J.settings(env)
+        self.assertEqual((cfg["label"], cfg["panel"]), ("J3-open-3x-hosted", list(J.OPEN3_PANEL)))
+        self.assertEqual(J.settings({k: v for k, v in env.items() if k != "JUDGE_HOSTED_PANEL"})["panel"], list(J.HOSTED_PANEL))
+        seen = []
+        def opener(req, timeout=None):
+            seen.append(json.loads(req.data))
+            return io.BytesIO(json.dumps({"choices": [{"message": {"content": "ok"}}]}).encode())
+        for m in J.OPEN3_PANEL:
+            J.post(cfg, m, [{"type": "text", "text": "hi"}], opener=opener)
+        self.assertEqual([b["model"] for b in seen], ["qwen/qwen3.8-flash", "qwen/qwen3.8-27b", "google/gemma-4-31b-it"])
+        self.assertTrue(all(b["provider"]["zdr"] for b in seen))
+        with self.assertRaises(J.RouteError):
+            J.settings({**env, "JUDGE_ROUTE": "together", "TOGETHER_API_KEY": "k"})
+
     def test_hosted_call_sends_the_key_but_never_records_it(self):
         cfg = J.settings({"JUDGE_ROUTE": "openrouter", "OPENROUTER_API_KEY": "sekrit-123"})
         seen = []
