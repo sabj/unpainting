@@ -28,7 +28,7 @@ When an attempt is painted (it ends with `kit.finish`), stop: the attempt is ove
   `src/plan.js`, `src/painter.js` and similar).
 - Paint like a person: light before dark, broad before detail, washes and strokes rather than pixel fills. Stage frames
   are saved automatically at 10%, 25%, 50%, 75% and 100% of your strokes and are judged for a human-like progression.
-- Budget per attempt: at most 2,500 strokes (brush and pen together). About 30 minutes per attempt, including your
+- Budget per attempt: at most 2,500 strokes (brush, pen, pencil and eraser together). About 30 minutes per attempt, including your
   thinking; each attempt is stopped after 30 minutes. One painting run at a time: do not run several in parallel.
 - End each attempt with `await kit.finish(note)`. Outputs land in `bench/out/{CROP}/` (`final.png`, `frames/`,
   `stats.json`). Rerunning overwrites them, so the last run in an attempt is the one that counts.
@@ -45,7 +45,7 @@ tools you were told not to use, take the technique and apply it with the kit.
 `bench/TIPS.md` shows how to get each basic thing out of this kit: a flat wash, a graded wash, wet into wet, a glaze, a
 soft edge beside a hard one, dry brush, paper white, a pen line over a wash, and how to render a shape with a brush
 (fill it along its long axis, taper to a point, go round a white, meet another shape along an edge, how long a dip
-lasts), and how the pen draws (nib, pressure, speed, hatching, soluble and waterproof ink under a wash). Each has a few lines of kit code that run as they stand (`bench/tips/N-name.mjs`) and a picture of the dried
+lasts), how the pen draws (nib, pressure, speed, hatching, soluble and waterproof ink under a wash), and the pencil and eraser (pressure, grade, under and over a wash, hatching, rubbing out before and after paint). Each has a few lines of kit code that run as they stand (`bench/tips/N-name.mjs`) and a picture of the dried
 result on blank paper (`bench/tips/N-name.png`; the shape examples also `-arrows.png`, the stroke paths). Read it, and
 look at the pictures, before you write your first stroke.
 
@@ -59,6 +59,8 @@ look at the pictures, before you write your first stroke.
   moves only when the sheet steps. `kit.dryAll(sheet, O)` dries the sheet; strokes on a wet sheet run together, on a
   dry sheet they keep their edges.
 - Pen: `kit.createPen({ nib, flex })`, `kit.dipPen(pen, kit.mix({ sepia: 3 }))`, `kit.penStroke(pen, sheet, [{ x, y, p, v }...])`.
+- Pencil: `kit.createPencil({ grade: 'HB' | '2B', width })`, `kit.pencilStroke(pencil, sheet, [{ x, y, p }...])`: dry graphite, darker and wider with pressure and with 2B; washes over it barely move it and cover it as they darken.
+- Eraser: `kit.erase(sheet, [{ x, y, p }...], { width })`: rubs pencil off dry paper, far less of it under dried paint, no ink worth seeing; it refuses a wet sheet.
 - Masking: `kit.applyResist(sheet, mask)`, `kit.liftResist(sheet)`. `kit.look()` returns your sheet as RGB bytes;
   `await kit.frame(name)` saves an extra frame.
 - Run a script with `node bench/<file>.mjs`.

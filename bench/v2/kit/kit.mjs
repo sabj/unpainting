@@ -9,7 +9,7 @@
 // Rules the kit enforces (it throws, and you may retry within your budget):
 // - No image files may be read (the targets are in your prompt; your own frames are readable under bench/out/).
 // - Paint only from the box: conc must come from kit.mix() over BRUSH_PAINTS (brush) or INK (pen); total at most 2 (brush), 8 (pen).
-// - Budget 2,500 counted strokes (brush plus pen) per painting.
+// - Budget 2,500 counted strokes (brush, pen, pencil and eraser) per painting.
 // Recorded and reported, not rejected: the share of small strokes (brush radius under 1.5 mm = 5.8 cells), short
 // strokes (shorter than 3x the brush width) and dots (shorter than the brush width).
 // Stroke log: every counted stroke is also written, in order, to out/<task>/strokes.jsonl.gz (see bench/docs/run-format.md).
@@ -18,6 +18,11 @@
 // The film: the sheet is also saved, lossless, every second stroke and after every drying, and thinned at the end to at most
 //   400 frames evenly through the painting: out/<task>/film/frames.json plus fNNNN.webp, the layout the Studio plays. It only
 //   reads the sheet. BENCH_NO_FILM=1 turns it off.
+// The pencil: kit.createPencil({ grade: 'HB' | '2B', width }) and kit.pencilStroke(pencil, sheet, pts) lay the session
+//   painter's graphite dry on the sheet (src/media/kit-graphite.mjs). The eraser: kit.erase(sheet, pts, { width }) rubs
+//   graphite off dry paper (much less of it under dried paint; a trace of paint and soluble ink; no waterproof ink), and
+//   refuses a wet sheet. Both count as strokes, go in the stroke log (tool 'pencil', 'eraser') and in the film.
+//   The sheet keeps the two graphite grades in two pans the kit does not offer (cadred, paynes), so nothing else moves.
 // The pen's ink is soluble (a wash over it rewets it) unless you ask for waterproof ink: kit.open(task, { ink: 'waterproof' }).
 // One painting at a time, on the GPU: if another of your processes still holds the GPU, or the GPU cannot be used, kit.open
 //   STOPS and names what holds it; it never paints on the CPU by itself. Ask for the CPU by name if you want it (far
@@ -34,6 +39,7 @@ import * as S from '../src/media/sheet.mjs';
 import { renderLayers } from '../src/media/km.mjs';
 import * as BR from '../src/media/brush.mjs';
 import * as PEN from '../src/media/pen.mjs';
+import * as GR from '../src/media/kit-graphite.mjs';
 import { BOX, boxPigment } from '../src/crop/box.mjs';
 import { attachGpu } from '../src/media/gpu/link.mjs';
 
@@ -46,6 +52,8 @@ export const TASKS = fs.existsSync(path.join(HERE, 'tasks'))
 export const BRUSH_PAINTS = ['ultramarine', 'cerulean', 'hansa', 'ochre', 'sienna', 'umber', 'rose', 'sapgreen'];
 export const INK = ['sepia', 'lampblack'];
 const KEYS = BOX.map(p => p.key);
+// the graphite grades sit in two pans of the box that no kit call can mix
+const GRAPHITE_PAN = Object.freeze({ HB: 'cadred', '2B': 'paynes' }), GRAPHITE = Object.values(GRAPHITE_PAN).map(k => KEYS.indexOf(k));
 export const { step, dry, DEFAULTS, applyResist, liftResist, blot } = S;
 const LOCK = path.resolve(HERE, '../../.bench-gpu.lock');
 const SLOTS = path.resolve(HERE, '../../.bench-slots'), NSLOTS = 6;
@@ -69,7 +77,7 @@ async function takeSlot() {
     await new Promise(r => setTimeout(r, 3000));
   }
 }
-const MIXES = new WeakSet(), INKS = new WeakSet();
+const MIXES = new WeakSet(), INKS = new WeakSet(), PENCILS = new WeakSet();
 const DIPS = new WeakMap(); // brush or pen -> its last dip, read by the stroke log
 const r4 = v => (typeof v === 'number' ? +v.toFixed(4) : v);
 function logLine(o) { if (st?.log) st.log.push(JSON.stringify(o)); }
@@ -131,14 +139,15 @@ export async function open(task, { seed = +(process.env.BENCH_SEED || 1), gpu = 
   } else await S.setThreads(threads);
   // the pen's ink, by the name the session painter uses (--set ink=waterproof|soluble): waterproof ink holds to the paper
   // as the painter's set ink does (staining power 60), so later water lifts none of it; soluble is the ink's own profile
-  const pigments = BOX.map(p => (ink === 'waterproof' && INK.includes(p.key) ? { ...boxPigment(p), omega: 60 } : boxPigment(p)));
+  const grade = Object.fromEntries(Object.entries(GRAPHITE_PAN).map(([g, key]) => [key, g]));
+  const pigments = BOX.map(p => (grade[p.key] ? GR.gradePigment(grade[p.key]) : ink === 'waterproof' && INK.includes(p.key) ? { ...boxPigment(p), omega: 60 } : boxPigment(p)));
   const sheet = S.createSheet(makePaper(W, H, { seed, scale: 1, toothScale: 0.2, coldPress: { mmPerCell: MM } }), pigments);
   if (useGpu) {
     try { attachGpu(sheet, O, { mode: 'on', log: () => {} }); } catch (e) { reject(`the GPU could not be used (${String(e.message).slice(0, 200)}). Nothing was painted. Run again; to paint on the CPU on purpose (far slower), open with kit.open('${task}', { gpu: false })`); }
     if (!sheet._gpu) reject(`the GPU could not be used (no GPU sheet was attached). Nothing was painted. Run again; to paint on the CPU on purpose (far slower), open with kit.open('${task}', { gpu: false })`);
   }
   const log = process.env.BENCH_NO_STROKELOG ? null : [];
-  st = { log, logWritten: false, seed, task, out, sheet, pigments, W, H, strokes: 0, pen: 0, small: 0, short: 0, dots: 0, frames: 0, snaps: [], film: [], t0: Date.now(), backend: sheet._gpu ? 'gpu' : 'cpu', paperRGB: [240, 237, 228], pending: Promise.resolve() };
+  st = { log, logWritten: false, seed, task, out, sheet, pigments, W, H, strokes: 0, pen: 0, pencil: 0, erase: 0, small: 0, short: 0, dots: 0, frames: 0, snaps: [], film: [], t0: Date.now(), backend: sheet._gpu ? 'gpu' : 'cpu', paperRGB: [240, 237, 228], pending: Promise.resolve() };
   logLine({ ev: 'open', protocol: PROTOCOL, task, seed, W, H, mmPerCell: MM, paper: { toothScale: 0.2, coldPress: true }, backend: st.backend, t0: st.t0 });
   process.on('exit', flushLog); // a script that dies before finish() keeps the strokes it laid
   console.error(`kit v2: ${task} ${W}x${H}, ${st.backend}, budget ${BUDGET}`);
@@ -161,12 +170,13 @@ export function dipPen(pen, conc, amount = 1) {
   return PEN.dipPen(pen, Array.from(conc), amount);
 }
 
+const used = () => st.strokes + st.pen + st.pencil + st.erase;   // every counted stroke: brush, pen, pencil, eraser
 const lenOf = pts => { let L = 0; for (let i = 1; i < pts.length; i++) L += Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y); return L; };
 function counted(kind) {
   if (!st) reject('call kit.open() first');
-  if (st.strokes + st.pen >= BUDGET) reject(`stroke budget of ${BUDGET} used up`);
-  if (kind === 'pen') st.pen++; else st.strokes++;
-  const n = st.strokes + st.pen;
+  if (used() >= BUDGET) reject(`stroke budget of ${BUDGET} used up`);
+  st[kind === 'brush' ? 'strokes' : kind]++;
+  const n = used();
   if (n % SNAP_EVERY === 0) snap(n);
   if (n > 1 && (n - 1) % FILM_EVERY === 0) film('painting', n - 1);   // the sheet as it stands before this stroke is laid: after strokes 2, 4, ...
 }
@@ -177,14 +187,36 @@ export function stroke(brush, sheet, pts, options) {
   if (r < R_MIN) st.small++;
   if (L < 6 * r) st.short++;
   if (L < 2 * r) st.dots++;
-  if (st.log) logLine({ i: st.strokes + st.pen, tool: 'brush', t: Date.now() - st.t0, brush: { radius: r4(brush.radius), bristles: brush.hairs?.length, capacity: r4(brush.capacity), flat: !!brush.flat }, dip: DIPS.get(brush) ?? null, load: r4(brush.load), dips: brush.dips ?? 0, pts: pts.map(q => ({ x: r4(q.x), y: r4(q.y), p: r4(q.p), ...(q.r != null ? { r: r4(q.r) } : {}) })), options: options ?? null });
+  if (st.log) logLine({ i: used(), tool: 'brush', t: Date.now() - st.t0, brush: { radius: r4(brush.radius), bristles: brush.hairs?.length, capacity: r4(brush.capacity), flat: !!brush.flat }, dip: DIPS.get(brush) ?? null, load: r4(brush.load), dips: brush.dips ?? 0, pts: pts.map(q => ({ x: r4(q.x), y: r4(q.y), p: r4(q.p), ...(q.r != null ? { r: r4(q.r) } : {}) })), options: options ?? null });
   return BR.stroke(brush, sheet, pts, options);
 }
 export function penStroke(pen, sheet, pts, options) {
   if (!Array.isArray(pts) || pts.length < 2) reject('a pen line needs at least 2 points');
   counted('pen');
-  if (st.log) logLine({ i: st.strokes + st.pen, tool: 'pen', t: Date.now() - st.t0, pen: { nib: r4(pen.nib), flex: r4(pen.flex), capacity: r4(pen.capacity) }, dip: DIPS.get(pen) ?? null, ink: r4(pen.ink), pts: pts.map(q => ({ x: r4(q.x), y: r4(q.y), p: r4(q.p) })), options: options ?? null });
+  if (st.log) logLine({ i: used(), tool: 'pen', t: Date.now() - st.t0, pen: { nib: r4(pen.nib), flex: r4(pen.flex), capacity: r4(pen.capacity) }, dip: DIPS.get(pen) ?? null, ink: r4(pen.ink), pts: pts.map(q => ({ x: r4(q.x), y: r4(q.y), p: r4(q.p) })), options: options ?? null });
   return PEN.penStroke(pen, sheet, pts, options);
+}
+/** A pencil: grade 'HB' (harder, paler, finer) or '2B' (softer, darker, wider); width in cells at full pressure. */
+export function createPencil({ grade = 'HB', width } = {}) {
+  let p; try { p = GR.makePencil({ grade, width }, MM); } catch (e) { reject(e.message); }
+  PENCILS.add(p); return p;
+}
+export function pencilStroke(pencil, sheet, pts) {
+  if (!PENCILS.has(pencil)) reject('pencilStroke needs a pencil from kit.createPencil()');
+  try { GR.checkPath(pts, 'a pencil line'); } catch (e) { reject(e.message); }
+  counted('pencil');
+  const r = GR.layPencil(sheet, pencil, KEYS.indexOf(GRAPHITE_PAN[pencil.grade]), pts, { graphite: GRAPHITE, seed: st.seed * 131 + used() });
+  if (st.log) logLine({ i: used(), tool: 'pencil', t: Date.now() - st.t0, pencil: { grade: pencil.grade, width: pencil.width }, wetCells: r.wet, pts: pts.map(q => ({ x: r4(q.x), y: r4(q.y), p: r4(q.p) })) });
+  return r;
+}
+/** An eraser `width` cells across along pts; pressure p rubs harder. Refuses a wet sheet. */
+export function erase(sheet, pts, { width = 12 } = {}) {
+  if (!st) reject('call kit.open() first');
+  try { GR.checkPath(pts, 'an eraser stroke'); GR.checkEraser(sheet, width); } catch (e) { reject(e.message); }
+  counted('erase');
+  const r = GR.rubOut(sheet, pts, { width, graphite: GRAPHITE });
+  if (st.log) logLine({ i: used(), tool: 'eraser', t: Date.now() - st.t0, eraser: { width: r4(width) }, lifted: { graphiteShare: r4(r.graphiteShare) }, pts: pts.map(q => ({ x: r4(q.x), y: r4(q.y), p: r4(q.p) })) });
+  return r;
 }
 export function dryAll(sheet, O = S.DEFAULTS) {
   if (st && sheet === st.sheet) film('painting');   // wet, as the drying finds it
@@ -203,7 +235,7 @@ export function look() {
 const png = (rgb, file) => sharp(Buffer.from(rgb.buffer, rgb.byteOffset, rgb.byteLength), { raw: { width: st.W, height: st.H, channels: 3 } }).png().toFile(file);
 // The film (see the header). A frame is the sheet as look() gives it, written lossless in the background; nothing is painted.
 const FILM_EVERY = 2, FILM_MOST = 400, FILM = !process.env.BENCH_NO_FILM;
-function film(stage, after = st.strokes + st.pen) {
+function film(stage, after = used()) {
   if (!FILM || !st) return;
   const last = st.film.at(-1);
   if (last && last.after === after && last.stage === stage) return;
@@ -214,7 +246,7 @@ function film(stage, after = st.strokes + st.pen) {
 /** At the end: the last frame is the finished sheet; at most FILM_MOST frames are kept, evenly through, every 'dried' frame among them while they fit. */
 async function closeFilm(final) {
   if (!FILM) return null;
-  const dir = path.join(st.out, 'film'), n = st.strokes + st.pen, all = st.film;
+  const dir = path.join(st.out, 'film'), n = used(), all = st.film;
   await sharp(final).webp({ lossless: true, effort: 2 }).toFile(path.join(dir, 't-final.webp')); all.push({ src: 't-final.webp', stage: 'finished', after: n });
   let keep = all.map((_, i) => i);
   if (all.length > FILM_MOST) { const even = new Set(Array.from({ length: FILM_MOST }, (_, j) => Math.round(j * (all.length - 1) / (FILM_MOST - 1)))); keep = keep.filter(i => even.has(i)); }
@@ -229,11 +261,11 @@ function snap(n) {
   st.snaps.push(n); logLine({ ev: 'snap', after: n, t: Date.now() - st.t0 }); st.pending = st.pending.then(() => png(img, f));
 }
 export async function frame(name) {
-  st.frames++; logLine({ ev: 'frame', name: String(name), after: st.strokes + st.pen, t: Date.now() - st.t0 });
+  st.frames++; logLine({ ev: 'frame', name: String(name), after: used(), t: Date.now() - st.t0 });
   return png(look(), path.join(st.out, 'frames', `own-${String(st.frames).padStart(2, '0')}-${String(name).replace(/[^a-z0-9]+/gi, '-').slice(0, 40)}.png`));
 }
 export async function finish(note = '') {
-  const n = st.strokes + st.pen;
+  const n = used();
   await st.pending;
   const final = path.join(st.out, 'final.png'); await png(look(), final);
   const filmed = await closeFilm(final);
@@ -247,7 +279,7 @@ export async function finish(note = '') {
   logLine({ ev: 'finish', strokes: n, t: Date.now() - st.t0, note });
   flushLog();
   fs.rmSync(path.join(st.out, 'snaps'), { recursive: true, force: true });
-  const stats = { protocol: PROTOCOL, task: st.task, film: filmed, brushStrokes: st.strokes, penStrokes: st.pen, smallStrokes: st.small, shortStrokes: st.short, dotStrokes: st.dots, smallShare: st.strokes ? +(st.small / st.strokes).toFixed(3) : 0, strokes: n, budget: BUDGET, stageStrokes: stages, seconds: Math.round((Date.now() - st.t0) / 1000), backend: st.backend, note, seed: st.seed, sheet: { W: st.W, H: st.H, mmPerCell: MM }, strokeLog: st.log ? 'strokes.jsonl.gz' : null };
+  const stats = { protocol: PROTOCOL, task: st.task, film: filmed, brushStrokes: st.strokes, penStrokes: st.pen, pencilStrokes: st.pencil, eraserStrokes: st.erase, smallStrokes: st.small, shortStrokes: st.short, dotStrokes: st.dots, smallShare: st.strokes ? +(st.small / st.strokes).toFixed(3) : 0, strokes: n, budget: BUDGET, stageStrokes: stages, seconds: Math.round((Date.now() - st.t0) / 1000), backend: st.backend, note, seed: st.seed, sheet: { W: st.W, H: st.H, mmPerCell: MM }, strokeLog: st.log ? 'strokes.jsonl.gz' : null };
   fs.writeFileSync(path.join(st.out, 'stats.json'), JSON.stringify(stats, null, 2));
   fs.appendFileSync(path.join(HERE, 'out', 'kitlog.jsonl'), JSON.stringify({ ev: 'finish', task: st.task, t: Date.now(), strokes: n }) + '\n');
   if (st.sheet._gpu) st.sheet._gpu.close();

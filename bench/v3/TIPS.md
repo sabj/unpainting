@@ -1,6 +1,6 @@
 # Tips: brush technique in this painter, by worked example
 
-Eighteen small examples. Each was painted on a blank sheet (320 x 200 cells, 83 x 52 mm) by the code shown beside it,
+Twenty-six small examples. Each was painted on a blank sheet (320 x 200 cells, 83 x 52 mm) by the code shown beside it,
 and the picture is its dried result. None is a picture of anything: they show how the brush, the water and the paper
 behave, and nothing about what to paint.
 
@@ -253,10 +253,9 @@ for (let k = 0; k < 6; k++) { kit.dip(b, { water: 0.85, conc: paint }); kit.stro
 
 ## Drawing: pencil, pen and ink
 
-What exists, said plainly. **The kit (level 1) has a pen and two inks (`sepia`, `lampblack`) and nothing else to draw
-with: no pencil and no eraser.** The simulator does have graphite (the session painter at levels 2 to 4 lays the
-pencil drawing with it), but the kit does not hand it to you, and nothing anywhere rubs graphite or ink out. So the
-pencil and erasing notes below are for levels 2 to 4 and are words only; the pen examples were painted with the kit.
+The kit (level 1) draws with a pen and two inks (`sepia`, `lampblack`), a pencil (graphite in two grades, HB and 2B,
+the same graphite the session painter lays at levels 2 to 4) and an eraser. Every example here was painted with the kit.
+In the arrow pictures the pen is red, the pencil green and the eraser orange.
 
 ### 15. The pen line: nib, flex, pressure, speed
 ![](tips/15-pen-lines.png) ![](tips/15-pen-lines-arrows.png)
@@ -309,28 +308,122 @@ const { sheet, O, W, H } = await kit.open('tips', { ink: 'waterproof' });    // 
 - At levels 2 to 4 the same choice is the setting `"ink": "waterproof"` or `"soluble"`.
 - A pen line over a wash, on dry paper and on damp, is example 8.
 
-### Pencil (levels 2 to 4; the kit has none)
+### 19. The pencil line and pressure
+![](tips/19-pencil-pressure.png) ![](tips/19-pencil-pressure-arrows.png)
 
-- A pencil line is graphite caught on the tops of the paper's grain: light pressure gives a pale broken line, heavy
-  pressure a dark continuous one that also dents the paper. Decide the weight line by line; a lay-in drawn all at one
-  weight reads as an outline, not a drawing.
-- Under a wash: a pale wash lets every pencil line show; a dark wash hides the light ones and keeps only the heavy. So
-  draw lightly where a pale wash will sit and the line should not show, and expect lines under the darks to vanish.
-- Loose graphite is picked up by the first wet wash over it and greys it a little. Fewer, lighter lines under clean
-  pale colours.
-- Pencil over a dry wash sits on top of the paint, crisp and a little shiny; over a damp wash it digs in and cannot
-  be undone. Wait for the sheet to dry.
-- In the session painter the pencil is your choice of the drawing's lines: which are laid before the washes, which
-  after, which not at all, and each one's weight.
+```js
+const pencil = kit.createPencil({ grade: '2B' });
+kit.pencilStroke(pencil, sheet, wave(35, 0.2));                  // light: pale, broken on the grain
+kit.pencilStroke(pencil, sheet, wave(75, 0.5));
+kit.pencilStroke(pencil, sheet, wave(115, 1));                   // hard: dark and unbroken
+kit.pencilStroke(pencil, sheet, wave(160, t => 0.1 + 0.9 * t));  // light to hard along one line
+```
 
-### Erasing and correcting
+- Physics: graphite catches on the tops of the paper's grain. Light pressure touches only the highest fibres (a pale,
+  broken line); hard pressure fills the grain and widens the line.
+- Prevents: a drawing laid all at one weight, which reads as an outline. Choose each line's weight.
+- *Kit only:* `p` is 0 to 1 at each point. At this scale even a hard line is fine and grey; pencil never gets near ink
+  black. The simulator does not dent the paper, so a heavy line leaves no groove.
 
-- **Before paint:** pencil rubs out of dry paper almost completely; heavy lines leave their dent. In the session
-  painter that is simply leaving a line out of your choice, or giving it a lighter weight: decide before the washes.
-- **After a wash has dried over it:** the graphite under the paint is sealed in and does not come off; only pencil
-  drawn on top of the dry wash can be rubbed back, and rubbing lifts some paint with it. Do not plan on it.
-- **A pen line cannot be erased.** Waterproof ink stays for good. Soluble ink can be softened by a wet brush while it
-  is fresh, which spreads it rather than removing it. A wrong pen line is corrected by drawing the right one more
-  firmly beside it, or by a dark wash over both; so draw the pen last where you are unsure.
-- *Kit only:* there is no eraser call. `kit.blot` lifts standing water and the paint in it (example 7), not a dried
-  line.
+### 20. A hard grade against a soft one
+![](tips/20-hard-and-soft-pencil.png) ![](tips/20-hard-and-soft-pencil-arrows.png)
+
+```js
+const hard = kit.createPencil({ grade: 'HB' }), soft = kit.createPencil({ grade: '2B' });
+kit.pencilStroke(hard, sheet, line(40, 0.5)); kit.pencilStroke(soft, sheet, line(75, 0.5));   // half pressure
+kit.pencilStroke(hard, sheet, line(125, 1));  kit.pencilStroke(soft, sheet, line(160, 1));    // full pressure
+```
+
+- Physics: a soft lead (2B) has more graphite and less clay: it lays more, darker and a little wider at the same pressure.
+- Prevents: pressing a hard pencil to get a dark. Use the soft one, lightly, and keep HB for lines a pale wash will cover.
+- *Kit only:* the grades are `'HB'` and `'2B'`, the simulator's two graphite profiles; any other grade is refused.
+  `width` (cells, at full pressure) blunts or sharpens the point.
+
+### 21. A pencil lay-in under a pale and a dark wash
+![](tips/21-pencil-under-wash.png) ![](tips/21-pencil-under-wash-arrows.png)
+
+```js
+[0.25, 1, 0.25, 1, 0.25, 1].forEach((p, k) => kit.pencilStroke(pencil, sheet, [{ x: 20, y: 40 + 24 * k, p }, { x: W - 20, y: 46 + 24 * k, p }]));
+kit.dryAll(sheet, O);
+wash(120, 190, kit.mix({ ultramarine: 0.25 }));                // pale: every line shows through
+wash(230, 290, kit.mix({ ultramarine: 1.2, umber: 0.4 }));     // dark: the light lines are gone, the heavy ones dimmed
+```
+
+- Physics: graphite does not dissolve. The wash flows over it and moves almost none (a few hundredths spread into a
+  faint halo); the paint lies on top and covers it as much as the paint is dark.
+- Prevents: lines showing through the lights for good. Draw lightly where a pale wash will sit; expect the light
+  lines under the darks to vanish.
+
+### 22. Pencil over a wash: dry, and (what the simulator does) wet
+![](tips/22-pencil-over-wash.png) ![](tips/22-pencil-over-wash-arrows.png)
+
+```js
+band(30, 86); kit.dryAll(sheet, O);                             // top: washed, DRIED, then drawn on
+line(58);
+band(114, 170); for (let q = 0; q < 4; q++) kit.step(sheet, O); // bottom: drawn on while wet
+line(142);
+```
+
+- Physics: on a dry wash the pencil sits on the paint, crisp. On wet paper a real pencil digs into the swollen
+  fibres, smears and scores the sheet for good. **The simulator does not model that:** it lays the line on wet paper
+  exactly as on dry, and the water then spreads a few hundredths of it. The bottom line is that, not the real thing.
+- Prevents: drawing into a wet wash. Wait for the sheet to dry. *Kit only:* the stroke log records `wetCells` for a
+  pencil line laid on water, so you can see that you did it.
+
+### 23. Hatching in pencil
+![](tips/23-pencil-hatching.png) ![](tips/23-pencil-hatching-arrows.png)
+
+```js
+const hatch = (x0, gap, slope, p = 0.6) => { for (let x = x0; x <= x0 + 60; x += gap) kit.pencilStroke(pencil, sheet, [{ x, y: 60, p }, { x: x + slope, y: 140, p }]); };
+hatch(20, 8, 14);  hatch(100, 3, 14);  hatch(180, 3, 14); hatch(194, 3, -14);   // apart, close, crossed
+const blunt = kit.createPencil({ grade: 'HB', width: 6 });                      // right: the side of the lead, pressed hard
+for (let y = 60; y <= 140; y += 4) kit.pencilStroke(blunt, sheet, [{ x: 262, y, p: 1 }, { x: 302, y, p: 1 }]);
+```
+
+- Physics: as with the pen, tone is how much paper the lines cover. Pressing harder on one patch does darken it, but
+  it fills the grain flat and reads as a smudge, not a tone.
+- Prevents: shading by scrubbing. Parallel lines, drawn the same way, closer or crossed for darker.
+
+### 24. Rubbing out pencil before paint
+![](tips/24-erase-pencil-before-paint.png) ![](tips/24-erase-pencil-before-paint-arrows.png)
+
+```js
+for (const [y, p] of [[40, 0.4], [70, 1], [100, 0.4], [130, 1]]) kit.pencilStroke(pencil, sheet, [{ x: 30, y, p }, { x: W - 30, y: y + 4, p }]);
+kit.erase(sheet, [{ x: 100, y: 25, p: 1 }, { x: 100, y: 145, p: 1 }], { width: 30 });     // hard: 82% comes off
+kit.erase(sheet, [{ x: 220, y: 25, p: 0.3 }, { x: 220, y: 145, p: 0.3 }], { width: 30 }); // light: 25%, a ghost stays
+```
+
+- Physics: on dry, bare paper graphite rubs off; one hard pass takes most of it, a second takes most of the rest.
+- Prevents: a wrong line sealed under a wash. Correct the drawing, and lighten lines in the lights, before the first wash.
+- *Kit only:* `kit.erase(sheet, pts, { width })`, width in cells (default 12); `p` is how hard you rub. It counts as a stroke.
+- At levels 2 to 4 rubbing out is leaving a line out of your drawing, or giving it a lighter weight: decide before the washes.
+
+### 25. Trying to lift pencil from under a dried wash
+![](tips/25-erase-pencil-under-wash.png) ![](tips/25-erase-pencil-under-wash-arrows.png)
+
+```js
+for (const y of [50, 80, 110, 140]) kit.pencilStroke(pencil, sheet, [{ x: 30, y, p: 1 }, { x: W - 30, y: y + 4, p: 1 }]);
+kit.dryAll(sheet, O);  /* a pale wash over the right half */  kit.dryAll(sheet, O);
+for (const x of [100, 240]) kit.erase(sheet, [{ x, y: 30, p: 1 }, { x, y: 165, p: 1 }], { width: 30 });   // same rub, bare and washed
+```
+
+- Physics: the dried gum of the wash holds the graphite under it. The same hard rub took 82% on bare paper and 19%
+  under this pale wash; under a dark wash it takes under a tenth. What comes off is graphite only, and a trace (about
+  2% a rub) of the paint. Pencil drawn on top of a dried wash rubs off as from bare paper.
+- Prevents: planning to clean up the drawing after painting. The lines under the paint stay.
+
+### 26. What an eraser does to a pen line
+![](tips/26-erase-pen-line.png) ![](tips/26-erase-pen-line-arrows.png)
+
+```js
+for (const y of [60, 100, 140]) { kit.dipPen(pen, ink); kit.penStroke(pen, sheet, zigzag(y)); }   // soluble sepia, the default
+kit.dryAll(sheet, O);
+for (let k = 0; k < 3; k++) kit.erase(sheet, [{ x: 160, y: 35, p: 1 }, { x: 160, y: 165, p: 1 }], { width: 40 });
+```
+
+- Physics: dry ink is in the paper, not on it. Three hard rubs took about 2% each of the soluble ink under them, which
+  does not show; waterproof ink loses none at all. A real eraser would also scuff the paper; the simulator does not.
+- Prevents: drawing a doubtful line in ink. Find it in pencil first, then ink it. A wrong pen line is corrected by
+  drawing the right one more firmly beside it, or by a dark wash over both.
+- *Kit only:* the eraser refuses a wet sheet (the paper would pill and tear) with a message and rubs nothing:
+  `kit.dryAll` first. `kit.blot` lifts standing water and the paint in it (example 7), not a dried line.
