@@ -73,7 +73,8 @@ export function adaptLevel(lv, v, written = false) {
   t.short += st.short; t.fewer += st.fewer; t.solves += st.solves; t.levelSteps += st.levelSteps; t.missed += st.missed;
   // light while every step since the last read had no level tile and the sheet was not written since they were encoded
   // (only for a caller that says when it writes the sheet: lv.tracksWrites, as stepfull.mjs does)
-  lv.light = !!lv.tracksWrites && lv.since > 0 && st.levelSteps === 0 && !written; lv.since = 0;
+  // lv.hold (a fast dry's tail, which adds no water): once light, light for the rest of it
+  lv.light = !!lv.tracksWrites && !written && ((lv.hold && lv.light) || (lv.since > 0 && st.levelSteps === 0)); lv.since = 0;
   let grew = false;
   if ((st.short || st.iterations > 0.75 * lv.iters) && lv.iters < LV_ITMAX) { lv.iters = Math.min(LV_ITMAX, 2 * lv.iters); grew = true; }
   if ((st.fewer || st.subs > 0.75 * lv.subs) && lv.subs < 64) { lv.subs = Math.min(64, 2 * lv.subs); grew = true; }
@@ -88,5 +89,8 @@ export function adaptLevel(lv, v, written = false) {
     const it = Math.max(16, Math.ceil(1.5 * Math.max(...lv.recent.map(r => r[0])))), sb = Math.max(8, 2 * pow2(Math.max(...lv.recent.map(r => r[1]))));
     if (it < lv.iters || sb < lv.subs) { lv.iters = Math.min(lv.iters, it); lv.subs = Math.min(lv.subs, sb); grew = true; }
   }
+  // lv.cap (a fast dry's level phase): no more iterations than that; a solve that runs short keeps its iterate and the
+  // next step levels on from it
+  if (lv.cap && lv.iters > lv.cap) { lv.iters = lv.cap; grew = true; }
   return grew;
 }

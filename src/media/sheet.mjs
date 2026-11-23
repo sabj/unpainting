@@ -5,6 +5,7 @@ import { edgeFeed, resetEdgeFeed } from './edge-feed.mjs';
 import { levelFilm } from './film-level.mjs';
 export { setTilt } from './film-level.mjs';
 import { flowTime, poreTime } from './flow-time.mjs';
+import { timeChunks, DRY_TAIL_CHUNK_DT, levelEvery } from './time-chunks.mjs';
 import { settleSpeed, settleDiffusion, settleShare } from './settling.mjs';
 // Pipeline: painting, stage 4 (the sheet physics).
 // A sheet of paper with water and pigment on it and in it. The model's structure is based on Computer-Generated Watercolor,
@@ -591,7 +592,7 @@ export const collectFlows = (a, at) => { STROKEFLOWS = a; STROKESTEP = at; };
 export const SHEET_CLOCK = Symbol('sheetClock');
 // millimetres a cell: the step's own, else the paper's (a sheet made without one is taken at 0.3)
 const sheetMm = (sheet, o) => (o.mmPerCell > 0 ? o.mmPerCell : sheet.paper.mmPerCell > 0 ? sheet.paper.mmPerCell : 0.3);
-export function step(sheet, o = DEFAULTS, reduction = null) {
+export function step(sheet, o = DEFAULTS, reduction = null, chunkDt = undefined) {
   const wetValid = recordWetStep(sheet, 1);
   // a flow inside a stroke is recorded at its position in that stroke; a flow between strokes is its own entry
   if (TAPE && sheet._tape) { if (STROKEFLOWS) STROKEFLOWS.push(STROKESTEP()); else TAPE.push({ k: 'f' }); }
@@ -605,7 +606,7 @@ export function step(sheet, o = DEFAULTS, reduction = null) {
   }
   // Split kinetic events as well as transport: a long dry request must not
   // change absorption, deposition or the donor budget of the exact path.
-  const chunks = Math.max(1, Math.ceil(o.dt / 2));
+  const chunks = timeChunks(o.dt, chunkDt);
   if (chunks > 1) {
     const sub = { ...o, dt: o.dt / chunks }; let wet = false;
     for (let t = 0; t < chunks; t++) { wet = stepCpu(sheet, sub, reduction); if (!wet) break; }
@@ -1202,17 +1203,17 @@ export function quietDryTail(sheet, o = DEFAULTS) {
 }
 function dryCpu(sheet, max, o, { level, levelMax, levelTol, dt, onStep, analyticTail }) {
   // water levels in moments and dries in minutes: keep real time while the surface is still moving, then run faster
-  let t = 0, fast = false;
+  let t = 0, fast = false; const every = levelEvery(analyticTail && !onStep);
   // the two settings a step runs with, made once rather than once a step (step reads them and never changes them)
   const oLevel = { ...o, dt: o.dt }, oFast = { ...o, dt };
   for (; t < max; t++) {
-    if (!fast && t >= level && (t >= levelMax || (t % 25 === 0 && surfaceLevel(sheet, o.slope ?? 0) < levelTol))) fast = true;
+    if (!fast && t >= level && (t >= levelMax || (t % every === 0 && surfaceLevel(sheet, o.slope ?? 0) < levelTol))) fast = true;
     if (analyticTail && !onStep) {
       if (quietDryTail(sheet, o)) {
         break;
       }
     }
-    if (!step(sheet, fast ? oFast : oLevel)) break;
+    if (!step(sheet, fast ? oFast : oLevel, null, fast && analyticTail ? DRY_TAIL_CHUNK_DT : undefined)) break;
     // a caller watching the sheet dry (frames of a wash spreading and settling)
     if (onStep) onStep(t);
   }
