@@ -7,8 +7,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import sharp from 'sharp';
-import { BENCH, RUN_SCHEMA, VERSION_STAMP, V2, BUDGET, readJson, writeJson, validateRun, posix, loadCrops, auditScripts } from './lib.mjs';
-import { turnCommand, codexThread, agyConversation, usage } from './runners.mjs';
+import { BENCH, RUN_SCHEMA, VERSION_STAMP, V2, BUDGET, readJson, writeJson, validateRun, posix, loadCrops, loadLevelOneCrops, auditScripts } from './lib.mjs';
+import { turnCommand, usage } from './runners.mjs';
 import { thumb, stageStrip } from './images.mjs';
 import { makeWorktree, keepScripts, runTurn, minutes } from './pipeline/harness.mjs';
 
@@ -26,7 +26,11 @@ function seed({ ws, crop, spec, view, tries, dry }) {
   for (const d of ['tasks', 'attempts', 'out']) fs.mkdirSync(path.join(b, d), { recursive: true });
   fs.copyFileSync(path.join(V2, 'kit', 'kit.mjs'), path.join(b, 'kit.mjs'));
   fs.copyFileSync(path.join(V2, 'kit', 'guard.mjs'), path.join(b, 'guard.mjs'));
-  for (const c of loadCrops()) if (c.distributed) fs.copyFileSync(path.join(V2, c.coarseFile), path.join(b, 'tasks', `${c.task}-coarse.json`));
+  for (const c of allCrops()) if (c.distributed) fs.copyFileSync(path.join(c.base ?? V2, c.coarseFile), path.join(b, 'tasks', `${c.task}-coarse.json`));
+  // the harness tips (level 1 = nothing prepared, plus these): worked examples of brush technique on blank sheets
+  fs.copyFileSync(path.join(BENCH, 'v3', 'TIPS.md'), path.join(b, 'TIPS.md'));
+  fs.mkdirSync(path.join(b, 'tips'), { recursive: true });
+  for (const f of fs.readdirSync(path.join(BENCH, 'v3', 'tips'))) if (/\.(png|mjs)$/.test(f)) fs.copyFileSync(path.join(BENCH, 'v3', 'tips', f), path.join(b, 'tips', f));
   fs.cpSync(path.join(V2, 'skill', 'skills'), path.join(b, 'skills'), { recursive: true });
   const p = readJson(path.join(V3, 'prompts.json'));
   fs.writeFileSync(path.join(b, 'BRIEF.md'), fill(sayLimit(fs.readFileSync(path.join(V3, 'BRIEF.md'), 'utf8')), {
@@ -41,6 +45,9 @@ function seed({ ws, crop, spec, view, tries, dry }) {
       + "process.argv = [process.argv[0], 'bench/paint.mjs', crop];\nawait import('./paint.mjs');\n");
   }
 }
+
+/** The public suite's targets and level 1's own (bench/v3/crops.json; each of those carries its `base` folder). */
+const allCrops = () => [...loadCrops(), ...loadLevelOneCrops()];
 
 /** One attempt's outputs into bench/attempts/a<n>/ (the model sees them) and the raw folder. */
 async function collect({ ws, crop, n, raw, view, turn }) {
@@ -65,47 +72,55 @@ async function collect({ ws, crop, n, raw, view, turn }) {
     min: minutes(turn.seconds), killed: turn.killed, exit: turn.code, changed: changed || null };
 }
 
-/** One target's session: attempts 1..tries, resumed between attempts. */
+/** One target's attempts 1..tries. Every attempt starts in a worktree of its own and a model session of its own (the
+ *  owner, 22 Nov 2026: attempts that come out pixel-identical are suspicious; "at least be in fresh branch"). What an
+ *  attempt is handed from the one before, as a later try is at level 3: that attempt's own folder (its scripts, its
+ *  painting, its frames, its stats, the comparison), read-only, beside the subject. Nothing else carries over: no
+ *  notes, no model context, no files it left lying. */
 async function session({ model, crop, spec, tries, rawTry, dry }) {
   const raw = path.join(rawTry, crop), view = path.join(raw, 'view', `${crop}.png`);
   fs.rmSync(raw, { recursive: true, force: true }); fs.mkdirSync(path.dirname(view), { recursive: true });
-  fs.copyFileSync(path.join(V2, spec.file), view);
-  const { ws, cleanup } = makeWorktree();
+  fs.copyFileSync(path.join(spec.base ?? V2, spec.file), view);
   const p = readJson(path.join(V3, 'prompts.json'));
-  const attempts = [], res = { crop, attempts, tokens: 0, costUSD: 0, done: null };
-  const sessionId = ['claude', 'muse'].includes(model.runner) ? crypto.randomUUID() : null;
-  let thread = null;
-  try {
-    seed({ ws, crop, spec, view, tries, dry });
-    let prompt = p.first, image = view;
-    for (let n = 1; n <= tries; n++) {
-      fs.rmSync(path.join(ws, 'bench', 'DONE'), { force: true });
-      fs.rmSync(path.join(ws, 'bench', 'out', crop), { recursive: true, force: true });
+  const attempts = [], res = { crop, attempts, tokens: 0, costUSD: 0, done: null, freshWorkspaceEachAttempt: true };
+  const SKIP = /^bench\/(out|tasks|attempts|skills|tips)\/|^bench\/(BRIEF\.md|TIPS\.md|kit\.mjs|guard\.mjs|paint\.mjs|dry-v3\.mjs)$|^node_modules$/;
+  let prompt = p.first, images = [view];
+  for (let n = 1; n <= tries; n++) {
+    const { ws, cleanup } = makeWorktree();
+    const sessionId = ['claude', 'muse'].includes(model.runner) ? crypto.randomUUID() : null;
+    let stop = false;
+    try {
+      seed({ ws, crop, spec, view, tries, dry });
+      // the attempt before, for reference only: its own folder as the round kept it, every file read-only
+      const before = path.join(raw, `a${n - 1}`), ref = path.join(ws, 'bench', 'attempts', `a${n - 1}`);
+      if (n > 1 && fs.existsSync(before)) {
+        fs.cpSync(before, ref, { recursive: true });
+        for (const f of fs.readdirSync(ref, { recursive: true })) { const g = path.join(ref, f); if (fs.statSync(g).isFile()) fs.chmodSync(g, 0o444); }
+      }
       const events = path.join(raw, `events-a${n}.jsonl`), stderr = path.join(raw, `stderr-a${n}.log`);
       const env = { BENCH_SEED: '1', BENCH_VIOLATIONS: path.join(raw, `a${n}-violations.jsonl`), PYTHONPATH: path.join(V2, 'kit', 'py'), BENCH_PYGUARD: path.join(V2, 'kit', 'py') };
       const c = dry ? { cmd: process.execPath, args: ['bench/dry-v3.mjs', crop, String(n)] }
-        : turnCommand(model, { ws, raw, text: prompt, images: image ? [image] : [], sessionId: sessionId ?? thread, resume: n > 1 && model.runner !== 'together', turn: n,
+        : turnCommand(model, { ws, raw, text: prompt, images, sessionId, resume: false, turn: n,
           briefFile: path.join(ws, 'bench', 'BRIEF.md'), crops: [crop], logFile: events, minutes: ATTEMPT_MIN - 2 });
-      console.error(`bench:run: ${model.name}, V3, ${crop}, attempt ${n} of up to ${tries}${dry ? ' (dry run)' : ''}`);
+      console.error(`bench:run: ${model.name}, V3, ${crop}, attempt ${n} of up to ${tries}${dry ? ' (dry run)' : ''}, in a fresh worktree and session`);
       const turn = await runTurn(c, { cwd: ws, env, events, stderr, capMs: ATTEMPT_MIN * 60000 });
-      if (model.runner === 'codex' && !thread) thread = codexThread(events);
-      if (model.runner === 'agy' && !thread) thread = agyConversation(events);
       const u = dry ? { tokens: null, costUSD: null } : usage(model.runner, events);
       res.tokens += u.tokens || 0; res.costUSD += u.costUSD || 0;
-      if (n > 1 && fs.existsSync(path.join(ws, 'bench', 'DONE'))) { res.done = { before: n, reason: fs.readFileSync(path.join(ws, 'bench', 'DONE'), 'utf8').trim().slice(0, 400), min: minutes(turn.seconds) }; break; }
-      const a = await collect({ ws, crop, n, raw, view, turn });
-      a.tokens = u.tokens; a.violations = fs.existsSync(env.BENCH_VIOLATIONS) ? fs.readFileSync(env.BENCH_VIOLATIONS, 'utf8').split('\n').filter(Boolean).length : 0;
-      a.rejections = 0;
-      attempts.push(a);
-      if (!dry && !sessionId && !thread && model.runner !== 'together') { console.error('bench:run: no session id; the session cannot be resumed, so it stops here'); break; }
-      prompt = fill(sayLimit(p.next), { PREV: n, N: n + 1, OF: tries === 2 ? tries : `up to ${tries}`, STROKES: a.stats?.strokes ?? 'no', MIN: a.min }) + (tries === 2 ? '' : p.done);
-      // Attach the comparison when supported; otherwise the runner opens it from disk.
-      image = ['codex', 'muse', 'agy'].includes(model.runner) ? path.join(ws, 'bench', 'attempts', `a${n}`, 'compare.png') : model.runner === 'together' ? view : null;
-      if (image && !fs.existsSync(image)) image = null;
+      if (n > 1 && fs.existsSync(path.join(ws, 'bench', 'DONE'))) { res.done = { before: n, reason: fs.readFileSync(path.join(ws, 'bench', 'DONE'), 'utf8').trim().slice(0, 400), min: minutes(turn.seconds) }; stop = true; }
+      else {
+        const a = await collect({ ws, crop, n, raw, view, turn });
+        a.tokens = u.tokens; a.violations = fs.existsSync(env.BENCH_VIOLATIONS) ? fs.readFileSync(env.BENCH_VIOLATIONS, 'utf8').split('\n').filter(Boolean).length : 0;
+        a.rejections = 0;
+        attempts.push(a);
+        prompt = fill(sayLimit(p.next), { PREV: n, N: n + 1, OF: tries === 2 ? tries : `up to ${tries}`, STROKES: a.stats?.strokes ?? 'no', MIN: a.min }) + (tries === 2 ? '' : p.done);
+                // a fresh session has not seen the target: it is attached again, with the comparison where the runner takes pictures
+        images = [view, ...(['codex', 'muse', 'agy'].includes(model.runner) ? [path.join(raw, `a${n}`, 'compare.png')] : [])].filter(f => fs.existsSync(f));
+      }
+    } finally {
+      keepScripts(ws, path.join(raw, `scripts-a${n}`), SKIP);
+      cleanup();
     }
-  } finally {
-    keepScripts(ws, path.join(raw, 'scripts'), /^bench\/(out|tasks|attempts|skills)\/|^bench\/(BRIEF\.md|kit\.mjs|guard\.mjs|paint\.mjs|dry-v3\.mjs)$|^node_modules$/);
-    cleanup();
+    if (stop) break;
   }
   writeJson(path.join(raw, 'result.json'), res);
   return res;
@@ -113,7 +128,7 @@ async function session({ model, crop, spec, tries, rawTry, dry }) {
 
 /** Run V3 for one model and write try folders 1..tries. */
 export async function runV3({ round, model, tries, crops, dry, outRoot, force }) {
-  const specs = Object.fromEntries(loadCrops().map(c => [c.task, c]));
+  const specs = Object.fromEntries(allCrops().map(c => [c.task, c]));
   for (let n = 1; n <= tries; n++) {
     const f = path.join(outRoot, round.dir, model.key, String(n), 'run.json');
     if (fs.existsSync(f) && !force) throw new Error(`${path.dirname(f)} already has a run.json; pass --force to replace it`);

@@ -18,7 +18,8 @@
   ],
   "ignore": [
     "bench/v2/kit/**",
-    "bench/scripts/dry-painter.mjs"
+    "bench/scripts/dry-painter.mjs",
+    "bench/v3/tips/**"
   ],
   "ignoreBinaries": [
     "codex",
