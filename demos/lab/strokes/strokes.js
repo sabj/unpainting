@@ -56,7 +56,7 @@ exportButton.onclick = () => {
   const colW = Math.max(...sizes.map(z => z.w)), H = 60 + sizes.reduce((a, z) => a + z.h + GAP, 0);
   const out = document.createElement('canvas'); out.width = LABEL + 2 * (colW + GAP); out.height = H;
   const c = out.getContext('2d'); c.fillStyle = '#f6f3eb'; c.fillRect(0, 0, out.width, out.height); c.fillStyle = '#39362f';
-  c.font = '600 18px Georgia, serif'; c.fillText(`Paint Lab stroke bench · 0.4.0-rc.2 · cell ${mm} mm`, 12, 26);
+  c.font = '600 18px Georgia, serif'; c.fillText(`Paint Lab stroke bench · 0.4.0-rc.3 · cell ${mm} mm`, 12, 26);
   c.font = '15px Georgia, serif'; c.fillText('CPU', LABEL, 50); c.fillText(gpuName ? `WebGPU (${gpuName})` : 'WebGPU (none)', LABEL + colW + GAP, 50);
   let y = 60;
   BENCH_STROKES.forEach((s, i) => {

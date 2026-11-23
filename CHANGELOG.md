@@ -4,7 +4,7 @@ Releases use semver. Each release records its painter and simulator versions ([v
 
 ## 0.4.0 (not released)
 
-Release candidate `v0.4.0-rc.2` (0.4 rc2), the frozen version for the benchmark's first run. Painter **V107-dev**, simulator **105**. An earlier, untagged state was named 0.4.0-rc.1; its entry is kept below as history. 0.4 scores are a new series, not comparable with rounds V1 to V5.
+Release candidate `v0.4.0-rc.3` (0.4 rc3): the ladder as the owner set it on 22 Nov (L2 and L3 get the code planner's inputs, not its plan). `v0.4.0-rc.2` was the first frozen version, run once as a harness proof under the old L2. Painter **V107-dev**, simulator **105**. An earlier, untagged state was named 0.4.0-rc.1; its entry is kept below as history. 0.4 scores are a new series, not comparable with rounds V1 to V5.
 
 Results: to be added from the release-candidate run.
 
