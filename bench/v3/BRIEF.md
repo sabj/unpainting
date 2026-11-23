@@ -45,7 +45,7 @@ tools you were told not to use, take the technique and apply it with the kit.
 `bench/TIPS.md` shows how to get each basic thing out of this kit: a flat wash, a graded wash, wet into wet, a glaze, a
 soft edge beside a hard one, dry brush, paper white, a pen line over a wash, and how to render a shape with a brush
 (fill it along its long axis, taper to a point, go round a white, meet another shape along an edge, how long a dip
-lasts). Each has a few lines of kit code that run as they stand (`bench/tips/N-name.mjs`) and a picture of the dried
+lasts), and how the pen draws (nib, pressure, speed, hatching, soluble and waterproof ink under a wash). Each has a few lines of kit code that run as they stand (`bench/tips/N-name.mjs`) and a picture of the dried
 result on blank paper (`bench/tips/N-name.png`; the shape examples also `-arrows.png`, the stroke paths). Read it, and
 look at the pictures, before you write your first stroke.
 
