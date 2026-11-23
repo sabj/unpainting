@@ -1,47 +1,50 @@
 # Levels
 
-Updated 23 November 2026 for 0.4 rc5. The owner's words are the source; this page puts them in order. The code that sums scores by level is [../scripts/levels.mjs](../scripts/levels.mjs). It still holds the 21 November design (L1 to L3), so it needs updating before it builds 0.4 results.
+Updated 23 November 2026 for 0.4 rc7. The owner's words are the source; this page puts them in order. The code that sums scores by level is [../scripts/levels.mjs](../scripts/levels.mjs). It still holds an older L1 to L3 layout, so it needs updating before it builds 0.4 results.
 
 The benchmark asks one question: how well does a model paint, and how much of that is the model and how much is the code that helps it? Auto, the code planner alone, is the reference.
 
 ## The ladder
 
-| Level | What the model is given | Tries |
-|---|---|---|
-| L0 | Nothing but the picture, a brush and a pen. No tips. | One. Defined, not run. |
-| L1 | L0 plus harness tips: guides to brush technique and worked examples of rendering a shape, painted on blank sheets. | One |
-| L2 | The same inputs Auto gets: the prepared drawing, the three colour studies, the named forms. Not Auto's plan: the model plans the painting itself, as its own script. | One |
-| L3 | L2 again, after studying its own L2 painting. Still no Auto plan. | Two in all |
-| L4 | L3, then one more retry, with more help: the studies' traced shapes as regions it may use, change, redraw or ignore (offered, not required, and maybe wrong); its own L3 painting with its film and stroke map. Not given: anything of Auto (its plan, planner, settings, finished painting, film or stroke map). | Three in all |
+Every level is one try that hands in the model's own script, with a budget of 3.0 look units. Only what the model is given differs.
 
-Notes on each level:
+| Level | What the model is given |
+|---|---|
+| L1 | The freehand kit and its tips: technique guides and worked examples painted on blank sheets. The paper's colour is its choice (white, or an `[r, g, b]` tone); paint only darkens it. One attempt; its budget is 3 runs of its script (each run that lays a mark costs 1.0). |
+| L2 | The same inputs the code planner gets: the prepared drawing, the three colour studies as pictures, and the named forms. No code plan: the model plans the painting itself. |
+| L3 | One retry of L2, after studying its own L2 painting: its finished full-size painting, its film and its stroke map. A fresh budget. |
+| L4 | One more retry, like L3, now also given the studies' traced shapes as regions it may use, change or ignore (offered, not required, and they may be wrong). It retries from its own L3 painting, film and stroke map, with a fresh budget. |
 
+Notes:
+
+- Nothing of Auto is given at any level: not its plan, planner, settings, painting, film or stroke map.
+- A hand-in of planner settings, or of the code's plan, is refused ("the code's plan, its planner and its settings are handed over at no level"). A session that hands in no script of its own has handed in nothing: a failed painting, never Auto's plan painted in its place.
 - L1 tips never come from a benchmark subject. The examples are random shapes, only to show technique ([TIPS.md](../v3/TIPS.md)).
-- The number of retries is a setting. One retry per level is the plan until there is proof that more tries help.
-- Test run first: three tries at L3 and at L4, each scored on its own, to see whether the second and third try add anything. After it the owner decides whether the scored run keeps three or scopes back to one. Planned, not yet run.
 - A model has a shell in its own workspace at every level and may write any script it wants.
-- At every level the model hands in its own script (with its choice of lines, medium and erase passages). No session folder holds `auto/`. Auto's settings, or Auto's plan edited or not, are refused with "the code's plan, its planner and its settings are handed over at no level". A session that hands in no script of its own has handed in nothing: a failed painting, never Auto's plan painted in its place.
-- L2 changed on 22 November: it gets Auto's inputs, not Auto's plan. L4 changed on 23 November (the owner: "I dont want it to just steer the code", then "probably not give auto painting in l4"): it gets the traced shapes and nothing of Auto. Runs made under the older terms show the harness works; they are not results at those levels.
+- Drawing is the model's choice at every level: pencil, pen or none. No drawing is a normal choice. At L2 to L4 the prepared drawing is offered, not required, and its lines may be drawn before the washes, with a stage of the washes, or after them.
+- Every picture is painted on one standard sheet. The original's real size is told to the model as a fact, not reproduced ([real sizes](../README.md#real-sizes-of-the-originals-told-to-the-model-as-a-fact)).
+- L0 (the kit with no tips) is defined, not run.
 
 ## Budget
 
-Every level has the same shape: one try, a budget of 3.0 look units. A look has a fixed price by size and by the share of the sheet or script it paints, whatever is in it: a half-size look of the whole sheet 0.3, full size 1.0, a look stopped at a stage or of a region its share of that, never under 0.2. The budget for one try is 3.0 at every level. The final is not charged. How a model paints is never charged: brush sweeps, dryings, water steps, cell-steps, seconds, tokens and steps are recorded in `usage.json` beside the charge. One guard only, as resource management: a painting whose water steps pass ten times those of Auto's painting of the subject is stopped with a plain message, recorded as a stop and never scored.
+A look has a fixed price by size, whatever is in it: a half-size look of the whole sheet 0.3, a full-size look 1.0, a look stopped at a stage or cut to a region its share of that (the share of the plan's washes or passages it paints), never under 0.2. At L2 to L4 a look is painted at half size (`./unpaint look`); at L1 each run of the script is a full-size painting (1.0). The budget for one try is 3.0 at every level. At L2 to L4 the full-size final is painted after the session and not charged; at L1 the painting is its last completed run. How a model paints (water, strokes, waits, dryings) is never charged: simulation work (cell-steps), sweeps, dryings, seconds, tokens (fresh, cached and output) and steps are recorded in `usage.json` beside the score. One runaway guard: a painting whose water steps pass ten times those of Auto's painting of the subject is stopped with a plain message, reported as a stop and not scored (a look it stops costs nothing). Steps (1,000) and a six-hour clock are runaway guards only.
 
 ## Retries are self-study
 
-- Before a retry the model is handed its own previous painting beside the original, the replay and its stroke map. At L4 it also gets the traced shapes.
+- Before a retry the model is handed its own previous painting beside the original, its film (the replay) and its stroke map. At L4 it also gets the traced shapes.
 - The model writes its own assessment of what to change.
 - It never gets a score, a judge's verdict or any outside critique, at any level.
-- There is no hill climbing: few fixed retries, the last try counts and not the best, reverts are counted, and nothing is measured against the original.
+- There is no hill climbing: one try a level (L3 and L4 are each one retry, from the level before), the last try counts and not the best, reverts are counted, and nothing is measured against the original.
 - Every attempt and retry starts in its own fresh branch and workspace. The previous one's files and painting arrive as read-only reference. The harness reports how much each try changed from the last, and flags a try that is identical or nearly so.
 
 ## How a painting is scored
 
 See [scoring](scoring.md). In short:
 
-- Judges read how human the making looks, from the painting in progress, by a written rubric. Quality and likeness is a second reading.
+- Human-ness, from the film, by a written rubric: the judges see the opening (the untouched paper the painter chose; context, not scored), twelve snapshots evenly through the film, then the finished sheet. The figure is the mean of the twelve, as a percentage of 5 (mean ÷ 5).
+- Quality and likeness is a second reading.
 - A combined number is shown too: two parts human-ness to one part quality, a setting. Both parts stay visible.
-- The original is scored the same way. A painting's result is its share of the original's score. Auto is scored too, so each subject has a difficulty index.
+- The original is scored for quality too, and a painting's quality is its share of the original's score. Auto is scored too, so each subject has a difficulty index.
 - Raw and difficulty-adjusted results are shown side by side.
 
 RESULTS: to be filled from the frozen run.

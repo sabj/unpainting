@@ -1,6 +1,6 @@
-# Paint one crop with the watercolour simulator (protocol v2)
+# Paint one picture with the watercolour simulator (level 1, protocol v2)
 
-You are in a fresh git worktree of a watercolour painting simulator (Node 25, ES modules). Paint the target crop as a
+You are in a fresh git worktree of a watercolour painting simulator (Node 25, ES modules). Paint the target as a
 person with a brush and pen would, using only the simulator's marks through `bench/kit.mjs`.
 
 Task `{CROP}`: {SIZE} px. Style: {STYLE}. The target is attached to the first message. You may look at it again with
@@ -25,7 +25,8 @@ want is the last one completed (it ended with `kit.finish`), stop.
   the brush, pen and sheet behave. Do not use the repo's existing painting pipeline (`tools/`, `src/paint/`,
   `src/plan.js`, `src/painter.js` and similar).
 - Paint like a person: light before dark, broad before detail, washes and strokes rather than pixel fills. Stage frames
-  are saved automatically at 10%, 25%, 50%, 75% and 100% of your strokes and are judged for a human-like progression.
+  are saved automatically at 10%, 25%, 50%, 75% and 100% of your strokes, and the kit films the painting: judges
+  score twelve snapshots from the film for whether the making looks like a person's.
 - Paintings: each run of your script that lays a mark is one painting of the whole sheet, whatever is in it, and
   counts against your budget of 3 paintings; the run past it is refused before it lays anything.
   `kit.work()` says which painting this is and how many are left. Nothing else is budgeted: strokes, water, waits and
@@ -33,6 +34,8 @@ want is the last one completed (it ended with `kit.finish`), stop.
   water steps of the code's own painting of this subject is stopped as a runaway, with a message.
 - At most 2,500 strokes a painting (brush, pen, pencil and eraser together). About 30 minutes in all, including your
   thinking; the session is stopped after 30 minutes. One painting run at a time: do not run several in parallel.
+- Drawing is your choice: pen, pencil or none. No drawing is a normal choice, and lines may go down before the washes,
+  between them or after them.
 - End each painting with `await kit.finish(note)`. Outputs land in `bench/out/{CROP}/` (`final.png`, `frames/`,
   `stats.json`). Rerunning overwrites them, so the last completed run is the one that counts.
 - Work only inside this worktree. Do not commit, push or touch anything outside it.
@@ -45,7 +48,7 @@ tools you were told not to use, take the technique and apply it with the kit.
 
 ## Tips: worked examples
 
-`bench/TIPS.md` is fifteen small paintings on blank paper, each with its script (`bench/tips/N-name.mjs`, runs as it
+`bench/TIPS.md` is fourteen small paintings on blank paper, each with its script (`bench/tips/N-name.mjs`, runs as it
 stands), its dried result (`N-name.png`) and its stroke paths (`N-name-arrows.png`). First, brushwork: how one stroke
 makes a form when the pressure, a flat's blade, the hand's speed and the load change as it travels, and how two or
 three such strokes make a rock or a bush where an outline filled flat makes a slab. Then the brush and the water
@@ -57,7 +60,8 @@ you write your first stroke.
 
 - `const { sheet, O, W, H } = await kit.open('{CROP}')`: a fresh cold-press sheet, one cell per target pixel,
   0.259 mm a cell. The paper's colour is your choice: `kit.open('{CROP}', { paper: [r, g, b] })` for a toned sheet
-  (white is the default); paint only darkens it.
+  (each 1 to 255; white is the default); paint only darkens it. The pen's ink is soluble (a wash over it rewets it)
+  unless you open with `{ ink: 'waterproof' }`.
 - `kit.createBrush({ radius, bristles, capacity, flat, belly, feed, give, splay, stiffness, seed })` (radius in
   cells), `kit.dip(brush, { water: 0..1, conc: kit.mix({ sapgreen: 1.2, ochre: 0.3 }) })` (a mix totals at most 8: about 0.5
   a pale tint, 1 to 2 a middle wash, 6 to 8 a strong dark). The brush is the main painter's own. A brush runs out:

@@ -1,6 +1,6 @@
 # Scoring
 
-Updated 22 November 2026 for 0.4. Scores in 0.4 are a new series. They are not comparable with the V1 to V5 rounds, and they never share a table or an average with them. The old rules are kept under [History](#history-how-v1-to-v5-were-scored-judges-j1-and-j2).
+Updated 23 November 2026 for 0.4 rc7. Scores in 0.4 are a new series. They are not comparable with the V1 to V5 rounds, and they never share a table or an average with them. The old rules are kept under [History](#history-how-v1-to-v5-were-scored-judges-j1-and-j2).
 
 ## Running it
 
@@ -21,10 +21,10 @@ npm run bench:score04 -- runs.json --out DIR
 
 Each painting gets several readings. They are kept apart and shown together.
 
-- Human-ness: does the painting, and its replay stopped anywhere, look made by a person? This is the main reading.
+- Human-ness: does the painting, and its film stopped anywhere, look made by a person? This is the main reading.
 - Quality and likeness: a second reading, beside it.
 - Combined: two parts human-ness to one part quality. The weights are a setting (`WEIGHTS` in `bench/scorer/s04_table.py`), written into the results. Both parts stay visible next to it.
-- The original is scored too. A painting's quality is its share of the original's score. If the original gets 9 and Auto gets 4.5, Auto gets 50%. A model can go over 100%.
+- The original is scored for quality too (it has no film, so no human-ness). A painting's quality is its share of the original's score. If the original gets 9 and Auto gets 4.5, Auto gets 50%. A model can go over 100%.
 - Difficulty: the subject's Auto painting is scored the same way. Each model painting's figures are shown raw and adjusted for Auto side by side: (painting - Auto) / max(top - Auto, top / 5), so 0 is level with Auto. The adjustment needs exactly one Auto painting of the subject among the inputs; otherwise the table says so.
 - Kept separate, for reference: the anti-cheat record and algorithmic measurements. They never change a score.
 
@@ -35,7 +35,7 @@ RESULTS: to be filled from the frozen run.
 - First the opening: the untouched paper the painter chose, the film's first frame, in its own colour (a toned sheet shows toned). The prompt says it is context only and not scored. Auto's films and models' films (the painter's and the level 1 kit's) all start with that frame; a film that does not is refused.
 - Then twelve snapshots evenly through the painting's film, then the finished sheet, shown in order, each labelled only with its percentage complete. It does not know the method.
 - It first says whether this is the order and the kind of mark a person would use (yes or no). Then it scores each snapshot 1 to 5 by the [rubric](human-ness-rubric.md): 5 is unmistakably a person's painting in progress, 1 is a finished image uncovered by a filter or wipe. Tells are named by letter (a to j).
-- The figure is the mean of the twelve film snapshots, as a percentage of 5. The finished sheet is shown last but not counted: it is at its ceiling. Also shown: the means of the first, middle and last four, the tally of tells (each judge's first reading, every snapshot shown), and how many readings said yes.
+- The figure is the mean of the twelve film snapshots, as a percentage of 5 (mean ÷ 5). The finished sheet is shown last but not counted: it is at its ceiling. Also shown: the means of the first, middle and last four, the tally of tells (each judge's first reading, every snapshot shown), and how many readings said yes.
 - The rubric file is `bench/docs/human-ness-rubric.md`. Its sha256 is written into the results; editing it starts a new series.
 - A painting with no film is refused, not scored from its finished sheet.
 
@@ -47,9 +47,12 @@ RESULTS: to be filled from the frozen run.
 
 ## Judges
 
-- One setting, `JUDGE_ROUTE`: `local` by default, `together` or `openrouter`.
-- `local`: the panel `qwen3.8-flash-next:125b-mlx`, `qwen3.8:27b-mlx`, `gemma4:31b-mlx` through Ollama (`bench/scorer/local_route.py`; `JUDGE_LOCAL_URL`, `JUDGE_LOCAL_PANEL`). One model in memory at a time: every picture for one judge, then it is unloaded. The run waits while the server holds another job's model. Judge label `J3-local-3x`.
-- `together` or `openrouter`: the J1 panel, hosted. Each needs its key (`TOGETHER_API_KEY`, `OPENROUTER_API_KEY`) and stops with a plain message without one. The key is never written into a result. Labels `J4-together-3x`, `J4-openrouter-3x`.
+- The 0.4 panel is three open-weight models: GLM-5.3-Flash, Qwen3.8-27B and Gemma-4-31B. The defaults of the routes are not this panel: name it as below.
+- `JUDGE_ROUTE` picks where: `local` (the default), `openrouter` or `together`.
+- Hosted, the 0.4 panel: `JUDGE_ROUTE=openrouter JUDGE_HOSTED_PANEL=open3` (`z-ai/glm-5.3-flash`, `qwen/qwen3.8-27b`, `google/gemma-4-31b-it`), zero-data-retention providers only. Judge label `J3-open-3x-hosted`. Needs `OPENROUTER_API_KEY`.
+- `local`: Ollama (`bench/scorer/local_route.py`; `JUDGE_LOCAL_URL`, `JUDGE_LOCAL_PANEL`). Its default panel is `qwen3.8-flash-next:125b-mlx`, `qwen3.8:27b-mlx`, `gemma4:31b-mlx`; for the 0.4 panel, name its three models' Ollama tags in `JUDGE_LOCAL_PANEL`. One model in memory at a time: every picture for one judge, then it is unloaded. The run waits while the server holds another job's model. Judge label `J3-local-3x`.
+- `openrouter` without `JUDGE_HOSTED_PANEL`, or `together`: the J1 panel (Kimi-K3, GLM-5.3-Flash, Qwen3.5-9B), labels `J4-openrouter-3x`, `J4-together-3x`. `together` needs `TOGETHER_API_KEY`.
+- A hosted route without its key stops with a plain message before any work. The key is never written into a result.
 - Three readings a judge, temperature 0. A judge's figure is the median of its three and needs all three. The panel's figure is the mean of the judges'.
 - The results record the route, endpoint, panel, model digests (local), the judge label, the rubric hash and the prompt hashes. Results with different labels are not compared.
 - A judge never sees a painter's name or level.
@@ -58,7 +61,7 @@ RESULTS: to be filled from the frozen run.
 
 - Anti-cheat: the painter's own `cheat-risk.json` beside the painting (risk, fine-detail copy against its ceiling, strokes against the stroke ceiling) and its progression part. Where a level writes none, the table says "none". See [anti-cheat](anti-cheat.md).
 - Algorithmic: `bench/scorer/classic.py` against the original (value shapes, edges, marks, each 0 to 10, and their mean). The larger of the two pictures is brought down to the other; nothing is enlarged.
-- Usage: each run's `usage.json`: rendering units, steps, tool calls and tool use, tokens, cost where reported, wall minutes. A run without one is shown as "none". See [rules](rules.md#budgets-measured-not-limited) and the [run format](run-format.md).
+- Usage: each run's `usage.json`: look units charged, the work of each look (sweeps, dryings, water steps, cell-steps, seconds), steps, tool calls and tool use, tokens (fresh, cached, output), cost where reported, wall minutes. A run without one is shown as "none". See [rules](rules.md#budgets-measured-not-limited) and the [run format](run-format.md).
 
 # History: how V1 to V5 were scored (judges J1 and J2)
 

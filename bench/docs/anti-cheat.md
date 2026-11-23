@@ -7,7 +7,7 @@ Cheating here means hill-climbing toward the photo: repeatedly changing strokes 
 - Models can look at the target and at their own painting as often as they like, the way a painter glances at a reference.
 - Their code may not read the target's pixels. Node scripts that import the painting toolkit given to models or the guard (a check that blocks image reads), and Python scripts started with the benchmark runner's environment, block and log image reads. Separate Node processes are not automatically guarded. A blocked read disqualifies the run.
 - Every painting also gets a cheat-risk score: how closely its fine detail copies the photo, whether its stages go light to dark and broad to fine like a person's would, and how much of it is tiny strokes.
-- In 0.4 a look is rendering, measured and not limited ([rules](rules.md#budgets-measured-not-limited)). No look shows the target.
+- In 0.4 a look has a fixed price by size, from a budget of 3.0 a try; how a model paints is measured, not limited ([rules](rules.md#budgets-measured-not-limited)). No look shows the target.
 - Retries are self-study: a model gets no score and no critique, and its last try counts, not its best ([levels](levels.md#retries-are-self-study)). That removes the main route to hill climbing across tries.
 - Gentle mode applies these checks. Hard mode, with a look budget, is history (see the end of this page).
 

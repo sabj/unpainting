@@ -171,9 +171,9 @@ opening drawing, the three studies, the named forms as a picture and as an id ma
   the count. No score is shown.
 - The broker never trusts the folder: it follows no symlink, reads only plain files of bounded size, never echoes a
   request or a file, and takes the time of a request from its own clock. Every request is in `looks.jsonl`.
-- Budgets are measured, not capped. When the rendering units or `--steps N` (tool calls, default 1000) are used, the
-  session is asked to hand in. `--wallminutes N` (default 360) is only a safety stop: at it the session and every
-  process it started are ended (SIGTERM, then SIGKILL) and the last choice it had planned is painted. `--minutes` is gone.
+- The budget is 3.0 look units (a look's price is fixed by its size). When it is spent, or `--steps N` (tool calls,
+  default 1000, a runaway guard) are used, the session is asked to hand in. `--wallminutes N` (default 360) is only a safety stop: at it the session and every
+  process it started are ended (SIGTERM, then SIGKILL) and the last choice it had planned is painted.
 - Levels: `--level L2` (default) is one go, without the code's plan. `--level L3` and `--level L4` are retries from `--previous <run folder>` (a retry refuses a previous try that did not hand in its own script);
   `prepare` makes the same inputs for every level (the plan, the traced shapes, the unit look); no level needs
   Auto's full-size painting. See [levels](../bench/docs/levels.md).

@@ -4,7 +4,9 @@ A submission is one or more try folders (one model session per folder) in the [r
 
 A try is one model session that paints the requested subject.
 
-0.4 note, 22 November 2026: the steps below were written for rounds V1 to V5. The 0.4 benchmark runs a ladder, L0 to L4 ([levels](levels.md)), with the harness in `tools/paint/` and judges that run locally ([scoring](scoring.md)). The first 0.4 run uses Gemini 4 Argon, Neon and Hydrogen at medium effort and Claude Sonnet 5.5 at medium, on subscriptions with no API keys. OpenAI models (gpt-6-astra, gpt-6.1-sol, gpt-6.1-terra) are planned, not in 0.4's first run. Hosted judging (OpenRouter or Together) is planned, not in 0.4's first run. A container for replication is planned, not in 0.4's first run. Until the 0.4 harness steps are written here, treat the sections below as the V1 to V5 process: V4 and V5 run only from tag v0.3.2.
+0.4, 23 November 2026: the benchmark runs a ladder, L1 to L4 ([levels](levels.md)). Level 1 runs through `bench/scripts/run.mjs --round V3` (a model key in `models.json`); levels 2 to 4 through `npm run paint` (a model key in `tools/paint/authors.json`); scoring through `npm run bench:score04` ([scoring](scoring.md)). The commands are in [How to replicate 0.4](../README.md#how-to-replicate-04). The first 0.4 run uses Gemini 4 Argon, Neon and Hydrogen and Claude Sonnet 5.5, all at medium effort, on subscriptions with no API keys. The OpenAI models and a container for replication are not in it.
+
+The numbered steps below are the V1 to V5 process, kept as a record: V4 and V5 run only from tag v0.3.2.
 
 ## 1. Check the benchmark runner
 

@@ -122,22 +122,23 @@ Everything runs on a basic machine. A GPU, including a local one through WebGPU,
 
 **0.4 is a new series.** Its scores are not comparable with the rounds before it.
 
-The ladder:
+The ladder. Every level is one try that hands in the model's own script, with a budget of 3.0 look units:
 
-- L0: nothing but the picture, a brush and a pen. Defined, not run.
-- L1: L0 plus harness tips (technique guides and worked examples).
-- L2: the same inputs Auto gets (the drawing, the three colour studies, the named forms), not Auto's plan. The model plans the painting itself. One go.
-- L3: L2 again, after studying its own L2 painting. Still no Auto plan.
-- L4: L3, then one more retry, with more help: the studies' traced shapes as regions it may use, change or ignore (offered, maybe wrong). Nothing of Auto: not its plan, planner, painting, film or stroke map.
-- At every level the model hands in its own script; Auto's settings or Auto's plan are refused.
+- L1: the freehand kit and its tips (technique guides and worked examples). Paper colour is its choice. One attempt; budget 3 runs of its script.
+- L2: the same inputs the code planner gets (the prepared drawing, the three colour studies as pictures, the named forms). No code plan: the model plans the painting itself.
+- L3: one retry of L2, after studying its own L2 painting (its finished full-size painting, film and stroke map). Fresh budget.
+- L4: one more retry, from its own L3 painting, film and stroke map, now also given the studies' traced shapes as regions it may use, change or ignore (they may be wrong). Fresh budget.
+- Nothing of Auto at any level: no plan, planner, painting, film or stroke map. A hand-in of planner settings or of the code's plan is refused.
 
 How it is run and scored:
 
-- A model may draw its own lines, choose pen, pencil or none, and choose waterproof or soluble ink.
-- A retry is self-study: the model sees its own painting, replay and stroke map, and writes its own assessment. It never gets a score or a critique.
-- Budget for one try: 3.0 look units at fixed prices (a half-size whole look 0.3, never under 0.2); how a model paints is recorded, never charged. Steps and the clock are runaway guards. Cost and tool use are recorded.
-- Judges read how human the making looks, from the painting in progress, and how good and how like the original it is. A combined number is shown too. The original is scored as well, and a painting's result is its share of the original's score.
-- Judges run locally. Hosted judging (OpenRouter or Together), a container for replication, and the OpenAI models are planned, not in 0.4's first run.
+- Drawing is the model's choice: pencil, pen or none. The prepared drawing is offered, not required.
+- Every picture is painted on one standard sheet; the original's real size is told to the model as a fact.
+- A look's price is fixed by size: a half-size whole look 0.3, full size 1.0, a partial look its share, never under 0.2. The final is not charged. How a model paints is free and measured beside the score. Steps and a six-hour clock are runaway guards only.
+- Judges read how human the making looks from the film (an opening of the bare paper, then twelve scored snapshots, then the finished sheet), and how good and how like the original the painting is. The original is scored for quality as well, and a painting's quality is its share of the original's.
+- Judges: an open-weight panel (GLM-5.3-Flash, Qwen3.8-27B, Gemma-4-31B), hosted with zero data retention or run locally ([scoring](bench/docs/scoring.md#judges)).
+- The first run: Gemini 4 Argon, Neon and Hydrogen and Claude Sonnet 5.5, all at medium effort, on subscriptions. Not in it: a container for replication and the OpenAI models.
+- How to replicate: [bench/README](bench/README.md#how-to-replicate-04).
 
 <p align="center"><a href="docs/auto-vs-model.md"><img src="docs/img/auto-vs-model-banner.webp" width="720" alt="Mittens: the picture, Auto's painting, and a model's painting at level 2"></a></p>
 

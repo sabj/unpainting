@@ -35,7 +35,8 @@ brief names.
 
 ## What is yours to decide, and what the kit does
 
-You decide what a painter decides: which brush, how loaded, which way each stroke runs, how wet the paper is, when to
+You decide what a painter decides: the paper's colour (white, or a tone with `kit.open(task, { paper: [r, g, b] })`;
+paint only darkens it), whether to draw first, later or not at all (pen, pencil or none), which brush, how loaded, which way each stroke runs, how wet the paper is, when to
 wait, when to dry, when to stop. The kit does the rest: while a brush or pen is on the paper it moves the water for
 the time that passed. Strokes laid while the sheet is wet run together; on a dry sheet they keep their edges.
 `kit.wait(sheet, moments)` lets the water run with the brush off the paper (a moment is one water step, about the
@@ -284,8 +285,7 @@ beside your score either way.
   waits until it is done; on a wet full-size sheet that is a noticeable wait. Dry when the painting needs it:
   before a glaze, before a shape that must keep a hard edge against its neighbour, before pen or pencil over paint,
   before the eraser. Between strokes of one wash it spoils the wash (they must be wet together).
-- **Waits.** `kit.wait(sheet, moments)` moves the water with the brush off the paper; it does not make paper damp
-  (on the earlier kit a wash laid at water 0.9 was still too wet for a stroke after `kit.wait(sheet, 600)`). It is
+- **Waits.** `kit.wait(sheet, moments)` moves the water with the brush off the paper; it does not make paper damp. It is
   rarely needed.
 - Each example above gives its own counts and seconds on a full-size sheet, painted on one of two machines (named
   beside it), each with other work on it: the seconds are that machine's on that night; the counts are the same

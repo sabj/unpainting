@@ -1,6 +1,6 @@
 # Rules (0.4)
 
-Updated 22 November 2026. The 2,500-stroke, 15-minute and 85-minute rules of rounds V1 to V5 are history; see [the end of this page](#history). For what each level is given, see [levels](levels.md).
+Updated 23 November 2026 for 0.4 rc7. The 15-minute and 85-minute rules of rounds V1 to V5 are history; see [the end of this page](#history). For what each level is given, see [levels](levels.md).
 
 ## The task
 
@@ -12,15 +12,17 @@ More freedom than before, and mistakes are allowed.
 
 - Its own drawn lines.
 - The drawing medium: pen, pencil or none.
-- Pen ink: waterproof or soluble, a choice at every level (`"ink"` beside its script at L2 to L4; waterproof when it says nothing).
+- Pen ink: waterproof or soluble, a choice at every level (`kit.open(task, { ink })` at L1, soluble when it says nothing; `"ink"` beside its script at L2 to L4, waterproof when it says nothing).
 - Erasing: the kit's eraser at L1; an erase passage in its own script at L2 to L4.
-- At L2 to L4: a whole script of its own (the model plans the painting itself from Auto's inputs), the pencil lines Auto keeps, and the paints (up to 14). Auto's plan and planner are given at no level: a settings choice or a plan edit is refused, and a session that hands in no script of its own has handed in nothing (a failed painting).
+- The prepared drawing (L2 to L4) is offered, not required: each of its lines may be drawn before the washes, with a stage of the washes, after them, or not at all. No drawing is a normal choice.
+- At every level: a whole script of its own (at L2 to L4 planned from the same inputs as Auto), and the paints (up to 14 at L2 to L4). Auto's plan, planner and settings are given at no level: a hand-in of settings, or of the code's plan, is refused, and a session that hands in no script of its own has handed in nothing (a failed painting).
+- At L1 the paper's colour: white or an `[r, g, b]` tone (each 1 to 255) (`kit.open(task, { paper })`); paint only darkens it.
 - At L4 also: the studies' traced shapes as regions its script may name, change or ignore. Nothing of Auto at any level.
 - Where a choice only risks a worse painting, the harness gives a warning, not a refusal. It refuses only to protect the sheet or the rules.
 
 ## What is fixed
 
-- The paper, the simulator, the paint box and the brush physics.
+- One standard sheet for every picture; the original's real size is told to the model as a fact, not reproduced. The simulator, the paint box and the brush physics.
 - The subject and, at each level, the inputs listed in [levels](levels.md).
 - The judges and the scoring.
 - A model is never given a score, a verdict or an outside critique.
@@ -35,11 +37,10 @@ More freedom than before, and mistakes are allowed.
 
 ## Budgets: measured, not limited
 
-- Looks (owner, 23 Nov: "I dont want to penalize a model for choosing more water"). A look has a fixed price by size and by the share of the sheet or script it paints, whatever is in it: a half-size look of the whole sheet 0.3, full size 1.0, a look stopped at a stage or of a region its share of that, never under 0.2. The budget for one try is 3.0 at every level. The final is not charged. How a model paints is never charged: brush sweeps, dryings, water steps, cell-steps, seconds, tokens and steps are recorded in `usage.json` beside the charge. One guard only, as resource management: a painting whose water steps pass ten times those of Auto's painting of the subject is stopped with a plain message, recorded as a stop and never scored. The model chooses where and when to look: to a stage, or in a region.
-- Steps: 1,000, as a runaway guard.
-- The clock is a safety stop only: six hours.
-- The target for resource management is about 60 minutes per session, covering the model's thinking and its looks. A session that reaches it hands in what it has and is marked so. The owner wants to tighten this. The harness records the actual terms in each run's record.
-- Not counted on the model's clock: Auto's prepared inputs and plan (they are free), the filmed full-size final, and judging.
+- Looks A look has a fixed price by size, whatever is in it: a half-size look of the whole sheet 0.3, full size 1.0, a look stopped at a stage or of a region its share of that (the share of the plan's washes or passages it paints), never under 0.2. At L2 to L4 a look is painted at half size; at L1 each run of the script is a full-size painting (1.0). The budget for one try is 3.0 at every level. At L2 to L4 the full-size final is not charged; at L1 the painting is its last completed run. How a model paints is never charged: water, strokes, waits and dryings are free; simulation work (cell-steps), sweeps, dryings, seconds, tokens (fresh, cached, output) and steps are recorded in `usage.json` beside the charge. One guard only, as resource management: a painting whose water steps pass ten times those of Auto's painting of the subject is stopped with a plain message, reported as a stop and not scored. The model chooses where and when to look: to a stage, or in a region.
+- L1: the budget is 3 runs of its script (each run that lays a mark costs 1.0; a fourth is refused before it lays a mark). The L1 kit also stops a painting at 2,500 strokes, a guard it keeps from the earlier rounds. Its runner's clock is `BENCH_V3_ATTEMPT_MIN` minutes: run it with 360, the six-hour stop, and the brief tells the model that limit.
+- Steps (1,000) and the clock (six hours) are runaway guards only. A return to a choice the model had left is counted, and refused past 20 (`--reverts`). The harness records the actual terms in each run's record.
+- Not counted on the model's clock: the prepared inputs, the filmed full-size final, and judging.
 
 ## What is recorded
 
