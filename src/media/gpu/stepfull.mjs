@@ -388,7 +388,7 @@ export class GpuSheet {
 
   /** Copy a whole CPU sheet to the GPU. */
   upload(sheet) {
-    this.lvWritten();
+    if (this.lv) this.lv.light = false;   // written: no light levelling from here (see lvWritten)
     this.paper = sheet.paper; this.mmPerCell = sheet.paper?.mmPerCell > 0 ? sheet.paper.mmPerCell : 0.3;
     const { device: d, b: B, n, K, w, h } = this, put = (buf, arr, off = 0) => d.queue.writeBuffer(buf, off, arr);
     const u32 = a => { const o = new Uint32Array(n); for (let i = 0; i < n; i++) o[i] = a[i]; return o; };
@@ -540,7 +540,7 @@ export class GpuSheet {
     if (this.ef.stale) await this.efRefresh();
   }
   async runStrokeNow(data, { planFloats, nSteps, sp, s0, rect, lift, cont, h0 }, split) {
-    this.lvWritten();
+    if (this.lv) this.lv.light = false;   // written: no light levelling from here (see lvWritten)
     const d = this.device, U32 = new Uint32Array(data.buffer, data.byteOffset, data.length);
     if (data.length > this.SB) throw new Error('GpuSheet: the stroke plan is too long');
     // A stroke that carries straight on from the last one leaves the generator's two words (22, 23) as that one left them,
@@ -579,7 +579,7 @@ export class GpuSheet {
   // Uploads live in the command stream, so a later plan cannot overwrite BSTR before
   // an earlier dispatch reads it. Brush results stay in a GPU ring until requested.
   async queueStroke(data, info) {
-    this.lvWritten();
+    if (this.lv) this.lv.light = false;   // written: no light levelling from here (see lvWritten)
     if (this.ef) { this.ef.stale = true; this.ef.batch = 1; }   // paint laid here can move the edge feed's footprint
     const { planFloats, nSteps, sp, s0, rect, lift, cont, h0, slot, seq, state, restore } = info, split = !!this.encoding;
     if (data.length > this.SB || planFloats > 6144) throw new Error('stroke exceeds GPU slot');
@@ -650,7 +650,7 @@ export class GpuSheet {
   // GPU_PROF: the same stroke with the brush's runs and the flows between them submitted and waited for one at a time, so the
   // GPU's time splits into brush and flow (each submit adds its own small latency to both)
   async runStrokeProf(data, { planFloats, nSteps, sp, s0, lift }) {
-    this.lvWritten();
+    if (this.lv) this.lv.light = false;   // written: no light levelling from here (see lvWritten)
     if (this.ef) { this.ef.stale = true; this.ef.batch = 1; }   // paint laid here can move the edge feed's footprint
     const d = this.device, U32 = new Uint32Array(data.buffer, data.byteOffset, data.length), P = globalThis.GPU_PROF;
     const book = (k, t, n = 1) => { const e = P[k] ??= { ms: 0, n: 0 }; e.ms += performance.now() - t; e.n += n; };
@@ -679,7 +679,7 @@ export class GpuSheet {
 
   /** Lay planned splats, the flows between them where the plan says, and return the brush's water left ([W]). */
   async runSplat(data, info) {
-    this.lvWritten();
+    if (this.lv) this.lv.light = false;   // written: no light levelling from here (see lvWritten)
     if (this.ef) { this.ef.stale = true; this.ef.batch = 1; }   // paint laid here can move the edge feed's footprint
     if (this.batch) return this.queueSplat(data, info);
     const { nRec, offRec, flowsBefore, rect } = info;
@@ -705,7 +705,7 @@ export class GpuSheet {
   }
 
   queueSplat(data, { nRec, offRec, flowsBefore, state, restore, seq }) {
-    this.lvWritten();
+    if (this.lv) this.lv.light = false;   // written: no light levelling from here (see lvWritten)
     if (this.ef) { this.ef.stale = true; this.ef.batch = 1; }   // paint laid here can move the edge feed's footprint
     if (data.length > this.SB) throw new Error('GpuSheet: the splat plan is too long');
     const d = this.device, words = new Uint32Array(data.buffer, data.byteOffset, data.length);
@@ -960,7 +960,7 @@ export class GpuSheet {
     return { mask: words[0], signedZero: words[1] !== 0 };
   }
   writeRect(rect, packed, logicalRect = null) {
-    this.lvWritten();
+    if (this.lv) this.lv.light = false;   // written: no light levelling from here (see lvWritten)
     if (this.ef) { this.ef.stale = true; this.ef.batch = 1; }   // paint laid here can move the edge feed's footprint
     this.flushStrokes();
     const d = this.device;
@@ -999,9 +999,8 @@ export class GpuSheet {
     }
     this.writeRect(rect, p);
   }
-  /** The sheet is written (paint, water, an upload): the levelling is not light from here, not even for the flows encoded in
-   *  the same pass as the write (a stroke's own flows), which come before its epoch is bumped. */
-  lvWritten() { if (this.lv) this.lv.light = false; }
+  // lvWritten: each path that writes the sheet (paint, water, an upload) turns the levelling's light off at once, so not
+  // even the flows encoded in the same pass as the write (a stroke's own flows, before its epoch is bumped) go light.
   bumpFor(rect) { this.epoch++; this.knownDry = false; this.hold = 3; this.setCap(this.cap + 1.2 * Math.ceil(rect[2] / 16 + 1) * Math.ceil(rect[3] / 16 + 1)); }
 
   async resetCounters(...words) { for (const i of words) this.device.queue.writeBuffer(this.b.CTR, i * 4, new Uint32Array([0])); }
