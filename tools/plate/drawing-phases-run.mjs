@@ -62,6 +62,8 @@ export function phaseRunner(plan, deps) {
   async function before(k, { intoWet = false } = {}) {
     const due = pending().filter(p => p.at <= k);
     if (!due.length) return;
+    // (a painting taken over after its opening was laid makes its hand here: the same drawing file, the same pace)
+    plan.hand ??= deps.hand?.();
     if (!plan.hand) throw new Error('drawing phases: the opening drawing was not laid, so its later phases have no hand');
     const t0 = Date.now(); let paper = deps.measurePaperDry(deps.sheet()), dried = false;
     // a pencil line goes on dry paper: where the plan meant this paper to be dry and it is not, the hand waits for it
@@ -70,24 +72,26 @@ export function phaseRunner(plan, deps) {
     const dryMs = Date.now() - t0;
     for (const p of due) {
       const what = p.at >= plan.washes ? 'after the washes' : `with stage ${p.stage}`;
-      await plan.hand.lay(p.strokes, { phase: what });
+      const got = await plan.hand.lay(p.strokes, { phase: what });
       // the lines dry into the paper where they lie, by the sheet's own dry, as the opening drawing does (a pen's ink
       // keeps its own set or soluble state, --inkfast)
       deps.inkres?.settle();
       const t1 = Date.now(); deps.dry(); const settleMs = Date.now() - t1;
       p.laid = true;
-      record.push({ beforeWash: p.at, stage: p.stage, washId: p.washId, lines: p.strokes.length, ids: p.strokes.map(q => q.seq), paperWasDry: !dried, extraDryMs: dried ? dryMs : 0, lineDryMs: settleMs, nextWashIntoWet: intoWet });
+      record.push({ beforeWash: p.at, stage: p.stage, washId: p.washId, lines: p.strokes.length, ids: p.strokes.map(q => q.seq), paperWasDry: !dried, extraDryMs: dried ? dryMs : 0, lineDryMs: settleMs, nextWashIntoWet: intoWet, addedNoCell: got.nothing ?? 0 });
       deps.log(`drawing phase ${what}: ${p.strokes.length} lines ${p.at >= plan.washes ? 'after the last wash' : `before wash ${p.at + 1}`}${p.washId ? ` (${p.washId})` : ''}, on ${dried ? `paper dried for it (${dryMs} ms)` : 'dry paper'}`);
     }
     deps.onLaid?.(k);
   }
   return {
     before, record,
-    finish: () => before(Infinity),
+    // the last phases, then the check that the whole drawing inked something (a sheet too coarse for its lines stops
+    // the run as it always has; one phase of strokes finer than the sheet samples does not)
+    finish: async () => { await before(Infinity); plan.hand?.checkWhole(); },
     resumeFrom(k) { for (const p of plan.phases) if (p.at < k) p.laid = true; },
     write() {
       fs.writeFileSync(path.join(deps.out, 'drawing-phases.json'), JSON.stringify({ washes: plan.washes, opening: plan.opening.length, why: plan.why, warnings: plan.warnings,
-        phases: record, extraDries: record.filter(r => !r.paperWasDry).length, extraDryMs: record.reduce((a, r) => a + r.extraDryMs, 0) }, null, 1) + '\n');
+        phases: record, addedNoCell: record.reduce((a, r) => a + r.addedNoCell, 0), extraDries: record.filter(r => !r.paperWasDry).length, extraDryMs: record.reduce((a, r) => a + r.extraDryMs, 0) }, null, 1) + '\n');
     },
   };
 }

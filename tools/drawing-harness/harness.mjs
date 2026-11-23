@@ -288,14 +288,17 @@ export async function phasesCells(dir, { gpu = false } = {}) {
       { id: 'ground', what: 'the lower part', stage: 1, kind: 'wash', region: [[4, 21], [44, 21], [44, 34], [4, 34]], paint: { pigments: { ochre: 1 }, dilution: 'pale' }, brush: 'mop', paper: 'dry', handling: { direction: 0 } },
       { id: 'band', what: 'the band round line 2', stage: 2, kind: 'wash', region: [[4, 9], [44, 9], [44, 18], [4, 18]], paint: { pigments: { ultramarine: 1 }, dilution: 'pale' }, brush: 'mop', paper: 'dry', handling: { direction: 0 } }] }));
   const base = ['--image', subject.target, '--washplan', `script:${script}`, '--drawing', 'first', '--stages', 'none', '--paints', 'ochre,ultramarine', '--paintsextend', '0', '--width', String(W)];
-  const choose = (name, rules, medium) => {
-    const got = writeLinesEdit({ dir: path.join(dir, name, 'choice'), stem: subject.stems.pencil, edit: { format: LINES_EDIT_FORMAT, rules }, listing: linesListing(drawingDoc('pencil')), medium });
+  const choose = (name, rules, medium, own) => {
+    const got = writeLinesEdit({ dir: path.join(dir, name, 'choice'), stem: subject.stems.pencil, edit: { format: LINES_EDIT_FORMAT, rules, ...(own ? { own } : {}) }, listing: linesListing(drawingDoc('pencil')), medium });
     const args = []; for (const [k, v] of got.sets) args.push(k === 'drawing' ? '--drawingfile' : `--${k}`, v); return args;
   };
   const cases = [
     { id: 'pencil-auto', args: ['--drawingfile', subject.stems.pencil, '--outlinemedium', 'graphite'], opening: [1, 5], phases: [[2]] },
     { id: 'pen-auto', args: ['--drawingfile', subject.stems.ink, '--inkrecipe', 'wash', '--inkfast', '1'], opening: [1, 2, 3, 4, 5], phases: [] },
     { id: 'pencil-model', args: [...choose('pencil-model', [{ where: { ids: [1] }, do: 'stage 2' }, { where: { ids: [2] }, do: 'before' }], null), '--outlinemedium', 'graphite'], opening: [2, 5], phases: [[1]] },
+    // a phase of one stroke finer than the sheet samples (0.01 mm long and wide): told and counted, never a stop (the
+    // rc7 white-ships fault: a phase of one 0.03 mm stroke stopped the painting with "inked no cell")
+    { id: 'subcell-phase', args: [...choose('subcell-phase', [{ where: { ids: [2] }, do: 'before' }], null, [{ points: [[20, 14], [20.01, 14]], widthMm: 0.01, dark: 0.5, when: 'stage 2' }]), '--outlinemedium', 'graphite'], opening: [1, 2, 5], phases: [[6]], addedNoCell: 1 },
     { id: 'pen-model', args: [...choose('pen-model', [{ where: { ids: [2] }, do: 'stage 2' }], 'pen'), '--inkrecipe', 'wash', '--inkfast', '1'], opening: [1, 5], phases: [[2]] },
   ];
   const R = [];
@@ -310,7 +313,8 @@ export async function phasesCells(dir, { gpu = false } = {}) {
       const fr = readJson(path.join(out, 'frames.json'))?.frames ?? [], firstPaint = fr.findIndex(f => f.stage === 'paint');
       put('the film shows the later lines drawn after paint', firstPaint >= 0 && fr.slice(firstPaint).some(f => f.stage === 'drawing' && f.ids?.some(id => c.phases.flat().includes(id))), `first paint frame ${firstPaint}`);
       for (const k of phaseChecks(out, laid)) put(k.check, k.ok, k.detail);
-      put('the washes over a phase are measured', fs.existsSync(path.join(out, 'drawing-phases-held.jsonl')), 'drawing-phases-held.jsonl');
+      if (c.addedNoCell == null) put('the washes over a phase are measured', fs.existsSync(path.join(out, 'drawing-phases-held.jsonl')), 'drawing-phases-held.jsonl');
+      else { const rec = readJson(path.join(out, 'drawing-phases.json')); put('a phase finer than the sheet is told and counted, not a stop', rec?.addedNoCell === c.addedNoCell && /added no cell/.test(done.log), `added no cell: ${rec?.addedNoCell}`); }
     }
   }
   return R;
