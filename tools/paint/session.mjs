@@ -25,7 +25,7 @@ import fs from 'node:fs';
 import { proxyEnv, TOOLS_OPEN } from './session-net.mjs';
 import os from 'node:os';
 import path from 'node:path';
-import { spawn } from 'node:child_process';
+import { spawn, execFileSync } from 'node:child_process';
 import { readChoice, choiceKind, choiceKey } from './choice.mjs';
 import { needsOf } from './author.mjs';
 import { editLine } from '../../src/paint/methods/plan-edit.mjs';
@@ -360,12 +360,15 @@ const q = s => `"${String(s).replace(/[\\"]/g, '\\$&')}"`;
  * port 443 (its own service). Later rules win, so `cwd`, the session's own folder, is allowed again after the denials.
  * `local`: the command talks to its own helper over this machine's loopback, and runs its shell on a pseudo-terminal.
  */
-export function seatbelt({ deny, write, cwd, local = false, gated = false, readable = [] }) {
+export function seatbelt({ deny, write, cwd, local = false, gated = false, readable = [], hidden = [] }) {
+  // hidden: folders nothing may list or read (the home folder, other users, other volumes), save what is read again after
+  // them: its own folder, `readable` (the toolbox, the model command's own program and settings) and `write`
   // gated: nothing goes out but to this machine's loopback, where the session's gate (session-net.mjs) passes the
   // model's own service only; readable: folders read again after the denials (the toolbox's Python)
   return ['(version 1)', '(allow default)',
     '(deny file-write*)', `(allow file-write* ${write.map(d => `(subpath ${q(d)})`).join(' ')} (literal "/dev/null") (literal "/dev/dtracehelper") (regex #"^/dev/tty"))`,
     `(deny file-read* file-write* ${deny.map(d => `(subpath ${q(d)})`).join(' ')} (regex #"/unpaint-session-"))`,
+    ...(hidden.length ? [`(deny file-read* ${hidden.map(d => `(subpath ${q(d)})`).join(' ')})`, `(allow file-read* ${write.map(d => `(subpath ${q(d)})`).join(' ')})`] : []),
     `(allow file-read* file-write* (subpath ${q(cwd)}))`, ...readable.map(d => `(allow file-read* (subpath ${q(d)}))`),
     '(deny network*)', ...(gated ? ['(allow network-outbound (remote ip "localhost:*"))'] : ['(allow network-outbound (remote tcp "*:443") (remote udp "*:53") (remote tcp "*:53") (literal "/private/var/run/mDNSResponder"))', '(allow network-inbound (local udp "*:*"))']), '(allow system-socket)',
     ...(local ? ['(allow network-bind (local ip "localhost:*"))', '(allow network-inbound (local ip "localhost:*"))', '(allow network-outbound (remote ip "localhost:*"))', '(allow pseudo-tty)', '(allow file-read* file-write* file-ioctl (literal "/dev/ptmx") (regex #"^/dev/ttys[0-9]+$"))'] : []),
@@ -398,8 +401,11 @@ export function sessionCall(author, { prompt, cwd, deny = [], images = [], home 
   }
   if (author.cli === 'agy') {
     // with a gate (session-net.mjs) its network is the gate's: the model's service only; with a toolbox, its Python is on PATH and installs are answered by shims
-    const readable = toolbox ? [toolbox.dir, path.dirname(path.dirname(toolbox.python)), real(path.dirname(path.dirname(toolbox.python)))] : [];
-    const profile = seatbelt({ deny: all, write: [...new Set([path.join(home, '.gemini'), real(tmp), '/private/tmp', '/private/var/folders'])], cwd: real(cwd), local: true, gated: Boolean(gate), readable: [...new Set(readable)] });
+    // closed (a gate): nothing of the home folder, other users or other volumes can be listed or read, but its own
+    // program, its settings folder and the toolbox
+    const agy = (() => { try { return real(execFileSync('/usr/bin/which', ['agy'], { encoding: 'utf8' }).trim()); } catch { return null; } })();
+    const readable = [...(toolbox?.readable ?? []), ...(gate && agy ? [agy] : [])];
+    const profile = seatbelt({ deny: all, write: [...new Set([path.join(home, '.gemini'), real(tmp), '/private/tmp', '/private/var/folders'])], cwd: real(cwd), local: true, gated: Boolean(gate), readable: [...new Set(readable)], hidden: gate ? [...new Set([home, real(home), '/Users', '/Volumes'])] : [] });
     return { cmd: 'sandbox-exec', env: { DO_NOT_TRACK: '1', ...(gate ? proxyEnv(gate.url) : {}), ...(toolbox?.env ?? {}) }, unset: [], profile, serial: true, gated: Boolean(gate),
       args: ['-p', profile, 'agy', '-p', prompt, '--model', author.id, '--dangerously-skip-permissions', '--output-format', 'stream-json'],
       probe: file => ({ cmd: 'sandbox-exec', args: ['-p', profile, '/bin/cat', file] }),

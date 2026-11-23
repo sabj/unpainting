@@ -49,9 +49,14 @@ test('the toolbox: its Python first on PATH, installers answered in a plain sent
 test('a gated session\'s profile lets out only to loopback; its command gets the proxy and the toolbox', () => {
   const open = seatbelt({ deny: ['/repo'], write: ['/w'], cwd: '/c', local: true }), shut = seatbelt({ deny: ['/repo'], write: ['/w'], cwd: '/c', local: true, gated: true, readable: ['/tb'] });
   assert.match(open, /remote tcp "\*:443"/); assert.doesNotMatch(shut, /\*:443|\*:53|mDNSResponder/); assert.match(shut, /\(allow network-outbound \(remote ip "localhost:\*"\)\)/); assert.match(shut, /\(allow file-read\* \(subpath "\/tb"\)\)/);
-  const toolbox = { dir: '/tb', python: '/venv/bin/python', env: { PATH: '/tb/bin:/bin', ZDOTDIR: '/tb' } };
+  const toolbox = { dir: '/tb', python: '/venv/bin/python', readable: ['/tb', '/venv'], env: { PATH: '/tb/bin:/bin', ZDOTDIR: '/tb' } };
   const c = sessionCall({ key: 'argon-m', cli: 'agy', id: 'm' }, { prompt: 'P', cwd: '/c', deny: ['/repo'], gate: { url: 'http://127.0.0.1:9' }, toolbox });
   assert.equal(c.env.HTTPS_PROXY, 'http://127.0.0.1:9'); assert.equal(c.env.NO_PROXY, 'localhost,127.0.0.1,::1'); assert.equal(c.env.PATH, '/tb/bin:/bin'); assert.equal(c.gated, true);
   assert.match(c.profile, /\(allow file-read\* \(subpath "\/venv"\)\)/, 'the toolbox Python\'s folder is read again after the denials'); assert.doesNotMatch(c.profile, /\*:443/); assert.match(c.closed, /a gate passes its own service's hosts/);
   assert.deepEqual(proxyEnv('u').all_proxy, 'u');
+  // nothing of the home folder, other users or other volumes can be listed or read in a gated session, save its own program, settings and toolbox
+  const hid = seatbelt({ deny: [], write: ['/home/x/.gemini'], cwd: '/c', gated: true, readable: ['/home/x/venv'], hidden: ['/home/x', '/Users', '/Volumes'] });
+  assert.match(hid, /\(deny file-read\* \(subpath "\/home\/x"\) \(subpath "\/Users"\) \(subpath "\/Volumes"\)\)\n\(allow file-read\* \(subpath "\/home\/x\/\.gemini"\)\)\n\(allow file-read\* file-write\* \(subpath "\/c"\)\)\n\(allow file-read\* \(subpath "\/home\/x\/venv"\)\)/);
+  const g = sessionCall({ key: 'argon-m', cli: 'agy', id: 'm' }, { prompt: 'P', cwd: '/c', deny: [], gate: { url: 'u' }, toolbox, home: '/home/x' });
+  assert.match(g.profile, /\(deny file-read\* \(subpath "\/home\/x"\)/);
 });

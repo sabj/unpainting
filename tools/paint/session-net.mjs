@@ -64,7 +64,10 @@ export function makeToolbox(python, { tmp = os.tmpdir(), pathNow = process.env.P
   // a shell started inside reads its start-up files from here, not the user's (whose own PATH would put other Pythons and npm first)
   const first = `# the session's toolbox first on PATH\nexport PATH=${JSON.stringify(bin)}:"$PATH"\n`;
   for (const f of ['.zshenv', '.zprofile', '.zshrc', 'bashenv']) fs.writeFileSync(path.join(dir, f), first);
-  return { dir, bin, python, said, env: { PATH: `${bin}:${pathNow}`, ZDOTDIR: dir, BASH_ENV: path.join(dir, 'bashenv'), ENV: path.join(dir, 'bashenv'), PIP_NO_INDEX: '1', PIP_DISABLE_PIP_VERSION_CHECK: '1', PYTHONNOUSERSITE: '1' } };
+  // what the Python reads to run: its venv, and the interpreter the venv stands on (its real place and the one pyvenv.cfg names)
+  const venv = path.dirname(path.dirname(python)), real = fs.realpathSync(python), cfg = (() => { try { return /^home\s*=\s*(.+)$/m.exec(fs.readFileSync(path.join(venv, 'pyvenv.cfg'), 'utf8'))?.[1].trim(); } catch { return null; } })();
+  const readable = [...new Set([dir, venv, fs.realpathSync(venv), path.dirname(path.dirname(real)), ...(cfg ? [path.dirname(cfg)] : [])])];
+  return { dir, bin, python, said, readable, env: { PATH: `${bin}:${pathNow}`, ZDOTDIR: dir, BASH_ENV: path.join(dir, 'bashenv'), ENV: path.join(dir, 'bashenv'), PIP_NO_INDEX: '1', PIP_DISABLE_PIP_VERSION_CHECK: '1', PYTHONNOUSERSITE: '1' } };
 }
 
 /** The proxy variables a command and its children read, for the gate at `url`; loopback is left direct. */
