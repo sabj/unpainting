@@ -11,6 +11,7 @@ import { parseArgs, USAGE } from './args.mjs';
 import { loadRegistry, resolveSubject, checkInputs } from './subjects.mjs';
 import { buildCommand, describeRun, shellLine, runFolder } from './command.mjs';
 import { refuseExtraGpuPaint, gpuPaintCount, cacheDirFor, switchesOf, segEnvFor, runPainter, collectResults } from './run.mjs';
+import { renderer } from './render.mjs';
 import { expandSubjects, pool, gpuPlace, throughput, jobsNow, DEFAULT_JOBS, PLAN_JOBS } from './queue.mjs';
 import { writeRunSheet, writeGridSheet, runPictures, formsImage, drawingSvg } from './sheet.mjs';
 import { toolsBase, resolveTools, writeTools, linesPictureDoc, allLinesDoc } from './session-tools.mjs';
@@ -28,7 +29,7 @@ import { DEFAULT_REVERTS } from './reverts.mjs';
 import { levelOf, handedAt, CODE_PLAN_IS_L4 } from './levels.mjs';
 import { usageOf, usageLine } from './usage.mjs';
 import { shapesData, namesShapes, resolveNumbered } from './study-shapes.mjs';
-import { paintThroughStage, stoppedText } from './stage-look.mjs';
+import { stoppedText } from './stage-look.mjs';
 import { lookCost, regionBox, scriptInRegion, paintedWork, planWork, sweepsInLog, workUnits } from './look-cost.mjs';
 import { preparedRoot, preparedKey, prepareCommand, readPrepared, writePrepared, preparedFilm, SHAPES_FILE, WASHES_FILE } from './prepared.mjs';
 import crypto from 'node:crypto';
@@ -77,6 +78,8 @@ async function closedRoutes(author) {
   return { gate, toolbox, done: async () => { await gate.stop(); fs.rmSync(toolbox.dir, { recursive: true, force: true }); return { gated: true, passed: gate.passed, refused: gate.refused }; } };
 }
 const segEnv = { ...segEnvFor(ROOT), W2_CACHE_DIR: cacheDirFor(process.env.W2_CACHE_DIR || path.join(ROOT, 'work', 'cache'), switches) };
+// where a GPU painting is painted: this Mac, or the render pool (UNPAINT_RENDER, render.mjs)
+const render = renderer(process.env, { root: ROOT, codeState: () => codeState(ROOT) });
 
 // every subject and author is resolved and checked before anything runs
 let registry, specs, authors, qwen = null, level, terms = null; const refused = [];
@@ -164,7 +167,7 @@ const readJobs = () => { try { return jobsNow(jobs, fs.readFileSync(path.join(ou
 // holds them all (a session's plans, its looks, and the plan of what it hands over); the models themselves mostly wait
 // and all run at once (agy three at a time: three at once in separate folders did not interrupt one another).
 const heavySlot = pool(HEAVY_JOBS);
-const painterSlot = req.mode === 'plan' ? heavySlot : pool(many ? 16 : jobs), planSlot = req.mode === 'plan' ? heavySlot : pool(2 * PLAN_JOBS), startGate = pool(1), agySlot = pool(3), modelSlot = pool(12), qwenSlot = pool(1), lookSlot = req.mode === 'plan' ? heavySlot : pool(LOOK_JOBS), lookGate = pool(1);
+const painterSlot = req.mode === 'plan' ? heavySlot : pool(many ? 16 : jobs), planSlot = req.mode === 'plan' ? heavySlot : pool(2 * PLAN_JOBS), startGate = pool(1), agySlot = pool(3), modelSlot = pool(12), qwenSlot = pool(1), lookSlot = render.pool ? pool(render.cap) : req.mode === 'plan' ? heavySlot : pool(LOOK_JOBS), lookGate = pool(1);
 const say = (r, text) => console.log(`[${r.spec.id} · ${r.record.author.name}] ${text}`);
 const SHOWN = /^(study washes: \d|wash plan:|plan values|phases|!!!|UNUSED|IGNORED|named forms|painting script)/;
 
@@ -179,7 +182,7 @@ async function paintOnce(r, commandFor, plate, logFile) {
     done = await painterSlot(async () => {
       // the wait for a place and the start are one step at a time, so two runs never take the same free place
       const going = await startGate(async () => {
-        if (req.mode === 'paint') {
+        if (req.mode === 'paint' && !render.pool) {
           // one painting by itself is refused when the places are taken; a queue waits for one
           if (many) record.gpuPaintsAtStart = await gpuPlace({ most: readJobs, running: gpuPaintCount, onWait: n => say(r, `waiting: ${n} GPU paintings are running and --jobs is ${readJobs()}`) }), record.jobsAtStart = readJobs();
           else record.gpuPaintsAtStart = refuseExtraGpuPaint(jobs);
@@ -187,7 +190,8 @@ async function paintOnce(r, commandFor, plate, logFile) {
         const now = codeState(ROOT), command = commandFor(now.dirty);
         Object.assign(record, { code: codeOf(now), command: shellLine(command), argv: command.argv, plate, startedMs: Date.now() });
         if (many) say(r, `started at ${new Date().toTimeString().slice(0, 8)} on ${now.commit?.slice(0, 8)}${now.dirty ? ' plus uncommitted changes (allow-dirty passed)' : ''}`);
-        return { ended: runPainter(command, { cwd: ROOT, logFile, onLine: l => { if (SHOWN.test(l) || /^\s*(Error|TypeError|RangeError)/.test(l)) say(r, l.trim().slice(0, 300)); } }) };
+        const onLine = l => { if (SHOWN.test(l) || /^\s*(Error|TypeError|RangeError)/.test(l)) say(r, l.trim().slice(0, 300)); };
+        return { ended: req.mode === 'paint' ? render.paint(command, { cwd: ROOT, logFile, onLine, kind: 'painting' }).then(x => { record.render = x.render; return x.done; }) : runPainter(command, { cwd: ROOT, logFile, onLine }) };
       });
       try { return await going.ended; } finally { record.endedMs = Date.now(); }
     });
@@ -311,17 +315,16 @@ async function paintLookOnce(r, choice, script, plate, at, edit, compiled, ask =
     fs.mkdirSync(path.dirname(plate), { recursive: true });
     if (script) fs.writeFileSync(scriptFile, JSON.stringify(script, null, 1) + '\n');
     if (edit) fs.writeFileSync(editFile, JSON.stringify(edit, null, 1) + '\n');
-    const size = lookSizeNote({ cells: small.sheet.cells, fullCells: full.sheet.cells, cellMm: small.sheet.cellMm, kind: choice.kind }), asked = Date.now(); let started = null, stoppedAt = null;
+    const size = lookSizeNote({ cells: small.sheet.cells, fullCells: full.sheet.cells, cellMm: small.sheet.cellMm, kind: choice.kind }), asked = Date.now(); let started = null, stoppedAt = null, rendered = null;
     const done = await lookSlot(async () => {
       // the wait for a place among the machine's GPU paintings and the start are one step at a time
       const going = await lookGate(async () => {
-        await gpuPlace({ most: readJobs, running: gpuPaintCount, onWait: n => say(r, `look ${at.look}: waiting, ${n} GPU paintings are running and --jobs is ${readJobs()}`) });
+        if (!render.pool) await gpuPlace({ most: readJobs, running: gpuPaintCount, onWait: n => say(r, `look ${at.look}: waiting, ${n} GPU paintings are running and --jobs is ${readJobs()}`) });
         const command = buildCommand(small, { mode: 'paint', out: plate, known, dirty: codeState(ROOT).dirty, segEnv, script: script ? { file: scriptFile, paints: script.palette } : null, edit: edit ? { file: editFile } : null, planOf });
         fs.writeFileSync(`${plate}.command.txt`, shellLine(command) + '\n'); started = Date.now();
         say(r, `look ${at.look} (plan ${at.plan}, ${choiceKind(choice)}): ${size}; started at ${new Date().toTimeString().slice(0, 8)}`);
         // stopped after a stage the author names: the painter's own stop at that boundary, dried (stage-look.mjs)
-        if (ask.until != null) return { ended: paintThroughStage({ command, cwd: ROOT, logFile: `${plate}.log`, pauseDir: `${plate}.pause`, stage: ask.until, run: runPainter }).then(x => { stoppedAt = x.stopped; return { ...x.done, seconds: x.done?.seconds ?? Math.round((Date.now() - started) / 1000) }; }) };
-        return { ended: runPainter(command, { cwd: ROOT, logFile: `${plate}.log` }) };
+        return { ended: render.paint(command, { cwd: ROOT, logFile: `${plate}.log`, until: ask.until ?? null, pauseDir: `${plate}.pause`, kind: ask.until != null ? 'look stopped at a stage' : 'look' }).then(x => { stoppedAt = x.stopped; rendered = x.render; return { ...x.done, seconds: x.done?.seconds ?? Math.round((Date.now() - started) / 1000) }; }) };
       });
       return going.ended;
     });
@@ -342,7 +345,7 @@ async function paintLookOnce(r, choice, script, plate, at, edit, compiled, ask =
     return { ok: true, picture: await lookPicture({ planPreview: results.painting, run: record }), stages: results.strip ? await stagesPicture(results.strip) : null,
       planPicture: compiled.planPreview ? await planPicture({ planPreview: compiled.planPreview, run: record }) : null,
       numbersText: `${stoppedAt ? `${stoppedText(stoppedAt, ask.until)}\n\n` : ''}${numbersText(numbers, { script: Boolean(script), painted: size })}`, marked: numbers.marked, stoppedText: stoppedAt ? stoppedText(stoppedAt, ask.until) : null,
-      painted: { work, workFault, until: ask.until ?? null, stopped: stoppedAt ? { passesDone: stoppedAt.passesDone, passesPlanned: stoppedAt.passesPlanned, strokes: stoppedAt.strokes } : null, region: ask.region?.box ?? null, regionPassages: inRegion ? `${inRegion.kept} of ${inRegion.of} passages` : null, cells: small.sheet.cells, fullCells: full.sheet.cells, size, seconds: done.seconds, waitedSeconds: Math.round((started - asked) / 1000), backend: results.backend, plate, painting: results.painting, strip: results.strip } };
+      painted: { work, workFault, until: ask.until ?? null, stopped: stoppedAt ? { passesDone: stoppedAt.passesDone, passesPlanned: stoppedAt.passesPlanned, strokes: stoppedAt.strokes } : null, region: ask.region?.box ?? null, regionPassages: inRegion ? `${inRegion.kept} of ${inRegion.of} passages` : null, cells: small.sheet.cells, fullCells: full.sheet.cells, size, seconds: done.seconds, waitedSeconds: Math.round((started - asked) / 1000), backend: results.backend, plate, painting: results.painting, strip: results.strip, render: rendered } };
   } catch (e) { return { ok: false, error: tidy(e.message) }; }
 }
 
@@ -703,7 +706,7 @@ async function oneRun(r) {
   if (record.author.session) {
     let plan = null; try { plan = planSummary(JSON.parse(fs.readFileSync(path.join(record.plate, 'value-plan.json'), 'utf8'))); } catch { /* no plan was made */ }
     const s = record.author.session, usage = usageOf({ subject: record.subject.key, author: record.author, level: s.level ?? record.author.level ?? null, tryNumber: s.tryNumber ?? record.author.tryNumber ?? null, budget: s.budget ?? record.author.budget ?? null, session: s,
-      final: { seconds: record.seconds, backend: record.results.backend?.backend ?? null, failure: record.failure, mode: req.mode }, plan, prepared: record.author.prepared ?? null, commit: record.code.commit });
+      final: { seconds: record.seconds, backend: record.results.backend?.backend ?? null, failure: record.failure, mode: req.mode, render: record.render ?? null }, plan, prepared: record.author.prepared ?? null, commit: record.code.commit });
     fs.writeFileSync(path.join(record.out, 'usage.json'), JSON.stringify(usage, null, 1) + '\n'); record.usage = path.join(record.out, 'usage.json');
     say(r, `usage: ${usageLine(usage)}`);
   }
@@ -802,11 +805,13 @@ if (req.preflight) {
   process.exit(rows.every(x => x.ok) ? 0 : 1);
 }
 if (req.prepare) {
+  if (render.pool) render.register(runs.length);
   for (const r of runs) await prepareRun(r);
   process.exit(runs.some(r => r.record.failure) || refused.length ? 1 : 0);
 }
 // every session's folder exists before any session starts, so each is shut out of the others'
 for (const r of runs) if (r.authorFull.work === 'session' && !r.record.author.from) r.sessionDir = fs.mkdtempSync(path.join(os.tmpdir(), `unpaint-session-${r.authorFull.key}-`));
+if (render.pool) render.register(runs.length);
 await Promise.all(runs.map(oneRun));
 for (const r of runs) if (r.sessionDir) fs.rmSync(r.sessionDir, { recursive: true, force: true });
 const failed = runs.filter(r => r.record.failure).length + refused.length;

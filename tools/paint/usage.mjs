@@ -18,7 +18,7 @@ export function usageOf({ subject, author, level, tryNumber, budget, session, fi
     session: {
       ended: session.ended, wallMinutes: session.wallMinutes ?? null, ownMinutes: session.ownMinutes ?? null, waitMinutes: session.waitMinutes ?? null,
       steps: session.steps ?? null, cutOffBySafetyStop: Boolean(session.budgetReached?.safetyStop),
-      looks: looks.length, lookUnits: session.lookUnits ?? null, looksEach: looks.map(l => ({ look: l.look, cost: l.cost ?? 1, until: l.ask?.until ?? null, region: l.ask?.region?.box ?? null, machineSeconds: l.painted?.seconds ?? null })), plans: plans.length, plansRefused: plans.filter(p => !p.ok).length, toolCalls: session.toolCallsTotal ?? null, toolCallsByKind: session.toolCalls ?? null,
+      looks: looks.length, lookUnits: session.lookUnits ?? null, looksEach: looks.map(l => ({ look: l.look, cost: l.cost ?? 1, until: l.ask?.until ?? null, region: l.ask?.region?.box ?? null, machineSeconds: l.painted?.seconds ?? null, render: l.painted?.render ?? null })), plans: plans.length, plansRefused: plans.filter(p => !p.ok).length, toolCalls: session.toolCallsTotal ?? null, toolCallsByKind: session.toolCalls ?? null,
       selfReviews: (session.selfReviews ?? []).filter(r => r.written).length, assessmentWritten: session.assessment ? session.assessment.written : null, reverts: session.reverts ?? null, warningsGiven: session.warningsGiven ?? null,
       picturesHanded: session.pictures?.handed ?? [], picturesDescribed: session.pictures ? Object.keys(session.pictures.said ?? {}).length : 0,
     },
@@ -31,12 +31,22 @@ export function usageOf({ subject, author, level, tryNumber, budget, session, fi
       lookGpuMinutes: minutes(lookSeconds), lookPaintings: looks.filter(l => l.painted?.seconds != null).length, planCpuMinutes: minutes(planSeconds),
       finalGpuMinutes: final?.seconds != null ? minutes(final.seconds) : null, finalBackend: final?.backend ?? null, finalFailure: final?.failure ?? null,
       note: 'the full-size final is painted after the session and is outside its clock; machine seconds are recorded beside each look and never charged: looks are charged in units of rendering',
+      // where each painting was painted (render.mjs: this Mac, or the render pool's worker) and what that took; the operator's, never charged
+      render: renderTotals(looks.map(l => l.painted?.render).filter(Boolean), final?.render ?? null),
     },
     work: plan ? { washes: plan.washes ?? null, strokes: plan.strokes ?? null, dryings: plan.dryings ?? null, passages: plan.passages ?? null, ...(plan.erases ? { erases: { passages: plan.erases.passages, strokes: plan.erases.strokes } } : {}) } : null,
     prepared: prepared ?? null,
     // the terms the try ran under (cli.mjs): budgets, the subject's unit, seed, commit, prepared inputs by hash; a rerun with the same terms is the same try
     terms: author.terms ?? null,
   };
+}
+
+/** The render record of a session's paintings together: the workers, the seconds waited, painted and copied, the pods' cost. */
+export function renderTotals(looks, final) {
+  const all = [...looks, ...(final ? [final] : [])];
+  if (!all.length) return null;
+  const sum = k => +all.reduce((a, r) => a + (r[k] ?? 0), 0).toFixed(4);
+  return { mode: all[0].mode, workers: [...new Set(all.map(r => r.worker))], waitSeconds: sum('waitSeconds'), paintSeconds: sum('paintSeconds'), copySeconds: sum('copySeconds'), costUSD: sum('costUSD'), retried: all.filter(r => (r.tries?.length ?? 1) > 1).length, final };
 }
 
 /** One line of a usage record, for the log. */
