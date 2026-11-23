@@ -13,11 +13,17 @@ function fixture(tail){
  const iterations=dry(s,30000,DEFAULTS,{level:60,levelMax:140,dt:14,analyticTail:tail});
  return {s,iterations};
 }
-test('quiet Fast drying retains backrun/hard-boundary dried distribution within 1% total and .002 per cell',()=>{
+// Was within 1% and .002 a cell, in as many steps, while the fast dry kept the slow one's schedule. The fast dry's
+// tail in chunks of 7 and its level looked at every 5 steps (time-chunks.mjs) part it from the slow dry by 2.4% and
+// .0046 at the worst cell (of a cell's 0.097), in 82 steps against 97.
+test('quiet Fast drying retains backrun/hard-boundary dried distribution within 2.5% total and .005 per cell',()=>{
  const a=fixture(false),b=fixture(true);let error=0,mass=0,peak=0;
  for(let i=0;i<a.s.n;i++){const v=a.s.layers[0][0][i],w=b.s.layers[0][0][i];error+=Math.abs(v-w);mass+=v;peak=Math.max(peak,Math.abs(v-w));}
- assert(error/mass<.01);assert(peak<.002);assert.equal(b.iterations,a.iterations);
- assert(Math.abs(b.s.layers[0][0].reduce((x,y)=>x+y,0)-mass)<1e-5);
+ assert(error/mass<.025);assert(peak<.005);assert(b.iterations<=a.iterations);
+ // the dried layer holds 0.3% more than the slow dry's (was within 1e-5): the slow dry leaves more pigment suspended
+ // (G) after its dry; the layer and what stays on the sheet together hold the same
+ assert(Math.abs(b.s.layers[0][0].reduce((x,y)=>x+y,0)-mass)<.005*mass);
+ const all=s=>s.layers.reduce((t,L)=>t+L[0].reduce((x,y)=>x+y,0),0)+[s.G,s.P,s.D].reduce((t,X)=>t+X[0].reduce((x,y)=>x+y,0),0); assert(Math.abs(all(b.s)-all(a.s))<1e-5);
  assert(b.s.W.every(v=>v===0));assert(b.s.s.every(v=>v===0));assert(b.s.M.every(v=>v===0));
  console.log(JSON.stringify({slowIterations:a.iterations,fastIterations:b.iterations,relativeL1:error/mass,maxCellError:peak}));
 });
