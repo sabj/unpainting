@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createSheet,deposit,step,dry,fix,quietDryTail,DEFAULTS,thickness} from './sheet.mjs';
 import {makePaper} from './paper.mjs';
+import {levelEvery,DRY_TAIL_CHUNK_DT} from './time-chunks.mjs';
 const make=()=>createSheet(makePaper(64,48,{seed:9}),[{K:[1,.5,.2],S:[.1,.1,.1],rho:.1,omega:.2,gamma:.1}]);
 // the water's surface is its depth plus slope times the paper's height (sheet.mjs surfaceLevel)
 function scan(s) {
@@ -22,15 +23,16 @@ test('completed step summaries equal full scans across wet fronts and separated 
   }
 });
 
-test('fast dry summaries keep the original iteration schedule and exact planes', () => {
+// the fast dry's own schedule (time-chunks.mjs): its level looked at every levelEvery(true) steps, its tail in chunks of DRY_TAIL_CHUNK_DT
+test('fast dry summaries keep the fast schedule and exact planes', () => {
   const a=make(),b=make();load(a);load(b);
   const options={level:10,levelMax:90,levelTol:.02,dt:14,analyticTail:true};
   const actual=dry(a,4000,DEFAULTS,options);
   let t=0,fast=false;const oFast={...DEFAULTS,dt:14};
   for(;t<4000;t++){
-    if(!fast&&t>=10&&(t>=90||(t%25===0&&scan(b).surfaceLevel<.02)))fast=true;
+    if(!fast&&t>=10&&(t>=90||(t%levelEvery(true)===0&&scan(b).surfaceLevel<.02)))fast=true;
     if(quietDryTail(b,DEFAULTS))break;
-    if(!step(b,fast?oFast:DEFAULTS))break;
+    if(!step(b,fast?oFast:DEFAULTS,null,fast?DRY_TAIL_CHUNK_DT:undefined))break;
   }
   assert.ok(t<4000);fix(b);assert.equal(actual,t);
   for(const key of ['W','s','M'])assert.deepEqual(a[key],b[key]);
