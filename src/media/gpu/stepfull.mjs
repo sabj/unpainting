@@ -5,6 +5,7 @@ import { PaperReadback } from './paper-readback.mjs';
 import { PaperGate } from './paper-gate.mjs';
 import {FINISH_WET_SCAN, FINISH_WET_SCAN_14} from './finish-wet-scan.mjs';
 import { edgeFeedWgsl, EF_RMAX, EF_BMAX } from './edge-feed-wgsl.mjs';
+import { boxGeometryKey, keepGeometry } from './edge-geometry-cache.mjs';
 import { filmLevelWgsl } from './film-level-wgsl.mjs';
 import { levelOn, levelBudget, levelBuffers, levelUniforms, encodeLevel, adaptLevel } from './film-level-host.mjs';
 import { wetBoxes, edgeGeometry, prepareEdgeGeometry, finishEdgeGeometry } from './edge-geometry.mjs';
@@ -32,6 +33,11 @@ const FAST_DRY_DT_SCALE = Math.max(0.01, envNum('GPU_FAST_DRY_DT_SCALE', 2));
 const onesCache = new Map(), ONES = n => onesCache.get(n) ?? (onesCache.set(n, new Float32Array(n).fill(1)), onesCache.get(n));
 // the most steps the edge feed runs between looks at whether its geometry has moved (efSteps)
 const EF_BATCH = Math.max(1, envNum('GPU_EDGE_BATCH', 25));
+// Between strokes' flows (advance, not a dry), a moved outline remakes the feed's geometry only once this many steps have
+// passed since it was last made: the geometry (a pressure solve over the whole wet box, about 200 ms at full size) then
+// trails the wash's front by a few steps while it is being painted. A dry remakes it at once, as the CPU sheet does.
+// Set by the painter's fast mode (tools/painter/native-paint-mode.mjs nativeEdgeLagPolicy: 16); otherwise 0, at once.
+const EF_STROKE_LAG = Math.max(0, envNum('GPU_EDGE_LAG', 0));
 const SPARSE_ALL = typeof process === 'undefined' || process.env.GPU_SPARSE_ALL !== '0';
 const KEEP = []; // Dawn's instance, adapter and device must stay reachable or the GC frees them under the running device
 
@@ -213,7 +219,10 @@ export class GpuSheet {
     // the mask, footprint and damp pores packed four bits a cell on the GPU (ef_pack): an eighth of one field to read
     const encoder = this.device.createCommandEncoder(), pack = encoder.beginComputePass();
     pack.setPipeline(this.p.ef_pack); pack.setBindGroup(0, this.bg.ef_pack); pack.dispatchWorkgroups(Math.ceil(n / 2048)); pack.end();
-    const bits = new Uint32Array(await this.readWords('EFP', Math.ceil(n / 8) * 4, 0, encoder)), M = new Uint8Array(n), ever = new Uint8Array(n), damp = new Uint8Array(n), water = new Uint8Array(n);
+    const bits = new Uint32Array(await this.readWords('EFP', Math.ceil(n / 8) * 4, 0, encoder));
+    // the unpacked fields are kept between refreshes (every cell is written below), not made again each time
+    const U = ef.unpacked?.M.length === n ? ef.unpacked : (ef.unpacked = { M: new Uint8Array(n), ever: new Uint8Array(n), damp: new Uint8Array(n), water: new Uint8Array(n) });
+    const { M, ever, damp, water } = U;
     for (let i = 0; i < n; i++) { const b = (bits[i >>> 3] >>> (4 * (i & 7))) & 15; M[i] = b & 1; ever[i] = (b >> 1) & 1; damp[i] = (b >> 2) & 1; water[i] = b >> 3; }
     // wetBoxes asks M[i] || s[i] > 0.02 capacity[i]: the packed bit answers it with a capacity of 1 and s of 1 or 0
     const boxes = wetBoxes({ w, h, M: damp, s: damp, capacity: ONES(n) }, Math.max(2, this.poreTime.iters));
@@ -238,36 +247,51 @@ export class GpuSheet {
     ef.stale = false;
     const key = `${feeding.length}:${hash}`;
     if (key === ef.key) return;
-    const list = [], G = new Float32Array(4 * n);
-    let b = 0;
+    // EFG holds the geometry of the cells the last refresh wrote (cells lo to hi) and zeros elsewhere: this one clears
+    // those, writes its own and sends the GPU only the span of cells either touched, not the whole 16 bytes a cell sheet
+    if (ef.G?.length !== 4 * n) { ef.G = new Float32Array(4 * n); ef.span = null; }
+    const list = [], G = ef.G;
+    const was = ef.span; if (was) G.fill(0, 4 * was[0], 4 * (was[1] + 1));
+    let b = 0, lo = Infinity, hi = -1;
+    // each box's geometry is kept by its key (edge-geometry-cache.mjs): only the boxes that changed are solved again
+    const opts = `${mm}:${o.edgeMm ?? 1}:${o.edgeEvap}:${o.reachMm ?? 1.5}:${o.holeSpan ?? 0}`, kept = ef.boxGeo ?? new Map(), seen = new Map();
     for (const box of feeding) {
-      const sheet = { w, h, M, ever, resist };
-      const grid = contactGrid(box, mm, o.edgeMm ?? 1, this.device.limits);
-      let geo;
-      if (grid) {
-        this.contactDistance ??= new GpuContactDistance(this.device);
-        const [field, prepared] = await Promise.all([
-          this.contactDistance.field(this.b.EFP, w, h, grid, o.holeSpan ?? 0),
-          Promise.resolve().then(() => prepareEdgeGeometry(sheet, o, box, mm, ef.scratch)),
-        ]);
-        geo = finishEdgeGeometry(prepared, field);
-        this.gpuDistanceBoxes = (this.gpuDistanceBoxes ?? 0) + 1;
-      } else {
-        geo = edgeGeometry(sheet, o, box, mm, ef.scratch);
+      const sheet = { w, h, M, ever, resist }, bkey = boxGeometryKey(sheet, box, opts, o.holeSpan ?? 0);
+      let geo = kept.get(bkey);
+      if (geo === undefined) {
+        const grid = contactGrid(box, mm, o.edgeMm ?? 1, this.device.limits);
+        if (grid) {
+          this.contactDistance ??= new GpuContactDistance(this.device);
+          const [field, prepared] = await Promise.all([
+            this.contactDistance.field(this.b.EFP, w, h, grid, o.holeSpan ?? 0),
+            Promise.resolve().then(() => prepareEdgeGeometry(sheet, o, box, mm, ef.scratch)),
+          ]);
+          geo = finishEdgeGeometry(prepared, field);
+          this.gpuDistanceBoxes = (this.gpuDistanceBoxes ?? 0) + 1;
+        } else {
+          geo = edgeGeometry(sheet, o, box, mm, ef.scratch);
+        }
+        geo = keepGeometry(geo);
       }
+      seen.set(bkey, geo);
       if (!geo) continue;
       const { order, ex, fx, fy } = geo;
-      for (const i of order) { G[4 * i] = ex[i]; G[4 * i + 1] = fx[i]; G[4 * i + 2] = fy[i]; }
-      for (const i of order) {
-        if (fx[i] > 0) G[4 * i + 3] += fx[i]; else if (fx[i] < 0) G[4 * (i + 1) + 3] -= fx[i];
-        if (fy[i] > 0) G[4 * i + 3] += fy[i]; else if (fy[i] < 0) G[4 * (i + w) + 3] -= fy[i];
+      for (let q = 0; q < order.length; q++) { const i = order[q]; G[4 * i] = ex[q]; G[4 * i + 1] = fx[q]; G[4 * i + 2] = fy[q]; }
+      for (let q = 0; q < order.length; q++) {
+        const i = order[q];
+        if (fx[q] > 0) G[4 * i + 3] += fx[q]; else if (fx[q] < 0) G[4 * (i + 1) + 3] -= fx[q];
+        if (fy[q] > 0) G[4 * i + 3] += fy[q]; else if (fy[q] < 0) G[4 * (i + w) + 3] -= fy[q];
       }
-      for (const i of order) list.push(i, b);
+      for (const i of order) { list.push(i, b); if (i < lo) lo = i; if (i + w > hi) hi = Math.min(n - 1, i + w); }
       b++;
     }
+    ef.boxGeo = seen;
     const L = new Uint32Array(1 + list.length); L[0] = list.length / 2; L.set(list, 1);
     const q = this.device.queue;
-    q.writeBuffer(this.b.EFL, 0, L); q.writeBuffer(this.b.EFG, 0, G);
+    q.writeBuffer(this.b.EFL, 0, L);
+    const now = hi >= lo ? [lo, hi] : null, from = Math.min(now?.[0] ?? Infinity, was?.[0] ?? Infinity), to = Math.max(now?.[1] ?? -1, was?.[1] ?? -1);
+    if (to >= from) q.writeBuffer(this.b.EFG, 16 * from, G, 4 * from, 4 * (to - from + 1));
+    ef.span = now;
     q.writeBuffer(this.b.EFB, 0, new Uint32Array([b]));
     ef.count = L[0]; ef.boxes = b; this.efWriteRounds(); ef.key = key;
   }
@@ -283,7 +307,9 @@ export class GpuSheet {
       pass.setPipeline(this.efPipe('ef_apply', r)); pass.setBindGroup(0, this.bg.ef_apply); pass.dispatchWorkgroups(groups);
     }
   }
-  /** After each step: has the footprint or the wet box moved since the geometry was made? (ef_watch) */
+  /** After a batch's last step: has the footprint or the wet box moved since the geometry was made? (ef_watch) The host
+   *  reads the answer once a batch and remakes the geometry from the state the batch left, so the steps before the last
+   *  need no look of their own (a whole-sheet pass each, 12 s of GPU on full-size Mittens). */
   efWatch(pass) {
     if (!this.efOn) return;
     pass.setPipeline(this.p.ef_watch); pass.setBindGroup(0, this.bg.ef_watch); pass.dispatchWorkgroups(Math.ceil(this.n / 256));
@@ -481,7 +507,7 @@ export class GpuSheet {
         }
         pores(true);
         if (fuseStep && this.p.p5ab) go('p5ab'); else { go('p5a'); go('p5b'); }
-        finish(s === steps - 1); this.efWatch(pass);
+        finish(s === steps - 1); if (s === steps - 1) this.efWatch(pass);
       }
       return;
     }
@@ -496,7 +522,7 @@ export class GpuSheet {
       }
       go('p3a');
       if ((o.slide ?? 0) > 0) { go('dep_k'); go('slide_out', 12); go('slide_apply', 12); }
-      pores(false); go('p5a'); go('p5b'); finish(s === steps - 1); this.efWatch(pass);
+      pores(false); go('p5a'); go('p5b'); finish(s === steps - 1); if (s === steps - 1) this.efWatch(pass);
     }
   }
 
@@ -781,8 +807,9 @@ export class GpuSheet {
       // a step used most of the rounds it had: give it more before one runs short (the last round takes all the time left)
       // (washes at 0.1 mm cells take up to 12 substeps a step; a quarter of the rounds are kept spare)
       if (st[3] > 0.75 * this.ef.rounds && this.ef.rounds < EF_RMAX) { this.ef.rounds = Math.min(EF_RMAX, 2 * this.ef.rounds); this.efWriteRounds(); }
-      if (this.ef.stale) await this.efRefresh();
-      const k = Math.min(this.ef.batch, steps - done);
+      const lagging = !measure && this.ef.count > 0 && (this.ef.steps ?? 0) - (this.ef.madeAt ?? -Infinity) < EF_STROKE_LAG;
+      if (this.ef.stale && !lagging) { await this.efRefresh(); this.ef.madeAt = this.ef.steps ?? 0; }
+      const k = Math.min(this.ef.batch, steps - done); this.ef.steps = (this.ef.steps ?? 0) + k;
       batch = this.device.createCommandEncoder();
       this.encodeSteps(batch, k, measure && done + k === steps); done += k;
     }

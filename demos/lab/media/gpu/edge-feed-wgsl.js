@@ -11,7 +11,10 @@
 // The geometry depends on the footprint (cells the wash has wet) and on the boxes round the wet and damp cells. Each
 // step ef_watch counts the one and bounds the other, and ef_watch_end compares them with what they were when the
 // geometry was made (EFB[10..15)) and raises EFB[4] when they differ, so the host makes it again (stepfull efSteps).
-// EFB[5..10): this step's footprint count and wet box x0, y0, x1, y1.
+// EFB[5..10): this step's footprint count and wet box x0, y0, x1, y1. EFB[15]: the latest round any cell offered a
+// substep for this step (efCandidate). A box is active in round r > 0 only if round r - 1's substep was offered (else that
+// round took all its time), so rounds past EFB[15] + 1 leave at once (efLate): the rounds encoded past the need cost
+// almost nothing, and no box's sums change.
 export const EF_RMAX = 32;
 export const EF_BMAX = 256;
 // The host shader names its pigment list (`channel(a)` the a-th pigment worked on, `count` of them) and defines
@@ -40,11 +43,16 @@ fn efSub(b: u32, r: u32) -> f32 {
 }
 fn efCandidate(i: u32, b: u32, r: u32, water: f32) {
   let g = EFG[i]; let rate = g.w + g.x;
-  if (rate > 0.0 && water > 2.0 * u.wetEps) { atomicMin(&EFB[efBox(b) + 1u + r], bitcast<u32>(0.5 * water / rate)); }
+  if (rate > 0.0 && water > 2.0 * u.wetEps) {
+    atomicMin(&EFB[efBox(b) + 1u + r], bitcast<u32>(0.5 * water / rate));
+    if (r > atomicLoad(&EFB[15])) { atomicMax(&EFB[15], r); }
+  }
 }
+fn efLate(r: u32) -> bool { return r > atomicLoad(&EFB[15]) + 1u; }
 @compute @workgroup_size(256)
 fn ef_reset(@builtin(local_invocation_index) li: u32) {
   if (efHalted()) { return; }
+  if (li == 0u) { atomicStore(&EFB[15], 0u); }
   let words = atomicLoad(&EFB[0]) * (EF_RMAX + 1u);
   for (var q = li; q < words; q += 256u) { atomicStore(&EFB[16u + q], select(0x7f800000u, 0u, q % (EF_RMAX + 1u) == 0u)); }
 }
@@ -57,7 +65,7 @@ fn ef_begin(@builtin(global_invocation_id) gid: vec3<u32>) {
 }
 @compute @workgroup_size(256)
 fn ef_prep(@builtin(global_invocation_id) gid: vec3<u32>) {
-  let q = gid.x; if (q >= EFL[0] || efHalted()) { return; }
+  let q = gid.x; if (q >= EFL[0] || efLate(ROUND) || efHalted()) { return; }
   let i = EFL[1u + 2u * q]; let b = EFL[2u + 2u * q];
   if (!efActive(b, ROUND)) { return; }
   atomicMax(&EFB[3], ROUND + 1u);
@@ -78,7 +86,7 @@ fn ef_prep(@builtin(global_invocation_id) gid: vec3<u32>) {
 }
 @compute @workgroup_size(256)
 fn ef_apply(@builtin(global_invocation_id) gid: vec3<u32>) {
-  let q = gid.x; if (q >= EFL[0] || efHalted()) { return; }
+  let q = gid.x; if (q >= EFL[0] || efLate(ROUND) || efHalted()) { return; }
   let i = EFL[1u + 2u * q]; let b = EFL[2u + 2u * q];
   if (!efActive(b, ROUND)) { return; }
   let sub = efSub(b, ROUND);
@@ -117,13 +125,27 @@ fn ef_apply(@builtin(global_invocation_id) gid: vec3<u32>) {
   EFS[i] = vec4<f32>(own.x, own.y, pending, own.w + (water - wn));
   if (ROUND + 1u < atomicLoad(&EFB[1])) { efCandidate(i, b, ROUND + 1u, wn); }
 }
+// (gathered in the workgroup first, then one global atomic a workgroup: the same counts and bounds, without every wet
+// cell of the sheet contending for the same five words)
+var<workgroup> efWa: array<atomic<u32>, 5>;
 @compute @workgroup_size(256)
-fn ef_watch(@builtin(global_invocation_id) gid: vec3<u32>) {
-  let i = gid.x; if (i >= u.n || efHalted()) { return; }
-  if (M[i] == 1u || EVER[i] == 1u) { atomicAdd(&EFB[5], 1u); }
-  if (M[i] == 1u || S[i] > 0.02 * PAPER[i].x) {
-    let x = i % u.w; let y = i / u.w;
-    atomicMin(&EFB[6], x); atomicMin(&EFB[7], y); atomicMax(&EFB[8], x); atomicMax(&EFB[9], y);
+fn ef_watch(@builtin(global_invocation_id) gid: vec3<u32>, @builtin(local_invocation_index) li: u32) {
+  if (li == 0u) { atomicStore(&efWa[0], 0u); atomicStore(&efWa[1], 0xffffffffu); atomicStore(&efWa[2], 0xffffffffu); atomicStore(&efWa[3], 0u); atomicStore(&efWa[4], 0u); }
+  workgroupBarrier();
+  let i = gid.x;
+  if (i < u.n && !efHalted()) {
+    if (M[i] == 1u || EVER[i] == 1u) { atomicAdd(&efWa[0], 1u); }
+    if (M[i] == 1u || S[i] > 0.02 * PAPER[i].x) {
+      let x = i % u.w; let y = i / u.w;
+      atomicMin(&efWa[1], x); atomicMin(&efWa[2], y); atomicMax(&efWa[3], x); atomicMax(&efWa[4], y);
+    }
+  }
+  workgroupBarrier();
+  if (li == 0u) {
+    let c = atomicLoad(&efWa[0]); if (c > 0u) { atomicAdd(&EFB[5], c); }
+    if (atomicLoad(&efWa[1]) != 0xffffffffu) {
+      atomicMin(&EFB[6], atomicLoad(&efWa[1])); atomicMin(&EFB[7], atomicLoad(&efWa[2])); atomicMax(&EFB[8], atomicLoad(&efWa[3])); atomicMax(&EFB[9], atomicLoad(&efWa[4]));
+    }
   }
 }
 // the wet mask, the footprint, the damp pores (sheet.mjs wetBoxes) and surface water of eight cells a word: bit 1 M,

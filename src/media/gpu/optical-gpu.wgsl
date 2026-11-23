@@ -63,8 +63,10 @@ fn compose(@builtin(global_invocation_id) g:vec3<u32>,@builtin(num_workgroups) g
   matrix[q]=divd(aa,dd);matrix[q+1u]=divd(bb,dd);matrix[q+2u]=divd(cc,dd);matrix[q+3u]=ds(1.);
  }
 }
+// Four channel bytes a word (little-endian, as the reader's byte view takes them): a quarter of the readback.
 @compute @workgroup_size(64)
-fn frame(@builtin(global_invocation_id) g:vec3<u32>,@builtin(num_workgroups) groups:vec3<u32>){let i=g.x+g.y*groups.x*64u;if(i>=o.n*3u){return;}let q=i*4u;let b=base[i];let value=divd(add(mul(matrix[q],b),matrix[q+1u]),add(mul(matrix[q+2u],b),matrix[q+3u]));let byte=mul(value,ds(255.));let whole=floor(byte.x);let delta=sub(byte,ds(whole+.5));let up=delta.x>0.||(delta.x==0.&&delta.y>=0.);result[i]=u32(clamp(whole+select(0.,1.,up),0.,255.));}
-
+fn frame(@builtin(global_invocation_id) g:vec3<u32>,@builtin(num_workgroups) groups:vec3<u32>){let w=g.x+g.y*groups.x*64u;if(w*4u>=o.n*3u){return;}var packed=0u;
+ for(var j=0u;j<4u;j++){let i=w*4u+j;if(i>=o.n*3u){break;}let q=i*4u;let b=base[i];let value=divd(add(mul(matrix[q],b),matrix[q+1u]),add(mul(matrix[q+2u],b),matrix[q+3u]));let byte=mul(value,ds(255.));let whole=floor(byte.x);let delta=sub(byte,ds(whole+.5));let up=delta.x>0.||(delta.x==0.&&delta.y>=0.);packed|=u32(clamp(whole+select(0.,1.,up),0.,255.))<<(8u*j);}
+ result[w]=packed;}
 @compute @workgroup_size(64)
 fn restore_mask(@builtin(global_invocation_id) g:vec3<u32>,@builtin(num_workgroups) groups:vec3<u32>){let i=g.x+g.y*groups.x*64u;if(i>=o.n*3u||layer[i/3u]==0.){return;}for(var c=0u;c<4u;c++){matrix[i*4u+c]=base[i*4u+c];}}

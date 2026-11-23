@@ -120,6 +120,11 @@ fn lvOverlap(a: u32, b: u32) -> bool {
   let A = lvBX(a); let B = lvBX(b);
   return LVX[A] <= LVX[B + 2u] && LVX[B] <= LVX[A + 2u] && LVX[A + 1u] <= LVX[B + 3u] && LVX[B + 1u] <= LVX[A + 3u];
 }
+// the wet tiles in tile order (lv_boxes): each thread counts a run of tiles, the counts are summed, each thread writes
+// its run's wet tiles at its offset, into word 9 of the k-th tile's record (unused). The one thread that then finds the
+// boxes walks only the wet tiles, as the loops over all tiles did (they skipped the dry ones).
+var<workgroup> lvWl: array<u32, 256>;
+var<workgroup> lvWn: u32;
 @compute @workgroup_size(256)
 fn lv_boxes(@builtin(local_invocation_index) li: u32) {
   let nt = lvNt32(); let tw32 = lvTw32();
@@ -140,12 +145,22 @@ fn lv_boxes(@builtin(local_invocation_index) li: u32) {
     LVX[r + 5u] = bitcast<u32>(sum); LVX[r + 6u] = cnt; LVX[r + 7u] = LV_NONE; LVX[r + 8u] = lmask;
   }
   storageBarrier(); workgroupBarrier();
+  let span = (nt + 255u) / 256u; let ra = min(nt, li * span); let re = min(nt, ra + span);
+  var wc = 0u; for (var t = ra; t < re; t++) { if (LVX[lvTR(t)] != 0u) { wc += 1u; } }
+  lvWl[li] = wc;
+  workgroupBarrier();
+  if (li == 0u) { var o = 0u; for (var k = 0u; k < 256u; k++) { let v = lvWl[k]; lvWl[k] = o; o += v; } lvWn = o; }
+  workgroupBarrier();
+  var wo = lvWl[li]; for (var t = ra; t < re; t++) { if (LVX[lvTR(t)] != 0u) { LVX[lvTR(wo) + 9u] = t; wo += 1u; } }
+  storageBarrier(); workgroupBarrier();
   if (li == 0u) {
+    let nw = lvWn;
     // clusters of wet tiles touching on a side or corner, found in tile order (sheet.mjs wetBoxes)
     let st = lvCL(); var nb = 0u; let m = u32(u.poreReach); let th32 = (u.h + 31u) / 32u;
     LVX[2] = 0u;
-    for (var t0 = 0u; t0 < nt; t0++) {
-      if (LVX[lvTR(t0)] == 0u || LVX[lvTR(t0) + 7u] != LV_NONE) { continue; }
+    for (var w = 0u; w < nw; w++) {
+      let t0 = LVX[lvTR(w) + 9u];
+      if (LVX[lvTR(t0) + 7u] != LV_NONE) { continue; }
       if (nb >= LV_BMAX) { LVX[2] = 1u; break; }
       var top = 0u; LVX[st] = t0; top = 1u; LVX[lvTR(t0) + 7u] = nb;
       var ax = LV_NONE; var ay = LV_NONE; var bx = 0u; var by = 0u; var sum = 0.0; var cnt = 0u;
@@ -194,11 +209,11 @@ fn lv_boxes(@builtin(local_invocation_index) li: u32) {
       LVX[B + 6u] = bitcast<u32>(select(u.slideFill, u.slideFill * (fr / mean) * (fr / mean), fr > 0.0 && u.slide > 0.0 && mean > fr));
       LVX[B + 8u] = 0u; LVX[B + 14u] = 0u;
     }
-    for (var t = 0u; t < nt; t++) { let r = lvTR(t); if (LVX[r] != 0u) { let b = LVX[lvRM() + LVX[r + 7u]]; LVX[r + 7u] = b; LVX[lvBX(b) + 8u] += countOneBits(LVX[r + 8u]); } }
+    for (var w = 0u; w < nw; w++) { let r = lvTR(LVX[lvTR(w) + 9u]); let b = LVX[lvRM() + LVX[r + 7u]]; LVX[r + 7u] = b; LVX[lvBX(b) + 8u] += countOneBits(LVX[r + 8u]); }
     var off = 0u;
     for (var b = 0u; b < nb; b++) { let B = lvBX(b); LVX[B + 7u] = off; off += LVX[B + 8u]; LVX[B + 8u] = 0u; }
-    for (var t = 0u; t < nt; t++) {
-      let r = lvTR(t); let lm = LVX[r + 8u]; if (LVX[r] == 0u || lm == 0u) { continue; }
+    for (var w = 0u; w < nw; w++) {
+      let t = LVX[lvTR(w) + 9u]; let r = lvTR(t); let lm = LVX[r + 8u]; if (lm == 0u) { continue; }
       let B = lvBX(LVX[r + 7u]); let tx = t % tw32; let ty = t / tw32;
       for (var c = 0u; c < 4u; c++) {
         if ((lm & (1u << c)) == 0u) { continue; }

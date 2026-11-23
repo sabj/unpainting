@@ -259,13 +259,23 @@ export function makeInkRes({ N, W2, H2, paperOpts, pigments, main, inkAt = 0, gr
       renderVersion = materialVersion;
     }
   }
+  // The last composition and the render it came from: a frame recomposes only the fine rows whose two render rows
+  // changed since (a frame after one mark changes a band of rows), with the same arithmetic, so the same bytes.
+  let lastLo = null, lastOut = null, lastVersion = -1;
   function composeImpl(lo) {
     ensureInkRatio();
-    const rowLen = WH * 3;
-    const out = Buffer.allocUnsafe(nH * 3);
+    const rowLen = WH * 3, loRow = W2 * 3, src = Buffer.from(lo.buffer, lo.byteOffset, lo.byteLength);
+    let from = 0, to = H2 - 1;
+    if (lastOut && lastVersion === renderVersion && lastLo.length === src.length) {
+      while (from < H2 && src.compare(lastLo, from * loRow, (from + 1) * loRow, from * loRow, (from + 1) * loRow) === 0) from++;
+      if (from === H2) return Buffer.from(lastOut);
+      while (to > from && src.compare(lastLo, to * loRow, (to + 1) * loRow, to * loRow, (to + 1) * loRow) === 0) to--;
+    }
+    const out = lastOut && (from > 0 || to < H2 - 1) ? Buffer.from(lastOut) : Buffer.allocUnsafe(nH * 3);
     let r0 = hBuf0, r1 = hBuf1, cy0 = -1, cy1 = -1;
     for (let y = 0; y < HH; y++) {
       const ya = y0Tab[y], yc = y1Tab[y], ty = tyTab[y], ty0 = 1 - ty, row = y * rowLen;
+      if ((ya / loRow < from && yc / loRow < from) || (ya / loRow > to && yc / loRow > to)) continue;
       if (ya !== cy0) {
         if (ya === cy1) { const t = r0; r0 = r1; r1 = t; cy1 = cy0; cy0 = ya; }
         else { interpRow(lo, ya, r0); cy0 = ya; }
@@ -281,6 +291,7 @@ export function makeInkRes({ N, W2, H2, paperOpts, pigments, main, inkAt = 0, gr
         out[row + i] = v < 0 ? 0 : v > 255 ? 255 : v;
       }
     }
+    lastLo = Buffer.from(src); lastOut = Buffer.from(out); lastVersion = renderVersion;
     return out;
   }
 

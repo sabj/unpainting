@@ -172,3 +172,16 @@ test('composeFine lays the pen over a paint render already at the fine grid as c
   assert.ok(worst <= 1, `worst ${worst}`);
   assert.throws(() => R.composeFine(lo), /composeFine/);
 });
+
+test('a frame after a change in a band of rows composes to the same bytes as one composed afresh', () => {
+  const a = setup(), b = setup();
+  for (const { R } of [a, b]) R.draw([line], new Float32Array(W * H).fill(1), W, H, { ink: [10], peak: 1 });
+  const lo = Buffer.alloc(W * H * 3); for (let i = 0; i < lo.length; i++) lo[i] = 120 + (i * 7) % 120;
+  a.R.compose(lo);
+  const next = Buffer.from(lo); for (let y = 6; y <= 8; y++) for (let x = 10; x < 30; x++) next[(y * W + x) * 3 + 1] = 17;
+  const again = a.R.compose(next);
+  assert.deepEqual(again, b.R.compose(next));
+  assert.deepEqual(a.R.compose(next), again, 'unchanged: the same bytes');
+  next[0] = 3; next[(H * W - 1) * 3] = 4;
+  assert.deepEqual(a.R.compose(next), b.R.compose(Buffer.from(next)));
+});

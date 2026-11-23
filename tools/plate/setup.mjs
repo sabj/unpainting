@@ -16,7 +16,7 @@ import {availableParallelism} from 'node:os';
 import {DEFAULT_SHEET_MM} from '../../src/media/sheet-size.mjs';
 import {finalWidthOf, mmSpacingDefault, dabSpacingFactor} from '../../src/paint/methods/look-scale.mjs';
 import {nativeBodyCadence} from '../painter/native-body-cadence.mjs';
-import {nativePaintMode, nativeUploadPolicy} from '../painter/native-paint-mode.mjs';
+import {nativePaintMode, nativeUploadPolicy, nativeEdgeLagPolicy} from '../painter/native-paint-mode.mjs';
 import {measurePaper as physicalMeasurePaper} from '../../src/paint/methods/wetdry.mjs';
 import {codeHash, digest} from '../../src/paint/run-cache.mjs';
 import {setPaperStore} from '../../src/media/paper.mjs';
@@ -130,6 +130,7 @@ if (SPEED_TRANSFERS && process.env.GPU_DIRTY_UPLOAD == null) {
   Object.assign(NATIVE_UPLOAD_POLICY, { value: '1', enabled: true, selection: 'speed-transfer-default' });
 }
 process.env.GPU_DIRTY_UPLOAD ??= NATIVE_UPLOAD_POLICY.value;
+process.env.GPU_EDGE_LAG = nativeEdgeLagPolicy(NATIVE_PAINT_MODE.mode).value;
 NATIVE_PAINT_MODE.uploadPolicy = NATIVE_UPLOAD_POLICY;
 // --video 0|1: 0 keeps stage images and passage checkpoints; 1 retains and encodes the film. Default 1.
 const OUTPUT_VIDEO = num('video', 1);

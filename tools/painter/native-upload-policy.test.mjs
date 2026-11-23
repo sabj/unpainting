@@ -30,3 +30,10 @@ test('actual CLI records effective policy before failed image load; mode uses la
   }
  }finally{fs.rmSync(folder,{recursive:true,force:true});}
 });
+
+test('fast mode lets the edge feed\'s geometry trail a stroke\'s outline; full mode remakes it at once', async () => {
+  const { nativeEdgeLagPolicy, FAST_EDGE_LAG } = await import('./native-paint-mode.mjs');
+  assert.deepEqual(nativeEdgeLagPolicy('fast'), { environmentVariable: 'GPU_EDGE_LAG', value: String(FAST_EDGE_LAG) });
+  assert.equal(nativeEdgeLagPolicy('full').value, '0');
+  assert.throws(() => nativeEdgeLagPolicy('other'));
+});
