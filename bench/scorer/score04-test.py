@@ -34,7 +34,7 @@ def make_run(root, name, author, registry, source, frames=20, film=True, usage=N
         fr = []
         for i in range(frames):
             picture(f / "plate" / f"f{i:04d}.webp", i + 100 * len(name), (30, 40))
-            fr.append({"src": f"f{i:04d}.webp", "position": i / (frames - 1)})
+            fr.append({"src": f"f{i:04d}.webp", "position": i / (frames - 1), **({"stage": "paper"} if i == 0 else {})})
         (f / "plate" / "frames.json").write_text(json.dumps({"frames": fr}))
     run = {"subject": {"id": "subj", "sourceAbs": str(source), "registry": str(registry)}, "author": {"key": author, "name": author},
            "code": {"commit": "abcdef1234"}, "failure": None}
@@ -102,15 +102,28 @@ class Readings(unittest.TestCase):
             with self.assertRaisesRegex(R.Refusal, "not the rubric"):
                 R.load_rubric(p)
 
-    def test_twelve_evenly_spaced_snapshots_then_the_finished_sheet(self):
+    def test_the_paper_then_eleven_evenly_spaced_snapshots_then_the_finished_sheet(self):
         with tempfile.TemporaryDirectory() as d:
             src, reg = fixtures(d)
-            f = make_run(d, "r", "auto", reg, src, frames=27)
+            f = make_run(d, "r", "auto", reg, src, frames=25)
             s = R.snapshots(str(f / "plate" / "painting.png"))
             self.assertEqual(len(s), 13)
-            self.assertEqual([os.path.basename(x) for x, _ in s[:3]], ["f0002.webp", "f0004.webp", "f0006.webp"])
+            self.assertEqual(s[0], (str(f / "plate" / "f0000.webp"), 0))
+            self.assertEqual([os.path.basename(x) for x, _ in s[1:4]], ["f0002.webp", "f0004.webp", "f0006.webp"])
+            self.assertEqual(os.path.basename(s[11][0]), "f0022.webp")
             self.assertEqual(s[-1], (str(f / "plate" / "painting.png"), 100))
-            self.assertEqual(s[5][1], round(100 * 12 / 26))
+            self.assertEqual(s[5][1], round(100 * 10 / 24))
+            self.assertIn("the first (0%) is the untouched sheet of paper", R.SEQ)
+
+    def test_a_film_that_does_not_start_with_the_paper_is_refused(self):
+        with tempfile.TemporaryDirectory() as d:
+            src, reg = fixtures(d)
+            f = make_run(d, "old", "auto", reg, src)
+            doc = json.loads((f / "plate" / "frames.json").read_text())
+            doc["frames"][0].pop("stage")
+            (f / "plate" / "frames.json").write_text(json.dumps(doc))
+            with self.assertRaisesRegex(R.Refusal, "does not start with the untouched paper"):
+                R.snapshots(str(f / "plate" / "painting.png"))
 
     def test_no_film_short_film_or_missing_frame_is_refused(self):
         with tempfile.TemporaryDirectory() as d:
@@ -328,8 +341,8 @@ class EndToEnd(unittest.TestCase):
         import score_painting as SP
         from common import load_rgb
         uri = lambda f, px: SP.data_uri(load_rgb(f), px)
-        j.marks = {uri(str(a / "plate" / "f0001.webp"), 640): "Auto", uri(str(a / "plate" / "painting.png"), 768): "Auto",
-                   uri(str(m / "plate" / "f0001.webp"), 640): "model", uri(str(m / "plate" / "painting.png"), 768): "model"}
+        j.marks = {uri(str(a / "plate" / "f0000.webp"), 640): "Auto", uri(str(a / "plate" / "painting.png"), 768): "Auto",
+                   uri(str(m / "plate" / "f0000.webp"), 640): "model", uri(str(m / "plate" / "painting.png"), 768): "model"}
         out = os.path.join(self.tmp.name, "out")
         rc = self.S.main([str(a), str(m), "--out", out], judge=j, say=lambda *x, **k: None)
         self.assertEqual(rc, 0)

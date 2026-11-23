@@ -58,12 +58,12 @@ kit.dryAll(sheet, O); await kit.finish('film');`);
     assert.match(said, /ink must be "soluble"/); assert.ok(!said.includes('OPENED')); assert.match(said, /WATERPROOF 2/, 'the two inks, and only they, are set');
     execFileSync(process.execPath, ['p.mjs'], { cwd: wb, stdio: 'ignore' });
     const out = path.join(wb, 'out', 'sargent'), doc = JSON.parse(fs.readFileSync(path.join(out, 'film', 'frames.json'), 'utf8'));
-    // after strokes 2, 4, 6, 8; wet before the drying (after 9); dried; finished
-    assert.deepEqual(doc.frames.map(f => [f.stage, f.strokes]), [['painting', 2], ['painting', 4], ['painting', 6], ['painting', 8], ['painting', 9], ['dried', 9], ['finished', 9]]);
+    // the untouched paper; after strokes 2, 4, 6, 8; wet before the drying (after 9); dried; finished
+    assert.deepEqual(doc.frames.map(f => [f.stage, f.strokes]), [['paper', 0], ['painting', 2], ['painting', 4], ['painting', 6], ['painting', 8], ['painting', 9], ['dried', 9], ['finished', 9]]);
     assert.deepEqual(doc.frames.map(f => f.src), doc.frames.map((_, i) => `f${String(i).padStart(4, '0')}.webp`));
     assert.deepEqual(fs.readdirSync(path.join(out, 'film')).sort(), [...doc.frames.map(f => f.src), 'frames.json'].sort(), 'nothing else is left in the folder');
     const last = await sharp(path.join(out, 'film', doc.frames.at(-1).src)).raw().toBuffer(), final = await sharp(path.join(out, 'final.png')).raw().toBuffer();
     assert.ok(last.equals(final), 'the last frame is the finished sheet, lossless');
-    assert.deepEqual(JSON.parse(fs.readFileSync(path.join(out, 'stats.json'), 'utf8')).film, { frames: 7, saved: 7 });
+    assert.deepEqual(JSON.parse(fs.readFileSync(path.join(out, 'stats.json'), 'utf8')).film, { frames: 8, saved: 8 });
   } finally { fs.rmSync(ws, { recursive: true, force: true }); }
 });

@@ -199,6 +199,7 @@ export async function open(task, { seed = +(process.env.BENCH_SEED || 1), gpu = 
   st = { work, advance, clock: waterClock(advance), unit: unitOf(task), O, log, logWritten: false, seed, task, out, sheet, pigments, W, H, strokes: 0, pen: 0, pencil: 0, erase: 0, small: 0, short: 0, dots: 0, frames: 0, snaps: [], film: [], t0: Date.now(), backend: sheet._gpu ? 'gpu' : 'cpu', paperRGB, pending: Promise.resolve() };
   logLine({ ev: 'open', protocol: PROTOCOL, task, seed, W, H, mmPerCell: MM, paper: { toothScale: 0.2, coldPress: true, rgb: paperRGB }, backend: st.backend, t0: st.t0 });
   process.on('exit', flushLog); // a script that dies before finish() keeps the strokes it laid
+  film('paper', 0);   // the film's first frame: the untouched sheet in its own colour (the judges' first snapshot)
   console.error(`kit v2: ${task} ${W}x${H}, ${st.backend}, budget ${BUDGET} strokes; this is painting ${runsSoFar(task) + 1} of the ${RUNS} you may run in this attempt (charged when it lays its first mark)`);
   return { sheet, O, W, H };
 }
