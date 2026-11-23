@@ -19,7 +19,8 @@ test('a CG iteration is two dispatches, closed once by lv_cg_d with the last par
 
 test('light only after a read with steps and no level tile, and nothing written since', () => {
   const lv = levelBudget();
-  names(lv); adaptLevel(lv, status(0)); assert.equal(lv.light, true);
+  names(lv); adaptLevel(lv, status(0)); assert.equal(lv.light, false, 'not for a caller that does not say when it writes');
+  lv.tracksWrites = true; names(lv); adaptLevel(lv, status(0)); assert.equal(lv.light, true);
   assert.deepEqual(names(lv).map(([n]) => n), ['lv_tiles', 'lv_boxes']);
   assert.equal(lv.lightSteps, 1);
   adaptLevel(lv, status(1, 1)); assert.equal(lv.light, false, 'a level tile found on a light step turns it back on');

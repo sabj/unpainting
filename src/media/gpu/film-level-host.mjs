@@ -71,7 +71,8 @@ export function adaptLevel(lv, v, written = false) {
   t.iterations = Math.max(t.iterations, st.iterations); t.subs = Math.max(t.subs, st.subs); t.boxes = Math.max(t.boxes, st.boxes);
   t.short += st.short; t.fewer += st.fewer; t.solves += st.solves; t.levelSteps += st.levelSteps; t.missed += st.missed;
   // light while every step since the last read had no level tile and the sheet was not written since they were encoded
-  lv.light = lv.since > 0 && st.levelSteps === 0 && !written; lv.since = 0;
+  // (only for a caller that says when it writes the sheet: lv.tracksWrites, as stepfull.mjs does)
+  lv.light = !!lv.tracksWrites && lv.since > 0 && st.levelSteps === 0 && !written; lv.since = 0;
   let grew = false;
   if ((st.short || st.iterations > 0.75 * lv.iters) && lv.iters < LV_ITMAX) { lv.iters = Math.min(LV_ITMAX, 2 * lv.iters); grew = true; }
   if ((st.fewer || st.subs > 0.75 * lv.subs) && lv.subs < 64) { lv.subs = Math.min(64, 2 * lv.subs); grew = true; }

@@ -302,7 +302,7 @@ export class GpuSheet {
     const d = this.device, B = this.b, size = levelBuffers(this.w, this.h, this.n, this.ntiles, on);
     const mk = bytes => d.createBuffer({ size: Math.max(16, bytes), usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST });
     for (const k of B.LVX ? ['LVA', 'LVB', 'LVF', 'LVP'] : Object.keys(size)) { B[k]?.destroy(); B[k] = mk(size[k]); }
-    this.lvBig = on; this.lv ??= levelBudget();
+    this.lvBig = on; this.lv ??= levelBudget(); this.lv.tracksWrites = true;
     if (this.bg) for (const name of Object.keys(this.bg)) if (name.startsWith('lv_')) this.bg[name] = d.createBindGroup({ layout: this.bgl[name], entries: this.uses[name].map(binding => ({ binding, resource: { buffer: this.bufFor(this.names[binding]) } })) });
   }
   lvMm(o = this.o) { return o.mmPerCell > 0 ? o.mmPerCell : (this.mmPerCell > 0 ? this.mmPerCell : 0.3); }
