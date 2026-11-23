@@ -2,6 +2,44 @@
 
 Releases use semver. Each release records its painter and simulator versions ([version guide](docs/versions.md)).
 
+## 0.4.0 benchmark (not released)
+
+Written 22 November 2026. This entry covers the benchmark. The painter's changes are in the 0.4.0-rc.1 entry below. The benchmark is frozen before its one scored run; nothing here has a result yet.
+
+RESULTS: to be filled from the frozen run.
+
+0.4 is a new series. Its scores are not comparable with rounds V1 to V5.
+
+### Changed
+
+- A ladder of levels replaces the rounds. L0 is nothing, L1 adds harness tips, L2 adds prepared inputs and Auto's plan, L3 adds a retry, L4 adds a second retry with many resources. L0 is defined, not run. See [levels](bench/docs/levels.md).
+- Retries are self-study. The model sees its own painting, replay and stroke map, and writes its own assessment. No score, no critique. Every attempt starts in a fresh branch and workspace.
+- Models get more freedom: their own drawn lines, pen, pencil or none, waterproof or soluble ink, and warnings in place of refusals that only protect the painting.
+- Budgets are measured, not limited. Rendering is charged in a machine-independent unit (one full look of Auto's plan is 1.00), steps are a runaway guard at 1,000, and the clock is a six-hour safety stop. The target is about 60 minutes a session.
+- Usage, tool use and cost are recorded for every session.
+- The model's shell has no internet and one fixed toolbox. Attempts are recorded.
+- Scoring: human-ness from the painting in progress by a written rubric, quality and likeness, and a combined number. The original is scored too, and a painting's result is its share of the original's. Auto is the difficulty index. Anti-cheat and algorithmic measures sit beside the scores. See [scoring](bench/docs/scoring.md).
+- Judges run locally by default.
+- Level 1 has its own targets outside the old public suite, harness tips, and a film of the kit's strokes; the pen's ink is a named choice.
+
+### Retired
+
+- Rounds V1 to V5 as names, the 85-minute model clock, and look counts. They stay as history in the docs.
+
+### Planned, not in 0.4's first run
+
+- A container for replication.
+- Hosted judging through OpenRouter or Together, one setting.
+- The OpenAI models (gpt-6-astra, gpt-6.1-sol, gpt-6.1-terra).
+- Pencil and eraser in the kit.
+
+### First run
+
+- Models: Gemini 4 Argon, Neon and Hydrogen, and Claude Sonnet 5.5, all at medium effort, on subscriptions.
+- Subjects: Mittens and Homer's daughter.
+- A test run with three tries at L3 and L4 comes first, to decide whether the scored run keeps three or scopes back to one.
+- New page: [Auto against a model](docs/auto-vs-model.md).
+
 ## 0.4.0-rc.1 (not released)
 
 Painter **V107-dev**, simulator **105**, judges **J1**. Changes are against 0.2.1, the last release. There was no 0.3.3 release. Assembled on 2026-11-19.

@@ -21,6 +21,7 @@ The [project README](../README.md) has the quick start. The [0.3.0 release notes
 ## Checking the work
 
 - [Judging](judging.md): repeatable image measurements, stage checks and AI image judges
+- [Auto against a model](auto-vs-model.md): how the code alone paints a cat, and how a model paints it at level 2
 - [Honesty](honesty.md): the check that blocks target-pixel reads, and its records
 - The benchmark has its own docs in [bench/](../bench/README.md)
 

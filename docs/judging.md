@@ -38,7 +38,7 @@ Vision judges, AI models that score images, are optional. `tools/judge/rounds/` 
 - `tools/judge/rounds/tally.mjs` drops a judge that ranks the known bad example above the known good one, or scores the duplicates more than 1 point apart.
 - A candidate wins when at least 4 valid judges prefer it and those votes make up at least two thirds of all valid judges.
 
-The benchmark scores paintings with its own judges; [bench/docs/scoring.md](../bench/docs/scoring.md) describes them.
+The benchmark scores paintings with its own judges; [bench/docs/scoring.md](../bench/docs/scoring.md) describes them. In 0.4 the benchmark judges human-ness more than quality: they read the painting in progress by the [human-ness rubric](../bench/docs/human-ness-rubric.md), and quality and likeness is a second reading beside it. Judges run locally by default.
 
 ## Why advisory
 
