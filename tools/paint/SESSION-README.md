@@ -43,15 +43,18 @@ plan's minutes and a look's painting are on it.
 | `./unpaint status` | nothing | what is used of this try's budget (minutes on the clock, look units, returns to an earlier choice) and the plans made so far | none |
 | `./unpaint plan` | compiles your present `choice.json` and the script it names | whether it compiled, or why it was refused, and its counts (passages, washes, strokes, widest brush, washes by stage, and how far the hand jumps between consecutive strokes of one passage, median and worst, in mm), what each erase will take, and every WARNING on your choice (each is laid as you wrote it; heed or ignore it). Nothing else: no picture and no wash data | none |
 | `./unpaint look` | the same, then PAINTS your present choice for real, small, through drying, and shows you the dried sheet | `looks/N/beside.png` (your painting as it dried, the subject, the middle study, side by side), `looks/N/stages.png` (the subject, then your sheet at 10, 25, 50, 75 and 100% of the strokes: the order of the work), `looks/N/numbers.txt` (each named form measured on the DRIED sheet against the study and against your plan, marked when it is TOO DARK or TOO PALE, and every wash), `looks/N/plan.json` (every wash of your script as data), `looks/N/plan.png` (the plan as a diagram) | its cost in look units, of LOOKS_MOST for this try (the benchmark's budget) |
-| `./unpaint look --until S` | the same, stopped after stage S of your plan (1 the first washes) and dried there; nothing after it is painted | the same files; `numbers.txt` begins with what is on the paper and what is still to come | that stage's share of the plan's washes |
-| `./unpaint look --region x0,y0,x1,y1` or `--region FORM NAME` | your own script only: paints the passages that touch that box (sheet millimetres) or that named form's box, and what they are laid into, by themselves on the sheet | the same files | the share of your script's passages that touch the region (with `--until` too: both shares multiplied). A wide box touches most passages and saves little: `./unpaint cost` says before you spend |
+| `./unpaint look --until S` | the same, stopped after stage S of your plan (1 the first washes) and dried there; nothing after it is painted | the same files; `numbers.txt` begins with what is on the paper and what is still to come | that stage's share of the plan's washes, of the whole look's price |
+| `./unpaint look --region x0,y0,x1,y1` or `--region FORM NAME` | your own script only: paints the passages that touch that box (sheet millimetres) or that named form's box, and what they are laid into, by themselves on the sheet | the same files | the share of your script's passages that touch the region, of the whole look's price (with `--until` too: both shares multiplied). A wide box touches most passages and saves little: `./unpaint cost` says before you spend |
 | `./unpaint cost [--until S] [--region ...]` | prices that look of your present choice and paints nothing | the cost in units and what you have left | none |
 | `./unpaint wait` | waits for the answer of the command that said "still working" | that answer | none |
 
 A choice that is refused costs no look. A choice that is exactly one you planned before and then left is a
 return to an earlier choice: it is counted, and past REVERTS_MOST of them it is refused (`TASK.md` says why). A painting that fails on this side costs no look either: the answer
 says NOT PAINTED, and you may ask again. The same look of a choice you have already looked at renders nothing and
-costs nothing. No look costs less than 0.05 units: the sheet is set up, drawn on and dried whatever is painted.
+costs nothing. A look's price is fixed: 0.3 units for your whole plan at half size, its share when stopped at a stage
+or cut to a region, and never under 0.2, whatever the look holds. How you paint (water, strokes, dryings) is not
+charged. One guard only, to keep the machines free: a painting that runs to more than ten times the water steps of
+the automatic painting of this subject is stopped and said so; it costs no look.
 
 What a look's painting is, exactly:
 

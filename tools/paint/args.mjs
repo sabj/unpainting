@@ -32,10 +32,10 @@ export const USAGE = `usage: npm run paint -- <subject[,subject...]> plan|paint|
                         not its plan, planner, painting, film or stroke map)
   --retries N           retries at a level (L3, L4; default 1), and --try N which of them this is (default 1)
   --previous <dir>      the run folder of the result this retry starts from (its finished full-size painting)
-  --looks U             the benchmark's resource budget, rendering: how much a try may spend on looks, in units
-                        (default 5). A full look of the whole plan on the whole sheet costs 1; a look stopped at
-                        a stage costs that stage's share of the washes; a look of a region the share of
-                        the script's passages that touch it. The cost is told before it is spent. Machine seconds are recorded, never charged
+  --looks U             the benchmark's budget for looks in one try, in units (default 3). A look has a fixed price:
+                        0.3 for the whole sheet at half size, 1.0 at full size, its share when stopped at a stage
+                        or cut to a region, never under 0.2. How it paints (sweeps, water, dryings) and machine
+                        seconds are recorded, never charged
   --wallminutes N       the safety stop, not a budget: minutes on the wall clock after which a session is cut off and
                         marked so (default 360). Waiting for a look, a queue or the provider is never charged
   --graceminutes N      minutes a session has to hand in after the safety stop (default 10)

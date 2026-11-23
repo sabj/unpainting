@@ -34,7 +34,7 @@ import { editLine } from '../../src/paint/methods/plan-edit.mjs';
 import { tinyTouchWarning } from './plan-data.mjs';
 import { revertCounter, DEFAULT_REVERTS } from './reverts.mjs';
 import { readSeen, seenAsk } from './seen.mjs';
-import { DEFAULT_LOOK_UNITS, readLookAsk, regionBox, lookCost, costLine, workCostLine, scriptInRegion, planWork, workUnits } from './look-cost.mjs';
+import { DEFAULT_LOOK_UNITS, readLookAsk, regionBox, lookCost, costLine, scriptInRegion } from './look-cost.mjs';
 
 /**
  * The benchmark's resource budget for one try (one model, one subject, one level), when the command line names none:
@@ -189,6 +189,18 @@ export function ledgerLooks(ledger) {
   return fs.readFileSync(ledger, 'utf8').split('\n').filter(Boolean).map(l => JSON.parse(l)).filter(e => e.look);
 }
 
+/** The words beside each command's token split: how it reports them, and what is not reported. */
+const SPLIT_FROM = {
+  agy: 'agy reports input (fresh), cache_read (cached) and output per response; thinking tokens it reports apart, and its total is input + output',
+  claude: 'claude reports input, cache_creation (counted as fresh input, and also shown as cacheWriteIn), cache_read (cached) and output',
+  codex: 'codex reports input (cached included; fresh = input - cached) and output per turn',
+};
+/** The split of a transcript's tokens, or a plain record that its command did not report one. */
+function tokenSplit(cli, split) {
+  if (!split) return { reported: false, note: `the ${cli ?? 'model'} transcript reported no token split (fresh input, cached input, output)` };
+  return { reported: true, ...split, from: SPLIT_FROM[cli] ?? `as the ${cli} transcript reported them` };
+}
+
 /**
  * The answering side of the session: the one broker. `compile(choice, script, n)` plans a checked choice outside the
  * model's folder and resolves {ok, error, summary, rows}; `checkScript(obj)` returns a checked script or throws.
@@ -212,7 +224,7 @@ export function ledgerLooks(ledger) {
  * `codePlan`: the level hands over the code's plan and planner (the preflight); without them a plan or a look of anything
  * but the model's own script is refused with OWN_SCRIPT_ONLY (choice.mjs readChoice), and nothing is spent.
  */
-export function sessionServer({ dir, codePlan = true, sheet = null, forms = [], looks: most = DEFAULT_LOOKS, wallMinutes = DEFAULT_WALL_MINUTES, graceMinutes = DEFAULT_GRACE_MINUTES, steps: stepsMost = DEFAULT_STEPS, stepsTaken = () => 0, unit = null, reverts: revertsMost = DEFAULT_REVERTS, startKey = null, pictures = [], compile, look: paintLook, keep = null, checkScript, checkPlan = null, checkTools = null, ledger, now = Date.now, everyMs = 400 }) {
+export function sessionServer({ dir, codePlan = true, sheet = null, forms = [], looks: most = DEFAULT_LOOKS, wallMinutes = DEFAULT_WALL_MINUTES, graceMinutes = DEFAULT_GRACE_MINUTES, steps: stepsMost = DEFAULT_STEPS, stepsTaken = () => 0, lookSize = 'half', reverts: revertsMost = DEFAULT_REVERTS, startKey = null, pictures = [], compile, look: paintLook, keep = null, checkScript, checkPlan = null, checkTools = null, ledger, now = Date.now, everyMs = 400 }) {
   if (!(most > 0) || !(wallMinutes > 0) || !(stepsMost > 0)) throw new Error('session: the budget is a number of look units and of steps, and the safety stop a number of minutes, each above 0');
   const plans = [], cache = new Map(), painted = new Map(), requests = [], good = new Set(), seen = new Map(), reverts = revertCounter(revertsMost, startKey);
   let t0 = now(), waitMs = 0, busy = false, timer = null, lastGood = null, n = 0, pending = null, lastEnd = t0, reached = null, warningsGiven = 0, described = null;
@@ -297,15 +309,14 @@ export function sessionServer({ dir, codePlan = true, sheet = null, forms = [], 
       } catch (e) { return `REFUSED, nothing was painted and nothing was spent: ${e.message}`; }
       // a region look paints the script's passages that touch the box: its cost is their share of the passages
       if (region) { const inR = scriptInRegion(p.script, region.box); if (!inR.kept) return `REFUSED, nothing was painted and nothing was spent: no passage of your script touches the region ${region.box.join(', ')} mm`; region.passages = inR.kept; region.of = inR.of; region.passageShare = inR.kept / inR.of; }
-      cost = lookCost(got.rows ?? [], { until: ask.until, regionShare: region?.passageShare ?? null });
-      // with the subject's unit, the quote is the work the plan holds (its brush sweeps and dryings, to the stage asked) against one full automatic look
-      if (unit && got.passes) { const w = planWork(got.passes, { until: ask.until }); cost = { ...cost, cost: workUnits(w, unit.plan, region?.passageShare ?? 1), work: w, from: 'the plan: its brush sweeps and dryings' }; }
+      // a fixed price by size and share (look-cost.mjs), whatever is in the look: how it paints costs nothing
+      cost = lookCost(got.rows ?? [], { until: ask.until, regionShare: region?.passageShare ?? null, size: lookSize });
     }
     const askKey = `${p.key}:${ask.until ?? ''}:${region ? region.box.join(',') : ''}`, costSaid = cost ? `${cost.cost} unit${cost.cost === 1 ? '' : 's'} (${ask.until != null ? `stopped after stage ${ask.until}: ${cost.washes} of the plan's ${cost.of} washes` : `the whole plan, ${cost.of} washes`}${region ? `; the region ${region.name ? `"${region.name}", ` : ''}${region.box.join(', ')} mm, which ${region.passages} of your ${region.of} passages touch` : ', the whole sheet'})` : '';
     const edited = `${editSaid}${p.tools ? ` ${p.tools.said}${got.toolFiles?.length ? ` See ${got.toolFiles.map(f => f.rel).join(', ')}.` : ''}` : ''}${warned(p.warnings)}${back.revert ? `\nThis is a return to a choice you had left: ${back.count} of ${revertsMost} allowed.` : ''}`;
     // ... and of the strokes too small for a wet bed, before anything is painted (plan-data.mjs tinyTouchWarning)
     const tiny = tinyTouchWarning(s) + (s.erases?.said ?? '');
-    if (cmd === 'plan') return `It compiles (${what}): ${line}.${travelLine(s.handTravel)}${edited}${tiny}${unit && got.passes ? workCostLine(got.passes, unit, unitsLeft()) : costLine(got.rows ?? [], unitsLeft())} Nothing else is shown without a look.\n${left()}`;
+    if (cmd === 'plan') return `It compiles (${what}): ${line}.${travelLine(s.handTravel)}${edited}${tiny}${costLine(got.rows ?? [], unitsLeft(), lookSize)} Nothing else is shown without a look.\n${left()}`;
     if (cmd === 'cost') return `This look would cost ${costSaid}. You have ${unitsLeft()} of ${most} units left. Nothing was painted and nothing was spent.${painted.has(askKey) ? ' (You have already looked at exactly this: looking again renders nothing and costs nothing.)' : ''}\n${left()}`;
     // the same look of the same choice was rendered already: it is shown again and costs nothing
     const charge = painted.has(askKey) ? 0 : cost.cost;
@@ -317,11 +328,10 @@ export function sessionServer({ dir, codePlan = true, sheet = null, forms = [], 
     let seenIt = painted.get(askKey);
     if (!seenIt) { try { seenIt = await paintLook(p.choice, p.script, { plan: id, look }, p.edit?.edit ?? null, got, { until: ask.until, region }); } catch (e) { seenIt = { ok: false, error: e.message }; } if (seenIt?.ok) painted.set(askKey, seenIt); }
     if (!seenIt?.ok) { note({ notPainted: String(seenIt?.error ?? 'no painting').slice(0, 300), plan: id, key: p.key }); return `NOT PAINTED, no look was counted: ${seenIt?.error ?? 'the painter gave no painting'}\nYour choice compiles (${what}): ${line}. Ask for the look again, or go on.\n${left()}`; }
-    // charged what it really did (the painter's own counts) when the subject has a unit; the quote stands only when the painter gave no count, and says so
-    let charged = charge, chargedFrom = 'the quote';
-    if (charge && unit) { const w = seenIt.painted?.work; if (w) { charged = workUnits(w, unit.look); chargedFrom = 'the painter\'s count: its brush sweeps and dryings'; } else chargedFrom = `the quote: ${seenIt.painted?.workFault ?? 'the painter gave no count'}`; }
+    // charged its fixed price, as quoted; its work (sweeps, dryings, water steps, cell-steps) is recorded beside the charge and never charged
+    const charged = charge, chargedFrom = `the fixed price of a ${lookSize}-size look of ${ask.until != null || region ? 'part of ' : ''}the sheet`;
     // the look is spent before it is delivered: whatever happens to the delivery, it stays spent
-    note({ look, cost: charged, quoted: charge, chargedFrom, work: seenIt.painted?.work ?? null, ask: { until: ask.until, region: region ? { box: region.box, name: region.name, sheetShare: +region.share.toFixed(4), passages: region.passages, of: region.of } : null }, estimate: cost, plan: id, atSeconds, at: new Date(now()).toISOString(), what, kind: p.choice.kind, settings: entry.settings, script: p.choice.script, plan: p.choice.plan ?? null, edit: er, tools: p.tools?.record ?? null, key: p.key, marked: seenIt.marked ?? null, painted: seenIt.painted ?? null });
+    note({ look, cost: charged, quoted: charge, chargedFrom, size: lookSize, work: seenIt.painted?.work ?? null, ask: { until: ask.until, region: region ? { box: region.box, name: region.name, sheetShare: +region.share.toFixed(4), passages: region.passages, of: region.of } : null }, estimate: cost, plan: id, atSeconds, at: new Date(now()).toISOString(), what, kind: p.choice.kind, settings: entry.settings, script: p.choice.script, plan: p.choice.plan ?? null, edit: er, tools: p.tools?.record ?? null, key: p.key, marked: seenIt.marked ?? null, painted: seenIt.painted ?? null });
     entry.look = look;
     const folder = `looks/${look}`, t = p.choice.tools, choiceText = JSON.stringify({ kind: p.choice.kind, settings: entry.settings, script: p.choice.script, plan: p.choice.plan ?? null, ...(t ? { lines: t.lines ?? undefined, forms: t.forms ?? undefined, perForm: t.perFormGiven ?? undefined, medium: t.medium ?? undefined } : {}), why: p.choice.why }, null, 1) + '\n';
     // kept outside the folder as it was shown, with the choice as it was looked at: what changed between looks is read from here
@@ -338,7 +348,7 @@ export function sessionServer({ dir, codePlan = true, sheet = null, forms = [], 
     if (seenIt.planPicture) safeWrite(dir, `${folder}/plan.png`, seenIt.planPicture);
     safeWrite(dir, `${folder}/plan.json`, JSON.stringify({ choice: { kind: p.choice.kind, settings: entry.settings, script: p.choice.script, plan: p.choice.plan ?? null }, summary: got.summary, washes: got.rows }, null, 1) + '\n');
     const m = seenIt.marked;
-    return `LOOK ${look} (${what}), cost ${charged} unit${charged === 1 ? '' : 's'}${charge ? (unit ? ` (quoted ${charge}; charged ${chargedFrom === 'the quote' || /^the quote/.test(chargedFrom) ? chargedFrom : 'what it really did'})` : '') : ' (looked at before: nothing was rendered)'}, ${unitsLeft()} of ${most} left${seenIt.stoppedText ? `. ${seenIt.stoppedText.split('\n')[0]}` : ''}${region ? `. Only the passages in the region were painted (${seenIt.painted?.regionPassages ?? '?'})` : ''}. PAINTED${seenIt.painted?.cells ? ` small (${seenIt.painted.cells} cells across${seenIt.painted.fullCells ? ` of the final ${seenIt.painted.fullCells}` : ''})` : ''} and dried: ${line}.${edited}\nOpen ${folder}/beside.png: your painting as it dried, the subject and the middle study, left to right, on the same grid.${seenIt.stages ? ` Open ${folder}/stages.png: the subject, then the sheet at 10, 25, 50, 75 and 100% of the strokes (the order of the work).` : ''} Read ${folder}/numbers.txt: each named form on the DRIED sheet against the study and against your plan${m ? `; ${m.forms} named forms are marked !! (too dark or too pale)${m.washes ? ` and ${m.washes} washes` : ''}` : ''}. ${folder}/plan.json holds every wash as data${seenIt.planPicture ? `, ${folder}/plan.png the plan as a diagram` : ''}.\nStep back from it as from the easel, and revise for what you see.\n${left()}`;
+    return `LOOK ${look} (${what}), cost ${charged} unit${charged === 1 ? '' : 's'}${charge ? ` (${chargedFrom})` : ' (looked at before: nothing was rendered)'}, ${unitsLeft()} of ${most} left${seenIt.stoppedText ? `. ${seenIt.stoppedText.split('\n')[0]}` : ''}${region ? `. Only the passages in the region were painted (${seenIt.painted?.regionPassages ?? '?'})` : ''}. PAINTED${seenIt.painted?.cells ? ` small (${seenIt.painted.cells} cells across${seenIt.painted.fullCells ? ` of the final ${seenIt.painted.fullCells}` : ''})` : ''} and dried: ${line}.${edited}\nOpen ${folder}/beside.png: your painting as it dried, the subject and the middle study, left to right, on the same grid.${seenIt.stages ? ` Open ${folder}/stages.png: the subject, then the sheet at 10, 25, 50, 75 and 100% of the strokes (the order of the work).` : ''} Read ${folder}/numbers.txt: each named form on the DRIED sheet against the study and against your plan${m ? `; ${m.forms} named forms are marked !! (too dark or too pale)${m.washes ? ` and ${m.washes} washes` : ''}` : ''}. ${folder}/plan.json holds every wash as data${seenIt.planPicture ? `, ${folder}/plan.png the plan as a diagram` : ''}.\nStep back from it as from the easel, and revise for what you see.\n${left()}`;
   }
 
   async function tick() {
@@ -498,7 +508,9 @@ const kindOfCommand = c => { const m = /(?:^|[\s;&|/])unpaint\s+(status|plan|loo
  * step as it starts and ends, the tool's parameters in it, and one result).
  */
 export function readTranscript(cli, out) {
-  const calls = {}, commands = [], toolSteps = [], byId = new Map(); let text = '', tokens = null, costUSD = null, tokensIn = null, tokensOut = null;
+  const calls = {}, commands = [], toolSteps = [], byId = new Map(); let text = '', tokens = null, costUSD = null, tokensIn = null, tokensOut = null, split = null;
+  // the tokens split as the command reports them: fresh input, cached input, output (tokenSplit below)
+  const add = (k, v) => { if (!Number.isFinite(v)) return; split ??= { freshIn: 0, cachedIn: 0, out: 0 }; split[k] = (split[k] ?? 0) + v; };
   const count = k => { calls[k] = (calls[k] ?? 0) + 1; };
   // each tool step for tool-use.mjs: its kind, the command or the place, and once it has ended its exit and the start of its output
   const kindOf = name => (/^(read_file|view_file|list_dir|find_by_name|grep_search|Read|Glob|Grep)$/.test(name) ? 'read' : /^(write_to_file|write_file|replace_file_content|multi_replace_file_content|sed_file|Write|Edit)$/.test(name) ? 'write' : name);
@@ -517,7 +529,7 @@ export function readTranscript(cli, out) {
           const places = Object.entries(par).filter(([k, v]) => typeof v === 'string' && /path|file|dir|uri|cwd/i.test(k)).map(([, v]) => v); if (places.length) commands.push(`${name} ${places.join(' ')}`); stepOf(s.step_index, kindOf(name), places.join(' ')); }
       }
       if (d.event === 'step_update' && s?.step_type === 'tool' && s.state && s.state !== 'ACTIVE') ended(byId.get(s.step_index), { failed: s.state !== 'DONE', output: s.tool_info?.output ?? s.error ?? null });
-      if (d.event === 'step_update' && s?.step_type === 'agent_response') { if (s.text_delta) said.set(s.step_index, (said.get(s.step_index) ?? '') + s.text_delta); if (s.usage?.total_tokens) tokens = (tokens ?? 0) + s.usage.total_tokens; }
+      if (d.event === 'step_update' && s?.step_type === 'agent_response') { if (s.text_delta) said.set(s.step_index, (said.get(s.step_index) ?? '') + s.text_delta); if (s.usage?.total_tokens) { tokens = (tokens ?? 0) + s.usage.total_tokens; add('freshIn', s.usage.input_tokens); add('cachedIn', s.usage.cache_read_tokens); add('out', s.usage.output_tokens); add('thinking', s.usage.thinking_tokens); } }
       if (d.event === 'result' && d.result?.response) text = String(d.result.response);
       continue;
     }
@@ -529,7 +541,7 @@ export function readTranscript(cli, out) {
         else { count(b.name === 'Read' ? 'read file' : ['Write', 'Edit'].includes(b.name) ? 'write file' : b.name); const f = b.input?.file_path ?? b.input?.path; if (f) commands.push(`${b.name} ${f}`); stepOf(b.id, kindOf(b.name), f ?? ''); }
       }
       if (d.type === 'user') for (const b of d.message?.content ?? []) if (b.type === 'tool_result') ended(byId.get(b.tool_use_id), { failed: Boolean(b.is_error), output: typeof b.content === 'string' ? b.content : (b.content ?? []).map(x => x.text ?? '').join('\n') });
-      if (d.type === 'result') { const u = d.usage ?? {}; if (d.result) text = String(d.result); const tin = ['input_tokens', 'cache_creation_input_tokens', 'cache_read_input_tokens'].reduce((a, k) => a + (u[k] || 0), 0);
+      if (d.type === 'result') { const u = d.usage ?? {}; if (d.result) text = String(d.result); const tin = ['input_tokens', 'cache_creation_input_tokens', 'cache_read_input_tokens'].reduce((a, k) => a + (u[k] || 0), 0); add('freshIn', (u.input_tokens || 0) + (u.cache_creation_input_tokens || 0)); add('cacheWriteIn', u.cache_creation_input_tokens || 0); add('cachedIn', u.cache_read_input_tokens || 0); add('out', u.output_tokens || 0);
         // several turns of one session (a command run again in the same folder) are one cost: their results add up
         tokensIn = (tokensIn ?? 0) + tin; tokensOut = (tokensOut ?? 0) + (u.output_tokens || 0); tokens = (tokens ?? 0) + tin + (u.output_tokens || 0); if (d.total_cost_usd != null) costUSD = (costUSD ?? 0) + d.total_cost_usd; }
     } else {
@@ -540,11 +552,11 @@ export function readTranscript(cli, out) {
         else if (it.type === 'file_change') count('write file');
         else if (it.type !== 'reasoning' && it.type !== 'agent_message') count(it.type);
       }
-      if (d.type === 'turn.completed' && d.usage) { tokensIn = (tokensIn ?? 0) + (d.usage.input_tokens || 0); tokensOut = (tokensOut ?? 0) + (d.usage.output_tokens || 0); tokens = tokensIn + tokensOut; }
+      if (d.type === 'turn.completed' && d.usage) { add('freshIn', (d.usage.input_tokens || 0) - (d.usage.cached_input_tokens || 0)); add('cachedIn', d.usage.cached_input_tokens || 0); add('out', d.usage.output_tokens || 0); tokensIn = (tokensIn ?? 0) + (d.usage.input_tokens || 0); tokensOut = (tokensOut ?? 0) + (d.usage.output_tokens || 0); tokens = tokensIn + tokensOut; }
     }
   }
   if (cli === 'agy' && !text && said.size) text = [...said].sort((a, b) => a[0] - b[0]).at(-1)[1];
-  return { text, tokens: tokens || null, tokensIn: tokensIn || null, tokensOut: tokensOut || null, costUSD, calls, commands, steps: toolSteps };
+  return { text, tokens: tokens || null, tokensIn: tokensIn || null, tokensOut: tokensOut || null, tokenSplit: tokenSplit(cli, split), costUSD, calls, commands, steps: toolSteps };
 }
 
 /**

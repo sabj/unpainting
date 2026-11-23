@@ -23,6 +23,10 @@ Notes on each level:
 - At every level the model hands in its own script (with its choice of lines, medium and erase passages). No session folder holds `auto/`. Auto's settings, or Auto's plan edited or not, are refused with "the code's plan, its planner and its settings are handed over at no level". A session that hands in no script of its own has handed in nothing: a failed painting, never Auto's plan painted in its place.
 - L2 changed on 22 November: it gets Auto's inputs, not Auto's plan. L4 changed on 23 November (the owner: "I dont want it to just steer the code", then "probably not give auto painting in l4"): it gets the traced shapes and nothing of Auto. Runs made under the older terms show the harness works; they are not results at those levels.
 
+## Budget
+
+Every level has the same shape: one try, a budget of 3.0 look units. A look has a fixed price by size and by the share of the sheet or script it paints, whatever is in it: a half-size look of the whole sheet 0.3, full size 1.0, a look stopped at a stage or of a region its share of that, never under 0.2. The budget for one try is 3.0 at every level. The final is not charged. How a model paints is never charged: brush sweeps, dryings, water steps, cell-steps, seconds, tokens and steps are recorded in `usage.json` beside the charge. One guard only, as resource management: a painting whose water steps pass ten times those of Auto's painting of the subject is stopped with a plain message, recorded as a stop and never scored.
+
 ## Retries are self-study
 
 - Before a retry the model is handed its own previous painting beside the original, the replay and its stroke map. At L4 it also gets the traced shapes.

@@ -35,7 +35,7 @@ More freedom than before, and mistakes are allowed.
 
 ## Budgets: measured, not limited
 
-- Looks are rendering. Rendering is charged in a machine-independent unit: the painter's own count of brush sweeps plus dry calls. One full look of Auto's plan is 1.00, at every level; below L4 the model is told the unit but not shown the plan. The model chooses where and when to spend it: to a stage, or in a region.
+- Looks (owner, 23 Nov: "I dont want to penalize a model for choosing more water"). A look has a fixed price by size and by the share of the sheet or script it paints, whatever is in it: a half-size look of the whole sheet 0.3, full size 1.0, a look stopped at a stage or of a region its share of that, never under 0.2. The budget for one try is 3.0 at every level. The final is not charged. How a model paints is never charged: brush sweeps, dryings, water steps, cell-steps, seconds, tokens and steps are recorded in `usage.json` beside the charge. One guard only, as resource management: a painting whose water steps pass ten times those of Auto's painting of the subject is stopped with a plain message, recorded as a stop and never scored. The model chooses where and when to look: to a stage, or in a region.
 - Steps: 1,000, as a runaway guard.
 - The clock is a safety stop only: six hours.
 - The target for resource management is about 60 minutes per session, covering the model's thinking and its looks. A session that reaches it hands in what it has and is marked so. The owner wants to tighten this. The harness records the actual terms in each run's record.
@@ -43,7 +43,7 @@ More freedom than before, and mistakes are allowed.
 
 ## What is recorded
 
-- Usage: tokens, provider cost, machine minutes, rendering units, steps.
+- Usage: tokens (fresh input, cached input and output, where the command reports them), provider cost, machine minutes, look units, the work of each look and of the final (sweeps, dryings, water steps, cell-steps), steps.
 - Tool use: shell commands, scripts written and run, pictures opened, plan and look calls, refusals met, attempts to reach outside the folder or the internet.
 - Film: snapshots of the painting in progress, taken at many stops, and the replay.
 - How much each attempt changed from the last, and a flag when it is identical or nearly so.

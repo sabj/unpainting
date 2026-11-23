@@ -39,13 +39,13 @@ Your work is measured, not capped: how many looks you take, how many plans, how 
 None of that is held against you, and no number of them is too many or too few.
 
 Two things are limited, and they are the benchmark's, not a judgment of your work: **the budget for one try**, the
-same for every model and every machine. Rendering: `LOOKS_MOST` units. One unit is the painting work of one full look
-of a reference painting of this subject, counted before you started and the same for every model; a look costs the
-painting work it really takes (its brush sweeps and its dryings),
-so a look stopped after a stage you name (`./unpaint look --until 2`) or of a region of your own script (`--region`)
-costs less: where and when you look is yours to choose. Each look is quoted before it is painted (`./unpaint plan`
-lists it; `./unpaint cost ...` prices any look and paints nothing) and charged what it really took after it; a look
-is refused only when its quote is more than you have left. Steps: `STEPS_MOST` of your tool calls (shell commands,
+same for every model and every machine. Looks: `LOOKS_MOST` units. A look has a fixed price, whatever is in it: a
+look of your whole plan on the whole sheet, painted at half size, costs 0.3; a look stopped after a stage you name
+(`./unpaint look --until 2`) or of a region of your own script (`--region`) costs its share of that, and at least 0.2.
+Where and when you look is yours to choose. How you paint costs nothing: water, wetness, brushwork, the number of
+strokes, waits and dryings are yours, and the final painting is not charged. Each price is told before anything is
+painted (`./unpaint plan` lists it; `./unpaint cost ...` prices any look and paints nothing); a look is refused only
+when its price is more than you have left. Steps: `STEPS_MOST` of your tool calls (shell commands,
 `./unpaint` among them, and file reads and writes). Time is not budgeted: waiting for a look or for the machine costs
 you nothing (a far safety stop ends a session after `WALL_MINUTES` minutes). `./unpaint status` shows what is used,
 and every answer of the tools says it too. When the budget is reached you are asked to hand in what you have: no

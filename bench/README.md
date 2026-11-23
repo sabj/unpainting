@@ -16,7 +16,7 @@ Details: [levels](docs/levels.md), [rules](docs/rules.md) and [scoring](docs/sco
 
 - A model may draw its own lines, choose pen, pencil or none, and choose waterproof or soluble ink. It gets warnings, not refusals, where a choice only risks the painting.
 - Retries are self-study. The model sees its own painting, replay and stroke map and writes its own assessment. It never gets a score or a critique.
-- Budgets are measured, not limited: rendering units and steps, with the clock only a six-hour safety stop. Cost and tool use are recorded.
+- Budget for one try: 3.0 look units at fixed prices (a half-size whole look 0.3, never under 0.2); how a model paints is recorded, never charged. Steps and the six-hour clock are runaway guards. Cost and tool use are recorded.
 - Scores: human-ness from the painting in progress, plus quality and likeness, plus a combined number. The original is scored too, and a painting is its share of the original. Auto sets the difficulty.
 - Judges run locally. OpenRouter or Together is a hosted option, planned, not in 0.4's first run.
 

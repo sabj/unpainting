@@ -18,6 +18,9 @@ import { FreshMap } from './fresh.mjs';
 import { resetCpuStrokeDirty, cpuStrokeDirtyRect } from '../cpu-stroke-dirty.mjs';
 import { CpuDemandWindow } from './cpu-demand-window.mjs';
 import { demandPolicy } from './demand-policy.mjs';
+import { waterStepsMost, checkWaterSteps } from './water-guard.mjs';
+// the resource guard of a session's painting (water-guard.mjs): Infinity unless the harness sets it
+const WATER_MOST = waterStepsMost();
 import { paperPlanes } from './paper-planes.mjs';
 import { mergeOf } from '../brush.mjs';
 import { deviceHealth, brokenReason, assertHealthy, markBroken } from './device-health.mjs';
@@ -620,7 +623,7 @@ export class GpuLink {
   }
 
   step(sheet, o) {
-    if (this.planning) { this.applyOptions(o); this.markFlow(this.planning); this.stats.steps++; sheet.steps++; return true; }
+    if (this.planning) { this.applyOptions(o); this.markFlow(this.planning); this.stats.steps++; sheet.steps++; if (this.stats.steps > WATER_MOST) checkWaterSteps(this.stats.steps, WATER_MOST); return true; }
     if (this.needFullUp) this.fullUp(sheet);
     this.applyOptions(o);
     const prior = this.transferPhase;
@@ -631,7 +634,7 @@ export class GpuLink {
         this.stats.cpuStrokeFlows = (this.stats.cpuStrokeFlows || 0) + 1;
         this.uploadCpuStroke(sheet, this.stroke); // the brush deposited since the last sync
       }
-      this.post({ op: 'step', n: 1 }); this.stats.steps++; sheet.steps++;
+      this.post({ op: 'step', n: 1 }); this.stats.steps++; sheet.steps++; if (this.stats.steps > WATER_MOST) checkWaterSteps(this.stats.steps, WATER_MOST);
       this.paperChanged(this.stroke, 1, hadPaper ? this.paperVersion : -1);
       this.stale = true; this.topStale = true; this.fresh.stale();
       if (this.stroke) {

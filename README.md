@@ -135,7 +135,7 @@ How it is run and scored:
 
 - A model may draw its own lines, choose pen, pencil or none, and choose waterproof or soluble ink.
 - A retry is self-study: the model sees its own painting, replay and stroke map, and writes its own assessment. It never gets a score or a critique.
-- Budgets are measured, not limited: rendering units and steps, with the clock only a safety stop. Cost and tool use are recorded.
+- Budget for one try: 3.0 look units at fixed prices (a half-size whole look 0.3, never under 0.2); how a model paints is recorded, never charged. Steps and the clock are runaway guards. Cost and tool use are recorded.
 - Judges read how human the making looks, from the painting in progress, and how good and how like the original it is. A combined number is shown too. The original is scored as well, and a painting's result is its share of the original's score.
 - Judges run locally. Hosted judging (OpenRouter or Together), a container for replication, and the OpenAI models are planned, not in 0.4's first run.
 

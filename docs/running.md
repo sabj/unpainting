@@ -165,8 +165,8 @@ opening drawing, the three studies, the named forms as a picture and as an id ma
 - `./unpaint plan` runs the wash planner on the present choice and answers with whether it compiled and its counts.
   Nothing else: no picture, no wash data. It is not limited.
 - `./unpaint look` shows the plan's picture beside the source and the middle study, each named form measured against
-  the study and marked when it is too dark or too pale, and every wash as data. Looks are charged in rendering
-  units: `--looks U` (default 5), where one full look of the whole plan costs 1. A look is written to `<out>/author/looks.jsonl`, outside the model's folder,
+  the study and marked when it is too dark or too pale, and every wash as data. Looks are charged in units:
+  `--looks U` (default 3). A look has a fixed price by size and by the share of the sheet or script it paints, whatever is in it: a half-size look of the whole sheet 0.3, full size 1.0, a look stopped at a stage or of a region its share of that, never under 0.2. The budget for one try is 3.0 at every level. The final is not charged. How a model paints is never charged: brush sweeps, dryings, water steps, cell-steps, seconds, tokens and steps are recorded in `usage.json` beside the charge. One guard only, as resource management: a painting whose water steps pass ten times those of Auto's painting of the subject is stopped with a plain message, recorded as a stop and never scored. A look is written to `<out>/author/looks.jsonl`, outside the model's folder,
   before anything is delivered, so a delivery that fails is still a spent look and a restarted broker goes on from
   the count. No score is shown.
 - The broker never trusts the folder: it follows no symlink, reads only plain files of bounded size, never echoes a
