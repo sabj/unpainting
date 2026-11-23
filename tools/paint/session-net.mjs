@@ -16,6 +16,7 @@ const PROBE = "import sys, numpy, PIL, scipy, skimage, cv2; print(f'Python {sys.
 /** The hosts each model command needs to reach its own service (and nothing else is passed). */
 export const PROVIDER_HOSTS = Object.freeze({
   agy: [/(^|\.)googleapis\.com$/, /(^|\.)googleusercontent\.com$/],
+  claude: [/^api\.anthropic\.com$/],
 });
 
 /** Whether `host` is one of `allow`. */

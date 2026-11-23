@@ -60,3 +60,13 @@ test('a gated session\'s profile lets out only to loopback; its command gets the
   const g = sessionCall({ key: 'argon-m', cli: 'agy', id: 'm' }, { prompt: 'P', cwd: '/c', deny: [], gate: { url: 'u' }, toolbox, home: '/home/x' });
   assert.match(g.profile, /\(deny file-read\* \(subpath "\/home\/x"\)/);
 });
+
+test('a gated Claude session: the whole command under the profile with its own sandbox off, out only through the gate, of the home folder only its program and the login keychain', () => {
+  const toolbox = { dir: '/tb', python: '/venv/bin/python', readable: ['/tb', '/venv'], env: { PATH: '/tb/bin:/bin' } };
+  const c = sessionCall({ key: 'sonnet-m', cli: 'claude', id: 'claude-sonnet-5-5', effort: 'medium' }, { prompt: 'P', cwd: '/c', deny: ['/repo'], gate: { url: 'http://127.0.0.1:9' }, toolbox, home: '/home/x' });
+  assert.equal(c.cmd, 'sandbox-exec'); assert.equal(c.args[2], 'claude'); assert.equal(c.env.HTTPS_PROXY, 'http://127.0.0.1:9'); assert.equal(c.gated, true);
+  assert.deepEqual(JSON.parse(c.args[c.args.indexOf('--settings') + 1]).sandbox, { enabled: false });
+  assert.match(c.profile, /\(deny file-read\* \(subpath "\/home\/x"\)/); assert.match(c.profile, /\(allow file-read\* \(subpath "\/home\/x\/Library\/Keychains"\)\)/); assert.doesNotMatch(c.profile, /\.claude/);
+  assert.deepEqual(c.signIn, ['/home/x/Library/Keychains']); assert.match(c.closed, /the model tool's own secret and list keychain entry names; accepted by the owner/);
+  assert.ok(allowed('api.anthropic.com', PROVIDER_HOSTS.claude)); assert.ok(!allowed('mcp-proxy.anthropic.com', PROVIDER_HOSTS.claude));
+});

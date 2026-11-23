@@ -12,6 +12,7 @@ const INLINE = [[/\bpython[\d.]*\s+-c\b|\bpython[\d.]*\s+-\s*<</, 'python'], [/\
 // an answer of the harness or the shell that says a thing was not done
 const REFUSED = /^(REFUSED|NOT PAINTED)|Operation not permitted|Permission denied|command not found|Could(?: not|n't) (?:resolve|connect)|No such file or directory/m;
 const INSTALL = /\b(pip3?|python[\d.]*\s+-m\s+pip|npm|npx|pnpm|yarn|brew|conda|uv|cargo|gem|apt(-get)?)\s+(install|add|i)\b/;
+const KEYCHAIN = /\bsecurity\s+\S|keychain/i;
 const NETWORK = /\b(curl|wget|nc|ssh|scp|ftp|telnet)\b|https?:\/\//;
 
 /** Files under `dir`, as paths relative to it, sorted. */
@@ -44,5 +45,7 @@ export function toolUseOf({ steps = [], startFiles = null, endFiles = [], read =
     schema: 'unpaint-paint/tool-use@1', toolSteps: steps.length, shellCommands: shell.length, fileReads: steps.filter(s => s.kind === 'read').length, fileWrites: steps.filter(s => s.kind === 'write').length,
     unpaint, scripts, inlinePrograms: inline, picturesOpened: pictures, filesCreated: created, filesCreatedNote: created ? null : 'the folder was not listed before the model started',
     failedOrRefused: failed, installsTried: tried(INSTALL), networkTried: tried(NETWORK),
+    // anything that touches the login keychain (the accepted sign-in exposure): recorded with the command
+    keychainTried: [...tried(KEYCHAIN), ...steps.filter(s => s.kind !== 'shell' && /keychain/i.test(s.text)).map(s => ({ text: mine(s.text).slice(0, 300), exit: s.exit ?? null }))],
   };
 }

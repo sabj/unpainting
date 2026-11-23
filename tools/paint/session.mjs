@@ -376,7 +376,7 @@ const q = s => `"${String(s).replace(/[\\"]/g, '\\$&')}"`;
  * port 443 (its own service). Later rules win, so `cwd`, the session's own folder, is allowed again after the denials.
  * `local`: the command talks to its own helper over this machine's loopback, and runs its shell on a pseudo-terminal.
  */
-export function seatbelt({ deny, write, cwd, local = false, gated = false, readable = [], hidden = [] }) {
+export function seatbelt({ deny, write, cwd, local = false, gated = false, readable = [], hidden = [], metadata = [] }) {
   // hidden: folders nothing may list or read (the home folder, other users, other volumes), save what is read again after
   // them: its own folder, `readable` (the toolbox, the model command's own program and settings) and `write`
   // gated: nothing goes out but to this machine's loopback, where the session's gate (session-net.mjs) passes the
@@ -385,7 +385,7 @@ export function seatbelt({ deny, write, cwd, local = false, gated = false, reada
     '(deny file-write*)', `(allow file-write* ${write.map(d => `(subpath ${q(d)})`).join(' ')} (literal "/dev/null") (literal "/dev/dtracehelper") (regex #"^/dev/tty"))`,
     `(deny file-read* file-write* ${deny.map(d => `(subpath ${q(d)})`).join(' ')} (regex #"/unpaint-session-"))`,
     ...(hidden.length ? [`(deny file-read* ${hidden.map(d => `(subpath ${q(d)})`).join(' ')})`, `(allow file-read* ${write.map(d => `(subpath ${q(d)})`).join(' ')})`] : []),
-    `(allow file-read* file-write* (subpath ${q(cwd)}))`, ...readable.map(d => `(allow file-read* (subpath ${q(d)}))`),
+    `(allow file-read* file-write* (subpath ${q(cwd)}))`, ...readable.map(d => `(allow file-read* (subpath ${q(d)}))`), ...metadata.map(d => `(allow file-read-metadata (literal ${q(d)}))`),
     '(deny network*)', ...(gated ? ['(allow network-outbound (remote ip "localhost:*"))'] : ['(allow network-outbound (remote tcp "*:443") (remote udp "*:53") (remote tcp "*:53") (literal "/private/var/run/mDNSResponder"))', '(allow network-inbound (local udp "*:*"))']), '(allow system-socket)',
     ...(local ? ['(allow network-bind (local ip "localhost:*"))', '(allow network-inbound (local ip "localhost:*"))', '(allow network-outbound (remote ip "localhost:*"))', '(allow pseudo-tty)', '(allow file-read* file-write* file-ioctl (literal "/dev/ptmx") (regex #"^/dev/ttys[0-9]+$"))'] : []),
   ].join('\n');
@@ -402,6 +402,20 @@ export function seatbelt({ deny, write, cwd, local = false, gated = false, reada
  */
 export function sessionCall(author, { prompt, cwd, deny = [], images = [], home = os.homedir(), tmp = os.tmpdir(), gate = null, toolbox = null }) {
   const real = d => { try { return fs.realpathSync(d); } catch { return d; } }, all = [...new Set(deny.flatMap(d => [d, real(d)]))];
+  if (author.cli === 'claude' && gate) {
+    // closed: the whole command under this harness's profile (its own sandbox off: two do not nest), out only through
+    // the gate; of the home folder it reads only its program and the login keychain (its sign-in: the accepted
+    // exposure, SIGN_IN_EXPOSURE); measured, it signs in and answers without ~/.claude or ~/.claude.json
+    const bin = (() => { try { return real(execFileSync('/usr/bin/which', ['claude'], { encoding: 'utf8' }).trim()); } catch { return null; } })();
+    const signIn = [path.join(home, 'Library', 'Keychains')];
+    const profile = seatbelt({ deny: all, write: [...new Set([real(tmp), '/private/tmp', '/private/var/folders'])], cwd: real(cwd), local: true, gated: true,
+      readable: [...new Set([...(toolbox?.readable ?? []), ...(bin ? [path.dirname(bin)] : []), ...signIn])], hidden: [...new Set([home, real(home), '/Users', '/Volumes'])], metadata: [path.join(home, '.local', 'bin'), path.join(home, '.local', 'bin', 'claude'), home] });
+    const settings = { sandbox: { enabled: false }, permissions: { deny: all.map(d => `Read(/${d}/**)`) } };
+    return { cmd: 'sandbox-exec', env: { CLAUDE_CODE_DISABLE_AUTO_MEMORY: '1', BASH_DEFAULT_TIMEOUT_MS: '120000', BASH_MAX_TIMEOUT_MS: '600000', DISABLE_TELEMETRY: '1', DISABLE_ERROR_REPORTING: '1', CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: '1', ...proxyEnv(gate.url), ...(toolbox?.env ?? {}) }, unset: [], profile, gated: true, signIn,
+      args: ['-p', profile, 'claude', '-p', prompt, '--model', author.id, ...(author.effort ? ['--effort', author.effort] : []), '--allowedTools', 'Read Write Edit Glob Grep Bash', '--settings', JSON.stringify(settings), '--setting-sources', 'project', '--no-session-persistence', '--output-format', 'stream-json', '--verbose'],
+      probe: file => ({ cmd: 'sandbox-exec', args: ['-p', profile, '/bin/cat', file] }),
+      closed: `the whole command runs under a seatbelt profile of this harness (its own sandbox off): nothing of the home folder can be listed or read but its program and the login keychain (${SIGN_IN_EXPOSURE}), it writes only in its folder and temporary folders, and reaches only this machine's loopback, where a gate passes its own service's hosts and refuses every other` };
+  }
   if (author.cli === 'claude') {
     const settings = { sandbox: { enabled: true, autoAllowBashIfSandboxed: true, allowUnsandboxedCommands: false }, permissions: { deny: all.map(d => `Read(/${d}/**)`) } };
     return { cmd: 'claude', env: { CLAUDE_CODE_DISABLE_AUTO_MEMORY: '1', BASH_DEFAULT_TIMEOUT_MS: '120000', BASH_MAX_TIMEOUT_MS: '600000' }, unset: [],
@@ -420,15 +434,20 @@ export function sessionCall(author, { prompt, cwd, deny = [], images = [], home 
     // closed (a gate): nothing of the home folder, other users or other volumes can be listed or read, but its own
     // program, its settings folder and the toolbox
     const agy = (() => { try { return real(execFileSync('/usr/bin/which', ['agy'], { encoding: 'utf8' }).trim()); } catch { return null; } })();
-    const readable = [...(toolbox?.readable ?? []), ...(gate && agy ? [agy] : [])];
-    const profile = seatbelt({ deny: all, write: [...new Set([path.join(home, '.gemini'), real(tmp), '/private/tmp', '/private/var/folders'])], cwd: real(cwd), local: true, gated: Boolean(gate), readable: [...new Set(readable)], hidden: gate ? [...new Set([home, real(home), '/Users', '/Volumes'])] : [] });
-    return { cmd: 'sandbox-exec', env: { DO_NOT_TRACK: '1', ...(gate ? proxyEnv(gate.url) : {}), ...(toolbox?.env ?? {}) }, unset: [], profile, serial: true, gated: Boolean(gate),
+    // its sign-in (accepted exposure, SIGN_IN_EXPOSURE): its handle in Application Support and the login keychain; its own folder seen, not listed
+    const signIn = gate ? [path.join(home, 'Library', 'Application Support', 'antigravity'), path.join(home, 'Library', 'Keychains')] : [];
+    const readable = [...(toolbox?.readable ?? []), ...(gate && agy ? [agy] : []), ...signIn];
+    const profile = seatbelt({ deny: all, write: [...new Set([path.join(home, '.gemini'), real(tmp), '/private/tmp', '/private/var/folders'])], cwd: real(cwd), local: true, gated: Boolean(gate), readable: [...new Set(readable)], hidden: gate ? [...new Set([home, real(home), '/Users', '/Volumes'])] : [], metadata: gate && agy ? [path.dirname(agy), home] : [] });
+    return { cmd: 'sandbox-exec', env: { DO_NOT_TRACK: '1', ...(gate ? proxyEnv(gate.url) : {}), ...(toolbox?.env ?? {}) }, unset: [], profile, serial: true, gated: Boolean(gate), signIn,
       args: ['-p', profile, 'agy', '-p', prompt, '--model', author.id, '--dangerously-skip-permissions', '--output-format', 'stream-json'],
       probe: file => ({ cmd: 'sandbox-exec', args: ['-p', profile, '/bin/cat', file] }),
       closed: `the whole command runs under a seatbelt profile of this harness: neither its shell nor its file tools can read the repository, the subject list, the caches or other sessions, it writes only in its folder, its own settings folder and temporary folders, and ${gate ? 'reaches only this machine\'s loopback, where a gate passes its own service\'s hosts and refuses every other (no downloads, no installs)' : 'reaches the network on port 443 and this machine\'s loopback only'} (its own permission prompts are off inside the profile)` };
   }
   throw new Error(`author ${author.key}: a working session needs a shell, and "${author.cli}" is called without one here (claude, codex and agy can)`);
 }
+
+/** The exposure the owner accepted for runs on his own machine (22 Nov): the model command signs in from the login keychain, and its shell runs under the same profile. */
+export const SIGN_IN_EXPOSURE = 'a session\'s shell can read the model tool\'s own secret and list keychain entry names; accepted by the owner for runs on this machine';
 
 const kindOfCommand = c => { const m = /(?:^|[\s;&|/])unpaint\s+(status|plan|look|cost|wait)\b/.exec(c); return m ? `unpaint ${m[1]}` : 'shell'; };
 

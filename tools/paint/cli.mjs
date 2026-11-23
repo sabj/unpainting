@@ -22,7 +22,7 @@ import { planNumbers, planSummary, numbersText, washesText, planPicture, lookPic
 import { lookSets, lookFault, stoppedLookFault, lookSizeNote, LOOK_JOBS, HEAVY_JOBS } from './look.mjs';
 import { toolUseOf, listFiles } from './tool-use.mjs';
 import { PROVIDER_HOSTS, startGate, makeToolbox, toolsText } from './session-net.mjs';
-import { DEFAULT_LOOKS, DEFAULT_WALL_MINUTES, DEFAULT_GRACE_MINUTES, DEFAULT_STEPS, safeRead, writeSession, sessionServer, finalChoice, sessionCall, readTranscript, reachedOutside, ownFolderOf, ownPictures, runSession } from './session.mjs';
+import { DEFAULT_LOOKS, DEFAULT_WALL_MINUTES, DEFAULT_GRACE_MINUTES, DEFAULT_STEPS, safeRead, writeSession, sessionServer, SIGN_IN_EXPOSURE, finalChoice, sessionCall, readTranscript, reachedOutside, ownFolderOf, ownPictures, runSession } from './session.mjs';
 import { DEFAULT_REVERTS } from './reverts.mjs';
 import { levelOf, handedAt } from './levels.mjs';
 import { usageOf, usageLine } from './usage.mjs';
@@ -507,7 +507,7 @@ async function sessionRun(r) {
         looks: kept.looks, selfReviews: reviews, turns: 1, plans: kept.plans.map(({ key, ...p }) => p), reverts: kept.reverts, warningsGiven: kept.warningsGiven, toolCalls: seen.calls, toolCallsTotal: Object.values(seen.calls).reduce((a, b) => a + b, 0),
         // the pictures it was handed: its own line on each (seen.md), and what its command's log shows of a read (null: that log cannot show one)
         pictures: kept.pictures ? { ...kept.pictures, logShowsRead: logReads(author.cli, seen.commands, kept.pictures.handed) } : null,
-        submitted: fin.submitted ?? null, lastMessage: seen.text.slice(0, 4000), routes: { closed: call.closed, commandsNamingOutside: outside, picturesItMade: pictures },
+        submitted: fin.submitted ?? null, lastMessage: seen.text.slice(0, 4000), routes: { closed: call.closed, commandsNamingOutside: outside, picturesItMade: pictures, signInExposure: call.signIn?.length ? { readable: call.signIn, words: SIGN_IN_EXPOSURE } : null },
         network: network ?? { gated: false },
         toolUse: toolUseOf({ steps: seen.steps, startFiles, endFiles: listFiles(cwd), read: f => { try { return safeRead(cwd, f); } catch { return null; } }, own: [cwd, real] }),
       };

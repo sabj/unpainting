@@ -35,6 +35,7 @@ test('tool use from an agy transcript and the folder: commands, scripts and thei
   assert.deepEqual(u.failedOrRefused.map(f => [f.text, f.exit]), [['pip install scipy', 1], ['curl https://example.com', 6], ['./unpaint look', 0], ['/repo/x.png', null]]);
   assert.match(u.failedOrRefused[2].said, /^REFUSED/);
   assert.deepEqual(u.installsTried, [{ text: 'pip install scipy', exit: 1 }]); assert.deepEqual(u.networkTried, [{ text: 'curl https://example.com', exit: 6 }]);
+  assert.deepEqual(toolUseOf({ steps: [{ kind: 'shell', text: 'security dump-keychain | wc -l', exit: 0 }, { kind: 'read', text: '/u/Library/Keychains/login.keychain-db' }] }).keychainTried.map(k => k.text), ['security dump-keychain | wc -l', '/u/Library/Keychains/login.keychain-db']);
   assert.equal(toolUseOf({ steps: [] }).filesCreated, null, 'no listing before the start: files made are not guessed');
 });
 
