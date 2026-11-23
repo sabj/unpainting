@@ -1,0 +1,240 @@
+{
+ "1-big-brush": {
+  "sheet": [
+   1462,
+   1082
+  ],
+  "seconds": 311,
+  "machine": "Apple M4",
+  "sweeps": 25,
+  "penLines": 0,
+  "pencilLines": 0,
+  "erasures": 0,
+  "dryings": 1,
+  "waits": 0,
+  "waterSteps": 380,
+  "cellsStepped": 601115920,
+  "backend": "gpu"
+ },
+ "2-big-shapes-first": {
+  "sheet": [
+   1462,
+   1082
+  ],
+  "seconds": 744,
+  "machine": "Apple M5 Max",
+  "sweeps": 24,
+  "penLines": 0,
+  "pencilLines": 0,
+  "erasures": 0,
+  "dryings": 4,
+  "waits": 0,
+  "waterSteps": 997,
+  "cellsStepped": 1577138348,
+  "backend": "gpu"
+ },
+ "3-how-wet-the-paper-is": {
+  "sheet": [
+   1462,
+   1082
+  ],
+  "seconds": 546,
+  "machine": "Apple M4",
+  "sweeps": 57,
+  "penLines": 0,
+  "pencilLines": 0,
+  "erasures": 0,
+  "dryings": 2,
+  "waits": 0,
+  "waterSteps": 488,
+  "cellsStepped": 771959392,
+  "backend": "gpu"
+ },
+ "4-hard-and-soft-edge": {
+  "sheet": [
+   1462,
+   1082
+  ],
+  "seconds": 148,
+  "machine": "Apple M5 Max",
+  "sweeps": 9,
+  "penLines": 0,
+  "pencilLines": 0,
+  "erasures": 0,
+  "dryings": 1,
+  "waits": 0,
+  "waterSteps": 270,
+  "cellsStepped": 427108680,
+  "backend": "gpu"
+ },
+ "5-glaze": {
+  "sheet": [
+   1462,
+   1082
+  ],
+  "seconds": 169,
+  "machine": "Apple M4",
+  "sweeps": 10,
+  "penLines": 0,
+  "pencilLines": 0,
+  "erasures": 0,
+  "dryings": 2,
+  "waits": 0,
+  "waterSteps": 393,
+  "cellsStepped": 621680412,
+  "backend": "gpu"
+ },
+ "6-whites": {
+  "sheet": [
+   1462,
+   1082
+  ],
+  "seconds": 645,
+  "machine": "Apple M4",
+  "sweeps": 23,
+  "penLines": 0,
+  "pencilLines": 0,
+  "erasures": 0,
+  "dryings": 1,
+  "waits": 0,
+  "waterSteps": 482,
+  "cellsStepped": 762468088,
+  "backend": "gpu"
+ },
+ "7-brush-shapes": {
+  "sheet": [
+   1462,
+   1082
+  ],
+  "seconds": 73,
+  "machine": "Apple M5 Max",
+  "sweeps": 25,
+  "penLines": 0,
+  "pencilLines": 0,
+  "erasures": 0,
+  "dryings": 1,
+  "waits": 0,
+  "waterSteps": 191,
+  "cellsStepped": 302139844,
+  "backend": "gpu"
+ },
+ "8-pen": {
+  "sheet": [
+   1462,
+   1082
+  ],
+  "seconds": 28,
+  "machine": "Apple M5 Max",
+  "sweeps": 0,
+  "penLines": 81,
+  "pencilLines": 0,
+  "erasures": 0,
+  "dryings": 1,
+  "waits": 0,
+  "waterSteps": 800,
+  "cellsStepped": 1265507200,
+  "backend": "gpu"
+ },
+ "9-ink-under-wash": {
+  "sheet": [
+   1462,
+   1082
+  ],
+  "seconds": 187,
+  "machine": "Apple M5 Max",
+  "sweeps": 10,
+  "penLines": 3,
+  "pencilLines": 0,
+  "erasures": 0,
+  "dryings": 2,
+  "waits": 0,
+  "waterSteps": 449,
+  "cellsStepped": 710265916,
+  "backend": "gpu"
+ },
+ "11-pencil-and-eraser": {
+  "sheet": [
+   1462,
+   1082
+  ],
+  "seconds": 370,
+  "machine": "Apple M5 Max",
+  "sweeps": 15,
+  "penLines": 0,
+  "pencilLines": 4,
+  "erasures": 1,
+  "dryings": 1,
+  "waits": 0,
+  "waterSteps": 419,
+  "cellsStepped": 662809396,
+  "backend": "gpu"
+ },
+ "12-colours-meeting-wet": {
+  "sheet": [
+   1462,
+   1082
+  ],
+  "seconds": 428,
+  "machine": "Apple M5 Max",
+  "sweeps": 32,
+  "penLines": 0,
+  "pencilLines": 0,
+  "erasures": 0,
+  "dryings": 3,
+  "waits": 0,
+  "waterSteps": 741,
+  "cellsStepped": 1172176044,
+  "backend": "gpu"
+ },
+ "13-how-far-a-dip-goes": {
+  "sheet": [
+   1462,
+   1082
+  ],
+  "seconds": 103,
+  "machine": "Apple M5 Max",
+  "sweeps": 4,
+  "penLines": 0,
+  "pencilLines": 0,
+  "erasures": 0,
+  "dryings": 1,
+  "waits": 0,
+  "waterSteps": 252,
+  "cellsStepped": 398634768,
+  "backend": "gpu"
+ },
+ "14-one-stroke-shapes": {
+  "sheet": [
+   1462,
+   1082
+  ],
+  "seconds": 43,
+  "machine": "Apple M5 Max",
+  "sweeps": 6,
+  "penLines": 0,
+  "pencilLines": 0,
+  "erasures": 0,
+  "dryings": 1,
+  "waits": 0,
+  "waterSteps": 122,
+  "cellsStepped": 192989848,
+  "backend": "gpu"
+ },
+ "15-strokes-make-the-form": {
+  "sheet": [
+   1462,
+   1082
+  ],
+  "seconds": 187,
+  "machine": "Apple M5 Max",
+  "sweeps": 43,
+  "penLines": 0,
+  "pencilLines": 0,
+  "erasures": 0,
+  "dryings": 1,
+  "waits": 0,
+  "waterSteps": 266,
+  "cellsStepped": 420781144,
+  "backend": "gpu"
+ }
+}

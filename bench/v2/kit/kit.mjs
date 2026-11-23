@@ -3,7 +3,7 @@
 //   const { sheet, O, W, H } = await kit.open('hills');
 //   const map = kit.coarse('hills');            // at most 24x24 cells: palette (8 colours) and value per cell
 //   const b = kit.createBrush({ radius: 8, bristles: 16, capacity: 60 });   // radius in sheet cells (0.259 mm a cell)
-//   kit.dip(b, { water: 0.8, conc: kit.mix({ sapgreen: 0.4, ochre: 0.1 }) });
+//   kit.dip(b, { water: 0.8, conc: kit.mix({ sapgreen: 1.2, ochre: 0.3 }) });
 //   kit.stroke(b, sheet, [{ x: 10, y: 20, p: 1 }, { x: 60, y: 24, p: 0.8 }]);
 //   kit.wait(sheet, 20);                         // let the wet strokes run together a while; kit.dryAll(sheet) dries
 //   kit.dryAll(sheet); kit.work(); await kit.finish('note');

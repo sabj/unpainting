@@ -1,428 +1,293 @@
-# Tips: brush technique in this painter, by worked example
+# Tips: painting with the kit, by worked example
 
-Twenty-six small examples. Each was painted on a blank sheet (320 x 200 cells, 83 x 52 mm) by the code shown beside it,
-and the picture is its dried result. None is a picture of anything: they show how the brush, the water and the paper
-behave, and nothing about what to paint.
+Fourteen small paintings. Each was painted with the kit on a blank full-size sheet (1462 x 1082 cells, 379 x 280 mm)
+by the script beside it, `bench/tips/N-name.mjs`; `N-name.png` is the dried result and `N-name-arrows.png` the same
+with every stroke drawn as a numbered arrow (thicker where the brush pressed harder; pen red, pencil green, eraser
+orange). Positions are shares of the sheet (`W * 0.3`); the brushes' capacities are set for this full-size sheet (on a
+smaller one a dip goes further). The subjects are
+random: they show how the brush, the water and the paper behave, nothing about what to paint. They open a blank sheet
+called `'tips'` that exists only where they were made: your own script imports `./kit.mjs` and opens the task the
+brief names.
 
-How to read this in each setting:
+## The box
 
-- **Painting with the kit (level 1).** The code runs as it stands: `bench/tips/N-name.mjs`, pictures
-  `bench/tips/N-name.png`. Lines marked *kit only* are about kit calls.
-- **Writing a plan or a script for the session painter (levels 2 to 4).** You do not call the kit; read each example
-  for its physics and its mistake. In that vocabulary a "wash" is one passage; "wet into wet" and "charge" are a
-  passage laid while its neighbour is wet; a "glaze" is a passage over a dried one; "reserve" and "lift" are the white
-  of the paper; a passage's strokes follow the direction you give it. The same rules about overlap, drying and which
-  way the strokes run apply.
+- Brush paints (`kit.BRUSH_PAINTS`): ultramarine, cerulean, hansa (yellow), ochre, sienna, umber, rose, sapgreen.
+  `kit.mix({ ultramarine: 1, sienna: 0.5 })`: the numbers are strengths; a mix totals at most 8. In one layer, about
+  0.5 is a pale tint, 1 to 2 a light to middle wash, 4 a middle dark, 6 to 8 a strong dark. Clean water is `kit.mix({})`.
+- Pen inks (`kit.INK`): sepia, lampblack, at most 8 in all; `kit.mix({ sepia: 3 })` is a full black-brown line.
+- A brush (`kit.createBrush`) is the main painter's own brush: a tuft with a belly and a point, or with `flat: true` a
+  flat with a blade. Its `radius` is in cells (0.259 mm); it is about twice that wide pressed fully. `bristles` is how
+  many lanes of hair it has across (more: finer streaks where it runs dry); `capacity` is how much each holds, so
+  capacity and bristles together set how far one dip goes (example 13). A dip always fills the brush to its capacity:
+  for a brush that runs dry sooner, make one with less.
+- At each point of a stroke: `x`, `y`; `p` the pressure, 0 to 1 (how much of the brush lies down, so how wide it is);
+  and if you want them, `v` the hand's speed in mm/s (default 60: slower leaves more paint, faster less) and, for a flat,
+  `blade`, the blade's angle to the direction of travel in degrees (default 90, square across: full width; 0, on its
+  edge: a thin line). Both are eased from point to point, and the blade turns a little after the path, as a wrist does.
+  A round's width follows the pressure. A flat's width follows its blade (about its full width times the sine of the
+  blade angle); pressure hardly changes it (only below 0.05), but presses more of the hairs down and lays more paint.
+- The stroke option `{ upright: true }` holds a flat's blade at one direction on the sheet, measured from straight down
+  the sheet instead of from the direction of travel: blade 90 then lies across the sheet, left to right, whichever way
+  the stroke goes. `{ upright: 'sweep' }` measures it from the line between the stroke's first and last points.
+- Strokes meant to join into one form: overlap each with the last by a quarter to a half of its width and lay it while
+  the last is still wet (no drying between); they fuse with a soft join.
+- `kit.finish(note)` does not dry the sheet: the examples dry once at the end, to show the dried painting.
 
-Three things hold everywhere:
+## What is yours to decide, and what the kit does
 
-1. **Water moves only in time.** A wash is one wash only if its strokes are all wet together; strokes laid on a dried
-   sheet keep their own edges for good.
-2. **A brush runs out.** One dip covers one or two strokes of a wash (example 14). Dip again before it shows.
-3. **The stroke is the unit, not the tile.** A shape is filled by a few long strokes that follow it, each overlapping
-   the last. Squares laid side by side leave seams or paper between them and read as a mosaic.
+You decide what a painter decides: which brush, how loaded, which way each stroke runs, how wet the paper is, when to
+wait, when to dry, when to stop. The kit does the rest: while a brush or pen is on the paper it moves the water for
+the time that passed. Strokes laid while the sheet is wet run together; on a dry sheet they keep their edges.
+`kit.wait(sheet, moments)` lets the water run with the brush off the paper (a moment is one water step, about the
+time a brush takes to travel 17 cells); `kit.dryAll(sheet)` dries the sheet.
 
-## Single techniques
+## Brushwork: the brush makes the form
 
-### 1. A flat wash
-![](tips/1-flat-wash.png)
+The commonest thing that makes a painting look made by a machine is a form painted as a flat, even patch: an outline
+filled with one tone. A painter makes a form with the brush itself. The brush is as wide as it is pressed, a flat is
+as wide as its blade is turned, the paint pools where the hand slows and thins where it hurries, and the stroke runs
+dry as the load runs out. Change these as the stroke travels and one stroke becomes a leaf, a wedge, a fold; two or
+three side by side become a rock or a bush.
+
+Use shaped strokes for anything with a shape of its own: leaves, petals, folds, rocks, hulls, sleeves, branches,
+foliage, the wedge of a shadow, the dark accents. Use a wash for what is big, flat and quiet: a sky, a ground, water,
+a wall, the first light over a whole form. Give a stroke enough points (a dozen or more) for its changes to be smooth.
+
+### 7. One stroke, one form: leaves, petals, grass
+![](tips/7-brush-shapes.png) ![](tips/7-brush-shapes-arrows.png)
 
 ```js
-const b = kit.createBrush({ radius: 12, bristles: 24, capacity: 80 });
-const paint = kit.mix({ ultramarine: 0.35 });
-let row = 0;
-for (let y = 30; y <= H - 30; y += 14, row++) {            // rows 14 cells apart, brush 24 wide: each overlaps the last by almost half
-  kit.dip(b, { water: 0.9, conc: paint });                  // a full brush for every row
-  const [x0, x1] = row % 2 ? [W - 40, 40] : [40, W - 40];   // back and forth
-  kit.stroke(b, sheet, [{ x: x0, y, p: 0.9 }, { x: (x0 + x1) / 2, y: y + 1, p: 0.9 }, { x: x1, y, p: 0.9 }]);
+const swell = t => 0.08 + 0.85 * Math.sin(Math.PI * t) ** 1.2;   // pressure: nothing, full, nothing
+kit.stroke(b, sheet, leafPath.map((q, i) => ({ ...q, p: swell(i / (leafPath.length - 1)) })));   // a leaf: one stroke
+// a petal: the same, curved; grass: pressed at the root, lifted to nothing at the tip
+```
+
+- The brush is as wide as it is pressed. A leaf, a petal, a blade of grass is one stroke: press, then lift. No
+  outline, no filling in. Give a stroke enough points (a dozen or more) for its pressure to change smoothly.
+- On a full-size sheet: 25 sweeps, 1 drying, 191 water steps; 73 s on Apple M5 Max (shared with other work).
+
+### 14. One stroke, shaped as it travels
+![](tips/14-one-stroke-shapes.png) ![](tips/14-one-stroke-shapes-arrows.png)
+
+```js
+const path = (n, at) => Array.from({ length: n }, (_, i) => at(i / (n - 1)));   // at(t): a point at t = 0..1
+kit.stroke(round, sheet, path(24, t => ({ x, y, p: 0.04 + 0.96 * swell(t) })));         // 1 leaf: point, belly, point
+kit.stroke(flat, sheet, path(24, t => ({ x, y, p: 0.95, blade: 90 * (1 - t) })));         // 2 wedge: square, twisted to its edge
+kit.stroke(flat, sheet, path(30, t => ({ x, y: sCurve(t), p: 0.9 })), { upright: true }); // 3 ribbon: the blade held one way
+kit.stroke(thirsty, sheet, path(30, t => ({ x, y, p: 0.9, v: 20 + 400 * t * t })));      // 4 capacity 70: slow and wet, then fast, then dry
+kit.stroke(round, sheet, path(30, t => ({ x, y, p: landThenLift(t), v: 40 + 300 * t * t }))); // 5 land on the point, flick off
+kit.stroke(round, sheet, path(32, hook));        // 6 down, slowed and pressed at the bottom, carried round the turn and flicked up
+```
+
+- Top, left to right: a leaf (the pressure alone shapes it); a wedge of shadow (a flat pressed square, its blade
+  twisted onto its edge as it goes: broad where it lands, a line where it leaves); a ribbon (a flat held at one angle
+  on the sheet along an S: broad where the path crosses the blade, thin where it runs along it). Bottom: a brush given
+  little load (capacity 70) pressed evenly, slow where it lands so the paint pools, faster as it goes; partway its load
+  runs out and from there it catches only the grain of the paper, a dry broken tail. A stroke that lands on its point,
+  presses and flicks off. A hook: the path runs into the turn without a corner, slowed and pressed at the bottom, then
+  flicked up. Speed alone, at an even pressure and a full load, changes little: a fast stroke lays a little less paint.
+- On a full-size sheet: 6 sweeps, 1 drying, 122 water steps; 43 s on Apple M5 Max (shared with other work).
+
+### 15. Two or three strokes make a form; the same form outlined and filled
+![](tips/15-strokes-make-the-form.png) ![](tips/15-strokes-make-the-form-arrows.png)
+
+```js
+// left, a rock: three flat strokes, one above the other, each following the dome, each into the last while it is wet
+const dome = (k, t) => ({ x: L - S * (0.16 - 0.01 * k) + S * (0.32 - 0.02 * k) * t, y: rows[0] - S * 0.05 + S * 0.055 * k - S * (0.06 - 0.02 * k) * Math.sin(Math.PI * t) });
+kit.stroke(flat, sheet, path(20, t => ({ ...dome(0, t), p: 0.6 + 0.4 * Math.sin(Math.PI * t), blade: 20 + 70 * Math.sin(Math.PI * t) })));  // pale top, rounded ends
+kit.stroke(flat, sheet, path(20, t => ({ ...dome(1, t), p: 0.9, blade: 30 + 60 * Math.sin(Math.PI * Math.min(1, 0.2 + t)) })));       // darker middle
+kit.stroke(flat, sheet, path(24, t => (t < 0.7                                                                                         // darkest foot,
+  ? { ...dome(2, t / 0.7), p: 0.5 + 0.5 * t / 0.7, v: 40, blade: 30 + 60 * Math.min(1, 2.5 * t) }                                       // pressed harder to the right,
+  : { x: dome(2, 1).x + S * 0.12 * (t - 0.7) / 0.3, y: dome(2, 1).y + S * 0.01, p: 1 - 0.95 * (t - 0.7) / 0.3, v: 40 + 300 * (t - 0.7), blade: 90 - 80 * (t - 0.7) / 0.3 })));  // then out as the cast shadow
+// left, a bush: five leaf strokes fanned from one root (p 0.08 -> full -> 0.08), the darkest last and low;
+// a boat's bow: a flat along the sheer line, its blade turned to its edge at the stem, and one dark round under the flare
+// right: each left-hand form's outline, moved across, drawn with a small brush, then filled with even rows of one mix
+```
+
+- Left: each form is a few strokes, light to dark, joined soft because each went into the last while it was wet; the
+  form's turn and its shadow come from the strokes. Right: the same shapes outlined and filled. The fill is one even
+  tone, the outline shows as a darker rim, and paper is left in the corners the rows could not reach: a flat slab, not
+  a form.
+- On a full-size sheet: 43 sweeps, 1 drying, 266 water steps; 187 s on Apple M5 Max (shared with other work).
+
+## The brush
+
+### 1. Brush size: two lemons
+![](tips/1-big-brush.png) ![](tips/1-big-brush-arrows.png)
+
+```js
+const big = kit.createBrush({ radius: H * 0.05, bristles: 40, capacity: 800 });    // left: 5 sweeps
+const small = kit.createBrush({ radius: H * 0.0125, bristles: 14, capacity: 200 }); // right: 20 sweeps
+kit.dip(b, { water: 0.85, conc: paint });          // a full brush for every sweep
+kit.stroke(b, sheet, pts);                         // each sweep the length of the fruit, bending with it, easing off at the ends
+```
+
+- Choose the biggest brush the shape allows: here the brush (twice its radius) is about a quarter as wide as the lemon
+  is tall. The small brush paints much the same lemon with four times the sweeps.
+- Dip before every sweep of a wash, with capacity enough for the sweep (example 13); a brush that runs dry leaves a
+  pale, broken stripe. `water` near 0.85 lays a full wet wash; near 0.3 the brush skips on the grain (dry brush).
+- On a full-size sheet: 25 sweeps, 1 drying, 380 water steps; 311 s on Apple M4 (shared with other work).
+
+### 2. Big shapes first, with the big brush
+![](tips/2-big-shapes-first.png) ![](tips/2-big-shapes-first-arrows.png)
+
+```js
+band(sky);  kit.dryAll(sheet);        // 1: the biggest shape, one wet wash, rows overlapping by half the brush
+band(farHill); kit.dryAll(sheet);     // 2: the next; every row follows the hill line
+band(nearHill); kit.dryAll(sheet);    // 3
+posts(smallBrush); kit.dryAll(sheet); // 4: the few small marks last, on dry paper
+```
+
+- Light before dark, broad before detail. The whole sheet is covered in a few dozen sweeps; the small brush
+  comes last and does little.
+- On a full-size sheet: 24 sweeps, 4 dryings, 997 water steps; 744 s on Apple M5 Max (shared with other work).
+
+### 3. How wet the paper is
+![](tips/3-how-wet-the-paper-is.png) ![](tips/3-how-wet-the-paper-is-arrows.png)
+
+```js
+sky(0.67, 0.97, 0.9); kit.dryAll(sheet); cloud(W * 0.82);   // right, dried first: a hard edge
+sky(0.35, 0.64, 0.45); cloud(W * 0.495);                    // middle, damp: it keeps its shape, with a soft edge
+sky(0.03, 0.32, 0.9); cloud(W * 0.175);                     // left, very wet, laid last: the cloud spreads and pales
+```
+
+- You set how wet the paper is by the `water` of the brush that wets it. Into very wet paper (0.9) the cloud spreads,
+  pales and loses its edge; into damp paper (0.45) it keeps its shape with a soft edge; on dry paper it keeps a hard
+  one and its full strength.
+- For damp paper, lay the wash damp to begin with (water about 0.45); waiting is not a reliable way to get there.
+- On a full-size sheet: 57 sweeps, 2 dryings, 488 water steps; 546 s on Apple M4 (shared with other work).
+
+### 4. Hard and soft edges
+![](tips/4-hard-and-soft-edge.png) ![](tips/4-hard-and-soft-edge-arrows.png)
+
+```js
+kit.dip(water, { water: 0.45, conc: kit.mix({}) });   // clean water is kit.mix({})
+kit.stroke(water, sheet, lowerEdge);                  // damp paper where the pebble's lower edge will be
+// then the pebble: eight sweeps along it, the outer ones on its edges, so the lowest lies on the damp
+```
+
+- An edge on dry paper is hard; an edge that meets damp paper is soft. Decide each edge before the paint goes on.
+- On a full-size sheet: 9 sweeps, 1 drying, 270 water steps; 148 s on Apple M5 Max (shared with other work).
+
+### 5. A glaze over a dried wash
+![](tips/5-glaze.png) ![](tips/5-glaze-arrows.png)
+
+```js
+pear(yellowGreen, all);  kit.dryAll(sheet);   // the first wash is DRY before the second
+pear(thinViolet, shadowSide);                 // thin, laid once, left alone
+```
+
+- The first colour shows through the second: a shadow without mud. Painting into a damp wash to darken it moves
+  what is under it instead.
+- On a full-size sheet: 10 sweeps, 2 dryings, 393 water steps; 169 s on Apple M4 (shared with other work).
+
+### 6. Whites
+![](tips/6-whites.png) ![](tips/6-whites-arrows.png)
+
+```js
+const mask = new Uint8Array(W * H);    // masking fluid: 1 where it goes, row by row (mask[y * W + x])
+kit.applyResist(sheet, mask);          // before any paint; kit.liftResist(sheet) once the sheet is dry
+// painted round: the wash rows stop short of the white; then a smaller brush goes round its edge while the wash is wet
+```
+
+- Watercolour has no white paint: decide the whites before the first wash, and paint round them or mask them.
+- Lifting takes back part of a wash while it is wet, never to white: tested on a middle-blue wash (grey 176, paper
+  231), a clean brush dipped at water 0.3 to 0.5 and drawn through it left 199 to 205; a tissue (`kit.blot(sheet,
+  mask)`, 1 in the mask where it presses) 208; a nearly dry brush (water 0.1) took nothing. Good for a soft light
+  (a cloud's edge, a sheen); for a true white, paint round it or mask it.
+- On a full-size sheet: 23 sweeps, 1 drying, 482 water steps; 645 s on Apple M4 (shared with other work).
+
+### 12. Two colours meeting wet
+![](tips/12-colours-meeting-wet.png) ![](tips/12-colours-meeting-wet-arrows.png)
+
+```js
+band(H * 0.58, H * 0.92, 0.04, 0.55, yellow); kit.dryAll(sheet); band(H * 0.58, H * 0.92, 0.5, 0.96, rose);   // bottom, first
+kit.dryAll(sheet);
+band(H * 0.08, H * 0.42, 0.04, 0.55, yellow); band(H * 0.08, H * 0.42, 0.5, 0.96, rose);                     // top
+```
+
+- Top: the rose rows (back and forth) reach over the yellow's wet right edge, so the two run together. Bottom: the yellow was dried
+  first: a hard seam. Soft joins come from wet meeting wet, both laid in one sitting. A third, mixed colour laid between two dried ones
+  makes a band, not a blend.
+- On a full-size sheet: 32 sweeps, 3 dryings, 741 water steps; 428 s on Apple M5 Max (shared with other work).
+
+### 13. How far one dip goes
+![](tips/13-how-far-a-dip-goes.png) ![](tips/13-how-far-a-dip-goes-arrows.png)
+
+```js
+for (const capacity of [120, 400, 800, 1500]) {                       // four furrows, one dip each
+  const b = kit.createBrush({ radius: H * 0.04, bristles: 36, capacity });
+  kit.dip(b, { water: 0.85, conc }); kit.stroke(b, sheet, furrow);    // 1,340 cells long
 }
-kit.wait(sheet, 20);            // all rows still wet: they level into one
-kit.dryAll(sheet, O);
 ```
 
-- Physics: neighbouring wet rows share their water, so the paint evens out across the joins before it settles.
-- Prevents: a wash laid as separate tiles or rows with paper gaps, or with a dry row between wet ones (stripes).
-- *Kit only:* the darker rim round the wash is real: paint gathers where the wet edge dries last.
+- A brush holds a fixed load. With radius 43 cells and 36 bristles, capacity 120 runs dry after about 450 cells and
+  breaks up into dry grain; 400 runs low just before the end of the 1,340; 800 and 1,500 last the whole furrow. As a
+  rule (about 36 to 40 bristles), one dip lasts about capacity x 150 / radius cells: give a brush that, or dip again
+  before it runs out. A brush with fewer bristles holds less. To make a stroke run dry on purpose, give it less.
+- On a full-size sheet: 4 sweeps, 1 drying, 252 water steps; 103 s on Apple M5 Max (shared with other work).
 
-### 2. A graded wash
-![](tips/2-graded-wash.png)
+## Drawing
+
+### 8. The pen: a fence
+![](tips/8-pen.png) ![](tips/8-pen-arrows.png)
 
 ```js
-for (let r = 0; r < rows; r++) {
-  const y = 30 + 14 * r, fade = 1 - r / (rows - 1);                             // 1 at the top, 0 at the bottom
-  kit.dip(b, { water: 0.95, conc: kit.mix({ sienna: 0.5 * fade * fade }) });    // the same water every row, less paint each time
-  ...the same overlapping row as in the flat wash...
-}
-kit.wait(sheet, 30);
-kit.dryAll(sheet, O);
+const broad = kit.createPen({ nib: 2.4, flex: 0.3 }), fine = kit.createPen({ nib: 0.8, flex: 0.2 }), flexy = kit.createPen({ nib: 0.8, flex: 2.5 });
+kit.dipPen(pen, kit.mix({ sepia: 3 }));         // inks: sepia, lampblack; a pen runs out too: one dip drew about 2,000 cells of line here
+kit.penStroke(pen, sheet, [{ x, y, p }...]);    // p pressure: it opens a flexible nib; nib and flex are in cells
 ```
 
-- Physics: each row is a little weaker than the one it overlaps, and the shared water blends the step away.
-- Prevents: a gradation built from dried bands of different strength, which reads as stairs.
+- Posts broad, rails fine, the ground line thin to thick (a flexible nib, pressed harder as it goes). Tone by hatching: one direction, closer for darker,
+  crossed for darkest; not by pressing harder.
+- On a full-size sheet: 0 sweeps, 81 pen lines, 1 drying, 800 water steps; 28 s on Apple M5 Max (shared with other work).
 
-### 3. Wet into wet
-![](tips/3-wet-into-wet.png)
+### 9. Ink under a wash
+![](tips/9-ink-under-wash.png) ![](tips/9-ink-under-wash-arrows.png)
 
 ```js
-rows(114, 170, 40, 190, kit.mix({ ochre: 0.3 }));                       // the first colour (rows() is the flat wash's loop)
-rows(114, 170, 150, W - 40, kit.mix({ ultramarine: 0.5, rose: 0.1 }));  // at once, the second from inside the wet first one outward
-kit.wait(sheet, 12);
-kit.dryAll(sheet, O);
+kit.dipPen(pen, kit.mix({ sepia: 3 })); kit.penStroke(pen, sheet, kite);   // the drawing
+kit.dryAll(sheet);                                                          // the ink dry before the wash
+// then a wash over the kite's right half
 ```
 
-- Physics: where the second colour meets water already on the paper it has no edge to stop at; it travels until the
-  sheet dries. The wetter the first wash, the farther it goes.
-- Prevents: blending two colours by laying a third, mixed one between them when both have dried (a hard-edged band).
-- *Kit only:* the upper band in the picture had one strong stroke dropped into the middle of a wet wash. It all but
-  vanished: the standing water thins it and carries it off. Bring the second colour in from the wash's edge instead.
+- Draw, dry, then wash: once dry, the ink holds under the wash and stays as drawn. Opening the sheet with
+  `kit.open(task, { ink: 'waterproof' })` gave the same picture to the pixel; the choice of ink matters only for a
+  wash laid into ink that is still wet, where soluble ink (the default) moves a little.
+- On a full-size sheet: 10 sweeps, 3 pen lines, 2 dryings, 449 water steps; 187 s on Apple M5 Max (shared with other work).
 
-### 4. A glaze over a dry wash
-![](tips/4-glaze.png)
+### 11. Pencil lay-in and the eraser: a jug
+![](tips/11-pencil-and-eraser.png) ![](tips/11-pencil-and-eraser-arrows.png)
 
 ```js
-wash(kit.mix({ hansa: 0.4 }), 40, W - 120, 30, H - 30);
-kit.dryAll(sheet, O);                                        // the first wash is DRY before the second goes on
-wash(kit.mix({ cerulean: 0.3 }), 120, W - 40, 60, H - 60);   // thin, laid once
-kit.dryAll(sheet, O);
+const hb = kit.createPencil({ grade: 'HB' }), soft = kit.createPencil({ grade: '2B' });   // HB paler and finer, 2B darker
+kit.pencilStroke(hb, sheet, body);                           // light lines (p 0.4 at every point) where a pale wash will go
+kit.erase(sheet, wrongLine, { width: H * 0.03 });            // rubs out on bare, dry paper; it refuses a wet sheet
+kit.pencilStroke(soft, sheet, base);                         // heavy (p 1): it shows through every wash
 ```
 
-- Physics: dried paint is held in the paper; a thin wet layer over it adds its colour without moving what is below,
-  and light passes through both.
-- Prevents: darkening or shifting a colour by painting into it while it is damp (it lifts and goes muddy), and
-  mixing every colour on the palette when two clean layers would do.
-
-### 5. A soft edge next to a hard one
-![](tips/5-soft-and-hard-edge.png)
-
-```js
-for (const y of [112, 126, 140, 154]) {                      // clean water only, below where the stroke will go
-  kit.dip(water, { water: 1, conc: kit.mix({}) });
-  kit.stroke(water, sheet, [{ x: 40, y, p: 0.9 }, { x: W - 40, y, p: 0.9 }]);
-}
-kit.dip(b, { water: 0.7, conc: kit.mix({ sapgreen: 1.2, umber: 0.4 }) });
-kit.stroke(b, sheet, [{ x: 50, y: 92, p: 0.9 }, { x: 160, y: 94, p: 0.9 }, { x: W - 50, y: 92, p: 0.9 }]);   // upper half on dry paper, lower half on the wet band
-kit.wait(sheet, 40);
-```
-
-- Physics: paint stops where the wet stops. Against dry paper that is a line; into wet paper there is no line.
-- Prevents: a shape with the same cut-out edge all the way round. Decide for each edge whether it is found or lost.
-- *Kit only:* clean water is `kit.mix({})`.
-
-### 6. A dry-brush mark
-![](tips/6-dry-brush.png)
-
-```js
-const b = kit.createBrush({ radius: 9, bristles: 14, capacity: 40, flat: true });
-for (const [y, water, p] of [[50, 0.8, 0.9], [100, 0.3, 0.5], [150, 0.15, 0.3]]) {   // wet and full; drier and lighter; driest and lightest
-  kit.dip(b, { water, conc: kit.mix({ umber: 0.9, ultramarine: 0.3 }) });
-  kit.stroke(b, sheet, [{ x: 40, y, p }, { x: 160, y: y + 2, p }, { x: W - 40, y, p: p * 0.7 }]);
-}
-```
-
-- Physics: a brush with little water touches only the tops of the paper's grain; the hollows stay white.
-- Prevents: making texture out of hundreds of tiny dots. One dry stroke breaks up by itself.
-
-### 7. Paper white: reserve it, mask it, or lift it
-![](tips/7-paper-white.png)
-
-```js
-kit.applyResist(sheet, disc(160, 100, 22));                  // middle: masking fluid before any paint (a 0/1 field, one value a cell)
-...the flat wash, its rows stopping short of the notch on the left and starting again after it...
-kit.blot(sheet, disc(250, 100, 22), { strength: 1, pigmentShare: 1 });   // right: a tissue on the wash at once
-kit.dryAll(sheet, O);
-kit.liftResist(sheet);                                       // the mask comes off when the sheet is dry
-```
-
-- Physics: watercolour has no white paint; the lightest light is paper that never got paint. Left: painted round.
-  Middle: masked and washed straight over. Right: blotted, which in this picture took almost nothing.
-- Prevents: planning to "add the highlights at the end". Decide the whites before the first wash.
-- *Kit only:* blotting lifts only water still standing on the surface; do not rely on it for a white.
-
-### 8. A pen line over a wash
-![](tips/8-pen-over-wash.png)
-
-```js
-band(30, 86); kit.dryAll(sheet, O);                          // top: washed, DRIED, then drawn on
-line(58);
-band(114, 170); kit.wait(sheet, 4);   // bottom: drawn on while wet
-line(142);
-```
-
-- Physics: ink on dry paper stays where the nib put it; ink on wet paper spreads into the water.
-- Prevents: crisp drawing lost because the wash under it was still wet (or a soft line that was meant to be crisp).
-
-## Rendering a shape with a brush
-
-The second picture of each is the same result with every stroke drawn as an arrow, numbered in the order laid, the
-line thicker where the pressure was higher.
-
-### 9. Filling an irregular shape
-![](tips/9-fill-a-shape.png) ![](tips/9-fill-a-shape-arrows.png)
-
-```js
-const R = 8, b = kit.createBrush({ radius: R, bristles: 18, capacity: 70 });   // 16 cells wide: several strokes fit even where the shape is narrowest
-const lanes = 7;                                              // 2 x 38 / 7 = 11 cells apart at the widest, under the brush's 16
-for (let k = 0; k < lanes; k++) {
-  const side = -1 + 2 * (k + 0.5) / lanes, pts = [];          // -1 is one edge of the shape, +1 the other
-  for (let i = 0; i <= 24; i++) {
-    const t = i / 24, c = centre(t), d = centre(Math.min(1, t + 0.01)), n = Math.hypot(d.x - c.x, d.y - c.y) || 1;
-    const off = side * Math.max(0, half(t) - R * 0.8);        // keep the brush's own edge inside the outline
-    pts.push({ x: c.x - (d.y - c.y) / n * off, y: c.y + (d.x - c.x) / n * off, p: 0.85 });
-  }
-  kit.dip(b, { water: 0.9, conc: kit.mix({ sapgreen: 0.45, ochre: 0.15 }) });
-  kit.stroke(b, sheet, k % 2 ? pts.reverse() : pts);
-}
-```
-
-- Physics: seven strokes, each the whole length of the shape and bending with it, are wet together and become one
-  wash. Where the shape narrows the strokes close up and overlap more; none stops inside the shape.
-- Prevents: a grid of tiles laid over an outline (seams, paper gaps, a stepped edge), and strokes that run across the
-  shape's short way, which need many more of them and leave a ribbed fill.
-- Choosing the brush: about a third to a half of the shape's narrowest width, so two or three strokes fit there.
-
-### 10. A crescent
-![](tips/10-crescent.png) ![](tips/10-crescent-arrows.png)
-
-```js
-const arc = (r, a0, a1) => Array.from({ length: 25 }, (_, i) => { const t = i / 24, a = a0 + (a1 - a0) * t;
-  return { x: 160 + r * Math.cos(a), y: 150 - r * Math.sin(a), p: 0.12 + 0.8 * Math.sin(Math.PI * t) }; });   // pressure: nothing, full, nothing
-for (const r of [96, 88, 80]) { ...dip; one stroke along arc(r, ...), the inner arcs shorter... }
-```
-
-- Physics: the brush is as wide as it is pressed. Rising and falling pressure along a curved path gives a shape that
-  is thin at both ends and full in the middle, in three strokes.
-- Prevents: building the points of a shape out of small dabs.
-
-### 11. Tapering to a point by lifting pressure
-![](tips/11-taper-to-a-point.png) ![](tips/11-taper-to-a-point-arrows.png)
-
-```js
-[() => 0.85,                                                             // top: even pressure, blunt at both ends
- t => (t < 0.5 ? 0.85 : 0.85 * (1 - (t - 0.5) / 0.5) ** 1.5 + 0.03),     // middle: lifted away over the second half
- t => 0.05 + 0.85 * Math.sin(Math.PI * t) ** 1.5]                        // bottom: thin, thick, thin: a sliver from one stroke
-```
-
-- Physics: lifting the brush leaves only its tip on the paper.
-- Prevents: every mark ending in the same blunt stop.
-- *Kit only:* `p` is the pressure at each point of the path, 0 to 1; give a stroke enough points for it to change smoothly.
-
-### 12. Going round a reserved white
-![](tips/12-ring-round-a-white.png) ![](tips/12-ring-round-a-white-arrows.png)
-
-```js
-const R = 7;                                                  // the ring is 36 cells wide: a brush 14 wide goes round three times, overlapping
-for (const r of [hole + R, hole + R + 11, hole + R + 22])     // three laps, the one beside the hole first
-  for (const from of [0, Math.PI]) {                          // each lap in two halves, a fresh dip for each
-    kit.dip(b, { water: 0.9, conc: kit.mix({ cerulean: 0.5, ultramarine: 0.15 }) });
-    kit.stroke(b, sheet, round(r, from - 0.17), ...);         // each half starts before the last one ended: the joins overlap while wet
-  }
-```
-
-- Physics: the edge of the white is drawn by the side of one travelling stroke, so it is one clean line.
-- Prevents: painting across a light and trying to get it back, or dabbing up to it from all sides (a ragged edge).
-
-### 13. Two shapes meeting along a shared edge
-![](tips/13-shared-edge.png) ![](tips/13-shared-edge-arrows.png)
-
-```js
-block(90, -1, yellow); kit.dryAll(sheet, O);                  // left pair: dry first, then the neighbour: a crisp shared edge
-block(90, +1, blue);   kit.dryAll(sheet, O);
-block(235, -1, yellow);                                       // right pair: the neighbour laid while the first is wet: a lost edge
-block(235, +1, blue);
-```
-
-- Physics: a wet shape laid against a dry one stops at it; laid against a wet one, the two run together.
-- Prevents: a paper gap left between two shapes "to be safe" (it reads as a white outline), and an accidental bleed
-  where a crisp edge was wanted. In both pairs the strokes run along the shared edge, the one beside it first.
-
-### 14. How long a dip lasts
-![](tips/14-how-long-a-dip-lasts.png) ![](tips/14-how-long-a-dip-lasts-arrows.png)
-
-```js
-kit.dip(b, { water: 0.85, conc: paint });                     // left: one dip, six strokes
-for (let k = 0; k < 6; k++) kit.stroke(b, sheet, [{ x: 30, y: 30 + 28 * k, p: 0.85 }, { x: 150, y: 30 + 28 * k, p: 0.85 }]);
-for (let k = 0; k < 6; k++) { kit.dip(b, { water: 0.85, conc: paint }); kit.stroke(b, sheet, ...); }   // right: a dip before each
-```
-
-- Physics: the brush holds a fixed load. With this brush (radius 9, capacity 70) and strokes 120 cells long, the first
-  two are full, the third is breaking up and the fourth is nearly empty.
-- Prevents: a wash that starts strong and fades to scratches because the brush was never refilled. For a wash, dip
-  before every stroke; keep a running brush for dry-brush texture on purpose.
-- *Kit only:* a bigger `capacity` or a shorter stroke lasts longer; `brush.load` tells you what is left.
-
-## Drawing: pencil, pen and ink
-
-The kit (level 1) draws with a pen and two inks (`sepia`, `lampblack`), a pencil (graphite in two grades, HB and 2B,
-the same graphite the session painter lays at levels 2 to 4) and an eraser. Every example here was painted with the kit.
-In the arrow pictures the pen is red, the pencil green and the eraser orange.
-
-### 15. The pen line: nib, flex, pressure, speed
-![](tips/15-pen-lines.png) ![](tips/15-pen-lines-arrows.png)
-
-```js
-const fine = kit.createPen({ nib: 0.8, flex: 0.2 });   kit.dipPen(fine, ink);  kit.penStroke(fine, sheet, wave(35, 0.6));    // a fine stiff nib
-const broad = kit.createPen({ nib: 2.4, flex: 0.2 });  kit.dipPen(broad, ink); kit.penStroke(broad, sheet, wave(75, 0.6));   // a broad one
-const flexy = kit.createPen({ nib: 0.8, flex: 2.5 });  kit.dipPen(flexy, ink);
-kit.penStroke(flexy, sheet, wave(115, t => 0.1 + 0.9 * t));                    // pressure opens a flexible nib: thin to thick
-kit.penStroke(flexy, sheet, wave(160, 0.6, t => (t < 0.5 ? 0.5 : 8)));         // v: slow for the first half, fast for the second
-```
-
-- Physics: the nib sets the least width; pressure spreads a flexible nib's tines; a slow pen leaves more ink (darker,
-  a little wider), a fast one less (paler, and it may skip on the paper's grain).
-- Prevents: every line the same weight. A drawing reads by the difference between its thin and its thick lines.
-- *Kit only:* `nib` and `flex` are in cells (0.259 mm); `p` is pressure and `v` speed at each point of the path.
-
-### 16. Hatching and cross-hatching
-![](tips/16-hatching.png) ![](tips/16-hatching-arrows.png)
-
-```js
-const hatch = (x0, gap, slope) => { let k = 0; for (let x = x0; x <= x0 + 70; x += gap, k++) {
-  if (k % 6 === 0) kit.dipPen(pen, ink);                                        // a pen runs out too
-  kit.penStroke(pen, sheet, [{ x, y: 60, p: 0.5 }, { x: x + slope * 0.5, y: 100, p: 0.7 }, { x: x + slope, y: 140, p: 0.4 }]); } };
-hatch(30, 9, 14);                       // wide apart: a light tone
-hatch(125, 4, 14);                      // close: darker
-hatch(220, 4, 14); hatch(234, 4, -14);  // crossed by a second set: darkest
-```
-
-- Physics: ink does not dilute on dry paper, so tone comes from how much paper the lines cover: their spacing, and a
-  second set across the first.
-- Prevents: filling a dark with a solid block of ink, or scribbling. Lines of one set are parallel and drawn the same
-  way; darker means closer or crossed, not pressed harder.
-
-### 17 and 18. A pen line under a wash: soluble ink and waterproof ink
-![](tips/17-pen-under-wash-soluble.png) ![](tips/18-pen-under-wash-waterproof.png)
-
-```js
-const { sheet, O, W, H } = await kit.open('tips');                           // 17: soluble ink, the default
-const { sheet, O, W, H } = await kit.open('tips', { ink: 'waterproof' });    // 18: the same script, waterproof ink
-...three zigzags with the pen; kit.dryAll(sheet, O); then a pale wash over the right two thirds...
-```
-
-- Physics: soluble ink rewets: water laid over it loosens some and the wash carries it, so the line softens and tints
-  the wash. Waterproof ink holds to the paper once dry and the wash passes over it. In these two pictures the
-  difference is small (the soluble lines under the wash are a little softer): a pale wash laid once moves little; a
-  wetter wash, or one worked over twice, moves more.
-- Prevents: a drawing dissolved by its own washes (draw in waterproof ink, or lay each wash once and leave it), and
-  the opposite surprise, a line that was meant to bleed and did not.
-- At levels 2 to 4 the same choice is the setting `"ink": "waterproof"` or `"soluble"`.
-- A pen line over a wash, on dry paper and on damp, is example 8.
-
-### 19. The pencil line and pressure
-![](tips/19-pencil-pressure.png) ![](tips/19-pencil-pressure-arrows.png)
-
-```js
-const pencil = kit.createPencil({ grade: '2B' });
-kit.pencilStroke(pencil, sheet, wave(35, 0.2));                  // light: pale, broken on the grain
-kit.pencilStroke(pencil, sheet, wave(75, 0.5));
-kit.pencilStroke(pencil, sheet, wave(115, 1));                   // hard: dark and unbroken
-kit.pencilStroke(pencil, sheet, wave(160, t => 0.1 + 0.9 * t));  // light to hard along one line
-```
-
-- Physics: graphite catches on the tops of the paper's grain. Light pressure touches only the highest fibres (a pale,
-  broken line); hard pressure fills the grain and widens the line.
-- Prevents: a drawing laid all at one weight, which reads as an outline. Choose each line's weight.
-- *Kit only:* `p` is 0 to 1 at each point. At this scale even a hard line is fine and grey; pencil never gets near ink
-  black. The simulator does not dent the paper, so a heavy line leaves no groove.
-
-### 20. A hard grade against a soft one
-![](tips/20-hard-and-soft-pencil.png) ![](tips/20-hard-and-soft-pencil-arrows.png)
-
-```js
-const hard = kit.createPencil({ grade: 'HB' }), soft = kit.createPencil({ grade: '2B' });
-kit.pencilStroke(hard, sheet, line(40, 0.5)); kit.pencilStroke(soft, sheet, line(75, 0.5));   // half pressure
-kit.pencilStroke(hard, sheet, line(125, 1));  kit.pencilStroke(soft, sheet, line(160, 1));    // full pressure
-```
-
-- Physics: a soft lead (2B) has more graphite and less clay: it lays more, darker and a little wider at the same pressure.
-- Prevents: pressing a hard pencil to get a dark. Use the soft one, lightly, and keep HB for lines a pale wash will cover.
-- *Kit only:* the grades are `'HB'` and `'2B'`, the simulator's two graphite profiles; any other grade is refused.
-  `width` (cells, at full pressure) blunts or sharpens the point.
-
-### 21. A pencil lay-in under a pale and a dark wash
-![](tips/21-pencil-under-wash.png) ![](tips/21-pencil-under-wash-arrows.png)
-
-```js
-[0.25, 1, 0.25, 1, 0.25, 1].forEach((p, k) => kit.pencilStroke(pencil, sheet, [{ x: 20, y: 40 + 24 * k, p }, { x: W - 20, y: 46 + 24 * k, p }]));
-kit.dryAll(sheet, O);
-wash(120, 190, kit.mix({ ultramarine: 0.25 }));                // pale: every line shows through
-wash(230, 290, kit.mix({ ultramarine: 1.2, umber: 0.4 }));     // dark: the light lines are gone, the heavy ones dimmed
-```
-
-- Physics: graphite does not dissolve. The wash flows over it and moves almost none (a few hundredths spread into a
-  faint halo); the paint lies on top and covers it as much as the paint is dark.
-- Prevents: lines showing through the lights for good. Draw lightly where a pale wash will sit; expect the light
-  lines under the darks to vanish.
-
-### 22. Pencil over a wash: dry, and (what the simulator does) wet
-![](tips/22-pencil-over-wash.png) ![](tips/22-pencil-over-wash-arrows.png)
-
-```js
-band(30, 86); kit.dryAll(sheet, O);                             // top: washed, DRIED, then drawn on
-line(58);
-band(114, 170); kit.wait(sheet, 4); // bottom: drawn on while wet
-line(142);
-```
-
-- Physics: on a dry wash the pencil sits on the paint, crisp. On wet paper a real pencil digs into the swollen
-  fibres, smears and scores the sheet for good. **The simulator does not model that:** it lays the line on wet paper
-  exactly as on dry, and the water then spreads a few hundredths of it. The bottom line is that, not the real thing.
-- Prevents: drawing into a wet wash. Wait for the sheet to dry. *Kit only:* the stroke log records `wetCells` for a
-  pencil line laid on water, so you can see that you did it.
-
-### 23. Hatching in pencil
-![](tips/23-pencil-hatching.png) ![](tips/23-pencil-hatching-arrows.png)
-
-```js
-const hatch = (x0, gap, slope, p = 0.6) => { for (let x = x0; x <= x0 + 60; x += gap) kit.pencilStroke(pencil, sheet, [{ x, y: 60, p }, { x: x + slope, y: 140, p }]); };
-hatch(20, 8, 14);  hatch(100, 3, 14);  hatch(180, 3, 14); hatch(194, 3, -14);   // apart, close, crossed
-const blunt = kit.createPencil({ grade: 'HB', width: 6 });                      // right: the side of the lead, pressed hard
-for (let y = 60; y <= 140; y += 4) kit.pencilStroke(blunt, sheet, [{ x: 262, y, p: 1 }, { x: 302, y, p: 1 }]);
-```
-
-- Physics: as with the pen, tone is how much paper the lines cover. Pressing harder on one patch does darken it, but
-  it fills the grain flat and reads as a smudge, not a tone.
-- Prevents: shading by scrubbing. Parallel lines, drawn the same way, closer or crossed for darker.
-
-### 24. Rubbing out pencil before paint
-![](tips/24-erase-pencil-before-paint.png) ![](tips/24-erase-pencil-before-paint-arrows.png)
-
-```js
-for (const [y, p] of [[40, 0.4], [70, 1], [100, 0.4], [130, 1]]) kit.pencilStroke(pencil, sheet, [{ x: 30, y, p }, { x: W - 30, y: y + 4, p }]);
-kit.erase(sheet, [{ x: 100, y: 25, p: 1 }, { x: 100, y: 145, p: 1 }], { width: 30 });     // hard: 82% comes off
-kit.erase(sheet, [{ x: 220, y: 25, p: 0.3 }, { x: 220, y: 145, p: 0.3 }], { width: 30 }); // light: 25%, a ghost stays
-```
-
-- Physics: on dry, bare paper graphite rubs off; one hard pass takes most of it, a second takes most of the rest.
-- Prevents: a wrong line sealed under a wash. Correct the drawing, and lighten lines in the lights, before the first wash.
-- *Kit only:* `kit.erase(sheet, pts, { width })`, width in cells (default 12); `p` is how hard you rub. It counts as a stroke.
-- At levels 2 to 4 an erase passage in your own script or edited plan rubs out with this same eraser; leaving a line out of your drawing, or giving it a lighter weight, does it before the washes too.
-
-### 25. Trying to lift pencil from under a dried wash
-![](tips/25-erase-pencil-under-wash.png) ![](tips/25-erase-pencil-under-wash-arrows.png)
-
-```js
-for (const y of [50, 80, 110, 140]) kit.pencilStroke(pencil, sheet, [{ x: 30, y, p: 1 }, { x: W - 30, y: y + 4, p: 1 }]);
-kit.dryAll(sheet, O);  /* a pale wash over the right half */  kit.dryAll(sheet, O);
-for (const x of [100, 240]) kit.erase(sheet, [{ x, y: 30, p: 1 }, { x, y: 165, p: 1 }], { width: 30 });   // same rub, bare and washed
-```
-
-- Physics: the dried gum of the wash holds the graphite under it. The same hard rub took 82% on bare paper and 19%
-  under this pale wash; under a dark wash it takes under a tenth. What comes off is graphite only, and a trace (about
-  2% a rub) of the paint. Pencil drawn on top of a dried wash rubs off as from bare paper.
-- Prevents: planning to clean up the drawing after painting. The lines under the paint stay.
-
-### 26. What an eraser does to a pen line
-![](tips/26-erase-pen-line.png) ![](tips/26-erase-pen-line-arrows.png)
-
-```js
-for (const y of [60, 100, 140]) { kit.dipPen(pen, ink); kit.penStroke(pen, sheet, zigzag(y)); }   // soluble sepia, the default
-kit.dryAll(sheet, O);
-for (let k = 0; k < 3; k++) kit.erase(sheet, [{ x: 160, y: 35, p: 1 }, { x: 160, y: 165, p: 1 }], { width: 40 });
-```
-
-- Physics: dry ink is in the paper, not on it. Three hard rubs took about 2% each of the soluble ink under them, which
-  does not show; waterproof ink loses none at all. A real eraser would also scuff the paper; the simulator does not.
-- Prevents: drawing a doubtful line in ink. Find it in pencil first, then ink it. A wrong pen line is corrected by
-  drawing the right one more firmly beside it, or by a dark wash over both.
-- *Kit only:* the eraser refuses a wet sheet (the paper would pill and tear) with a message and rubs nothing:
-  `kit.dryAll` first. `kit.blot` lifts standing water and the paint in it (example 7), not a dried line.
+- Where your subject shows pencil, draw those lines and choose their weight: light ones all but vanish under a wash,
+  heavy ones stay (pencil does not dissolve). A line you do not want is rubbed out before any paint; under dried
+  paint the eraser takes little.
+- On a full-size sheet: 15 sweeps, 4 pencil lines, 1 rubs of the eraser, 1 drying, 419 water steps; 370 s on Apple M5 Max (shared with other work).
+
+## What makes a painting slow
+
+Paint as the picture needs: nothing here is charged but the paintings you run (each run of your script is one; see
+the brief). `kit.work()` reports what your painting asked of the simulator; you need not call it, it is recorded
+beside your score either way.
+
+- **A big brush on wet paper.** While a brush is on the paper the kit moves the water over the whole sheet, and each
+  time it does, the brush reads the wet paper round it again. A wide brush in a wide wet wash is the slow case: in
+  example 2 each sweep of the sky took about half a minute. A small brush, or a brush on dry paper, is quick.
+- **Dryings.** A drying dries the whole sheet. It runs on the GPU while your script goes on, and the next stroke
+  waits until it is done; on a wet full-size sheet that is a noticeable wait. Dry when the painting needs it:
+  before a glaze, before a shape that must keep a hard edge against its neighbour, before pen or pencil over paint,
+  before the eraser. Between strokes of one wash it spoils the wash (they must be wet together).
+- **Waits.** `kit.wait(sheet, moments)` moves the water with the brush off the paper; it does not make paper damp
+  (on the earlier kit a wash laid at water 0.9 was still too wet for a stroke after `kit.wait(sheet, 600)`). It is
+  rarely needed.
+- Each example above gives its own counts and seconds on a full-size sheet, painted on one of two machines (named
+  beside it), each with other work on it: the seconds are that machine's on that night; the counts are the same
+  anywhere.
+- Slow is not wrong: paint the washes the picture needs. A slow painting only takes longer to see.

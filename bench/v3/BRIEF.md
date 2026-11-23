@@ -45,20 +45,25 @@ tools you were told not to use, take the technique and apply it with the kit.
 
 ## Tips: worked examples
 
-`bench/TIPS.md` shows how to get each basic thing out of this kit: a flat wash, a graded wash, wet into wet, a glaze, a
-soft edge beside a hard one, dry brush, paper white, a pen line over a wash, and how to render a shape with a brush
-(fill it along its long axis, taper to a point, go round a white, meet another shape along an edge, how long a dip
-lasts), how the pen draws (nib, pressure, speed, hatching, soluble and waterproof ink under a wash), and the pencil and eraser (pressure, grade, under and over a wash, hatching, rubbing out before and after paint). Each has a few lines of kit code that run as they stand (`bench/tips/N-name.mjs`) and a picture of the dried
-result on blank paper (`bench/tips/N-name.png`; the shape examples also `-arrows.png`, the stroke paths). Read it, and
-look at the pictures, before you write your first stroke.
+`bench/TIPS.md` is fifteen small paintings on blank paper, each with its script (`bench/tips/N-name.mjs`, runs as it
+stands), its dried result (`N-name.png`) and its stroke paths (`N-name-arrows.png`). First, brushwork: how one stroke
+makes a form when the pressure, a flat's blade, the hand's speed and the load change as it travels, and how two or
+three such strokes make a rock or a bush where an outline filled flat makes a slab. Then the brush and the water
+(brush size, big shapes first, how wet the paper is, hard and soft edges, a glaze, whites, colours meeting wet, how far
+a dip goes), and drawing (the pen, ink under a wash, pencil and the eraser). Read it, and look at the pictures, before
+you write your first stroke.
 
 ## Simulator in brief
 
 - `const { sheet, O, W, H } = await kit.open('{CROP}')`: a fresh cold-press sheet, one cell per target pixel,
   0.259 mm a cell.
 - `kit.createBrush({ radius, bristles, capacity, flat, belly, feed, give, splay, stiffness, seed })` (radius in
-  cells), `kit.dip(brush, { water: 0..1, conc: kit.mix({ sapgreen: 0.4, ochre: 0.1 }) })`. A brush runs out: dip again.
-- `kit.stroke(brush, sheet, [{ x, y, p }...])`. The kit moves the water while the brush is on the paper; strokes
+  cells), `kit.dip(brush, { water: 0..1, conc: kit.mix({ sapgreen: 1.2, ochre: 0.3 }) })` (a mix totals at most 8: about 0.5
+  a pale tint, 1 to 2 a middle wash, 6 to 8 a strong dark). The brush is the main painter's own. A brush runs out:
+  dip again.
+- `kit.stroke(brush, sheet, [{ x, y, p, v, blade }...], { upright })`: p pressure (0 to 1), v the hand's speed in mm/s
+  (optional), blade a flat's angle to the direction of travel in degrees (optional; 90 square across, 0 on its edge).
+  The kit moves the water while the brush is on the paper; strokes
   laid while the sheet is wet run together, on a dry sheet they keep their edges. `kit.wait(sheet, moments)` lets the
   water run with the brush off the paper (default 20); `kit.dryAll(sheet)` dries the sheet.
 - Pen: `kit.createPen({ nib, flex })`, `kit.dipPen(pen, kit.mix({ sepia: 3 }))`, `kit.penStroke(pen, sheet, [{ x, y, p, v }...])`.
