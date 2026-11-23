@@ -62,6 +62,10 @@ def post(cfg, model, content, max_tokens=1024, num_ctx=local_route.NUM_CTX, open
                "max_tokens": max_tokens, "temperature": 0}
     if cfg["route"] == "openrouter":
         payload["provider"] = {"zdr": True, "data_collection": "deny"}
+        # hosted judges think before they answer; with the answer's own limit their thinking used it all and the reply
+        # came back empty (23 Nov 2026: most 13-picture readings). Thinking is kept short and given its own room.
+        payload["max_tokens"] = max_tokens + 6000
+        payload["reasoning"] = {"effort": "low"}
     hdr = {"Authorization": "Bearer " + cfg["env"][cfg["keyName"]], "User-Agent": "unpaint-bench-judge/1", "Content-Type": "application/json"}
     last = None
     for i in range(3):
