@@ -17,11 +17,12 @@ The [project README](../README.md) has the quick start. The [0.3.0 release notes
   - [Brush and wash techniques](techniques/README.md): each wash, lifting and line technique and its code
 - [Methods, techniques and tuned settings](techniques.md): an index of the modules and recipe flags
 - [Plan format](plan-format.md): the JSON stroke plan, line files and the V6 draft plan
+- [Painting script](painting-script.md): how a model writes passages (shape, paint, brush, paper, strokes), with a real passage
 
 ## Checking the work
 
 - [Judging](judging.md): repeatable image measurements, stage checks and AI image judges
-- [Auto against a model](auto-vs-model.md): how the code alone paints a cat, and how a model paints it at level 2
+- [Auto against a model](auto-vs-model.md): one cat painted by the code alone and by a model at level 2, step by step, and what a model may change at each level
 - [Honesty](honesty.md): the check that blocks target-pixel reads, and its records
 - The benchmark has its own docs in [bench/](../bench/README.md)
 
