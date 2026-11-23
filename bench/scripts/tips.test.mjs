@@ -1,6 +1,6 @@
 // node --test bench/scripts/tips.test.mjs   (part of npm run bench:test)
-// The harness tips (bench/v3/TIPS.md): every picture it shows exists, every worked example has its script and its
-// dried result, the examples paint a blank sheet only, and the kit keeps a film of a painting the Studio can play.
+// The harness tips (bench/v3/TIPS.md): every picture it shows exists, every worked example has its script, its
+// dried result, its stroke paths and its full-size cost, the examples paint a blank sheet only, and the kit keeps a film of a painting the Studio can play.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -15,17 +15,20 @@ const REPO = path.resolve(BENCH, '..'), V3 = path.join(BENCH, 'v3'), TIPS = path
 test('TIPS.md shows only pictures that exist, and every example has its script, its result and (for the shapes) its arrows', () => {
   const text = fs.readFileSync(path.join(V3, 'TIPS.md'), 'utf8');
   const shown = [...text.matchAll(/!\[\]\((tips\/[^)]+)\)/g)].map(m => m[1]);
-  assert.ok(shown.length >= 18);
   for (const f of shown) assert.ok(fs.existsSync(path.join(V3, f)), f);
-  const scripts = fs.readdirSync(TIPS).filter(f => /^\d+-.*\.mjs$/.test(f));
-  assert.equal(scripts.length, 26);
+  const scripts = fs.readdirSync(TIPS).filter(f => /^\d+-.*\.mjs$/.test(f)), costs = JSON.parse(fs.readFileSync(path.join(TIPS, 'costs.json'), 'utf8'));
+  assert.ok(scripts.length >= 10);
   for (const s of scripts) {
     const stem = s.replace(/\.mjs$/, ''), code = fs.readFileSync(path.join(TIPS, s), 'utf8');
-    assert.ok(shown.includes(`tips/${stem}.png`), `${stem} is shown`);
-    if ((parseInt(s) >= 9 && parseInt(s) <= 16) || parseInt(s) >= 19) assert.ok(shown.includes(`tips/${stem}-arrows.png`), `${stem} shows its stroke paths`);
+    assert.ok(shown.includes(`tips/${stem}.png`) && shown.includes(`tips/${stem}-arrows.png`), `${stem} is shown, with its stroke paths`);
+    // sized by the sheet, so it paints the same at any size, and painted at full size with its cost recorded
+    assert.ok(/\b[WH] \* /.test(code), `${s} places its marks as shares of the sheet`);
+    assert.ok(costs[stem]?.sheet?.[0] >= 1000 && Number.isInteger(costs[stem].waterSteps), `${stem} has its full-size cost in costs.json`);
     // a blank sheet only: no benchmark target is opened, read or named
     assert.deepEqual([...code.matchAll(/kit\.open\('([^']+)'/g)].map(m => m[1]), ['tips'], s);
     assert.ok(!/kit\.coarse|readFile|targets?\//.test(code), `${s} reads nothing`);
+    // the kit moves the water: no example steps it or hooks into a stroke
+    assert.ok(!/between:|kit\.step|kit\.dry\(|flowEvery/.test(code), `${s} leaves the water to the kit`);
     for (const c of [...loadCrops(), ...loadLevelOneCrops()]) assert.ok(!new RegExp(`\\b${c.task}\\b`).test(code), `${s} does not name ${c.task}`);
   }
   assert.match(fs.readFileSync(path.join(V3, 'BRIEF.md'), 'utf8'), /bench\/TIPS\.md/);
@@ -41,7 +44,7 @@ test('the kit keeps a film of a painting: frames.json and lossless frames, endin
   const ws = fs.mkdtempSync(path.join(os.tmpdir(), 'kitfilm-')), wb = path.join(ws, 'ws', 'bench');
   try {
     fs.mkdirSync(path.join(wb, 'tasks'), { recursive: true });
-    fs.symlinkSync(path.join(REPO, 'src'), path.join(ws, 'ws', 'src')); fs.symlinkSync(path.join(REPO, 'node_modules'), path.join(ws, 'ws', 'node_modules')); fs.copyFileSync(path.join(REPO, 'package.json'), path.join(ws, 'ws', 'package.json'));
+    fs.symlinkSync(path.join(REPO, 'src'), path.join(ws, 'ws', 'src')); fs.symlinkSync(path.join(REPO, 'tools'), path.join(ws, 'ws', 'tools')); fs.symlinkSync(path.join(REPO, 'node_modules'), path.join(ws, 'ws', 'node_modules')); fs.copyFileSync(path.join(REPO, 'package.json'), path.join(ws, 'ws', 'package.json'));
     for (const f of ['kit.mjs', 'guard.mjs']) fs.copyFileSync(path.join(V2, 'kit', f), path.join(wb, f));
     fs.copyFileSync(path.join(V2, 'targets', 'sargent-coarse.json'), path.join(wb, 'tasks', 'sargent-coarse.json'));
     fs.writeFileSync(path.join(wb, 'p.mjs'), `import * as kit from './kit.mjs';

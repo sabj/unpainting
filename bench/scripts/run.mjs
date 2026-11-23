@@ -78,8 +78,10 @@ if (!DRY) {
 
 const outRoot = path.resolve(opt('out', path.join(BENCH, 'work', DRY ? 'dry-run' : 'profile-runs', profile.id, 'runs')));
 {
-  const tries = Number(opt('tries', profile.planOnly ? 1 : DRY ? (round.id === 'V4' ? 1 : 2) : 3));
+  const tries = Number(opt('tries', profile.planOnly || round.id === 'V3' ? 1 : DRY ? (round.id === 'V4' ? 1 : 2) : 3));
   if (profile.planOnly && tries !== 1) fail('lite uses one try; select --profile full for repeated trials');
+  // level 1 is one attempt: one fresh session; its script may run 3 paintings, and the last completed one is the level's (the owner, 23 Nov)
+  if (round.id === 'V3' && tries !== 1) fail('level 1 (V3) is one attempt: leave out --tries, or give --tries 1');
   if (!Number.isInteger(tries) || tries < 1 || tries > 9) fail('--tries must be an integer from 1 to 9');
   if (!DRY && round.id === 'V5' && !process.env.TOGETHER_API_KEY) fail('V5 scores each try for the next one\'s feedback: set TOGETHER_API_KEY (the judges run on Together)');
   // --dry-width: the painting width of a dry run (default 96 px; the real widths are in v4v5/subjects.json)

@@ -18,6 +18,8 @@
   { "key": "spark", "name": "Muse Spark 1.3", "id": "muse-spark-1.3", "effort": "xhigh", "runner": "muse" },
   { "key": "argon", "name": "Gemini 4 Argon (High)", "id": "gemini-4-argon-high", "effort": "high", "runner": "agy" },
   { "key": "argonmed", "name": "Gemini 4 Argon (Medium)", "id": "gemini-4-argon-medium", "effort": "medium", "runner": "agy" },
+  { "key": "neonmed", "name": "Gemini 4 Neon (Medium)", "id": "gemini-4-neon-medium", "effort": "medium", "runner": "agy" },
+  { "key": "sonnetmed", "name": "Sonnet 5.5 (Medium)", "id": "claude-sonnet-5-5", "effort": "medium", "runner": "claude" },
   { "key": "gflash", "name": "Gemini 3.8 Flash", "id": "gemini-3.8-flash-high", "effort": "high", "runner": "agy" }
  ]
 }

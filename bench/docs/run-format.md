@@ -151,7 +151,7 @@ The file is gzip, one JSON object per line, in painting order:
 | Line | Fields |
 |---|---|
 | `{ev:"open"}` | `protocol`, `task`, `seed`, `W`, `H` (sheet cells), `mmPerCell`, `paper`, `backend`, `t0` (ms epoch) |
-| stroke | `i` (1-based index in the budget count), `tool` (`brush` or `pen`), `t` (ms since open), `brush` `{radius, bristles, capacity, flat}` or `pen` `{nib, flex, capacity}`, `dip` (last dip: `water` or `amount`, and `pigments`, one concentration per box pigment), `load` (brush water at the stroke start) or `ink`, `dips` (dips so far), `pts` (`x`, `y`, `p` pressure, optional `r`), `options` |
+| stroke | `i` (1-based index in the budget count), `tool` (`brush` or `pen`), `t` (ms since open), `brush` `{model, radius, bristles, capacity, flat, speed, bladeAngle}` (and `spacing`, cells between touches: 1.4 for a broad wash, 0.7 otherwise, as the main painter lays them) or `pen` `{nib, flex, capacity}`, `dip` (last dip: `water` or `amount`, and `pigments`, one concentration per box pigment), `load` (brush water at the stroke start) or `ink`, `dips` (dips so far), `pts` (`x`, `y`, `p` pressure, optional `r` radius, `v` hand speed in mm/s, `blade` a flat's angle in degrees), `options` |
 | `{ev:"snap"}` | `after`: the budget count at the snapshot (every 25). Counting precedes execution, so `after:25` shows 24 completed strokes |
 | `{ev:"frame"}` | the painter called `kit.frame(name)` after `after` strokes |
 | `{ev:"stage"}` | `pct` (10, 25, 50, 75, 100) and `after`: the selected snapshot count. Early stages show one fewer completed stroke; the final stage shows all strokes |
