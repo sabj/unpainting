@@ -25,7 +25,7 @@ import { toolUseOf, listFiles } from './tool-use.mjs';
 import { PROVIDER_HOSTS, startGate as startNetGate, makeToolbox, toolsText } from './session-net.mjs';
 import { DEFAULT_LOOKS, DEFAULT_WALL_MINUTES, DEFAULT_GRACE_MINUTES, DEFAULT_STEPS, safeRead, writeSession, sessionServer, SIGN_IN_EXPOSURE, finalChoice, sessionCall, readTranscript, reachedOutside, ownFolderOf, ownPictures, runSession } from './session.mjs';
 import { DEFAULT_REVERTS } from './reverts.mjs';
-import { levelOf, handedAt } from './levels.mjs';
+import { levelOf, handedAt, CODE_PLAN_IS_L4 } from './levels.mjs';
 import { usageOf, usageLine } from './usage.mjs';
 import { shapesData, namesShapes, resolveNumbered } from './study-shapes.mjs';
 import { paintThroughStage, stoppedText } from './stage-look.mjs';
@@ -369,6 +369,8 @@ async function handedTo(r, prepared, made) {
     const from = path.resolve(req.previous); let earlier; try { earlier = JSON.parse(fs.readFileSync(path.join(from, 'run.json'), 'utf8')); } catch { throw new Error(`--previous ${from}: no finished run there (run.json)`); }
     const sub = earlier.author?.session?.submitted;
     if (earlier.subject?.id !== spec.id || earlier.author?.key !== author.key || !sub) throw new Error(`--previous ${from}: not a session of ${author.name} on ${spec.id} that handed over a choice`);
+    // below level 4 what it is handed of its previous try must carry nothing of the code's plan: its own script only
+    if (!terms.plan && sub.kind !== 'script') throw new Error(`--previous ${from}: that try handed over ${sub.what}, which carries the code's plan, and ${CODE_PLAN_IS_L4}; a level ${level.name} retry starts from a try that handed over its own script`);
     const sheets = await writeWorkSheets(from, path.join(made, 'previous'), { whose: 'your previous' });
     // what it handed over, whole: choice.json and every file it names (its script or edited plan, its lines, its forms)
     const folder = path.join(from, 'author', 'folder'), names = ['choice.json', sub.script, sub.plan, sub.tools?.lines, sub.tools?.forms].filter(Boolean), missing = names.filter(n => !fs.existsSync(path.join(folder, n)));
@@ -457,9 +459,9 @@ async function sessionRun(r) {
     record.author.prepared = { plan: true, painting: Boolean(prepared.painting), from: preparedFolder, commit: prepared.record.commit ?? null, madeAt: prepared.record.made ?? null, planSeconds: prepared.record.plan?.seconds ?? null, paintingSeconds: prepared.record.painting?.seconds ?? null };
     // the terms of this try, so a rerun has identical terms: budgets, the subject's unit, the seed, the commit, and the prepared inputs by hash
     const hashOf = f => (f && fs.existsSync(f) ? crypto.createHash('sha256').update(fs.readFileSync(f)).digest('hex') : null);
-    record.author.terms = { budget, unit: prepared.record.unit, seed: null, commit: code.commit, dirty: Boolean(code.dirty), level: level.name, tryNumber: req.tryNumber, model: author.id, cli: author.cli,
+    record.author.terms = { budget, unit: prepared.record.unit, seed: null, commit: code.commit, dirty: Boolean(code.dirty), level: level.name, tryNumber: req.tryNumber, model: author.id, cli: author.cli, codePlan: terms.plan,
       prepared: { folder: preparedFolder, plan: hashOf(path.join(prepared.plan, 'value-plan.json')), planToEdit: hashOf(path.join(prepared.plan, 'plan-to-edit.json')), shapes: hashOf(prepared.shapes), washes: hashOf(prepared.washes), painting: prepared.painting ? Object.fromEntries(prepared.painting.sheets.map(f => [f.name, hashOf(f.from)])) : null } };
-    say(r, `the code planner's plan was taken prepared (${preparedFolder})${prepared.painting ? ', and its full-size painting with it' : ''}: nothing of it is made on the session's clock`);
+    say(r, `the code planner's plan was taken prepared (${preparedFolder})${prepared.painting ? ', and its full-size painting with it' : ''}: nothing of it is made on the session's clock${terms.plan ? '' : `; at level ${level.name} it sets the rendering unit only and is not handed to the session (${CODE_PLAN_IS_L4})`}`);
     // the model's folder: a temporary one outside the repository; it is kept in the run folder when the session ends
     const cwd = r.sessionDir, real = fs.realpathSync(cwd), listing = toEdit(auto.plate), base = await baseOf(r);
     // a choice's tools are checked against the drawing and the forms of this run; nothing is written for a check
@@ -469,7 +471,8 @@ async function sessionRun(r) {
       const handed = await handedTo(r, prepared, path.join(dir, 'handed'));
       if (terms.previous) record.author.previousTry = { tryNumber: req.tryNumber, retries: req.retries, from: path.resolve(req.previous) };
       routes = await closedRoutes(author);
-      const { prompt, pictures: handedPictures } = writeSession({ dir: cwd, tools: routes.toolbox ? toolsText(routes.toolbox.said) : undefined, packet, sheet: spec.sheet, medium: record.drawing.medium, auto: { picture: await planPicture({ planPreview: auto.planPreview, run: record }), washesText: washesText(auto), plan: { summary: auto.summary, washes: auto.rows }, toEdit: listing }, settings: settingsList(spec),
+      // the code's plan and its settings are handed at level 4 only (levels.mjs); below it the folder holds no auto/
+      const { prompt, pictures: handedPictures } = writeSession({ dir: cwd, tools: routes.toolbox ? toolsText(routes.toolbox.said) : undefined, packet, sheet: spec.sheet, medium: record.drawing.medium, codePlan: terms.plan, ...(terms.plan ? { auto: { picture: await planPicture({ planPreview: auto.planPreview, run: record }), washesText: washesText(auto), plan: { summary: auto.summary, washes: auto.rows }, toEdit: listing }, settings: settingsList(spec) } : {}),
         forms: record.masks.mask ? await formBoxes(record.masks.mask, record.masks.forms, W) : null, formsIds: record.masks.mask ?? null, looks: looksMost, wallMinutes: wallMost, graceMinutes: graceMost, steps: stepsMost, reverts: revertsMost, briefFile: path.join(HERE, 'SESSION-BRIEF.md'), readmeFile: path.join(HERE, 'SESSION-README.md'), handed,
         drawing: base.listing ? { listing: base.listing, picture: await drawingPicture(allLinesDoc(base.vectors), W) } : null });
       // what was handed, by hash, as it lies in the session's folder: a retry's first message can be shown to carry it
@@ -477,7 +480,7 @@ async function sessionRun(r) {
       record.author.handed = handed.map(h => ({ folder: h.folder, files: h.files.map(f => ({ name: f.name, sha256: sha(path.join(cwd, h.folder, f.name)), picture: Boolean(f.picture), namedInTheFirstMessage: prompt.includes(`\`${h.folder}/${f.name}\``) })) }));
       if (terms.previous) { const painting = ['painting.png', 'painting.jpg'].map(f => path.join(path.resolve(req.previous), 'plate', f)).find(f => fs.existsSync(f)); record.author.previousTry.paintingSha256 = sha(painting); record.author.previousTry.painting = painting; }
       fs.writeFileSync(path.join(dir, 'session-prompt.txt'), prompt);
-      const server = sessionServer({ dir: cwd, sheet: { widthMm: spec.sheet.widthMm, heightMm: spec.sheet.heightMm }, forms: record.masks.mask ? await formBoxes(record.masks.mask, record.masks.forms, W) : [], looks: looksMost, wallMinutes: wallMost, graceMinutes: graceMost, steps: stepsMost, stepsTaken: stepCounter(author.cli, path.join(dir, 'S.out.txt')), unit: prepared.record.unit, reverts: revertsMost, startKey: choiceKey(readChoice({ kind: 'settings', settings: {} }), ''), pictures: handedPictures, checkScript: check, checkPlan: obj => checkEdit(obj, listing), checkTools, ledger: path.join(dir, 'looks.jsonl'), keep: path.join(dir, 'looks'), compile: (choice, script, n, edit) => compileChoice(r, choice, script, path.join(dir, 'plans', String(n)), edit),
+      const server = sessionServer({ dir: cwd, sheet: { widthMm: spec.sheet.widthMm, heightMm: spec.sheet.heightMm }, forms: record.masks.mask ? await formBoxes(record.masks.mask, record.masks.forms, W) : [], looks: looksMost, wallMinutes: wallMost, graceMinutes: graceMost, steps: stepsMost, stepsTaken: stepCounter(author.cli, path.join(dir, 'S.out.txt')), unit: prepared.record.unit, reverts: revertsMost, codePlan: terms.plan, startKey: terms.plan ? choiceKey(readChoice({ kind: 'settings', settings: {} }), '') : null, pictures: handedPictures, checkScript: check, checkPlan: terms.plan ? obj => checkEdit(obj, listing) : null, checkTools, ledger: path.join(dir, 'looks.jsonl'), keep: path.join(dir, 'looks'), compile: (choice, script, n, edit) => compileChoice(r, choice, script, path.join(dir, 'plans', String(n)), edit),
         look: (choice, script, at, edit, compiled, ask) => paintLook(r, choice, script, path.join(dir, 'look-paints', `${at.plan}-${at.look}`), at, edit, compiled, ask) });
       // what nothing of the session may read: this checkout, the checkout it is a worktree of (with every worktree, cache
       // and earlier run under it), the subject list with its inputs, and whatever UNPAINT_SESSION_DENY adds (a:b:c)
@@ -506,7 +509,7 @@ async function sessionRun(r) {
       if (assessment) fs.writeFileSync(path.join(dir, 'assessment.md'), assessment);
       await server.tick(); const kept = await server.stop(); const network = await routes.done(); routes = null;
       const seen = readTranscript(author.cli, fs.existsSync(path.join(dir, 'S.out.txt')) ? fs.readFileSync(path.join(dir, 'S.out.txt'), 'utf8') : '');
-      fin = done.ended === 'not started' ? { failure: `the model could not be called: ${done.error}` } : finalChoice({ present: server.present, lastGood: kept.lastGood, good: kept.good, ended: done.ended, barred: server.barred });
+      fin = done.ended === 'not started' ? { failure: `the model could not be called: ${done.error}` } : finalChoice({ present: server.present, lastGood: kept.lastGood, good: kept.good, ended: done.ended, barred: server.barred, codePlan: terms.plan });
       const outside = reachedOutside(seen.commands, deny, [cwd, real]), pictures = ownPictures(cwd);
       // a session ended by the budget is not a failure: it is marked, and what it had is painted
       const budgetReached = kept.budgetReached ?? (done.ended === 'budget reached' ? { what: `the safety stop (${wallMost} minutes on the clock)`, safetyStop: true } : null);
@@ -770,11 +773,12 @@ async function preflightRun(r) {
     const { auto } = await preparedPlan(r);
     for (const f of packet.files) { fs.mkdirSync(path.dirname(path.join(cwd, f)), { recursive: true }); fs.copyFileSync(path.join(dir, f), path.join(cwd, f)); }
     routes = await closedRoutes(author);
-    writeSession({ dir: cwd, tools: routes.toolbox ? toolsText(routes.toolbox.said) : undefined, packet, sheet: spec.sheet, medium: record.drawing.medium, auto: { picture: await planPicture({ planPreview: auto.planPreview, run: record }), washesText: washesText(auto), plan: { summary: auto.summary, washes: auto.rows } }, settings: settingsList(spec),
+    // a preflight checks the tools, not a level: it plans the code planner's plan, nothing changed, as it always has
+    writeSession({ dir: cwd, tools: routes.toolbox ? toolsText(routes.toolbox.said) : undefined, packet, sheet: spec.sheet, medium: record.drawing.medium, codePlan: true, auto: { picture: await planPicture({ planPreview: auto.planPreview, run: record }), washesText: washesText(auto), plan: { summary: auto.summary, washes: auto.rows } }, settings: settingsList(spec),
       looks: looksMost, wallMinutes: PREFLIGHT_MINUTES, graceMinutes: PREFLIGHT_GRACE_MINUTES, reverts: revertsMost, briefFile: path.join(HERE, 'SESSION-BRIEF.md'), readmeFile: path.join(HERE, 'SESSION-README.md') });
     picture = packet.files.find(f => /source/.test(f));
     const prompt = preflightTask(picture); fs.writeFileSync(path.join(cwd, 'TASK.md'), prompt);
-    const server = sessionServer({ dir: cwd, looks: looksMost, wallMinutes: PREFLIGHT_MINUTES, graceMinutes: PREFLIGHT_GRACE_MINUTES, pictures: [picture], checkScript: obj => checkAuthored(obj, { sheetWidthMm: W }).script, ledger: path.join(dir, 'looks.jsonl'),
+    const server = sessionServer({ dir: cwd, codePlan: true, looks: looksMost, wallMinutes: PREFLIGHT_MINUTES, graceMinutes: PREFLIGHT_GRACE_MINUTES, pictures: [picture], checkScript: obj => checkAuthored(obj, { sheetWidthMm: W }).script, ledger: path.join(dir, 'looks.jsonl'),
       compile: (choice, script, n, edit) => compileChoice(r, choice, script, path.join(dir, 'plans', String(n)), edit), look: async () => ({ ok: false, error: 'a preflight paints nothing' }) });
     const deny = [...sessionDeny(spec), ...runs.filter(o => o !== r && o.sessionDir).map(o => o.sessionDir)], call = sessionCall(author, { prompt, cwd, deny, images: [path.join(cwd, picture)], gate: routes.gate, toolbox: routes.toolbox });
     say(r, `preflight of ${author.id} (${author.cli}, effort ${author.effort ?? 'not set'}): ${PREFLIGHT_MINUTES} minutes, nothing painted`);

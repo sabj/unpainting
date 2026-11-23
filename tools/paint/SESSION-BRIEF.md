@@ -12,26 +12,45 @@ anything that reaches outside this folder, and going back to an earlier choice a
 else is laid as you write it. Where the tools think a choice may spoil the painting they say so in a WARNING, and the
 warning is yours to heed or ignore: a mistake reaches the sheet as a mistake, and you see it in a look.
 
+<!-- L4 -->
 A code planner has already made a plan from the same inputs you have. It is in `auto/`, prepared before you started.
 It is a starting point you may keep, edit or throw away: bettering it is not the goal, and you owe it nothing. Faults
 it has shown on other pictures: every edge hard, flat slabs where the subject grades, a face cut into facets or left
 as one flat patch, colour too saturated or too dark, small white notches of bare paper, and fine marks that copy the
 study instead of reading as brushwork. Judge for yourself whether it has them here.
+<!-- end -->
+<!-- L2 L3 -->
+You have the subject's prepared inputs: the drawing, three colour studies and the named forms. The plan of the
+painting is yours to make: you write it as your own painting script, every passage of it.
+<!-- end -->
 
 What you have to work with, all of it yours to use:
 
+<!-- L4 -->
 - The three studies, coarse to fine. Study 3, the fine study, is close to the subject itself in shape, value and
   colour, and the code planner's plan uses almost none of it: nearly all its washes come from Study 1.
+<!-- end -->
+<!-- L2 L3 -->
+- The three studies, coarse to fine. Study 3, the fine study, is close to the subject itself in shape, value and
+  colour.
+<!-- end -->
 - **The drawing, and it is yours.** Its medium: pencil, pen, or no drawing at all, whatever the subject seems to be
   drawn in (`"medium"` in `choice.json`). Its prepared lines: which are drawn before the washes, which after them
   over the dry paint, which not at all, and how dark each is. And lines of your own: drawn where you put them, point
   by point, in pen or pencil, at the width and darkness you give, before or after the washes (`"lines"` beside any
   choice; `README.md`).
+<!-- L4 -->
 - The named forms, as a picture and as data, and yours to change: merge, cut out with a polygon, rename, give another
   kind (`"forms"` in a settings choice). The code planner can be set form by form (`"perForm"`).
 - The whole paint box (`own-script-brief.md` lists it). The choice of paints is yours; the code planner's own pick
   is often wrong for the subject. In your own script the paints are its `palette`; for the code planner they are the
   painter's option `paints` (box keys, comma separated), which a settings choice may name.
+<!-- end -->
+<!-- L2 L3 -->
+- The named forms, as a picture and as data: where each form lies and what kind it is, to plan and measure by.
+- The whole paint box (`own-script-brief.md` lists it). The choice of paints is yours: they are your script's
+  `palette`.
+<!-- end -->
 - Wet in wet: a wash into clean water, a shape dropped into a wash while it is damp, a soft join beside a damp
   neighbour (`README.md` and `own-script-brief.md` say how each is written).
 - Real looks (below). There is no cap on passages, layers, forms, strokes, lines, rules or strength.
@@ -44,8 +63,15 @@ Your work is measured, not capped: how many looks you take, how many plans, how 
 None of that is held against you, and no number of them is too many or too few.
 
 Two things are limited, and they are the benchmark's, not a judgment of your work: **the budget for one try**, the
+<!-- L4 -->
 same for every model and every machine. Rendering: `LOOKS_MOST` units. A look of the code planner's whole plan on the
 whole sheet costs about 1 unit; a look costs the painting work it really takes (its brush sweeps and its dryings),
+<!-- end -->
+<!-- L2 L3 -->
+same for every model and every machine. Rendering: `LOOKS_MOST` units. One unit is the painting work of one full look
+of a reference painting of this subject, counted before you started and the same for every model; a look costs the
+painting work it really takes (its brush sweeps and its dryings),
+<!-- end -->
 so a look stopped after a stage you name (`./unpaint look --until 2`) or of a region of your own script (`--region`)
 costs less: where and when you look is yours to choose. Each look is quoted before it is painted (`./unpaint plan`
 lists it; `./unpaint cost ...` prices any look and paints nothing) and charged what it really took after it; a look
@@ -67,21 +93,34 @@ is not painted. No score is ever shown to you; there is none to chase.
 
 ## A way to work (advice; work as you see fit)
 
+<!-- L4 -->
 - Open every picture in `inputs/` and `auto/plan.png`. `auto/washes.txt` and `auto/plan.json` say which washes make
   each form, in what order, with what brush, at what colour.
+<!-- end -->
+<!-- L2 L3 -->
+- Open every picture in `inputs/`, and read `inputs/forms.json` and `drawing/lines.json`.
+<!-- end -->
 - Decide how a painter would paint this subject: the forms, the order, where the lights are kept, where edges are
   lost, where the few darks go, what the drawing does. Notes help (`notes.md`, a line in `changes.md` after each
   look); they are for you, and for whoever reads the session afterwards.
+<!-- L4 -->
 - Three routes, from the least change to the most. Tuning is quick and re-plans the whole picture; earlier sessions
   that only tuned settings came out almost the same as the code planner. Editing the plan keeps every wash you do not
   touch exactly as the code planner would lay it and lets you change the washes you judge wrong, one by one. Your own
   script is free in every passage and is all your own work, values included.
+<!-- end -->
+<!-- L2 L3 -->
+- Write your plan as your script: each passage's shape, paint, brush, water and place in the order
+  (`own-script-brief.md`). A first script that lays the big shapes, looked at early, tells you more than a finished
+  one planned blind.
+<!-- end -->
 - Your shell is yours to measure and compute with: positions and boxes from `inputs/forms-ids.png`, colours from the
   studies.
 - `./unpaint plan` checks that your work compiles, as often as you like; it answers with counts and any warnings.
   When the plan is what you meant, look. A first look early is worth having: the dried sheet surprises more than the
   plan does.
 
+<!-- L4 -->
 ## What you may hand over
 
 Your answer is the file `choice.json` as it stands when you stop. Three kinds:
@@ -105,6 +144,22 @@ settings choice, your forms (`"forms": "my-forms.json"`) and planner settings fo
 
 `choice.json` starts as `{"kind": "settings", "settings": {}}`: change nothing and the painting is exactly the code
 planner's.
+<!-- end -->
+<!-- L2 L3 -->
+## What you hand over
+
+Your answer is the file `choice.json` as it stands when you stop: your own painting script,
+`{"kind": "script", "script": "script.json", "why": "..."}`. You write every passage yourself. `own-script-brief.md`
+is the full brief for that: the format, the kit, the paints, and painters' advice on how a watercolour is built. A
+script is laid as written.
+
+Beside it a choice may name the drawing's medium (`"medium": "pencil"`, `"pen"` or `"none"`) and your lines
+(`"lines": "my-lines.json"`: rules on the prepared lines, and lines of your own). Rubbing out is an erase passage in
+your script. `README.md` gives each format.
+
+`choice.json` starts as `{"kind": "script", "script": "script.json"}`, and `script.json` is yours to write. Nothing
+else stands in for it: a session that hands in no script that compiles has handed in nothing, and nothing is painted.
+<!-- end -->
 
 ## Looking
 
@@ -134,7 +189,13 @@ unbroken. DRAWING_NOTE All of it is yours to change.
   subject, numbered, each with where it is in millimetres, what differs and what you would do about it; last line
   `Major faults remaining: none` or `Major faults remaining: <how many>`. Nobody marks it and nothing depends on it:
   you hand in when you judge the painting done, or when you choose to stop.
+<!-- L4 -->
 - Say in your last message what you chose, what you changed from the code planner's plan and why, which warnings
   you ignored on purpose, and what you expect to be still wrong in the painting.
+<!-- end -->
+<!-- L2 L3 -->
+- Say in your last message what you chose and why, which warnings you ignored on purpose, and what you expect to be
+  still wrong in the painting.
+<!-- end -->
 
 The pictures and files are in the current directory. Start with `README.md`.

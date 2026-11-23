@@ -36,12 +36,12 @@ test('handed pictures: a line each in seen.md; what a command\'s log can show of
   assert.deepEqual(logReads('codex', ['sips -g pixelWidth previous/final-beside-subject.jpg'], files), { [files[0]]: null, [files[1]]: null }, 'codex\'s log cannot show a picture being read: null, never a guess');
 });
 
-test('a level is a named setting: L2 one go, L3 a retry from the L2 result, L4 a retry from the L3 result with many resources; no critique at any level', () => {
+test('a level is a named setting: L2 one go without the code\'s plan, L3 a retry from the L2 result, L4 a retry from the L3 result with many resources; no critique at any level', () => {
   assert.deepEqual(Object.keys(LEVELS), ['L2', 'L3', 'L4']); assert.throws(() => levelOf('L9'), /one of L2, L3, L4/); assert.equal(DEFAULT_RETRIES, 1);
-  assert.deepEqual(handedAt(levelOf('L2'), {}), { previous: false, auto: false, shapes: false });
-  assert.deepEqual(handedAt(levelOf('L3'), { previous: 'l2-run' }), { previous: true, auto: false, shapes: false }, 'L3 gets its own previous painting and nothing of the code\'s');
-  assert.deepEqual(handedAt(levelOf('L4'), { previous: 'l3-run' }), { previous: true, auto: true, shapes: true });
-  assert.deepEqual(handedAt(levelOf('L3'), { tryNumber: 3, retries: 3, previous: 'run' }), { previous: true, auto: false, shapes: false }, 'the number of retries is a setting');
+  assert.deepEqual(handedAt(levelOf('L2'), {}), { previous: false, plan: false, auto: false, shapes: false }, 'L2 gets the code planner\'s inputs, not its plan');
+  assert.deepEqual(handedAt(levelOf('L3'), { previous: 'l2-run' }), { previous: true, plan: false, auto: false, shapes: false }, 'L3 gets its own previous painting and nothing of the code\'s');
+  assert.deepEqual(handedAt(levelOf('L4'), { previous: 'l3-run' }), { previous: true, plan: true, auto: true, shapes: true }, 'the code\'s plan and planner are level 4');
+  assert.deepEqual(handedAt(levelOf('L3'), { tryNumber: 3, retries: 3, previous: 'run' }), { previous: true, plan: false, auto: false, shapes: false }, 'the number of retries is a setting');
   assert.throws(() => handedAt(levelOf('L2'), { previous: 'run' }), /L2 is one go from the prepared inputs/); assert.throws(() => handedAt(levelOf('L2'), { tryNumber: 2 }), /L2 is one go/);
   assert.throws(() => handedAt(levelOf('L3'), {}), /L3 is a retry: it starts from the model's own L2 result\. Name that run's folder with --previous/); assert.throws(() => handedAt(levelOf('L4'), {}), /starts from the model's own L3 result/);
   assert.throws(() => handedAt(levelOf('L3'), { tryNumber: 2, previous: 'run' }), /try 2: this benchmark gives 1 retry at a level \(--retries sets it\)/);
