@@ -28,7 +28,7 @@ SERIES = "0.4 scores are a new series: not comparable with the V1 to V5 rounds (
 
 import s04_judge, s04_readings as R, s04_runs, s04_table as T  # noqa: E402
 
-SEQ_CTX, SEQ_TOKENS = 16384, 3000   # thirteen pictures need a longer window than the scorer's 8,192
+SEQ_CTX, SEQ_TOKENS = 16384, 3000   # fourteen pictures (opening, twelve, finished) need a longer window than the scorer's 8,192
 ONE_CTX, ONE_TOKENS = 8192, 1024
 SNAP_PX, ONE_PX = 640, 768
 
@@ -70,8 +70,8 @@ def jobs_for(paintings, originals, rubric, data_uri):
     for e in paintings:
         snaps = e["snapshots"]
         head = R.SEQ.format(rubric=rubric, n=len(snaps), style=e["style"])
-        texts = [head + f"\nSnapshot 1: {snaps[0][1]}% complete"] + [f"Snapshot {k + 1}: {p}% complete" for k, (_, p) in enumerate(snaps) if k]
-        out.append(Job(e["id"], "sequence", [(f, SNAP_PX) for f, _ in snaps], texts, SEQ_CTX, SEQ_TOKENS, lambda raw, n=len(snaps): R.parse_sequence(raw, n), data_uri))
+        texts = [head + "\nOpening: the untouched paper (not scored)"] + [f"Snapshot {k + 1}: {p}% complete" for k, (_, p) in enumerate(snaps)]
+        out.append(Job(e["id"], "sequence", [(e["opening"], SNAP_PX)] + [(f, SNAP_PX) for f, _ in snaps], texts, SEQ_CTX, SEQ_TOKENS, lambda raw, n=len(snaps): R.parse_sequence(raw, n), data_uri))
         out.append(Job(e["id"], "single", [(e["painting"], ONE_PX)], [R.SINGLE.format(style=e["style"])], ONE_CTX, ONE_TOKENS, R.parse_single, data_uri))
     for sid, o in originals.items():
         out.append(Job("original--" + sid, "single", [(o["target"], ONE_PX)], [R.SINGLE.format(style=o["style"])], ONE_CTX, ONE_TOKENS, R.parse_single, data_uri))
@@ -120,7 +120,7 @@ def main(argv=None, judge=s04_judge, env=None, say=print):
         bad = []
         for e in paintings:
             try:
-                e["snapshots"] = R.snapshots(e["painting"])
+                e["snapshots"], e["opening"] = R.snapshots(e["painting"]), R.opening(e["painting"])
             except R.Refusal as x:
                 bad.append(f"{e['id']}: {x}")
         if bad:
@@ -148,7 +148,7 @@ def main(argv=None, judge=s04_judge, env=None, say=print):
         q = R.quality(got[(e["id"], "single")], cfg["panel"])
         faults += [f"{e['id']}, human-ness: {x}" for x in h["faults"]] + [f"{e['id']}, quality: {x}" for x in q["faults"]]
         rows.append({**{k: e[k] for k in ("id", "label", "subject", "auto", "author", "commit", "folder", "painting", "target", "style", "classic", "usage")},
-                     "snapshots": [{"file": f, "pct": p} for f, p in e["snapshots"]], "human": h, "quality": q, "cheat": cheat_summary(e["cheat"])})
+                     "opening": e["opening"], "snapshots": [{"file": f, "pct": p} for f, p in e["snapshots"]], "human": h, "quality": q, "cheat": cheat_summary(e["cheat"])})
     for sid, o in originals.items():
         o["quality"] = R.quality(got[("original--" + sid, "single")], cfg["panel"])
         faults += [f"original of {sid}, quality: {x}" for x in o["quality"]["faults"]]

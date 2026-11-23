@@ -1,7 +1,7 @@
 """The two judged readings of 0.4's scoring (score04.py), and how a panel's replies become one number each.
 
-HUMAN-NESS: twelve snapshots of the painting's film (the first is the untouched paper at 0%, in its own colour; the
-other eleven evenly through the rest), then the finished sheet, shown in order with only
+HUMAN-NESS: an opening picture, the untouched paper the painter chose (the film's first frame, in its own colour;
+shown as context, not scored), then twelve snapshots evenly through the painting's film, then the finished sheet, shown in order with only
 their percent complete, under the human-ness rubric (bench/docs/human-ness-rubric.md). The judge first says whether
 this is the order and the kind of mark a person would use (yes or no), then scores each snapshot 1 to 5 with lettered
 tells. The reading is the mean of the twelve film snapshots (the finished sheet is shown last but not counted: it is at
@@ -19,12 +19,12 @@ import hashlib, json, os, re, statistics
 SNAPSHOTS = 12
 READINGS = 3
 LETTERS = "abcdefghij"
-MIN_FRAMES = SNAPSHOTS + 2          # the paper, then eleven strictly between the first and the last frame
+MIN_FRAMES = SNAPSHOTS + 2          # the twelve are taken strictly between the first frame (the paper) and the last
 RUBRIC_CUT = "For each snapshot the judge writes"   # the rubric's own reply format is replaced by the prompts' below
 
 SEQ = """{rubric}
 
-Below are {n} snapshots of one painting in progress, in order, each labelled only with its percentage complete; the first (0%) is the untouched sheet of paper, in the paper's own colour, before any mark; the last is the finished sheet. It is a painting in this style: {style}.
+First, the opening: the untouched sheet of paper the painter chose, in its own colour, before any mark. It is context only: do not score it. Then come {n} snapshots of one painting in progress, in order, each labelled only with its percentage complete; the last is the finished sheet. It is a painting in this style: {style}.
 First answer for the whole sequence: is this the order and the kind of mark a person would use for this subject? Then score each snapshot.
 Reply with JSON only, no prose: {{"sequence":{{"human":true or false,"why":"one sentence"}},"snapshots":[{{"pct":n,"score":1-5,"tells":["a","c"],"note":"one sentence"}}, ... one object for each of the {n} snapshots, in order]}}"""
 
@@ -80,16 +80,21 @@ def film(painting):
 
 
 def snapshots(painting):
-    """[(file, percent complete)]: the untouched paper (the film's first frame, at 0), eleven film frames evenly through the
-    rest, then the finished sheet at 100. A film that does not start with the untouched paper is refused (made before
-    0.4 rc7: its snapshots are not comparable)."""
+    """[(file, percent complete)]: twelve evenly spaced film frames, then the finished sheet at 100."""
     d, fr = film(painting)
     n = len(fr)
-    if fr[0].get("stage") != "paper":
-        raise Refusal(f"the film beside {painting} does not start with the untouched paper (its first frame is stage {fr[0].get('stage')!r}, not 'paper'): human-ness reads the paper as the first snapshot")
-    idx = [0] + [round((i + 1) * (n - 1) / SNAPSHOTS) for i in range(SNAPSHOTS - 1)]
+    idx = [round((i + 1) * (n - 1) / (SNAPSHOTS + 1)) for i in range(SNAPSHOTS)]
     pct = lambda i: round(100 * (fr[i]["position"] if fr[i].get("position") is not None else i / (n - 1)))
     return [(os.path.join(d, fr[i]["src"]), pct(i)) for i in idx] + [(painting, 100)]
+
+
+def opening(painting):
+    """The opening picture, shown before the snapshots and not scored: the film's first frame, the untouched paper the
+    painter chose. A film that does not start with the untouched paper is refused."""
+    d, fr = film(painting)
+    if fr[0].get("stage") != "paper":
+        raise Refusal(f"the film beside {painting} does not start with the untouched paper (its first frame is stage {fr[0].get('stage')!r}, not 'paper'): the judges are shown it as the opening")
+    return os.path.join(d, fr[0]["src"])
 
 
 def _json(raw):

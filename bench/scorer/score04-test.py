@@ -82,7 +82,7 @@ class StubJudge:
         imgs = [c for c in content if c["type"] == "image_url"]
         if len(imgs) > 1:
             s = 2 if "Auto" in self.which else 4
-            return json.dumps({"sequence": {"human": s > 3, "why": "because"}, "snapshots": [{"pct": 0, "score": s, "tells": ["c"] if s < 3 else []} for _ in imgs]}), {"prompt_tokens": 10}
+            return json.dumps({"sequence": {"human": s > 3, "why": "because"}, "snapshots": [{"pct": 0, "score": s, "tells": ["c"] if s < 3 else []} for _ in imgs[1:]]}), {"prompt_tokens": 10}
         v = {"orig": 8, "Auto": 6}.get(self.which, 7)
         return json.dumps({"composition_values": v, "edges_detail": v, "marks_texture": v, "overall": v}), {"prompt_tokens": 5}
 
@@ -102,18 +102,22 @@ class Readings(unittest.TestCase):
             with self.assertRaisesRegex(R.Refusal, "not the rubric"):
                 R.load_rubric(p)
 
-    def test_the_paper_then_eleven_evenly_spaced_snapshots_then_the_finished_sheet(self):
+    def test_twelve_evenly_spaced_snapshots_then_the_finished_sheet(self):
         with tempfile.TemporaryDirectory() as d:
             src, reg = fixtures(d)
-            f = make_run(d, "r", "auto", reg, src, frames=25)
+            f = make_run(d, "r", "auto", reg, src, frames=27)
             s = R.snapshots(str(f / "plate" / "painting.png"))
             self.assertEqual(len(s), 13)
-            self.assertEqual(s[0], (str(f / "plate" / "f0000.webp"), 0))
-            self.assertEqual([os.path.basename(x) for x, _ in s[1:4]], ["f0002.webp", "f0004.webp", "f0006.webp"])
-            self.assertEqual(os.path.basename(s[11][0]), "f0022.webp")
+            self.assertEqual([os.path.basename(x) for x, _ in s[:3]], ["f0002.webp", "f0004.webp", "f0006.webp"])
             self.assertEqual(s[-1], (str(f / "plate" / "painting.png"), 100))
-            self.assertEqual(s[5][1], round(100 * 10 / 24))
-            self.assertIn("the first (0%) is the untouched sheet of paper", R.SEQ)
+            self.assertEqual(s[5][1], round(100 * 12 / 26))
+
+    def test_the_opening_is_the_untouched_paper_shown_and_not_scored(self):
+        with tempfile.TemporaryDirectory() as d:
+            src, reg = fixtures(d)
+            f = make_run(d, "r", "auto", reg, src, frames=27)
+            self.assertEqual(R.opening(str(f / "plate" / "painting.png")), str(f / "plate" / "f0000.webp"))
+            self.assertIn("It is context only: do not score it.", R.SEQ)
 
     def test_a_film_that_does_not_start_with_the_paper_is_refused(self):
         with tempfile.TemporaryDirectory() as d:
@@ -123,7 +127,7 @@ class Readings(unittest.TestCase):
             doc["frames"][0].pop("stage")
             (f / "plate" / "frames.json").write_text(json.dumps(doc))
             with self.assertRaisesRegex(R.Refusal, "does not start with the untouched paper"):
-                R.snapshots(str(f / "plate" / "painting.png"))
+                R.opening(str(f / "plate" / "painting.png"))
 
     def test_no_film_short_film_or_missing_frame_is_refused(self):
         with tempfile.TemporaryDirectory() as d:
@@ -347,12 +351,12 @@ class EndToEnd(unittest.TestCase):
         firsts, post = [], j.post
         def seen(cfg, model, content, max_tokens, num_ctx):
             imgs = [c["image_url"]["url"] for c in content if c["type"] == "image_url"]
-            if len(imgs) > 1: firsts.append(paper.get(imgs[0]))
+            if len(imgs) > 1: firsts.append(paper.get(imgs[0]) if len(imgs) == 14 else f"{len(imgs)} pictures")
             return post(cfg, model, content, max_tokens, num_ctx)
         j.post = seen
         rc = self.S.main([str(a), str(m), "--out", os.path.join(self.tmp.name, "out")], judge=j, say=lambda *x, **k: None)
         self.assertEqual(rc, 0)
-        self.assertTrue(firsts and all(firsts), f"every sequence a hosted judge saw began with the paper: {firsts}")
+        self.assertTrue(firsts and all(firsts), f"every sequence a hosted judge saw was the paper, then twelve and the finished sheet: {firsts}")
         self.assertEqual(set(firsts), {"auto-run", "model-run"})
 
     def test_two_paintings_and_their_original(self):
@@ -382,7 +386,7 @@ class EndToEnd(unittest.TestCase):
         self.assertIn("new series", res["series"])
         # 3 judges x (2 sequences + 3 single pictures) x 3 readings; sequences carry 13 pictures in the wider window
         self.assertEqual(len(j.calls), 45)
-        self.assertEqual({(n, c) for _, n, c in j.calls}, {(13, 16384), (1, 8192)})
+        self.assertEqual({(n, c) for _, n, c in j.calls}, {(14, 16384), (1, 8192)})
         self.assertEqual(j.events, [(e, m_) for m_ in PANEL for e in ("load", "unload")])
         md = Path(out, "SCORES.md").read_text()
         self.assertIn("- None: every reading has all its judges.", md)

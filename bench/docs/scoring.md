@@ -13,7 +13,7 @@ npm run bench:score04 -- runs.json --out DIR
 
 - A run folder holds `run.json` and the painting (`plate/painting.png` or `painting.png`) with its film, `frames.json`, beside it. The original is `run.json`'s `subject.sourceAbs`. The style the judges are told comes from the subject registry.
 - A manifest is JSON: a list, or `{"runs": [...]}`, of folders or of `{folder, label?, subject?, target?, style?}`. Relative paths are read from the manifest's folder.
-- It refuses before any judge call, naming every bad input: no painting, no original on disk, a failed run, no film or one with under 14 frames, missing frame files or no untouched-paper first frame, a missing rubric, an unknown route, or a hosted route without its key.
+- It refuses before any judge call, naming every bad input: no painting, no original on disk, a failed run, no film or one with under 14 frames, missing frame files or no untouched-paper first frame (the opening), a missing rubric, an unknown route, or a hosted route without its key.
 - Exit 0: complete. Exit 1: written, but a reading is short of a judge; the figure is left empty and named under "Faults first". A smaller panel is never used. Exit 2: refused.
 - `npm run bench:test` runs its tests with a stub judge (`bench/scorer/score04-test.py`); no model is needed.
 
@@ -32,8 +32,8 @@ RESULTS: to be filled from the frozen run.
 
 ## Human-ness
 
-- Twelve snapshots of the painting's film, then the finished sheet, are shown to the judge in order, each labelled only with its percentage complete. The first is the untouched paper at 0%, in its own colour (a toned sheet shows toned), and the prompt says so; the other eleven are spread evenly through the rest of the film. Auto's films and models' films (the painter's and the level 1 kit's) all start with that paper frame; a film that does not is refused. It does not know the method.
-- From 0.4 rc7 (owner, 23 Nov). Scores made before this showed twelve frames strictly inside the film, the first often a bare drawing; they are not comparable with later scores snapshot for snapshot (nor the first-four mean).
+- First the opening: the untouched paper the painter chose, the film's first frame, in its own colour (a toned sheet shows toned). The prompt says it is context only and not scored. Auto's films and models' films (the painter's and the level 1 kit's) all start with that frame; a film that does not is refused.
+- Then twelve snapshots evenly through the painting's film, then the finished sheet, shown in order, each labelled only with its percentage complete. It does not know the method.
 - It first says whether this is the order and the kind of mark a person would use (yes or no). Then it scores each snapshot 1 to 5 by the [rubric](human-ness-rubric.md): 5 is unmistakably a person's painting in progress, 1 is a finished image uncovered by a filter or wipe. Tells are named by letter (a to j).
 - The figure is the mean of the twelve film snapshots, as a percentage of 5. The finished sheet is shown last but not counted: it is at its ceiling. Also shown: the means of the first, middle and last four, the tally of tells (each judge's first reading, every snapshot shown), and how many readings said yes.
 - The rubric file is `bench/docs/human-ness-rubric.md`. Its sha256 is written into the results; editing it starts a new series.
