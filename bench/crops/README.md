@@ -1,6 +1,7 @@
 # Benchmark targets
 
-Each target is a crop, a section of a larger image. Sheet cells are the simulation grid squares.
+Each target is a whole image, not a section of a larger one (the folder's name, `crops`, is historical). Sheet cells
+are the simulation grid squares.
 
 | Subject | Sheet cells | Physical size at 0.259 mm a cell | Reference image |
 |---|---:|---:|---|

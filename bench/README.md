@@ -18,7 +18,17 @@ Details: [levels](docs/levels.md), [rules](docs/rules.md) and [scoring](docs/sco
 - Retries are self-study. The model sees its own painting, replay and stroke map and writes its own assessment. It never gets a score or a critique.
 - Budget for one try: 3.0 look units at fixed prices (a half-size whole look 0.3, never under 0.2); how a model paints is recorded, never charged. Steps and the six-hour clock are runaway guards. Cost and tool use are recorded.
 - Scores: human-ness from the painting in progress, plus quality and likeness, plus a combined number. The original is scored too, and a painting is its share of the original. Auto sets the difficulty.
+- Every picture is painted on one standard sheet. The original's real size is recorded and told to the model as a fact;
+  it is not reproduced. Each picture is the whole sheet, never a crop, with one exception chosen by the owner (Manet's
+  Morisot with a Fan, its head, shoulders and hand).
 - Judges run locally. OpenRouter or Together is a hosted option, planned, not in 0.4's first run.
+
+## Real sizes of the originals (told to the model as a fact)
+
+Tiepolo 31.2 x 24.3 cm · Guardi 45.4 x 30.1 · Homer, The Water Fan 37.4 x 53.4 · Homer, Adirondacks Guide 32.9 x 54.5 ·
+Homer, Two Ladies 17.6 x 20.2 · Manet, Morisot with a Fan 20.9 x 16.8 (whole sheet) · Sargent, In Austrian Tyrol
+29.9 x 45.2 · Turner 19.7 x 28 · Ender 21 x 28.5 · Morisot, Avenue du Bois 20 x 28 · Cezanne 21 x 27.2 · Sargent,
+White Ships: to look up. Nominal, generated: Mittens and Kasha portrait 23 x 30.5 · Yale Rosewalk 28 x 38.
 
 RESULTS: to be filled from the frozen run.
 
