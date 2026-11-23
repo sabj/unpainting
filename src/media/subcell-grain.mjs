@@ -4,13 +4,14 @@
 // view evaluates them again at its own pixels.
 //
 // Each cell keeps exactly its own pigment. Inside it, the amount at each output pixel follows a smooth interpolation of
-// the cell masses (so cell edges do not show), times the granulating weight w = exp(gamma (zCell - z) / unit): deeper
-// than the cell's mean, more pigment; on a crest, less, but never none (a painter sees the fibre peaks about 40%
-// lighter, not bare). zCell is the cell's mean relief over its own pixels, unit
-// the relief's RMS about its millimetre mean (the hollow unit of settling), and gamma the pigment's granulation times
-// SUBCELL_GAIN. A staining pigment (gamma 0) only interpolates. Then each cell's pixels are scaled to its total.
+// the cell masses, times the granulating weight w = exp(gamma (zRef - z) / unit): deeper than the paper about it, more
+// pigment; on a crest, less, but never none (a painter sees the fibre peaks about 40% lighter, not bare). zRef is the
+// relief smoothed over about a cell, unit the relief's RMS about its millimetre mean (the hollow unit of settling), and
+// gamma the pigment's granulation times SUBCELL_GAIN. A staining pigment (gamma 0) only interpolates. Each cell's total
+// is then put right by a factor interpolated between cells (no steps at the cells' edges), and exactly in the cell.
 // DOM free.
 import { paperRelief } from './paper-relief.mjs';
+import { gaussianField } from './grain-field.mjs';
 
 // how strongly a granulating pigment follows the relief inside a cell, per unit of gamma: fitted so a 30 mm ultramarine
 // puddle simulated at 0.25 and at 0.1 mm and rendered at 0.025 mm pixels has the 0.2 to 1 mm grain of the same puddle
@@ -29,31 +30,35 @@ export function subcellLayers(layers, pigments, paper, N, { gain = SUBCELL_GAIN 
   const { seed, relief } = paper.reliefOf;
   if (!(N >= 1 && Number.isInteger(N))) throw new Error('subcell-grain: N must be a whole number of pixels a cell');
   const FW = w * N, FH = h * N, R = paperRelief(FW, FH, mmPerCell / N, { seed, relief }), z = R.zUm, unit = R.hollowRmsUm;
-  // the cell's mean relief over its own pixels
-  const zc = new Float64Array(w * h);
-  for (let y = 0; y < FH; y++) for (let x = 0; x < FW; x++) zc[((y / N) | 0) * w + ((x / N) | 0)] += z[y * FW + x];
-  for (let i = 0; i < w * h; i++) zc[i] /= N * N;
+  // the level a pit is measured against: the relief smoothed over about a cell, not each cell's own mean (a mean per
+  // cell stepped at every cell's edge, and the steps showed as squares at zoom)
+  const zref = gaussianField(z, FW, FH, N);
   const gg = pigments.map(p => Math.max(0, (p.gamma ?? 0) * gain));
-  const sum = new Float64Array(w * h);
+  // bilinear weights between cell centres, clamped at the sheet's edge
+  const ax = axis(FW, w, N), ay = axis(FH, h, N);
+  const bil = (a, x, y) => { const X0 = ax.i0[x], X1 = ax.i1[x], Y0 = ay.i0[y] * w, Y1 = ay.i1[y] * w, fx = ax.t[x], fy = ay.t[y]; return (a[Y0 + X0] * (1 - fx) + a[Y0 + X1] * fx) * (1 - fy) + (a[Y1 + X0] * (1 - fx) + a[Y1 + X1] * fx) * fy; };
+  const cellOf = (x, y) => ((y / N) | 0) * w + ((x / N) | 0);
+  const sum = new Float64Array(w * h), f = new Float64Array(w * h), base = new Float64Array(FW * FH);
   return layers.map(layer => layer.map((cells, k) => {
     const out = new Float32Array(FW * FH);
-    sum.fill(0);
-    for (let y = 0; y < FH; y++) {
-      // bilinear between cell centres, clamped at the sheet's edge
-      const v = (y + 0.5) / N - 0.5, y0 = Math.max(0, Math.min(h - 1, Math.floor(v))), y1 = Math.min(h - 1, y0 + 1), fy = Math.max(0, Math.min(1, v - y0));
-      for (let x = 0; x < FW; x++) {
-        const u = (x + 0.5) / N - 0.5, x0 = Math.max(0, Math.min(w - 1, Math.floor(u))), x1 = Math.min(w - 1, x0 + 1), fx = Math.max(0, Math.min(1, u - x0));
-        const m = (cells[y0 * w + x0] * (1 - fx) + cells[y0 * w + x1] * fx) * (1 - fy) + (cells[y1 * w + x0] * (1 - fx) + cells[y1 * w + x1] * fx) * fy;
-        const c = ((y / N) | 0) * w + ((x / N) | 0), q = y * FW + x;
-        const wgt = gg[k] > 0 ? Math.exp((gg[k] * (zc[c] - z[q])) / unit) : 1;
-        out[q] = m * wgt; sum[c] += out[q];
-      }
-    }
-    // each cell's pixels carry its own mass exactly (N^2 pixels of its areal density)
+    for (let y = 0; y < FH; y++) for (let x = 0; x < FW; x++) { const q = y * FW + x; base[q] = bil(cells, x, y) * (gg[k] > 0 ? Math.exp((gg[k] * (zref[q] - z[q])) / unit) : 1); }
+    // each cell's pigment, put right by a factor that is itself interpolated between cells, so it has no steps
+    const pass = () => { sum.fill(0); for (let y = 0; y < FH; y++) for (let x = 0; x < FW; x++) { const q = y * FW + x; out[q] = base[q] * bil(f, x, y); sum[cellOf(x, y)] += out[q]; } };
+    f.fill(1);
+    for (let it = 0; it < SMOOTH_PASSES; it++) { pass(); for (let c = 0; c < w * h; c++) { const want = cells[c] * N * N; f[c] = sum[c] > 0 ? f[c] * Math.sqrt(want / sum[c]) : want > 0 ? f[c] * 2 : 0; } }
+    pass();
+    // what is left of each cell's error is put right in the cell itself: each cell's pixels carry its own mass exactly
     for (let y = 0; y < FH; y++) for (let x = 0; x < FW; x++) {
-      const c = ((y / N) | 0) * w + ((x / N) | 0), q = y * FW + x;
+      const c = cellOf(x, y), q = y * FW + x;
       out[q] = sum[c] > 0 ? (out[q] * cells[c] * N * N) / sum[c] : cells[c];
     }
     return out;
   }));
+}
+// how many times the interpolated factor is put right before the last exact pass (8 leaves under 1% to the last)
+const SMOOTH_PASSES = 8;
+function axis(F, n, N) {
+  const i0 = new Int32Array(F), i1 = new Int32Array(F), t = new Float64Array(F);
+  for (let x = 0; x < F; x++) { const u = Math.min(n - 1, Math.max(0, (x + 0.5) / N - 0.5)), a = Math.floor(u); i0[x] = a; i1[x] = Math.min(n - 1, a + 1); t[x] = u - a; }
+  return { i0, i1, t };
 }

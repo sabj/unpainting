@@ -154,9 +154,10 @@ export class GpuSheet {
     const put = (buf, arr, off = 0) => d.queue.writeBuffer(buf, off, arr);
     // paper: constant for a sheet
     const { px, py } = permeability(paper), P4 = new Float32Array(n * 4), P2 = new Float32Array(n * 4), P3 = new Float32Array(n * 4), hv = paper.valley || paper.height;
+    if (!paper.grainH) throw new Error('GPU sheet: the paper has no grainH (make it with makePaper or scanPaper)');
     for (let i = 0; i < n; i++) {
       P4.set([paper.capacity[i], paper.grain[i], paper.fdx[i], paper.fdy[i]], i * 4); P2.set([px[i], py[i], 0, 0], i * 4);
-      P3.set([paper.tooth[i], HASH(i), hv[i], paper.height[i]], i * 4);
+      P3.set([paper.tooth[i], HASH(i), hv[i], paper.grainH[i]], i * 4);
     }
     put(B.PAPER, P4); put(B.PAPER2, P2); put(B.PAPER3, P3);
     // what a brush reads of the paper: height, tooth, valley and how proud the fibres stand (brush.mjs)

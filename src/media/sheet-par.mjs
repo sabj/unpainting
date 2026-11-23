@@ -114,7 +114,8 @@ const PAPERS = new WeakMap(), PERMS = new WeakMap();
 function paperShared(paper) {
   if (PAPERS.has(paper)) return PAPERS.get(paper);
   const h = paper.valley || paper.height;
-  const out = { capacity: sharedCopy(paper.capacity), fdx: sharedCopy(paper.fdx), fdy: sharedCopy(paper.fdy), grain: sharedCopy(paper.grain), height: sharedCopy(h), fibreH: sharedCopy(paper.height), tooth: paper.tooth ? sharedCopy(paper.tooth) : null, hollow: sharedCopy(paper.hollow) };
+  if (!paper.grainH) throw new Error('sheet threads: the paper has no grainH (make it with makePaper or scanPaper)');
+  const out = { capacity: sharedCopy(paper.capacity), fdx: sharedCopy(paper.fdx), fdy: sharedCopy(paper.fdy), grain: sharedCopy(paper.grain), height: sharedCopy(h), fibreH: sharedCopy(paper.grainH), tooth: paper.tooth ? sharedCopy(paper.tooth) : null, hollow: sharedCopy(paper.hollow) };
   PAPERS.set(paper, out); return out;
 }
 const set = (C, key, value) => { C[key] = value; post({ t: 'set', id: C.id, key, value }); };
