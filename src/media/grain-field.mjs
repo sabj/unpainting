@@ -43,7 +43,7 @@ const UNITS = new Map();
  * low-passed at `grainMm` about its millimetre mean, on a fine patch of the same paper. Fixed for a paper and
  * grainMm, so every grid measures the same hollows in the same micrometres.
  */
-export function grainUnit({ seed, relief }, grainMm = GRAIN_MM) {
+function grainUnit({ seed, relief }, grainMm = GRAIN_MM) {
   const key = JSON.stringify([seed, relief, grainMm]);
   if (!UNITS.has(key)) {
     const n = Math.round(UNIT_SIDE_MM / UNIT_MM), R = paperRelief(n, n, UNIT_MM, { seed, relief });

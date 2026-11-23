@@ -1,5 +1,6 @@
 // Generated from src/media/paper.mjs by tools/lab/sync-site-media.mjs. Edit the source.
 import { paperRelief, HEIGHT_SPAN_UM } from './paper-relief.js';
+import { grainSurface } from './grain-field.js';
 // Paper: a surface height made of fibres and tooth, and the capacity of its pores. Rough watercolour paper is a
 // felt of cotton fibres pressed together, lightly sized (Computer-Generated Watercolor, section 2.1); the height steers water
 // and granulating pigment, the capacity (c = h (cmax - cmin) + cmin) sets how much water it can absorb.
@@ -27,7 +28,7 @@ export function makePaper(w, h, options = {}) {
   MADE.set(key, paper);
   return structuredClone(paper);
 }
-function buildPaper(w, h, { seed = 1, fibres = 0.5, tooth = 0.5, fibreLength = 14, cmin = 0.2, cmax = 0.55, scale = 1, toothScale = 1, patternScale = 1, proudBlur = 1, coldPress = null, mmPerCell = 0, relief = 'cold' } = {}) {
+function buildPaper(w, h, { seed = 1, fibres = 0.5, tooth = 0.5, fibreLength = 14, cmin = 0.2, cmax = 0.55, scale = 1, toothScale = 1, patternScale = 1, proudBlur = 1, coldPress = null, mmPerCell = 0, relief = 'cold', grainMm = 0 } = {}) {
   // Opt-in physical fibres: fibre size and count follow physical area.
   const fs = mmPerCell > 0 ? (280 / 1086) / mmPerCell : scale;
   const n = w * h, fib = new Float32Array(n), c2 = new Float32Array(n), s2 = new Float32Array(n); // fibre amount, and orientation as doubled angles (a fibre has no head or tail)
@@ -99,7 +100,10 @@ function buildPaper(w, h, { seed = 1, fibres = 0.5, tooth = 0.5, fibreLength = 1
   }
   // zUm, reliefOf (physical sheets): the relief in micrometres and the seed and preset it was made from (sub-cell grain
   // evaluates the same field finer, subcell-grain.mjs); hollow: each cell's depth below the tooth level in RMS units
-  return { w, h, n, height, capacity, valley, proud, tooth: toothH, toothLo, toothSpan, fdx, fdy, grain, relief: reliefSpread, subRelief, mmPerCell: physMm, ...toothHollow(height, toothH, toothLo, toothSpan, RF ? RF.hollowRmsUm / HEIGHT_SPAN_UM : 0), ...(RF ? { zUm: RF.zUm, reliefUm: RF.rmsUm, reliefOf: { seed, relief } } : {}) };
+  // grainH: the surface granulating pigment settles and rolls on. A physical sheet's is its relief low-passed at a
+  // length in millimetres (grain-field.mjs), its hollows measured in that field's own RMS; a sheet without units uses its height.
+  const G = RF ? grainSurface(height, w, h, physMm, { seed, relief }, grainMm > 0 ? { grainMm } : {}) : { grainH: height, unit: 0 };
+  return { w, h, n, height, grainH: G.grainH, capacity, valley, proud, tooth: toothH, toothLo, toothSpan, fdx, fdy, grain, relief: reliefSpread, subRelief, mmPerCell: physMm, ...toothHollow(G.grainH, toothH, toothLo, toothSpan, G.unit), ...(RF ? { zUm: RF.zUm, reliefUm: RF.rmsUm, reliefOf: { seed, relief } } : {}) };
 }
 
 /**
