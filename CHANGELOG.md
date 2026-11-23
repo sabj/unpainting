@@ -64,7 +64,7 @@ Results: to be added from the release-candidate run.
 - [Painting script](docs/painting-script.md): the script format, with a real passage.
 - [Levels](bench/docs/levels.md), [rules](bench/docs/rules.md), [scoring](bench/docs/scoring.md).
 
-### Painter changes in full (rc1, assembled 19 Nov)
+### Painter changes in full (0.4.0-rc.1, assembled 19 Nov)
 
 #### Changed
 
@@ -75,7 +75,7 @@ Results: to be added from the release-candidate run.
 - Coat strokes are loaded from a swatch and laid in two passes. They were 2.6 to 3 times darker than planned.
 - A recorded run sees every thin-dark pencil stroke, so recorded benchmark runs finish.
 
-#### Known problems at rc1 assembly
+#### Known problems at the 0.4.0-rc.1 assembly
 
 - Plates are plain sketches. Windows, stone and other detail are gone until stroke techniques are wired into the new plan.
 - White Ships comes out grey: no lights are reserved, and one colour laid over another goes to mud.
@@ -84,7 +84,7 @@ Results: to be added from the release-candidate run.
 - The 1.0 and 0.26 mm sheets plan separately, and paint laid depends on the cell (1.14 of plan at 1 mm).
 - A plan that names a style still takes the old separation planner. Benchmark plans from models do this.
 
-#### Subject to change at rc1 assembly
+#### Subject to change at the 0.4.0-rc.1 assembly
 
 - How shapes are chosen, so the same picture gives the same washes.
 - Reserved lights, and choosing a wash for what it makes over the wash beneath it.

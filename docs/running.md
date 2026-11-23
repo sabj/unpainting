@@ -189,11 +189,17 @@ tools, and `choice.json`. The task is `tools/paint/SESSION-BRIEF.md`; the tools 
   stops for good), so on this trunk every look is at a plan and nothing painted can be undone or redone.
 - What the session can reach. Nothing of it can read this checkout, the checkout it is a worktree of (every
   worktree, cache and earlier run), the subject list and its inputs, the other sessions of the same run, or the
-  folders named in `UNPAINT_SESSION_DENY` (`a:b:c`). `claude` uses its own sandbox for the shell and Read rules for
-  its file tools. `codex` cannot deny a read and seatbelt profiles do not nest, so the whole `codex` command runs
-  under this harness's seatbelt profile (`sandbox-exec`) with its own sandbox off: reads denied as above, writes only
-  in its folder and temporary folders, network on port 443 only. The profile is tried before the model starts and
-  the session is refused if a file of the repository can be read under it. The model's environment is cleaned.
+  folders named in `UNPAINT_SESSION_DENY` (`a:b:c`). The benchmark's models (`agy` and `claude`) run closed: the
+  whole command runs under this harness's seatbelt profile (`sandbox-exec`, the tool's own sandbox off, since two do
+  not nest). Reads are denied as above, and nothing of the home folder can be listed or read except the tool's own
+  program and its sign-in (the login keychain; for `agy` also its settings handle): an exposure the owner accepted
+  for the first run, recorded in each run. Writes go only to its folder and temporary folders. The network is only
+  this machine's loopback, where a gate (`tools/paint/session-net.mjs`) passes HTTPS tunnels to the model provider's
+  own hosts and refuses every other host, so the model's shell has no internet: downloads and installs fail, and every
+  refused host is recorded in `usage.json`. The shell has one fixed toolbox (a Python with numpy, pillow, scipy,
+  scikit-image, opencv). `codex` is not in the 0.4 run and is not gated: its command runs under the same profile with
+  the network open on port 443. The profile is tried before the model starts and the session is refused if a file of
+  the repository can be read under it. The model's environment is cleaned.
 - A session whose commands name the painter, a denied folder or another session is not painted (a failed cell).
 - Not closed: a model can draw its own script's polygons, or boxes from the code planner's wash data, with its own
   code (`run.json` lists the pictures it made and keeps every command, so it can be seen); a copy of the repository

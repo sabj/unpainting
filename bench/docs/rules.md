@@ -28,7 +28,7 @@ More freedom than before, and mistakes are allowed.
 - Every attempt and retry has its own fresh folder and branch. Earlier ones are handed over as read-only reference.
 - The model has a shell in its own folder and may write and run any code it likes.
 - It cannot reach outside its folder. The one exception is the model tool's own sign-in, which the owner accepted for the first run on his machine. The container for replication is planned, not in 0.4's first run.
-- The shell has no internet and one fixed, pre-installed toolbox, the same for every model. Installs fail. Each attempt is recorded.
+- The shell has no internet and one fixed, pre-installed toolbox, the same for every model. Only the model tool itself reaches its own provider, through a gate on the machine that passes the provider's hosts and refuses every other. Installs fail. Each attempt is recorded.
 - The model may not read the subject's pixels with code. See [anti-cheat](anti-cheat.md).
 
 ## Budgets: measured, not limited
