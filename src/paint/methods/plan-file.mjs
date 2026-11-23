@@ -7,7 +7,8 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { writeEntry, readEntry } from '../run-cache.mjs';
 
-export const PLAN_FILE = 'final-plan.bin', PLAN_NOTE = 'final-plan.json';
+export const PLAN_FILE = 'final-plan.bin';
+const PLAN_NOTE = 'final-plan.json';
 
 /**
  * A plan's hash: its washes in order, each with its mix, move, brushes and strokes (millimetres), and the mixes. Two
