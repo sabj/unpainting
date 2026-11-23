@@ -412,8 +412,12 @@ const kindOfCommand = c => { const m = /(?:^|[\s;&|/])unpaint\s+(status|plan|loo
  * step as it starts and ends, the tool's parameters in it, and one result).
  */
 export function readTranscript(cli, out) {
-  const calls = {}, commands = []; let text = '', tokens = null, costUSD = null, tokensIn = null, tokensOut = null;
+  const calls = {}, commands = [], toolSteps = [], byId = new Map(); let text = '', tokens = null, costUSD = null, tokensIn = null, tokensOut = null;
   const count = k => { calls[k] = (calls[k] ?? 0) + 1; };
+  // each tool step for tool-use.mjs: its kind, the command or the place, and once it has ended its exit and the start of its output
+  const kindOf = name => (/^(read_file|view_file|list_dir|find_by_name|grep_search|Read|Glob|Grep)$/.test(name) ? 'read' : /^(write_to_file|write_file|replace_file_content|multi_replace_file_content|sed_file|Write|Edit)$/.test(name) ? 'write' : name);
+  const stepOf = (id, kind, t) => { const st = { kind, text: String(t), exit: null, failed: false, output: null }; toolSteps.push(st); if (id != null) byId.set(id, st); return st; };
+  const ended = (st, { exit = null, failed = false, output = null }) => { if (!st) return; const ex = exit ?? (/exited with code (\d+)/.exec(output ?? '')?.[1] != null ? Number(/exited with code (\d+)/.exec(output)[1]) : null); Object.assign(st, { exit: ex, failed: failed || (ex != null && ex !== 0), output: output == null ? null : String(output).slice(0, 2000) }); };
   const steps = new Set(), said = new Map();
   for (const l of out.split('\n')) {
     let d; try { d = JSON.parse(l); } catch { continue; }
@@ -422,10 +426,11 @@ export function readTranscript(cli, out) {
       if (d.event === 'step_update' && s?.step_type === 'tool' && !steps.has(s.step_index)) {
         // a tool step is counted once, when it is first seen (a step cut off by the clock never ends)
         steps.add(s.step_index); const name = s.tool_name ?? s.tool_info?.name ?? 'tool', par = s.tool_info?.parameters ?? {};
-        if (name === 'run_command') { const c = String(par.CommandLine ?? ''); commands.push(c); count(kindOfCommand(c)); }
+        if (name === 'run_command') { const c = String(par.CommandLine ?? ''); commands.push(c); count(kindOfCommand(c)); stepOf(s.step_index, 'shell', c); }
         else { count(/^(read_file|view_file|list_dir|find_by_name|grep_search)$/.test(name) ? 'read file' : /^(write_to_file|replace_file_content|multi_replace_file_content|sed_file)$/.test(name) ? 'write file' : name);
-          const places = Object.entries(par).filter(([k, v]) => typeof v === 'string' && /path|file|dir|uri|cwd/i.test(k)).map(([, v]) => v); if (places.length) commands.push(`${name} ${places.join(' ')}`); }
+          const places = Object.entries(par).filter(([k, v]) => typeof v === 'string' && /path|file|dir|uri|cwd/i.test(k)).map(([, v]) => v); if (places.length) commands.push(`${name} ${places.join(' ')}`); stepOf(s.step_index, kindOf(name), places.join(' ')); }
       }
+      if (d.event === 'step_update' && s?.step_type === 'tool' && s.state && s.state !== 'ACTIVE') ended(byId.get(s.step_index), { failed: s.state !== 'DONE', output: s.tool_info?.output ?? s.error ?? null });
       if (d.event === 'step_update' && s?.step_type === 'agent_response') { if (s.text_delta) said.set(s.step_index, (said.get(s.step_index) ?? '') + s.text_delta); if (s.usage?.total_tokens) tokens = (tokens ?? 0) + s.usage.total_tokens; }
       if (d.event === 'result' && d.result?.response) text = String(d.result.response);
       continue;
@@ -434,9 +439,10 @@ export function readTranscript(cli, out) {
       if (d.type === 'assistant') for (const b of d.message?.content ?? []) {
         if (b.type === 'text' && b.text?.trim()) text = b.text;
         if (b.type !== 'tool_use') continue;
-        if (b.name === 'Bash') { const c = String(b.input?.command ?? ''); commands.push(c); count(kindOfCommand(c)); }
-        else { count(b.name === 'Read' ? 'read file' : ['Write', 'Edit'].includes(b.name) ? 'write file' : b.name); const f = b.input?.file_path ?? b.input?.path; if (f) commands.push(`${b.name} ${f}`); }
+        if (b.name === 'Bash') { const c = String(b.input?.command ?? ''); commands.push(c); count(kindOfCommand(c)); stepOf(b.id, 'shell', c); }
+        else { count(b.name === 'Read' ? 'read file' : ['Write', 'Edit'].includes(b.name) ? 'write file' : b.name); const f = b.input?.file_path ?? b.input?.path; if (f) commands.push(`${b.name} ${f}`); stepOf(b.id, kindOf(b.name), f ?? ''); }
       }
+      if (d.type === 'user') for (const b of d.message?.content ?? []) if (b.type === 'tool_result') ended(byId.get(b.tool_use_id), { failed: Boolean(b.is_error), output: typeof b.content === 'string' ? b.content : (b.content ?? []).map(x => x.text ?? '').join('\n') });
       if (d.type === 'result') { const u = d.usage ?? {}; if (d.result) text = String(d.result); const tin = ['input_tokens', 'cache_creation_input_tokens', 'cache_read_input_tokens'].reduce((a, k) => a + (u[k] || 0), 0);
         // several turns of one session (a command run again in the same folder) are one cost: their results add up
         tokensIn = (tokensIn ?? 0) + tin; tokensOut = (tokensOut ?? 0) + (u.output_tokens || 0); tokens = (tokens ?? 0) + tin + (u.output_tokens || 0); if (d.total_cost_usd != null) costUSD = (costUSD ?? 0) + d.total_cost_usd; }
@@ -444,7 +450,7 @@ export function readTranscript(cli, out) {
       if (d.type === 'item.completed' && d.item) {
         const it = d.item;
         if (it.type === 'agent_message' && it.text) text = it.text;
-        else if (it.type === 'command_execution') { const c = String(it.command ?? ''); commands.push(c); count(kindOfCommand(c)); }
+        else if (it.type === 'command_execution') { const c = String(it.command ?? ''); commands.push(c); count(kindOfCommand(c)); ended(stepOf(null, 'shell', c), { exit: it.exit_code ?? null, output: it.aggregated_output ?? null }); }
         else if (it.type === 'file_change') count('write file');
         else if (it.type !== 'reasoning' && it.type !== 'agent_message') count(it.type);
       }
@@ -452,7 +458,7 @@ export function readTranscript(cli, out) {
     }
   }
   if (cli === 'agy' && !text && said.size) text = [...said].sort((a, b) => a[0] - b[0]).at(-1)[1];
-  return { text, tokens: tokens || null, tokensIn: tokensIn || null, tokensOut: tokensOut || null, costUSD, calls, commands };
+  return { text, tokens: tokens || null, tokensIn: tokensIn || null, tokensOut: tokensOut || null, costUSD, calls, commands, steps: toolSteps };
 }
 
 /**

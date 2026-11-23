@@ -20,6 +20,7 @@ import { readChoice, choiceKey, choiceKind, withChoice, settingsList } from './c
 import { checkPlanEdit, editLine } from '../../src/paint/methods/plan-edit.mjs';
 import { planNumbers, planSummary, numbersText, washesText, planPicture, lookPicture, stagesPicture } from './plan-data.mjs';
 import { lookSets, lookFault, stoppedLookFault, lookSizeNote, LOOK_JOBS, HEAVY_JOBS } from './look.mjs';
+import { toolUseOf, listFiles } from './tool-use.mjs';
 import { DEFAULT_LOOKS, DEFAULT_WALL_MINUTES, DEFAULT_GRACE_MINUTES, safeRead, writeSession, sessionServer, finalChoice, sessionCall, readTranscript, reachedOutside, ownFolderOf, ownPictures, runSession } from './session.mjs';
 import { DEFAULT_REVERTS } from './reverts.mjs';
 import { levelOf, handedAt } from './levels.mjs';
@@ -453,6 +454,8 @@ async function sessionRun(r) {
         if (!can(path.join(cwd, 'README.md'))) throw new Error('the session\'s sandbox cannot be started on this machine (its own folder is not readable under it); the session is not started');
       }
       say(r, `${author.name} starts its working session (${author.cli}; level ${level.name}, try ${req.tryNumber}; the benchmark's budget for this try: ${wallMost} min on the clock, ${looksMost} look units of rendering, ${revertsMost} returns to an earlier choice${handed.length ? `; handed: ${handed.map(h => h.folder).join(', ')}` : ''}): ${call.closed}`);
+      // the folder as the model is given it, so the files it made can be told from the ones it was handed
+      const startFiles = listFiles(cwd);
       server.start();
       // the clock starts when the model's command does: the wait for a place among the models at work is not on it
       const t0 = Date.now();
@@ -479,6 +482,7 @@ async function sessionRun(r) {
         // the pictures it was handed: its own line on each (seen.md), and what its command's log shows of a read (null: that log cannot show one)
         pictures: kept.pictures ? { ...kept.pictures, logShowsRead: logReads(author.cli, seen.commands, kept.pictures.handed) } : null,
         submitted: fin.submitted ?? null, lastMessage: seen.text.slice(0, 4000), routes: { closed: call.closed, commandsNamingOutside: outside, picturesItMade: pictures },
+        toolUse: toolUseOf({ steps: seen.steps, startFiles, endFiles: listFiles(cwd), read: f => { try { return safeRead(cwd, f); } catch { return null; } }, own: [cwd, real] }),
       };
       if (budgetReached) say(r, `REACHED THE BENCHMARK'S RESOURCE BUDGET (${budgetReached.what}): the session was asked to hand in what it had; recorded, not a failure`);
       Object.assign(record.author, { seconds: kept.ownSeconds, tokens: seen.tokens, tokensIn: seen.tokensIn, tokensOut: seen.tokensOut, costUSD: seen.costUSD });

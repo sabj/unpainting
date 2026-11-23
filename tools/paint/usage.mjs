@@ -21,6 +21,8 @@ export function usageOf({ subject, author, level, tryNumber, budget, session, fi
       selfReviews: (session.selfReviews ?? []).filter(r => r.written).length, assessmentWritten: session.assessment ? session.assessment.written : null, reverts: session.reverts ?? null, warningsGiven: session.warningsGiven ?? null,
       picturesHanded: session.pictures?.handed ?? [], picturesDescribed: session.pictures ? Object.keys(session.pictures.said ?? {}).length : 0,
     },
+    // what it did with its tools, from its transcript and its folder (tool-use.mjs); null for a session kept before this was recorded
+    toolUse: session.toolUse ?? null,
     model: { tokensIn: author.tokensIn ?? null, tokensOut: author.tokensOut ?? null, tokens: author.tokens ?? null, costUSD: author.costUSD ?? null, costFrom: author.costUSD != null ? 'reported by the command' : 'not reported by this command' },
     machine: {
       lookGpuMinutes: minutes(lookSeconds), lookPaintings: looks.filter(l => l.painted?.seconds != null).length, planCpuMinutes: minutes(planSeconds),
