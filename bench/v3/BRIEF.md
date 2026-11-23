@@ -8,10 +8,12 @@ your own image viewing tool at `{TARGET}`.
 
 ## Attempts
 
-{ATTEMPTS} Every attempt starts from a fresh sheet (`kit.open` gives one). Your scripts, your notes and the earlier
-attempts stay: the harness copies each attempt's final image, frames, stats and scripts to `bench/attempts/a<N>/`, with
-`compare.png` (target left, your painting right) to look at with your own eyes. Keep your own notes in `bench/NOTES.md`.
-When an attempt is painted (it ends with `kit.finish`), stop and wait for the next message.
+{ATTEMPTS} Every attempt starts from a fresh sheet (`kit.open` gives one), in a fresh folder and a fresh session of
+its own: nothing you wrote or thought in an earlier attempt is here, except that attempt's own folder,
+`bench/attempts/a<N>/` (its scripts, final image, frames and stats, and `compare.png`: target left, your painting
+right, to look at with your own eyes). It is read-only and for reference. An attempt that repeats the one before it
+stroke for stroke is recorded as such.
+When an attempt is painted (it ends with `kit.finish`), stop: the attempt is over.
 
 ## Rules (protocol v2)
 
@@ -37,6 +39,15 @@ When an attempt is painted (it ends with `kit.finish`), stop and wait for the ne
 Two skills written for this painter are in `bench/skills/`: `watercolor-technique/SKILL.md` (with its `references/`)
 and `painting-planner/SKILL.md`. Read both before you plan, and plan and paint the way they say. Where they name repo
 tools you were told not to use, take the technique and apply it with the kit.
+
+## Tips: worked examples
+
+`bench/TIPS.md` shows how to get each basic thing out of this kit: a flat wash, a graded wash, wet into wet, a glaze, a
+soft edge beside a hard one, dry brush, paper white, a pen line over a wash, and how to render a shape with a brush
+(fill it along its long axis, taper to a point, go round a white, meet another shape along an edge, how long a dip
+lasts). Each has a few lines of kit code that run as they stand (`bench/tips/N-name.mjs`) and a picture of the dried
+result on blank paper (`bench/tips/N-name.png`; the shape examples also `-arrows.png`, the stroke paths). Read it, and
+look at the pictures, before you write your first stroke.
 
 ## Simulator in brief
 
