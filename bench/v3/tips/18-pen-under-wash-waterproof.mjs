@@ -9,8 +9,8 @@ let row = 0;
 for (let y = 40; y <= 160; y += 14, row++) {                   // a pale wash over the right two thirds: the left third of each line stays as drawn
   kit.dip(b, { water: 0.95, conc: kit.mix({ ochre: 0.2 }) });
   const [x0, x1] = row % 2 ? [W - 40, 120] : [120, W - 40];
-  kit.stroke(b, sheet, [{ x: x0, y, p: 0.9 }, { x: x1, y, p: 0.9 }], { between: s => { if (s % 6 === 0) kit.step(sheet, O); } });
+  kit.stroke(b, sheet, [{ x: x0, y, p: 0.9 }, { x: x1, y, p: 0.9 }]);
 }
-for (let q = 0; q < 20; q++) kit.step(sheet, O);
+kit.wait(sheet, 20);
 kit.dryAll(sheet, O);
 await kit.finish('pen under a wash, waterproof ink');

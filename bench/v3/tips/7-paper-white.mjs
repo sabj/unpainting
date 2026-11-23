@@ -10,10 +10,10 @@ for (let y = 30; y <= H - 30; y += 14, row++) {
   kit.dip(b, { water: 0.9, conc: kit.mix({ ultramarine: 0.3, sienna: 0.15 }) });
   const gap = Math.abs(y - 100) < 26;                          // rows that cross the left disc stop short of it and start again after it
   const runs = gap ? [[40, 44], [96, W - 40]] : [[40, W - 40]];
-  for (const [x0, x1] of runs) if (x1 - x0 > 30 || !gap) kit.stroke(b, sheet, row % 2 ? [{ x: x1, y, p: 0.9 }, { x: x0, y, p: 0.9 }] : [{ x: x0, y, p: 0.9 }, { x: x1, y, p: 0.9 }], { between: s => { if (s % 6 === 0) kit.step(sheet, O); } });
+  for (const [x0, x1] of runs) if (x1 - x0 > 30 || !gap) kit.stroke(b, sheet, row % 2 ? [{ x: x1, y, p: 0.9 }, { x: x0, y, p: 0.9 }] : [{ x: x0, y, p: 0.9 }, { x: x1, y, p: 0.9 }]);
 }
 kit.blot(sheet, disc(250, 100, 22), { strength: 1, pigmentShare: 1 });   // a tissue pressed on the wash AT ONCE, while water still stands on it: once it has sunk in there is nothing to lift
-for (let q = 0; q < 10; q++) kit.step(sheet, O);
+kit.wait(sheet, 10);
 kit.dryAll(sheet, O);
 kit.liftResist(sheet);                                         // the mask comes off only when the sheet is dry
 await kit.finish('paper white');

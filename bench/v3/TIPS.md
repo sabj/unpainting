@@ -34,10 +34,9 @@ let row = 0;
 for (let y = 30; y <= H - 30; y += 14, row++) {            // rows 14 cells apart, brush 24 wide: each overlaps the last by almost half
   kit.dip(b, { water: 0.9, conc: paint });                  // a full brush for every row
   const [x0, x1] = row % 2 ? [W - 40, 40] : [40, W - 40];   // back and forth
-  kit.stroke(b, sheet, [{ x: x0, y, p: 0.9 }, { x: (x0 + x1) / 2, y: y + 1, p: 0.9 }, { x: x1, y, p: 0.9 }],
-    { between: s => { if (s % 6 === 0) kit.step(sheet, O); } });
+  kit.stroke(b, sheet, [{ x: x0, y, p: 0.9 }, { x: (x0 + x1) / 2, y: y + 1, p: 0.9 }, { x: x1, y, p: 0.9 }]);
 }
-for (let q = 0; q < 20; q++) kit.step(sheet, O);            // all rows still wet: they level into one
+kit.wait(sheet, 20);            // all rows still wet: they level into one
 kit.dryAll(sheet, O);
 ```
 
@@ -54,7 +53,7 @@ for (let r = 0; r < rows; r++) {
   kit.dip(b, { water: 0.95, conc: kit.mix({ sienna: 0.5 * fade * fade }) });    // the same water every row, less paint each time
   ...the same overlapping row as in the flat wash...
 }
-for (let q = 0; q < 30; q++) kit.step(sheet, O);
+kit.wait(sheet, 30);
 kit.dryAll(sheet, O);
 ```
 
@@ -67,7 +66,7 @@ kit.dryAll(sheet, O);
 ```js
 rows(114, 170, 40, 190, kit.mix({ ochre: 0.3 }));                       // the first colour (rows() is the flat wash's loop)
 rows(114, 170, 150, W - 40, kit.mix({ ultramarine: 0.5, rose: 0.1 }));  // at once, the second from inside the wet first one outward
-for (let q = 0; q < 12; q++) kit.step(sheet, O);
+kit.wait(sheet, 12);
 kit.dryAll(sheet, O);
 ```
 
@@ -98,11 +97,11 @@ kit.dryAll(sheet, O);
 ```js
 for (const y of [112, 126, 140, 154]) {                      // clean water only, below where the stroke will go
   kit.dip(water, { water: 1, conc: kit.mix({}) });
-  kit.stroke(water, sheet, [{ x: 40, y, p: 0.9 }, { x: W - 40, y, p: 0.9 }], { between: s => { if (s % 6 === 0) kit.step(sheet, O); } });
+  kit.stroke(water, sheet, [{ x: 40, y, p: 0.9 }, { x: W - 40, y, p: 0.9 }]);
 }
 kit.dip(b, { water: 0.7, conc: kit.mix({ sapgreen: 1.2, umber: 0.4 }) });
-kit.stroke(b, sheet, [{ x: 50, y: 92, p: 0.9 }, { x: 160, y: 94, p: 0.9 }, { x: W - 50, y: 92, p: 0.9 }], ...);   // upper half on dry paper, lower half on the wet band
-for (let q = 0; q < 40; q++) kit.step(sheet, O);
+kit.stroke(b, sheet, [{ x: 50, y: 92, p: 0.9 }, { x: 160, y: 94, p: 0.9 }, { x: W - 50, y: 92, p: 0.9 }]);   // upper half on dry paper, lower half on the wet band
+kit.wait(sheet, 40);
 ```
 
 - Physics: paint stops where the wet stops. Against dry paper that is a line; into wet paper there is no line.
@@ -145,7 +144,7 @@ kit.liftResist(sheet);                                       // the mask comes o
 ```js
 band(30, 86); kit.dryAll(sheet, O);                          // top: washed, DRIED, then drawn on
 line(58);
-band(114, 170); for (let q = 0; q < 4; q++) kit.step(sheet, O);   // bottom: drawn on while wet
+band(114, 170); kit.wait(sheet, 4);   // bottom: drawn on while wet
 line(142);
 ```
 
@@ -171,7 +170,7 @@ for (let k = 0; k < lanes; k++) {
     pts.push({ x: c.x - (d.y - c.y) / n * off, y: c.y + (d.x - c.x) / n * off, p: 0.85 });
   }
   kit.dip(b, { water: 0.9, conc: kit.mix({ sapgreen: 0.45, ochre: 0.15 }) });
-  kit.stroke(b, sheet, k % 2 ? pts.reverse() : pts, { between: s => { if (s % 6 === 0) kit.step(sheet, O); } });
+  kit.stroke(b, sheet, k % 2 ? pts.reverse() : pts);
 }
 ```
 
@@ -360,7 +359,7 @@ wash(230, 290, kit.mix({ ultramarine: 1.2, umber: 0.4 }));     // dark: the ligh
 ```js
 band(30, 86); kit.dryAll(sheet, O);                             // top: washed, DRIED, then drawn on
 line(58);
-band(114, 170); for (let q = 0; q < 4; q++) kit.step(sheet, O); // bottom: drawn on while wet
+band(114, 170); kit.wait(sheet, 4); // bottom: drawn on while wet
 line(142);
 ```
 

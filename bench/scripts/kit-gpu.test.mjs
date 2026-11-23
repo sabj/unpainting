@@ -14,7 +14,7 @@ const REPO = path.resolve(BENCH, '..');
 function workspace() {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'kitgpu-')), ws = path.join(tmp, 'ws'), wb = path.join(ws, 'bench');
   fs.mkdirSync(path.join(wb, 'tasks'), { recursive: true });
-  fs.symlinkSync(path.join(REPO, 'src'), path.join(ws, 'src')); fs.symlinkSync(path.join(REPO, 'node_modules'), path.join(ws, 'node_modules'));
+  fs.symlinkSync(path.join(REPO, 'src'), path.join(ws, 'src')); fs.symlinkSync(path.join(REPO, 'tools'), path.join(ws, 'tools')); fs.symlinkSync(path.join(REPO, 'node_modules'), path.join(ws, 'node_modules'));
   fs.copyFileSync(path.join(REPO, 'package.json'), path.join(ws, 'package.json'));
   for (const f of ['kit.mjs', 'guard.mjs']) fs.copyFileSync(path.join(V2, 'kit', f), path.join(wb, f));
   fs.copyFileSync(path.join(V2, 'targets', 'sargent-coarse.json'), path.join(wb, 'tasks', 'sargent-coarse.json'));

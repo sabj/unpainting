@@ -26,6 +26,8 @@ test('TIPS.md shows only pictures that exist, and every example has its script, 
     // a blank sheet only: no benchmark target is opened, read or named
     assert.deepEqual([...code.matchAll(/kit\.open\('([^']+)'/g)].map(m => m[1]), ['tips'], s);
     assert.ok(!/kit\.coarse|readFile|targets?\//.test(code), `${s} reads nothing`);
+    // the kit moves the water: no example steps it or hooks into a stroke
+    assert.ok(!/between:|kit\.step|kit\.dry\(|flowEvery/.test(code), `${s} leaves the water to the kit`);
     for (const c of [...loadCrops(), ...loadLevelOneCrops()]) assert.ok(!new RegExp(`\\b${c.task}\\b`).test(code), `${s} does not name ${c.task}`);
   }
   assert.match(fs.readFileSync(path.join(V3, 'BRIEF.md'), 'utf8'), /bench\/TIPS\.md/);
@@ -41,7 +43,7 @@ test('the kit keeps a film of a painting: frames.json and lossless frames, endin
   const ws = fs.mkdtempSync(path.join(os.tmpdir(), 'kitfilm-')), wb = path.join(ws, 'ws', 'bench');
   try {
     fs.mkdirSync(path.join(wb, 'tasks'), { recursive: true });
-    fs.symlinkSync(path.join(REPO, 'src'), path.join(ws, 'ws', 'src')); fs.symlinkSync(path.join(REPO, 'node_modules'), path.join(ws, 'ws', 'node_modules')); fs.copyFileSync(path.join(REPO, 'package.json'), path.join(ws, 'ws', 'package.json'));
+    fs.symlinkSync(path.join(REPO, 'src'), path.join(ws, 'ws', 'src')); fs.symlinkSync(path.join(REPO, 'tools'), path.join(ws, 'ws', 'tools')); fs.symlinkSync(path.join(REPO, 'node_modules'), path.join(ws, 'ws', 'node_modules')); fs.copyFileSync(path.join(REPO, 'package.json'), path.join(ws, 'ws', 'package.json'));
     for (const f of ['kit.mjs', 'guard.mjs']) fs.copyFileSync(path.join(V2, 'kit', f), path.join(wb, f));
     fs.copyFileSync(path.join(V2, 'targets', 'sargent-coarse.json'), path.join(wb, 'tasks', 'sargent-coarse.json'));
     fs.writeFileSync(path.join(wb, 'p.mjs'), `import * as kit from './kit.mjs';

@@ -40,9 +40,9 @@ tool at `TARGET_DIR/<task>.png`. Do them in the order above.
   0.259 mm a cell.
 - `kit.createBrush({ radius, bristles, capacity, flat, belly, feed, give, splay, stiffness, seed })` (radius in
   cells), `kit.dip(brush, { water: 0..1, conc: kit.mix({ sapgreen: 0.4, ochre: 0.1 }) })`. A brush runs out: dip again.
-- `kit.stroke(brush, sheet, [{ x, y, p }...], { between: s => { if (s % 6 === 0) kit.step(sheet, O); } })`; water
-  moves only when the simulation advances. `kit.dryAll(sheet, O)` dries the sheet; strokes on a wet sheet run together, on a
-  dry sheet they keep their edges.
+- `kit.stroke(brush, sheet, [{ x, y, p }...])`. The kit moves the water while the brush is on the paper; strokes
+  laid while the sheet is wet run together, on a dry sheet they keep their edges. `kit.wait(sheet, moments)` lets the
+  water run with the brush off the paper (default 20); `kit.dryAll(sheet)` dries the sheet.
 - Pen: `kit.createPen({ nib, flex })`, `kit.dipPen(pen, kit.mix({ sepia: 3 }))`, `kit.penStroke(pen, sheet, [{ x, y, p, v }...])`.
 - Masking: `kit.applyResist(sheet, mask)`, `kit.liftResist(sheet)`. `kit.look()` returns your sheet as RGB bytes;
   `await kit.frame(name)` saves an extra frame.

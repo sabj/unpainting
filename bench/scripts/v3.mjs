@@ -27,6 +27,8 @@ function seed({ ws, crop, spec, view, tries, dry }) {
   fs.copyFileSync(path.join(V2, 'kit', 'kit.mjs'), path.join(b, 'kit.mjs'));
   fs.copyFileSync(path.join(V2, 'kit', 'guard.mjs'), path.join(b, 'guard.mjs'));
   for (const c of allCrops()) if (c.distributed) fs.copyFileSync(path.join(c.base ?? V2, c.coarseFile), path.join(b, 'tasks', `${c.task}-coarse.json`));
+  // each level 1 target's rendering unit (crops.json `unit`: one full painting of its automatic plan, counted), read by the kit
+  for (const c of allCrops()) if (c.distributed && c.unit) writeJson(path.join(b, 'tasks', `${c.task}-unit.json`), c.unit);
   // the harness tips (level 1 = nothing prepared, plus these): worked examples of brush technique on blank sheets
   fs.copyFileSync(path.join(BENCH, 'v3', 'TIPS.md'), path.join(b, 'TIPS.md'));
   fs.mkdirSync(path.join(b, 'tips'), { recursive: true });
@@ -170,6 +172,8 @@ export async function runV3({ round, model, tries, crops, dry, outRoot, force })
         seed: s.seed ?? null, sheet: s.sheet ?? null, strokeLog: logged ? `${r.crop}-strokes.jsonl.gz` : null,
         strokes: s.strokes ?? null, minutes: s.seconds != null ? Math.round(s.seconds / 6) / 10 : null, smallShare: s.smallShare ?? null,
         shortStrokes: s.shortStrokes ?? null, dotStrokes: s.dotStrokes ?? null, copyHF: null, images: { final: `${r.crop}.webp`, stages },
+        // rendering work, counted the same on any machine (the kit's kit.work()); recorded beside the score, never a cap below the budget
+        work: s.work ?? null,
         painterNote: n > 1 ? a.changed : null, score: null, progression: null, attempt: { n, minutes: a.min, killedAtCap: a.killed, exitCode: a.exit },
       };
     }

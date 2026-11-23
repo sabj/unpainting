@@ -21,8 +21,7 @@ for (const task of tasks) {
     for (let k = 0; k < STROKES_PER_BAND && cells.length; k++) {
       const i = cells[(k * step) % cells.length], cx = (i % map.cols + 0.5) * cw, cy = ((i / map.cols | 0) + 0.5) * ch;
       kit.dip(brush, { water: 0.85 - band * 0.15, conc: kit.mix({ ultramarine: 0.08 + band * 0.06, sienna: 0.05 + band * 0.04 }) });
-      kit.stroke(brush, sheet, [{ x: Math.max(1, cx - cw * 2), y: cy, p: 1 }, { x: Math.min(W - 1, cx + cw * 2), y: cy + 1, p: 0.8 }],
-        { between: s => { if (s % 6 === 0) kit.step(sheet, O); } });
+      kit.stroke(brush, sheet, [{ x: Math.max(1, cx - cw * 2), y: cy, p: 1 }, { x: Math.min(W - 1, cx + cw * 2), y: cy + 1, p: 0.8 }]);
     }
     kit.dryAll(sheet, O);
   }

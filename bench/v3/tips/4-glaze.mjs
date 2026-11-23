@@ -7,9 +7,9 @@ const wash = (paint, xa, xb, ya, yb) => {
   for (let y = ya; y <= yb; y += 14, row++) {
     kit.dip(b, { water: 0.9, conc: paint });
     const [x0, x1] = row % 2 ? [xb, xa] : [xa, xb];
-    kit.stroke(b, sheet, [{ x: x0, y, p: 0.9 }, { x: x1, y, p: 0.9 }], { between: s => { if (s % 6 === 0) kit.step(sheet, O); } });
+    kit.stroke(b, sheet, [{ x: x0, y, p: 0.9 }, { x: x1, y, p: 0.9 }]);
   }
-  for (let q = 0; q < 15; q++) kit.step(sheet, O);
+  kit.wait(sheet, 15);
 };
 wash(kit.mix({ hansa: 0.4 }), 40, W - 120, 30, H - 30);
 kit.dryAll(sheet, O);                                          // the whole point: the first wash is DRY before the second goes on

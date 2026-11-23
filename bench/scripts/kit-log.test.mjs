@@ -29,7 +29,7 @@ await kit.finish('test');
 function paint(noLog, script = SCRIPT, film = false) {
   const ws = fs.mkdtempSync(path.join(os.tmpdir(), 'kitlog-'));
   try {
-    fs.symlinkSync(path.join(REPO, 'src'), path.join(ws, 'src'));
+    fs.symlinkSync(path.join(REPO, 'src'), path.join(ws, 'src')); fs.symlinkSync(path.join(REPO, 'tools'), path.join(ws, 'tools'));
     fs.symlinkSync(path.join(REPO, 'node_modules'), path.join(ws, 'node_modules'));
     fs.copyFileSync(path.join(REPO, 'package.json'), path.join(ws, 'package.json'));
     const wb = path.join(ws, 'bench'); fs.mkdirSync(path.join(wb, 'tasks'), { recursive: true });
@@ -91,7 +91,7 @@ kit.dryAll(sheet, O); await kit.finish('pencil');`, true);
 test('the kit takes its targets from the coarse maps installed next to it', () => {
   const ws = fs.mkdtempSync(path.join(os.tmpdir(), 'kittasks-'));
   try {
-    fs.symlinkSync(path.join(REPO, 'src'), path.join(ws, 'src'));
+    fs.symlinkSync(path.join(REPO, 'src'), path.join(ws, 'src')); fs.symlinkSync(path.join(REPO, 'tools'), path.join(ws, 'tools'));
     fs.symlinkSync(path.join(REPO, 'node_modules'), path.join(ws, 'node_modules'));
     fs.copyFileSync(path.join(REPO, 'package.json'), path.join(ws, 'package.json'));
     const wb = path.join(ws, 'bench'); fs.mkdirSync(path.join(wb, 'tasks'), { recursive: true });

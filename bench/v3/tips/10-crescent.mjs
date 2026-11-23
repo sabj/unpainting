@@ -9,8 +9,8 @@ for (const r of [96, 88, 80]) {                                 // three arcs 8 
   kit.dip(b, { water: 0.85, conc: kit.mix({ ultramarine: 0.5, rose: 0.15 }) });
   const span = 0.18 + 0.1 * k;                                  // the inner arcs stop sooner: the shape is thinner toward its tips
   const pts = arc(r, Math.PI * (1 - span), Math.PI * span, true);
-  kit.stroke(b, sheet, k++ % 2 ? pts.reverse() : pts, { between: s => { if (s % 6 === 0) kit.step(sheet, O); } });
+  kit.stroke(b, sheet, k++ % 2 ? pts.reverse() : pts);
 }
-for (let q = 0; q < 15; q++) kit.step(sheet, O);
+kit.wait(sheet, 15);
 kit.dryAll(sheet, O);
 await kit.finish('crescent');

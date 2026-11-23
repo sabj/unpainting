@@ -5,7 +5,15 @@
 //   const b = kit.createBrush({ radius: 8, bristles: 16, capacity: 60 });   // radius in sheet cells (0.259 mm a cell)
 //   kit.dip(b, { water: 0.8, conc: kit.mix({ sapgreen: 0.4, ochre: 0.1 }) });
 //   kit.stroke(b, sheet, [{ x: 10, y: 20, p: 1 }, { x: 60, y: 24, p: 0.8 }]);
-//   kit.dryAll(sheet, O); await kit.finish('note');
+//   kit.wait(sheet, 20);                         // let the wet strokes run together a while; kit.dryAll(sheet) dries
+//   kit.dryAll(sheet); kit.work(); await kit.finish('note');
+// The water: the kit moves it for you. While a brush or pen is on the paper the sheet steps for the brush time that
+//   passed, on the main painter's cadence (src/media/water-clock.mjs); a script gives no `between` and calls no step.
+//   kit.wait(sheet, moments) lets time pass with the brush off the paper; kit.dryAll(sheet) dries the sheet.
+// Rendering work: every brush sweep, drying and water step is counted, the same on any machine. kit.work() gives the
+//   running total; the units are the levels 2 to 4 units (tools/paint/look-cost.mjs workUnits: brush sweeps plus dryings,
+//   over one full painting of the automatic plan of the subject = 1.00). Budget BENCH_UNITS (default 5): measured and
+//   generous; the kit stops a painting only at the limit; recorded beside the score in stats.json.
 // Rules the kit enforces (it throws, and you may retry within your budget):
 // - No image files may be read (the targets are in your prompt; your own frames are readable under bench/out/).
 // - Paint only from the box: conc must come from kit.mix() over BRUSH_PAINTS (brush) or INK (pen); total at most 2 (brush), 8 (pen).
@@ -42,6 +50,8 @@ import * as PEN from '../src/media/pen.mjs';
 import * as GR from '../src/media/kit-graphite.mjs';
 import { BOX, boxPigment } from '../src/crop/box.mjs';
 import { attachGpu } from '../src/media/gpu/link.mjs';
+import { waterClock } from '../src/media/water-clock.mjs';
+import { workUnits, DEFAULT_LOOK_UNITS } from '../tools/paint/look-cost.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 export const PROTOCOL = 'v2';
@@ -54,7 +64,8 @@ export const INK = ['sepia', 'lampblack'];
 const KEYS = BOX.map(p => p.key);
 // the graphite grades sit in two pans of the box that no kit call can mix
 const GRAPHITE_PAN = Object.freeze({ HB: 'cadred', '2B': 'paynes' }), GRAPHITE = Object.values(GRAPHITE_PAN).map(k => KEYS.indexOf(k));
-export const { step, dry, DEFAULTS, applyResist, liftResist, blot } = S;
+export const { DEFAULTS, applyResist, liftResist, blot } = S;
+export const UNITS = Number(process.env.BENCH_UNITS) > 0 ? Number(process.env.BENCH_UNITS) : DEFAULT_LOOK_UNITS;
 const LOCK = path.resolve(HERE, '../../.bench-gpu.lock');
 const SLOTS = path.resolve(HERE, '../../.bench-slots'), NSLOTS = 6;
 // A few render processes may run at once: open() waits for one of NSLOTS slots, held until the process exits.
@@ -119,6 +130,9 @@ export function mix(byName) {
 }
 const total = c => c.reduce((a, b) => a + b, 0);
 
+/** The subject's rendering unit, installed by the harness beside its coarse map: {sweeps, dryings, waterSteps, cells, from}, or null. */
+const unitOf = task => { try { return JSON.parse(fs.readFileSync(path.join(HERE, 'tasks', `${task}-unit.json`), 'utf8')); } catch { return null; } };
+
 /** The coarse map of a task: { cols, rows, palette: [[r,g,b] x8], cells: palette index per cell, value: 0..1 per cell }. */
 export const coarse = task => JSON.parse(fs.readFileSync(path.join(HERE, 'tasks', `${task}-coarse.json`), 'utf8'));
 
@@ -147,10 +161,12 @@ export async function open(task, { seed = +(process.env.BENCH_SEED || 1), gpu = 
     if (!sheet._gpu) reject(`the GPU could not be used (no GPU sheet was attached). Nothing was painted. Run again; to paint on the CPU on purpose (far slower), open with kit.open('${task}', { gpu: false })`);
   }
   const log = process.env.BENCH_NO_STROKELOG ? null : [];
-  st = { log, logWritten: false, seed, task, out, sheet, pigments, W, H, strokes: 0, pen: 0, pencil: 0, erase: 0, small: 0, short: 0, dots: 0, frames: 0, snaps: [], film: [], t0: Date.now(), backend: sheet._gpu ? 'gpu' : 'cpu', paperRGB: [240, 237, 228], pending: Promise.resolve() };
+  const work = { dryings: 0, waits: 0, waterSteps: 0 };
+  const advance = () => { S.step(sheet, O); work.waterSteps++; };
+  st = { work, advance, clock: waterClock(advance), unit: unitOf(task), O, log, logWritten: false, seed, task, out, sheet, pigments, W, H, strokes: 0, pen: 0, pencil: 0, erase: 0, small: 0, short: 0, dots: 0, frames: 0, snaps: [], film: [], t0: Date.now(), backend: sheet._gpu ? 'gpu' : 'cpu', paperRGB: [240, 237, 228], pending: Promise.resolve() };
   logLine({ ev: 'open', protocol: PROTOCOL, task, seed, W, H, mmPerCell: MM, paper: { toothScale: 0.2, coldPress: true }, backend: st.backend, t0: st.t0 });
   process.on('exit', flushLog); // a script that dies before finish() keeps the strokes it laid
-  console.error(`kit v2: ${task} ${W}x${H}, ${st.backend}, budget ${BUDGET}`);
+  console.error(`kit v2: ${task} ${W}x${H}, ${st.backend}, budget ${BUDGET} strokes; rendering budget ${UNITS} units${st.unit ? ` (1 unit = ${st.unit.sweeps + st.unit.dryings} brush sweeps and dryings, one full automatic painting of this subject)` : ': no unit for this sheet, work is counted, not charged'}`);
   return { sheet, O, W, H };
 }
 
@@ -175,26 +191,36 @@ const lenOf = pts => { let L = 0; for (let i = 1; i < pts.length; i++) L += Math
 function counted(kind) {
   if (!st) reject('call kit.open() first');
   if (used() >= BUDGET) reject(`stroke budget of ${BUDGET} used up`);
+  overBudget();
   st[kind === 'brush' ? 'strokes' : kind]++;
   const n = used();
   if (n % SNAP_EVERY === 0) snap(n);
   if (n > 1 && (n - 1) % FILM_EVERY === 0) film('painting', n - 1);   // the sheet as it stands before this stroke is laid: after strokes 2, 4, ...
 }
+// A stroke's own options: the kit moves the water (src/media/water-clock.mjs), so `between` and the step cadence are not the script's.
+function own(options, what) {
+  if (options == null) return {};
+  if (typeof options !== 'object') reject(`${what} options must be an object`);
+  for (const k of ['between', 'flowEvery', 'gpuBetween']) if (k in options) reject(`${what}: leave out "${k}". The kit moves the water itself while the brush is on the paper; to let time pass call kit.wait(sheet, moments), to dry call kit.dryAll(sheet)`);
+  return options;
+}
 export function stroke(brush, sheet, pts, options) {
   if (!Array.isArray(pts) || pts.length < 2) reject('a stroke needs a path of at least 2 points');
+  options = own(options, 'stroke');
   const r = Math.min(brush.radius, ...pts.map(q => q.r ?? brush.radius)), L = lenOf(pts);
   counted('brush');
   if (r < R_MIN) st.small++;
   if (L < 6 * r) st.short++;
   if (L < 2 * r) st.dots++;
-  if (st.log) logLine({ i: used(), tool: 'brush', t: Date.now() - st.t0, brush: { radius: r4(brush.radius), bristles: brush.hairs?.length, capacity: r4(brush.capacity), flat: !!brush.flat }, dip: DIPS.get(brush) ?? null, load: r4(brush.load), dips: brush.dips ?? 0, pts: pts.map(q => ({ x: r4(q.x), y: r4(q.y), p: r4(q.p), ...(q.r != null ? { r: r4(q.r) } : {}) })), options: options ?? null });
-  return BR.stroke(brush, sheet, pts, options);
+  if (st.log) logLine({ i: used(), tool: 'brush', t: Date.now() - st.t0, brush: { radius: r4(brush.radius), bristles: brush.hairs?.length, capacity: r4(brush.capacity), flat: !!brush.flat }, dip: DIPS.get(brush) ?? null, load: r4(brush.load), dips: brush.dips ?? 0, pts: pts.map(q => ({ x: r4(q.x), y: r4(q.y), p: r4(q.p), ...(q.r != null ? { r: r4(q.r) } : {}) })), options: Object.keys(options).length ? options : null });
+  return BR.stroke(brush, sheet, pts, { ...options, ...(sheet === st.sheet ? st.clock.stroke('brush') : {}) });
 }
 export function penStroke(pen, sheet, pts, options) {
   if (!Array.isArray(pts) || pts.length < 2) reject('a pen line needs at least 2 points');
+  options = own(options, 'penStroke');
   counted('pen');
-  if (st.log) logLine({ i: used(), tool: 'pen', t: Date.now() - st.t0, pen: { nib: r4(pen.nib), flex: r4(pen.flex), capacity: r4(pen.capacity) }, dip: DIPS.get(pen) ?? null, ink: r4(pen.ink), pts: pts.map(q => ({ x: r4(q.x), y: r4(q.y), p: r4(q.p) })), options: options ?? null });
-  return PEN.penStroke(pen, sheet, pts, options);
+  if (st.log) logLine({ i: used(), tool: 'pen', t: Date.now() - st.t0, pen: { nib: r4(pen.nib), flex: r4(pen.flex), capacity: r4(pen.capacity) }, dip: DIPS.get(pen) ?? null, ink: r4(pen.ink), pts: pts.map(q => ({ x: r4(q.x), y: r4(q.y), p: r4(q.p) })), options: Object.keys(options).length ? options : null });
+  return PEN.penStroke(pen, sheet, pts, { ...options, ...(sheet === st.sheet ? st.clock.stroke('pen') : {}) });
 }
 /** A pencil: grade 'HB' (harder, paler, finer) or '2B' (softer, darker, wider); width in cells at full pressure. */
 export function createPencil({ grade = 'HB', width } = {}) {
@@ -218,12 +244,46 @@ export function erase(sheet, pts, { width = 12 } = {}) {
   if (st.log) logLine({ i: used(), tool: 'eraser', t: Date.now() - st.t0, eraser: { width: r4(width) }, lifted: { graphiteShare: r4(r.graphiteShare) }, pts: pts.map(q => ({ x: r4(q.x), y: r4(q.y), p: r4(q.p) })) });
   return r;
 }
-export function dryAll(sheet, O = S.DEFAULTS) {
-  if (st && sheet === st.sheet) film('painting');   // wet, as the drying finds it
-  for (let q = 0; q < 30; q++) S.step(sheet, O);
-  const r = S.dry(sheet, 30000, O, { levelMax: 140, dt: 14 });
-  if (st && sheet === st.sheet) film('dried');
+/** Dry the whole sheet: the water settles a moment (30 steps) and the sheet is dried. One drying of the rendering work. */
+export function dryAll(sheet, O) {
+  if (!st || sheet !== st.sheet) reject('dryAll(sheet): the sheet kit.open() gave');
+  overBudget();
+  film('painting');   // wet, as the drying finds it
+  for (let q = 0; q < 30; q++) st.advance();
+  const r = S.dry(sheet, 30000, O ?? st.O, { levelMax: 140, dt: 14 });
+  st.work.dryings++; st.clock.dried();
+  logLine({ ev: 'dry', after: used(), t: Date.now() - st.t0 });
+  film('dried');
   return r;
+}
+/** Let time pass with the brush off the paper: the water runs and sinks in for `moments` water steps (default 20; a
+ *  moment is about the time a brush takes to travel 17 cells). Wet strokes merge further; nothing dries hard. */
+export function wait(sheet, moments = 20) {
+  if (!st || sheet !== st.sheet) reject('wait(sheet, moments): the sheet kit.open() gave');
+  overBudget();
+  try { st.clock.wait(moments); } catch (e) { reject(e.message); }
+  st.work.waits++;
+  logLine({ ev: 'wait', moments, after: used(), t: Date.now() - st.t0 });
+}
+/** The rendering work so far, counted the same on any machine, and what is left of the budget. */
+export function work() {
+  if (!st) reject('call kit.open() first');
+  const w = st.work, u = st.unit, cells = st.W * st.H;
+  const units = u ? workUnits({ sweeps: st.strokes, dryings: w.dryings }, u.sweeps + u.dryings) : null;
+  return {
+    sweeps: st.strokes, penLines: st.pen, pencilLines: st.pencil, erasures: st.erase, dryings: w.dryings, waits: w.waits,
+    waterSteps: w.waterSteps, cellsStepped: w.waterSteps * cells, strokeSteps: st.clock.counts.strokeSteps,
+    units, budget: UNITS, left: units == null ? null : +(UNITS - units).toFixed(2),
+    unit: u ? { sweeps: u.sweeps, dryings: u.dryings, waterSteps: u.waterSteps ?? null, from: u.from ?? null } : null,
+    // the water steps beside the automatic painting's, on this sheet: recorded, not charged
+    steppedShare: u?.waterSteps > 0 ? +(w.waterSteps / u.waterSteps).toFixed(2) : null,
+  };
+}
+// The budget stops a painting only at its limit: the next sweep, drying or wait past it is refused; finish() always works.
+function overBudget() {
+  if (!st?.unit) return;
+  const units = workUnits({ sweeps: st.strokes, dryings: st.work.dryings }, st.unit.sweeps + st.unit.dryings);
+  if (units >= UNITS) reject(`the rendering budget of ${UNITS} units is used (${units}): nothing more can be laid; call await kit.finish(note)`);
 }
 
 export function look() {
@@ -279,7 +339,7 @@ export async function finish(note = '') {
   logLine({ ev: 'finish', strokes: n, t: Date.now() - st.t0, note });
   flushLog();
   fs.rmSync(path.join(st.out, 'snaps'), { recursive: true, force: true });
-  const stats = { protocol: PROTOCOL, task: st.task, film: filmed, brushStrokes: st.strokes, penStrokes: st.pen, pencilStrokes: st.pencil, eraserStrokes: st.erase, smallStrokes: st.small, shortStrokes: st.short, dotStrokes: st.dots, smallShare: st.strokes ? +(st.small / st.strokes).toFixed(3) : 0, strokes: n, budget: BUDGET, stageStrokes: stages, seconds: Math.round((Date.now() - st.t0) / 1000), backend: st.backend, note, seed: st.seed, sheet: { W: st.W, H: st.H, mmPerCell: MM }, strokeLog: st.log ? 'strokes.jsonl.gz' : null };
+  const stats = { protocol: PROTOCOL, task: st.task, film: filmed, brushStrokes: st.strokes, penStrokes: st.pen, pencilStrokes: st.pencil, eraserStrokes: st.erase, smallStrokes: st.small, shortStrokes: st.short, dotStrokes: st.dots, smallShare: st.strokes ? +(st.small / st.strokes).toFixed(3) : 0, strokes: n, budget: BUDGET, stageStrokes: stages, seconds: Math.round((Date.now() - st.t0) / 1000), backend: st.backend, note, seed: st.seed, sheet: { W: st.W, H: st.H, mmPerCell: MM }, strokeLog: st.log ? 'strokes.jsonl.gz' : null, work: work() };
   fs.writeFileSync(path.join(st.out, 'stats.json'), JSON.stringify(stats, null, 2));
   fs.appendFileSync(path.join(HERE, 'out', 'kitlog.jsonl'), JSON.stringify({ ev: 'finish', task: st.task, t: Date.now(), strokes: n }) + '\n');
   if (st.sheet._gpu) st.sheet._gpu.close();

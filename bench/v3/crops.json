@@ -16,7 +16,14 @@
    "distributed": true,
    "file": "targets/mittens-closeup.png",
    "coarseFile": "targets/mittens-closeup-coarse.json",
-   "licence": "noncommercial project use; local branch only, not distributed"
+   "licence": "noncommercial project use; local branch only, not distributed",
+   "unit": {
+    "sweeps": 952,
+    "dryings": 3,
+    "waterSteps": 4442,
+    "from": "prepared mittens-closeup at f58e226f (v0.4.0-rc.2): one full look of the automatic plan",
+    "cellsAcross": 543
+   }
   },
   {
    "task": "mittens-closeup-full",
@@ -33,7 +40,14 @@
    "distributed": true,
    "file": "targets/mittens-closeup-full.png",
    "coarseFile": "targets/mittens-closeup-full-coarse.json",
-   "licence": "noncommercial project use; local branch only, not distributed"
+   "licence": "noncommercial project use; local branch only, not distributed",
+   "unit": {
+    "sweeps": 952,
+    "dryings": 3,
+    "waterSteps": 4442,
+    "from": "prepared mittens-closeup at f58e226f (v0.4.0-rc.2): one full look of the automatic plan; its full-size painting (1086 across) counted the same 952 sweeps and 4442 water steps",
+    "cellsAcross": 543
+   }
   },
   {
    "task": "white-ships-full",
@@ -50,7 +64,14 @@
    "distributed": true,
    "file": "targets/white-ships-full.png",
    "coarseFile": "targets/white-ships-full-coarse.json",
-   "licence": "public domain"
+   "licence": "public domain",
+   "unit": {
+    "sweeps": 1584,
+    "dryings": 38,
+    "waterSteps": 11314,
+    "from": "prepared white-ships at 3b5366fe (v0.4.0-rc.3; none was prepared at rc.2): one full look of the automatic plan",
+    "cellsAcross": 384
+   }
   },
   {
    "task": "h36-full",
@@ -84,7 +105,14 @@
    "distributed": true,
    "file": "targets/homer-daughter.png",
    "coarseFile": "targets/homer-daughter-coarse.json",
-   "licence": "CC0 (public domain)"
+   "licence": "CC0 (public domain)",
+   "unit": {
+    "sweeps": 5302,
+    "dryings": 15,
+    "waterSteps": 11320,
+    "from": "prepared homer-daughter at f58e226f (v0.4.0-rc.2): one full look of the automatic plan; its full-size painting counted 11321 water steps",
+    "cellsAcross": 731
+   }
   },
   {
    "task": "fragonard",
@@ -101,7 +129,14 @@
    "distributed": true,
    "file": "targets/fragonard.png",
    "coarseFile": "targets/fragonard-coarse.json",
-   "licence": "public domain"
+   "licence": "public domain",
+   "unit": {
+    "sweeps": 1028,
+    "dryings": 37,
+    "waterSteps": 8506,
+    "from": "prepared fragonard at 3b5366fe (v0.4.0-rc.3; none was prepared at rc.2): one full look of the automatic plan",
+    "cellsAcross": 731
+   }
   }
  ]
 }

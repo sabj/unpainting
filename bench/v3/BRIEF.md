@@ -28,6 +28,12 @@ When an attempt is painted (it ends with `kit.finish`), stop: the attempt is ove
   `src/plan.js`, `src/painter.js` and similar).
 - Paint like a person: light before dark, broad before detail, washes and strokes rather than pixel fills. Stage frames
   are saved automatically at 10%, 25%, 50%, 75% and 100% of your strokes and are judged for a human-like progression.
+- Rendering work: the kit counts what your painting asks of the simulator, the same on any machine. `kit.work()` gives
+  the running total: units (your brush sweeps plus dryings, where 1 unit is what one full painting of this subject by
+  the code's automatic planner takes), and beside them the water steps the kit took for you. Budget 5 units: measured
+  and generous; the kit stops a painting only at the limit; everything is recorded beside your score. Every water step
+  moves the water over the whole sheet, so on a full-size wet sheet waits and dryings are the slowest things you can
+  ask for; `bench/TIPS.md` says what each costs.
 - Budget per attempt: at most 2,500 strokes (brush, pen, pencil and eraser together). About 30 minutes per attempt, including your
   thinking; each attempt is stopped after 30 minutes. One painting run at a time: do not run several in parallel.
 - End each attempt with `await kit.finish(note)`. Outputs land in `bench/out/{CROP}/` (`final.png`, `frames/`,
@@ -55,9 +61,9 @@ look at the pictures, before you write your first stroke.
   0.259 mm a cell.
 - `kit.createBrush({ radius, bristles, capacity, flat, belly, feed, give, splay, stiffness, seed })` (radius in
   cells), `kit.dip(brush, { water: 0..1, conc: kit.mix({ sapgreen: 0.4, ochre: 0.1 }) })`. A brush runs out: dip again.
-- `kit.stroke(brush, sheet, [{ x, y, p }...], { between: s => { if (s % 6 === 0) kit.step(sheet, O); } })`; water
-  moves only when the sheet steps. `kit.dryAll(sheet, O)` dries the sheet; strokes on a wet sheet run together, on a
-  dry sheet they keep their edges.
+- `kit.stroke(brush, sheet, [{ x, y, p }...])`. The kit moves the water while the brush is on the paper; strokes
+  laid while the sheet is wet run together, on a dry sheet they keep their edges. `kit.wait(sheet, moments)` lets the
+  water run with the brush off the paper (default 20); `kit.dryAll(sheet)` dries the sheet.
 - Pen: `kit.createPen({ nib, flex })`, `kit.dipPen(pen, kit.mix({ sepia: 3 }))`, `kit.penStroke(pen, sheet, [{ x, y, p, v }...])`.
 - Pencil: `kit.createPencil({ grade: 'HB' | '2B', width })`, `kit.pencilStroke(pencil, sheet, [{ x, y, p }...])`: dry graphite, darker and wider with pressure and with 2B; washes over it barely move it and cover it as they darken.
 - Eraser: `kit.erase(sheet, [{ x, y, p }...], { width })`: rubs pencil off dry paper, far less of it under dried paint, no ink worth seeing; it refuses a wet sheet.

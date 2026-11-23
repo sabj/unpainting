@@ -7,9 +7,8 @@ for (let r = 0; r < rows; r++) {
   const y = 30 + 14 * r, fade = 1 - r / (rows - 1);            // 1 at the top, 0 at the bottom
   kit.dip(b, { water: 0.95, conc: kit.mix({ sienna: 0.5 * fade * fade }) });   // the same water every row, less paint each time
   const [x0, x1] = r % 2 ? [W - 40, 40] : [40, W - 40];
-  kit.stroke(b, sheet, [{ x: x0, y, p: 0.9 }, { x: (x0 + x1) / 2, y: y + 1, p: 0.9 }, { x: x1, y, p: 0.9 }],
-    { between: s => { if (s % 6 === 0) kit.step(sheet, O); } });
+  kit.stroke(b, sheet, [{ x: x0, y, p: 0.9 }, { x: (x0 + x1) / 2, y: y + 1, p: 0.9 }, { x: x1, y, p: 0.9 }]);
 }
-for (let q = 0; q < 30; q++) kit.step(sheet, O);              // wet rows blend into their neighbours: the steps disappear
+kit.wait(sheet, 30);              // wet rows blend into their neighbours: the steps disappear
 kit.dryAll(sheet, O);
 await kit.finish('graded wash');

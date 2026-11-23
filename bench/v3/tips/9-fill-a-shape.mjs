@@ -15,8 +15,8 @@ for (let k = 0; k < lanes; k++) {
     pts.push({ x: c.x - (d.y - c.y) / n * off, y: c.y + (d.x - c.x) / n * off, p: 0.85 });
   }
   kit.dip(b, { water: 0.9, conc: kit.mix({ sapgreen: 0.45, ochre: 0.15 }) });   // a full brush for every lane
-  kit.stroke(b, sheet, k % 2 ? pts.reverse() : pts, { between: s => { if (s % 6 === 0) kit.step(sheet, O); } });
+  kit.stroke(b, sheet, k % 2 ? pts.reverse() : pts);
 }
-for (let q = 0; q < 20; q++) kit.step(sheet, O);
+kit.wait(sheet, 20);
 kit.dryAll(sheet, O);
 await kit.finish('fill a shape');
