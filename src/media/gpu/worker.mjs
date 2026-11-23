@@ -84,7 +84,8 @@ async function handle(m) {
   if (m.op === 'close') return handleOp(m);
   assertHealthy(workerData.health);
   if (m.op === 'step') { pendingSteps += m.n; return; }
-  if (m.op !== 'init') await flushSteps();
+  if (m.op !== 'init') { if (gpu?.device.dispatchProfile) gpu.device.dispatchProfile.op = 'step'; await flushSteps(); }
+  if (gpu?.device.dispatchProfile) gpu.device.dispatchProfile.op = m.op;
   if (SERIAL_PROF && m.op !== 'init' && m.op !== 'prof') {
     const t = performance.now();
     if (m.op === 'stroke' || m.op === 'splat') {
