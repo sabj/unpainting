@@ -13,8 +13,9 @@ More freedom than before, and mistakes are allowed.
 - Its own drawn lines.
 - The drawing medium: pen, pencil or none.
 - Pen ink: waterproof or soluble (at L2 to L4 a model's own pen lines are waterproof unless its settings say `inkfast` 0).
-- Erasing: the kit's eraser at L1; an erase passage in its own script or edited plan at L2 to L4.
-- At L2 and above: Auto's settings, Auto's plan, the pencil lines Auto keeps, the named forms (merge, cut, rename), the paints (up to 14), or a whole script of its own.
+- Erasing: the kit's eraser at L1; an erase passage in its own script at L2 to L4, or in an edited plan at L4.
+- At L2 and L3: a whole script of its own (the model plans the painting itself from Auto's inputs), the pencil lines Auto keeps, and the paints (up to 14). Auto's plan and planner are not given: a settings choice or a plan edit is refused with "the code's plan and planner are level 4", and a session that hands in no script of its own has handed in nothing (a failed painting).
+- At L4 also: Auto's settings, Auto's plan, and the named forms (merge, cut, rename).
 - Where a choice only risks a worse painting, the harness gives a warning, not a refusal. It refuses only to protect the sheet or the rules.
 
 ## What is fixed
@@ -34,7 +35,7 @@ More freedom than before, and mistakes are allowed.
 
 ## Budgets: measured, not limited
 
-- Looks are rendering. Rendering is charged in a machine-independent unit: the painter's own count of brush sweeps plus dry calls. One full look of Auto's plan is 1.00. The model chooses where and when to spend it: to a stage, or in a region.
+- Looks are rendering. Rendering is charged in a machine-independent unit: the painter's own count of brush sweeps plus dry calls. One full look of Auto's plan is 1.00, at every level; below L4 the model is told the unit but not shown the plan. The model chooses where and when to spend it: to a stage, or in a region.
 - Steps: 1,000, as a runaway guard.
 - The clock is a safety stop only: six hours.
 - The target for resource management is about 60 minutes per session, covering the model's thinking and its looks. A session that reaches it hands in what it has and is marked so. The owner wants to tighten this. The harness records the actual terms in each run's record.

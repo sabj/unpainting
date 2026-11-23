@@ -10,9 +10,9 @@ The benchmark asks one question: how well does a model paint, and how much of th
 |---|---|---|
 | L0 | Nothing but the picture, a brush and a pen. No tips. | One. Defined, not run. |
 | L1 | L0 plus harness tips: guides to brush technique and worked examples of rendering a shape, painted on blank sheets. | One |
-| L2 | Prepared inputs, including Auto's plan: the drawing, colour studies, the named forms. | One |
-| L3 | L2, then one retry. | Two in all |
-| L4 | L3, then one more retry, with many resources: Auto's finished painting, and the studies' flat shapes and finer regions as data. | Three in all |
+| L2 | The same inputs Auto gets: the prepared drawing, the three colour studies, the named forms. Not Auto's plan: the model plans the painting itself, as its own script. | One |
+| L3 | L2 again, after studying its own L2 painting. Still no Auto plan. | Two in all |
+| L4 | L3, then one more retry, with many resources: Auto's plan (to read, edit or discard), Auto's planner as a tool with its settings, Auto's finished painting and its film, and the studies' flat shapes and finer regions as data. | Three in all |
 
 Notes on each level:
 
@@ -20,6 +20,8 @@ Notes on each level:
 - The number of retries is a setting. One retry per level is the plan until there is proof that more tries help.
 - Test run first: three tries at L3 and at L4, each scored on its own, to see whether the second and third try add anything. After it the owner decides whether the scored run keeps three or scopes back to one. Planned, not yet run.
 - A model has a shell in its own workspace at every level and may write any script it wants.
+- L2 changed on 22 November (the owner, after seeing a level 2 run): it gets Auto's inputs, not Auto's plan. Auto's plan and planner belong to L4. At L2 and L3 the session folder holds no `auto/`, the only thing a model may hand in is its own script (with its choice of lines, medium and erase passages), and asking for Auto's settings or an edit of Auto's plan is refused with "the code's plan and planner are level 4". A session that hands in no script of its own has handed in nothing: a failed painting, never Auto's plan painted in its place. Runs made before this change under the old L2 (given and editing Auto's plan) show the harness works; they are not level 2 results.
+- Looks are priced in the same unit at every level: one full look of Auto's plan of the subject is 1.00. Below L4 the model is told the unit, not shown the plan.
 
 ## Retries are self-study
 

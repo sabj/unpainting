@@ -22,13 +22,14 @@ export const USAGE = `usage: npm run paint -- <subject[,subject...]> plan|paint|
                         tools/paint/authors.json or bench/models.json, or script:FILE.json (a kept script).
                         Several authors make a grid, subjects down and authors across. Default auto.
   --work session|reply  how a model author works. session (default): a working session with a shell in its own
-                        folder, the code planner's plan as its starting point; it hands over planner settings,
-                        an edited plan or its own script. Its work is measured (usage.json), not capped.
+                        folder; it hands over its own script, and at L4 also planner settings or an edited plan
+                        of the code planner's plan. Its work is measured (usage.json), not capped.
                         reply: one read-only reply holding a whole script (the earlier route).
-  --level L2|L3|L4      what a session is handed (default L2). L2: the subject's prepared inputs and the code
-                        planner's plan, one go. L3: a retry from the model's own L2 result (--previous).
-                        L4: a retry from its L3 result with many resources: the code's finished painting, replay
-                        and arrows, and the studies' flat shapes and the plan's wash geometry as data
+  --level L2|L3|L4      what a session is handed (default L2). L2: the inputs the code planner gets (drawing,
+                        studies, named forms), not its plan; the model plans itself, one go. L3: L2 again from
+                        the model's own L2 result (--previous). L4: a retry from its L3 result with many
+                        resources: the code's plan and planner, its finished painting, replay and arrows, and
+                        the studies' flat shapes and the plan's wash geometry as data
   --retries N           retries at a level (L3, L4; default 1), and --try N which of them this is (default 1)
   --previous <dir>      the run folder of the result this retry starts from (its finished full-size painting)
   --looks U             the benchmark's resource budget, rendering: how much a try may spend on looks, in units

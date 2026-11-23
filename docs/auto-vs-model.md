@@ -31,7 +31,7 @@ Contents: [inputs](#what-both-start-from) ·
 - Pencil lines: 3,531, prepared from the picture.
 - Studies: three flat-colour versions of the picture. 1 broad shapes, 2 middle detail, 3 fine detail and accents.
 - Named forms: 11 parts with names, such as cat face, left eye, right ear, chest fur, background foliage.
-- Auto's plan: the model at L2 gets it too, as a starting point.
+- Auto's plan: Astra was run under the earlier L2, which also handed over Auto's plan as a starting point. Since 22 November L2 gets only Auto's inputs, and Auto's plan belongs to L4 ([levels](../bench/docs/levels.md)). This page shows that earlier run.
 
 ## 0. Pencil
 
@@ -208,12 +208,12 @@ Card key: colour square, paint parts, brush to scale, paper (full circle wet, ha
 
 As of 0.4. Levels are in [levels](../bench/docs/levels.md); the session's tools in [`tools/paint/SESSION-README.md`](../tools/paint/SESSION-README.md).
 
-| May change (L2 and up) | |
+| May change | |
 |---|---|
-| Auto's settings | how it cuts and plans, also form by form |
-| Auto's plan | wash by wash: colour, strength, brush, edge, order; leave out, merge, add |
-| Its own script | every passage its own ([painting script](painting-script.md)) |
-| Named forms | merge, cut, rename, change kind |
+| Its own script (L2 and up) | every passage its own ([painting script](painting-script.md)) |
+| Auto's settings (L4) | how it cuts and plans, also form by form |
+| Auto's plan (L4) | wash by wash: colour, strength, brush, edge, order; leave out, merge, add |
+| Named forms (L4) | merge, cut, rename, change kind |
 | Prepared pencil lines | keep, drop, lighter, darker, before or after the washes |
 | Its own drawn lines | new lines, pen or pencil, placed point by point |
 | Drawing medium | pen, pencil or none |
@@ -223,9 +223,9 @@ As of 0.4. Levels are in [levels](../bench/docs/levels.md); the session's tools 
 |---|---|---|
 | L0 | the picture, a brush and a pen | tips; defined, not run |
 | L1 | L0 and harness tips; a kit with pen, pencil and eraser; ink waterproof or soluble | prepared inputs |
-| L2 | prepared inputs and Auto's plan; one go | study shapes as regions (only the study pictures); anything finer than the 11 forms; Auto's finished painting |
-| L3 | L2, then one retry with its own painting, replay and stroke map | as L2 |
-| L4 | L3, then one more retry, also given Auto's finished painting with its replay, and the studies' flat shapes and the plan's wash geometry as data | |
+| L2 | the same inputs Auto gets: the prepared drawing, the three studies, the named forms; it plans the painting itself, as its own script; one go | Auto's plan and planner (no `auto/`; a settings choice or plan edit is refused); study shapes as regions (only the study pictures); anything finer than the 11 forms; Auto's finished painting |
+| L3 | L2 again after studying its own L2 run: its painting beside the subject, replay, stroke map, what it handed over | as L2 |
+| L4 | L3, then one more retry, also given Auto's plan (read, edit or discard), Auto's planner as a tool with its settings, Auto's finished painting with its replay, and the studies' flat shapes and the plan's wash geometry as data | |
 
 At every level:
 
@@ -233,7 +233,7 @@ At every level:
 - Not allowed: reading the subject's pixels with code ([anti-cheat](../bench/docs/anti-cheat.md)).
 - Fixed: paper, simulator, paint box, brush physics, the three studies, sheet size.
 - Pen ink at L2 to L4: a model's own pen lines, and a pen drawing with lines or a medium of its choosing, are set waterproof before the washes; its settings may make them soluble (`inkfast` 0). Auto's ink is unchanged.
-- Erasing at every level. L1: the kit's eraser. L2 to L4: an erase passage in a model's own script or added to an edited plan rubs pencil out with the same eraser, anywhere in the order, on dry paper only; before the first wash it takes most of the pencil, after a dried wash far less. The painter also lifts pencil from the lights by itself.
+- Erasing at every level. L1: the kit's eraser. L2 to L4: an erase passage in a model's own script (at L4 also added to an edited plan) rubs pencil out with the same eraser, anywhere in the order, on dry paper only; before the first wash it takes most of the pencil, after a dried wash far less. The painter also lifts pencil from the lights by itself.
 
 ## Notes
 

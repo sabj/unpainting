@@ -126,9 +126,9 @@ The ladder:
 
 - L0: nothing but the picture, a brush and a pen. Defined, not run.
 - L1: L0 plus harness tips (technique guides and worked examples).
-- L2: prepared inputs, including Auto's plan. One go.
-- L3: L2, then one retry.
-- L4: L3, then one more retry, with many resources: Auto's finished painting and the studies' flat shapes as data.
+- L2: the same inputs Auto gets (the drawing, the three colour studies, the named forms), not Auto's plan. The model plans the painting itself. One go.
+- L3: L2 again, after studying its own L2 painting. Still no Auto plan.
+- L4: L3, then one more retry, with many resources: Auto's plan and planner, Auto's finished painting and its film, and the studies' flat shapes as data.
 
 How it is run and scored:
 

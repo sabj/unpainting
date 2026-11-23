@@ -8,9 +8,9 @@ AI models paint a subject with the simulator's brush and pen, and judges score h
 |---|---|
 | L0 | Nothing: the picture, a brush and a pen. Defined, not run. |
 | L1 | L0 plus harness tips (technique guides and worked examples) |
-| L2 | Prepared inputs including Auto's plan. One go. |
-| L3 | L2, then one retry by self-study |
-| L4 | L3, then one more retry, with many resources: Auto's finished painting and the studies' shapes as data |
+| L2 | The same inputs Auto gets (the drawing, the three colour studies, the named forms), not Auto's plan: the model plans the painting itself. One go. |
+| L3 | L2 again, after studying its own L2 painting. Still no Auto plan. |
+| L4 | L3, then one more retry, with many resources: Auto's plan and planner, Auto's finished painting and its film, and the studies' shapes as data |
 
 Details: [levels](docs/levels.md), [rules](docs/rules.md) and [scoring](docs/scoring.md).
 

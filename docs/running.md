@@ -143,11 +143,17 @@ npm run paint -- mittens-closeup,morisot-face paint --author auto,opus,astra --f
 
 **A working session** (`--work session`, the default; code in `tools/paint/session.mjs`). The model gets a folder of
 its own outside the repository and a shell in it. The folder holds the locked inputs with a millimetre grid (source,
-opening drawing, the three studies, the named forms as a picture and as an id map), the code planner's own plan of
-the subject (`auto/`: its picture, every wash as a table and as data, and the planner's settings with their present
-values and meaning), the brief for writing a script, a `README.md` of its
+opening drawing, the three studies, the named forms as a picture and as an id map), at level 4 only the code
+planner's own plan of the subject (`auto/`: its picture, every wash as a table and as data, and the planner's
+settings with their present values and meaning), the brief for writing a script, a `README.md` of its
 tools, and `choice.json`. The task is `tools/paint/SESSION-BRIEF.md`; the tools are `tools/paint/SESSION-README.md`.
 
+- At levels 2 and 3 there is no `auto/` and the brief and README (cut to the level by their `<!-- L4 -->` and
+  `<!-- L2 L3 -->` marks) do not speak of the code's plan. The only choice is its own script, with lines, medium and
+  erase passages; a settings choice, a plan edit, `"forms"` and `"perForm"` are refused with "the code's plan and
+  planner are level 4". `choice.json` starts naming `script.json`, which the model writes; a session that hands in
+  no script that compiled has handed in nothing, and the run fails with "nothing handed in". The rest of this list is
+  level 4.
 - What it hands over is `choice.json` as it stands at the end, one of three kinds. The code planner tuned
   (`"kind": "settings"`, any of the listed settings, or another painter option by name; the inputs and the guard are
   locked): an empty settings choice paints exactly what `--author auto` paints, the same command. The code planner's
@@ -183,7 +189,7 @@ tools, and `choice.json`. The task is `tools/paint/SESSION-BRIEF.md`; the tools 
 - Budgets are measured, not capped. When the rendering units or `--steps N` (tool calls, default 1000) are used, the
   session is asked to hand in. `--wallminutes N` (default 360) is only a safety stop: at it the session and every
   process it started are ended (SIGTERM, then SIGKILL) and the last choice it had planned is painted. `--minutes` is gone.
-- Levels: `--level L2` (default) is one go. `--level L3` and `--level L4` are retries from `--previous <run folder>`;
+- Levels: `--level L2` (default) is one go, without the code's plan. `--level L3` and `--level L4` are retries from `--previous <run folder>` (an L3 retry refuses a previous try that handed in the code's plan);
   L4 first needs `prepare --level L4`, which paints Auto's full-size painting. See [levels](../bench/docs/levels.md).
 - Looks while painting are not offered: the painter cannot stop at a passage and go on from there (`--canarystop`
   stops for good), so on this trunk every look is at a plan and nothing painted can be undone or redone.
