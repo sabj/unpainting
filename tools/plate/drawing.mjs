@@ -28,7 +28,6 @@ import {fillReserved} from '../../src/crop/lights.mjs';
 import {erasePrep} from '../../src/paint/methods/pencil-erase.mjs';
 import {followErase} from '../../src/paint/methods/fine-erase.mjs';
 import {strokesToLay} from '../../src/paint/methods/drawing-default.mjs';
-import {setPencil} from '../../src/paint/methods/pencil-set.mjs';
 import {makeMopLanes} from '../../src/paint/methods/mop-lanes.mjs';
 import {sealAtBirth, sealTargetMaps} from '../guard/seal-maps.mjs';
 
@@ -362,8 +361,10 @@ if (!ctx.RESUMING && PEN_FIRST && opt('draw', '1') !== '0' && DRAWING !== 'none'
   console.log(`pen first: source line ${(100 * SOURCE_INK).toFixed(1)}% of cells`);
   const before = thickness(ctx.sheet).map(a => Float32Array.from(a));
   await drawPass(null, { first: true });
-  // the pencil is set into the paper before the first wash, as dry graphite in the tooth is (pencil-set.mjs)
-  if (GRAPHITE) { const set = setPencil(ctx.sheet, GRAPHITE_AT); if (set > 0) console.log(`pencil set: the opening drawing's graphite set into the paper before the washes (${set.toFixed(1)} units)`); }
+  // the pencil dries into the paper before the first wash, by the sheet's own dry (on the GPU the GPU's own fix): a
+  // layer pushed onto the sheet from the CPU here (pencil-set.mjs, 04422c61) was not the GPU's, and the film lost the
+  // first washes laid over it (Mittens Auto at rc5: the face's base wash shown, then gone at pass 7)
+  if (GRAPHITE) { clock('dry', () => dry(ctx.sheet, 20000, O, { levelMax: 200 })); console.log('pencil set: the opening drawing dried into the paper before the washes'); }
   if (PREP_ERASE && STAGE_PLAN?.files.prep && GRAPHITE) followErase(INKRES, ctx.sheet, GRAPHITE_AT, () => erasePrep({ sheet: ctx.sheet, k: GRAPHITE_AT, dabs: PREP_ERASE, strength: num('preperase', 0.85), SC, w, W2, layersChanged, log: console.log }));
   ctx.INK_THK = thickness(ctx.sheet).map((a, j) => Float32Array.from(a, (v, i) => Math.max(0, v - before[j][i])));
   await sharp(INKRES ? INKRES.compose(view()) : render(), { raw: { width: OUT_W, height: OUT_H, channels: 3 } }).png().toFile(path.join(out, 'drawing-opening.png'));

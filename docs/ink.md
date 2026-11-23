@@ -111,7 +111,7 @@ node tools/paint-plate.mjs --image <target> --drawingfile <stem> --inkrecipe was
 Auto on a pencil drawing lays a lay-in, not the whole drawing (`src/paint/methods/drawing-default.mjs`): the lines that
 place a form (contours, lay-in strokes, inner contours of the growth, the strokes of the drawing's most important lines,
 the strokes in and round a named feature of a face), no darker than the drawing's own lay-in lines; the hatching, tone
-and texture its maker tagged drop are left for the washes. A pen drawing is laid whole. The opening pencil is set into
-the paper before the first wash (`pencil-set.mjs`): laid as a loose deposit, the first wash's scour moved 0.5 to 0.8% of
-it out of its cells on Mittens; set, 0.004%.
+and texture its maker tagged drop are left for the washes. A pen drawing is laid whole. The opening pencil is dried into
+the paper before the first wash by the sheet's own dry: laid as a loose deposit, the first wash's scour moved 0.5 to 0.8%
+of it out of its cells on Mittens.
 

@@ -19,6 +19,7 @@ import { fileURLToPath } from 'node:url';
 import sharp from 'sharp';
 import { writeLinesEdit, linesListing, LINES_EDIT_FORMAT } from '../paint/lines-edit.mjs';
 import { strokesToLay } from '../../src/paint/methods/drawing-default.mjs';
+import { paintedShare, filmShrinks } from '../../src/paint/film-painted.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 export const MEDIA = ['pencil', 'waterproof', 'soluble', 'none'], WHENS = ['before', 'after'], WHO = ['auto', 'lines', 'own'], SIZES = ['look', 'full'];
@@ -139,6 +140,16 @@ function contrastAlong(img, yMm, { x0 = 10, x1 = 38 } = {}) {
   const sorted = [...v].sort((a, b) => a - b); return sorted[sorted.length >> 1];
 }
 
+/** A run's film checked for paint that is shown and then lost (film-painted.mjs): the drops, or null with no film. */
+export async function filmLosses(out) {
+  const fr = readJson(path.join(out, 'frames.json'))?.frames;
+  if (!fr?.length) return null;
+  const read = f => sharp(path.join(out, f.src)).resize(96, 96, { fit: 'fill' }).removeAlpha().raw().toBuffer();
+  const paper = await read(fr[0]), shares = [];
+  for (const f of fr) shares.push(paintedShare(await read(f), paper));
+  return filmShrinks(shares, fr);
+}
+
 /** Checks one finished cell: [{check, ok, detail}]. */
 export async function checkCell(cell, expect, out, { code, log }) {
   const R = [], put = (check, ok, detail = '') => R.push({ check, ok: Boolean(ok), detail });
@@ -190,6 +201,8 @@ export async function checkCell(cell, expect, out, { code, log }) {
     put('the film shows the drawing drawn over several frames', drawing.length >= 2, `${drawing.length} drawing frames`);
     if (drawing.length >= 2) put('the film lays the big forms first', len(drawing[0].ids) >= len(drawing.at(-1).ids), `first frame lines ${len(drawing[0].ids).toFixed(0)} mm long on average, last ${len(drawing.at(-1).ids).toFixed(0)} mm`);
   }
+  const lost = await filmLosses(out);
+  if (lost) put('the film never loses paint it has shown (but at an erase)', !lost.length, lost.length ? lost.map(d => `frame ${d.at}: ${d.from} to ${d.to}`).join('; ') : 'no drop');
   return R;
 }
 
