@@ -148,6 +148,12 @@ What to know:
   script), unless your settings say otherwise.
 - `./unpaint plan` checks the file, counts what it does and lists its warnings; `mine/drawing.png` shows the result
   (grey: before the washes; black: after them). The lines themselves show in a look's dried sheet.
+- Rubbing out (advice, yours to use or not): a pencil lay-in line that the paint has replaced, or a line drawn twice,
+  can be rubbed out with an erase passage in your own script or added to an edited plan, anywhere in the order:
+  `{ "own": { "id": "e1", "kind": "erase", "stage": 1, "widthMm": 3, "strokes": [{ "points": [[x, y, 1], [x, y, 1]] }] } }`
+  (or a `region` with `handling.pressure`). Before the first wash a firm rub takes most of the pencil off; after a wash
+  has dried it takes far less (about a fifth under a pale wash, a twentieth under a medium one, less under a dark one). The eraser needs dry
+  paper: leave its `wait` at `dry`. `./unpaint plan` says what each erase will take.
 
 ## Your own named forms
 
@@ -229,7 +235,7 @@ cells, the same paint, the same strokes. What you may change:
 | the wet session | `"session"`: consecutive entries with the same value are one sitting, laid without drying between them; the sheet dries between sessions | |
 | leave it out | delete the entry | it is not painted |
 | merge | `{ "merge": [12, 13, 15], "session": "face" }` in place of those entries, with any of the fields above | one wash over the cells of all of them (small gaps between them closed), holding the same paint in all, or mixed to the `colour` you give |
-| add your own | `{ "own": { "id": "a1", "what": "...", "kind": "wash", "stage": 3, "region": [[x, y], ...], "brushMm": 13, "colour": [r, g, b], "handling": { "direction": 20 } }, "lay": "wet on wet" }` | a passage written as `own-script-brief.md` describes (`wash`, `strokes`, `touches`, `lines`), with `colour` in place of `paint` and `brushMm` in place of `brush`; no charges |
+| add your own | `{ "own": { "id": "a1", "what": "...", "kind": "wash", "stage": 3, "region": [[x, y], ...], "brushMm": 13, "colour": [r, g, b], "handling": { "direction": 20 } }, "lay": "wet on wet" }` | a passage written as `own-script-brief.md` describes (`wash`, `strokes`, `touches`, `lines`, or `erase`, which takes no colour or brush), with `colour` in place of `paint` and `brushMm` in place of `brush`; no charges |
 
 What to know before you edit:
 

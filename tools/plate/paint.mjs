@@ -4,6 +4,7 @@ import {invalidatePaperCertificate} from '../../src/media/paper-certificate.mjs'
 import {EpochCells} from '../../src/paint/epoch-cells.mjs';
 import {check} from '../../src/media/checks.mjs';
 import {createScriptColourCheck} from '../painter/script-colour-check.mjs';
+import {eraseStep} from '../painter/erase-step.mjs';
 import {isMarkPassage, pressedRadius} from '../../src/paint/methods/mark-swatch.mjs';
 import {inkMoved, INK_MOVED_MOST} from '../../src/paint/methods/ink-held.mjs';
 import {splitLoadsFeathered} from '../../src/paint/methods/brushes.mjs';
@@ -223,6 +224,8 @@ const checkInkHeld = when => {
 };
 for (let L = L_START; L < ctx.layers.length; L++) {
   const layer = ctx.layers[L];
+  // an erase passage of a script or an edited plan: the pencil rubbed out where it passes (tools/painter/erase-step.mjs)
+  if (layer._erase) { await eraseStep(ctx, L, { dry, O, out, JSONL, shoot, MARKTAPE, cellMm: num('sheetmm', DEFAULT_SHEET_MM) / W2 }); continue; }
   colourMass('before-pass', {pass:L+1,value:layer.value,pigment:layer.pigment});
   if (opt('feedback', '1') !== '0') {
     if (FEEDBACK_LAG && FEEDBACK_BASE && !FEEDBACK_FRESH) {
