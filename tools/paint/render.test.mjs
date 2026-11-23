@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { renderSetting, outOf, paintHere, renderer } from './render.mjs';
 import { namedPaths, jobInputs, workerArgs, homePaths, workerEnv } from './render-ship.mjs';
-import { claim, claims, release, markStarted, waitRank, places, costOf, paintOnPool, WorkerFailure, registerClient } from './render-pool.mjs';
+import { claim, claims, release, markStarted, waitRank, places, costOf, paintOnPool, WorkerFailure, WorkersFailed, registerClient, podsDaemon, daemonProcessAlive, DAEMON_GONE_GRACE_S } from './render-pool.mjs';
 import { paintJob } from './render-worker.mjs';
 import { shellWords, keptCommand } from './render-replay.mjs';
 
@@ -99,11 +99,32 @@ test('a full-size painting with no pods daemon running fails at once, saying how
   await assert.rejects(paintOnPool(job, { dir, env: {}, local: async () => assert.fail('not here'), pollMs: 5 }), /pods daemon is not running.*render-pool-pods\.py/);
 });
 
+test('a stale pods heartbeat of a live daemon is waited for, not failed; a gone daemon is waited for a while', async () => {
+  assert.equal(podsDaemon({ updated: 1000, nowS: 1050, processAlive: false }), 'fresh');
+  assert.equal(podsDaemon({ updated: 1000, nowS: 1195, processAlive: true }), 'busy', 'tonight: 195 s old while it set up a pod');
+  assert.equal(podsDaemon({ updated: 1000, nowS: 1195, processAlive: false }), 'gone');
+  assert.equal(podsDaemon({ updated: null, nowS: 1195, processAlive: true }), 'busy');
+  assert.equal(podsDaemon({ updated: null, nowS: 1195, processAlive: false }), 'never');
+  assert.ok(DAEMON_GONE_GRACE_S >= 600);
+  const dir = tmp(); fs.writeFileSync(path.join(dir, 'pods.json'), JSON.stringify({ updated: Date.now() / 1000 - 195, pods: [] }));
+  const job = { command: { cmd: 'node', args: ['--out', path.join(dir, 'out')] }, cwd: dir, logFile: path.join(dir, 'x.log'), out: path.join(dir, 'out'), commit: 'a'.repeat(40), kind: 'painting' };
+  const whys = []; job.tick = why => { whys.push(why); if (whys.length >= 3) throw new Error('stop the test'); };
+  await assert.rejects(paintOnPool(job, { dir, env: {}, local: async () => assert.fail('not here'), pollMs: 1, daemonAlive: () => true }), /stop the test/);
+  assert.match(whys[0], /pods daemon is busy .*last written 19\d s ago; its process lives/);
+  whys.length = 0;
+  await assert.rejects(paintOnPool(job, { dir, env: {}, local: async () => assert.fail('not here'), pollMs: 1, daemonAlive: () => false }), /stop the test/);
+  assert.match(whys[0], /process is gone .*waiting 15 min/);
+  assert.equal(daemonProcessAlive(dir), false, 'no pods.pid');
+  fs.writeFileSync(path.join(dir, 'pods.pid'), String(process.pid));
+  assert.equal(daemonProcessAlive(dir, () => 'node test'), false, 'a pid that is not the daemon');
+  assert.equal(daemonProcessAlive(dir, () => 'python3 tools/cloud/render-pool-pods.py /p'), true);
+});
+
 test('a worker failure is tried once more and then fails loudly; a painter\'s own exit is never retried', async () => {
   const dir = tmp(), job = { command: { cmd: 'node', args: ['--out', path.join(dir, 'out')] }, cwd: dir, logFile: path.join(dir, 'x.log'), out: path.join(dir, 'out'), commit: 'a'.repeat(40), kind: 'look' };
   let n = 0;
   const failing = async () => { n++; throw new WorkerFailure(`gone ${n}`); };
-  await assert.rejects(paintOnPool(job, { dir, env: {}, local: failing, pollMs: 5 }), /failed on two workers .*this Mac: gone 1; this Mac: gone 2/);
+  await assert.rejects(paintOnPool(job, { dir, env: {}, local: failing, pollMs: 5 }), e => e instanceof WorkersFailed && /failed on two workers .*this Mac: gone 1; this Mac: gone 2/.test(e.message));
   assert.equal(n, 2);
   assert.match(fs.readFileSync(path.join(dir, 'log.txt'), 'utf8'), /FAILED on this Mac: gone 2/);
   n = 0;

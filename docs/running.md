@@ -191,6 +191,13 @@ tools, and `choice.json`. The task is `tools/paint/SESSION-BRIEF.md`; the tools 
   process it started are ended (SIGTERM, then SIGKILL) and the last choice it had planned is painted. `--minutes` is gone.
 - Levels: `--level L2` (default) is one go, without the code's plan. `--level L3` and `--level L4` are retries from `--previous <run folder>` (an L3 retry refuses a previous try that handed in the code's plan);
   L4 first needs `prepare --level L4`, which paints Auto's full-size painting. See [levels](../bench/docs/levels.md).
+- A session that handed in is never thrown away (`tools/paint/final-wait.mjs`). Its full-size final waits for a GPU
+  place (this Mac's, or the render pool's) with a line a minute, is painted again when its worker fails (up to 3
+  times), and stops only after 6 hours in all. The run then ends with exit 4 and prints the `--from` command that
+  paints the kept session later. A final painted `--from` a kept session keeps the session's own files
+  (`author/folder`, `author/looks`, its commands and records: `kept-files.mjs`), so it is accepted as a later try's
+  `--previous`. In the render pool, a pods daemon whose heartbeat is stale but whose process lives is waited for; one
+  whose process is gone is waited for 15 minutes, then the final stops with the session kept.
 - Looks while painting are not offered: the painter cannot stop at a passage and go on from there (`--canarystop`
   stops for good), so on this trunk every look is at a plan and nothing painted can be undone or redone.
 - What the session can reach. Nothing of it can read this checkout, the checkout it is a worktree of (every

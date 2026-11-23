@@ -12,6 +12,8 @@ import { loadRegistry, resolveSubject, checkInputs } from './subjects.mjs';
 import { buildCommand, describeRun, shellLine, runFolder } from './command.mjs';
 import { refuseExtraGpuPaint, gpuPaintCount, cacheDirFor, switchesOf, segEnvFor, runPainter, collectResults } from './run.mjs';
 import { renderer } from './render.mjs';
+import { WorkersFailed } from './render-pool.mjs';
+import { FINAL_WAIT_HOURS, FINAL_TRIES, EXIT_KEPT, waitTicker, paintWithRetries, keptNote } from './final-wait.mjs';
 import { expandSubjects, pool, gpuPlace, throughput, jobsNow, DEFAULT_JOBS, PLAN_JOBS } from './queue.mjs';
 import { writeRunSheet, writeGridSheet, runPictures, formsImage, drawingSvg } from './sheet.mjs';
 import { toolsBase, resolveTools, writeTools, linesPictureDoc, allLinesDoc } from './session-tools.mjs';
@@ -40,6 +42,7 @@ import { handedOverRecord, checkHandedOver, checkChoice } from './parity.mjs';
 import { qwenRoute, studyRequestPrompt, parseStudyRequests, writeStudyRequest, makeStudies, withAuthorStudies } from './studies.mjs';
 import { readSelfReview } from './self-review.mjs';
 import { checkSessionFolder, drawingOfKept } from './kept-session.mjs';
+import { keepSessionFiles } from './kept-files.mjs';
 import { codeState } from '../../src/paint/code-state.mjs';
 import { scanOptions } from '../../src/paint/option-ledger.mjs';
 
@@ -174,39 +177,51 @@ const SHOWN = /^(study washes: \d|wash plan:|plan values|phases|!!!|UNUSED|IGNOR
 /**
  * The painter once, into a fresh folder. commandFor(dirty) builds the command when the run's turn comes, from the
  * code as it is then: in a long queue each run records the commit it painted with. {failure, results}; never throws.
+ * A session's full-size final is never refused for want of a place (final-wait.mjs): it waits for one, saying so once
+ * a minute, is painted again when its worker fails, and stops only past the stated limit, with the session kept.
  */
 async function paintOnce(r, commandFor, plate, logFile) {
-  const { record } = r; let failure = null, done = null;
+  const final = req.mode === 'paint' && r.authorFull.work === 'session';
+  if (!final) return paintTry(r, commandFor, plate, logFile, null);
+  const tick = waitTicker({ what: 'a place to paint the final', say: text => say(r, `final: ${text}`) });
+  const got = await paintWithRetries(() => paintTry(r, commandFor, plate, logFile, tick), { tries: FINAL_TRIES, say: text => say(r, text), clear: () => fs.rmSync(plate, { recursive: true, force: true }) });
+  r.record.finalTries = got.tries;
+  return got;
+}
+async function paintTry(r, commandFor, plate, logFile, tick) {
+  const { record } = r; let failure = null, done = null, workerFailure = false;
   try {
     if (fs.existsSync(plate) && fs.readdirSync(plate).length) throw new Error(`${plate} already holds a painting; give a fresh --out`);
     done = await painterSlot(async () => {
       // the wait for a place and the start are one step at a time, so two runs never take the same free place
       const going = await startGate(async () => {
         if (req.mode === 'paint' && !render.pool) {
-          // one painting by itself is refused when the places are taken; a queue waits for one
-          if (many) record.gpuPaintsAtStart = await gpuPlace({ most: readJobs, running: gpuPaintCount, onWait: n => say(r, `waiting: ${n} GPU paintings are running and --jobs is ${readJobs()}`) }), record.jobsAtStart = readJobs();
+          // a queue, or a session's final, waits for a place; one painting asked for by itself is refused when they are taken
+          if (many || tick) record.gpuPaintsAtStart = await gpuPlace({ most: readJobs, running: gpuPaintCount, onWait: n => say(r, `waiting: ${n} GPU paintings are running and --jobs is ${readJobs()}${tick ? `; the final waits up to ${FINAL_WAIT_HOURS} h` : ''}`), tick: tick ?? undefined }), record.jobsAtStart = readJobs();
           else record.gpuPaintsAtStart = refuseExtraGpuPaint(jobs);
         }
         const now = codeState(ROOT), command = commandFor(now.dirty);
         Object.assign(record, { code: codeOf(now), command: shellLine(command), argv: command.argv, plate, startedMs: Date.now() });
         if (many) say(r, `started at ${new Date().toTimeString().slice(0, 8)} on ${now.commit?.slice(0, 8)}${now.dirty ? ' plus uncommitted changes (allow-dirty passed)' : ''}`);
         const onLine = l => { if (SHOWN.test(l) || /^\s*(Error|TypeError|RangeError)/.test(l)) say(r, l.trim().slice(0, 300)); };
-        return { ended: req.mode === 'paint' ? render.paint(command, { cwd: ROOT, logFile, onLine, kind: 'painting' }).then(x => { record.render = x.render; return x.done; }) : runPainter(command, { cwd: ROOT, logFile, onLine }) };
+        return { ended: req.mode === 'paint' ? render.paint(command, { cwd: ROOT, logFile, onLine, kind: 'painting', tick: tick ?? undefined }).then(x => { record.render = x.render; return x.done; }) : runPainter(command, { cwd: ROOT, logFile, onLine }) };
       });
       try { return await going.ended; } finally { record.endedMs = Date.now(); }
     });
     record.exit = done.exit; record.seconds = (record.seconds ?? 0) + done.seconds;
+    // a painter stopped by a signal on this Mac is the machine's failure, not the painting's answer
+    if (done.signal) workerFailure = true;
     // exit 3: the painting is written but an option was read by nothing (unused-options.txt)
     if (done.exit !== 0 && done.exit !== 3) {
-      const why = fs.readFileSync(logFile, 'utf8').split('\n').filter(l => /(^|\s)(Error|TypeError|RangeError)\b/.test(l)).pop()?.trim().slice(0, 400);
+      const why = fs.existsSync(logFile) ? fs.readFileSync(logFile, 'utf8').split('\n').filter(l => /(^|\s)(Error|TypeError|RangeError)\b/.test(l)).pop()?.trim().slice(0, 400) : null;
       failure = `the painter ended with exit ${done.exit ?? done.signal}${why ? `: ${why}` : ''}`;
     }
-  } catch (e) { failure = e.message; }
+  } catch (e) { failure = e.message; workerFailure = e instanceof WorkersFailed; }
   const results = collectResults(plate, req.mode);
   // no silent fallback: a painting that did not stay on the GPU is a failed cell
   if (!failure && req.mode === 'paint' && (results.backend?.backend !== 'gpu' || results.backend?.fallback !== false)) failure = `the painting did not stay on the GPU (backend.json: ${results.backend ? `backend ${results.backend.backend}, fallback ${results.backend.fallback}` : 'missing'})`;
   if (!failure && ['no plan', 'unfinished'].includes(results.state)) failure = `the painter ended without ${req.mode === 'plan' ? 'a plan' : 'a finished painting'}`;
-  return { failure, results };
+  return { failure, results, workerFailure };
 }
 
 const tidy = text => String(text).replaceAll(ROOT, '<painter>').replaceAll(registry.base, '<subjects>').replaceAll(os.homedir(), '<home>');
@@ -452,7 +467,9 @@ async function sessionRun(r) {
     }
     for (const k of ['seconds', 'tokens', 'tokensIn', 'tokensOut', 'costUSD', 'level', 'tryNumber', 'budget']) record.author[k] = earlier.author[k] ?? null;
     record.author.prepared = earlier.author.prepared ?? null;
-    if (!fin.failure) say(r, `painting what its earlier session handed over (${sub.what}); no model is called`);
+    // the session's own files come with it, unchanged, so this run is accepted as a later try's --previous (kept-files.mjs)
+    record.author.keptFiles = keepSessionFiles(path.join(from, 'author'), dir);
+    if (!fin.failure) say(r, `painting what its earlier session handed over (${sub.what}); no model is called; its own files kept here: ${record.author.keptFiles.join(', ')}`);
   } else {
     const pics = await runPictures(record);
     const packet = await preparePacket({ dir, root: ROOT, run: { ...record, masks: record.masks.receipt ? { ...record.masks, formsPng: await formsImage(record.masks.mask) } : null }, drawingPng: pics.drawing, briefFile: BRIEF_FILE });
@@ -542,6 +559,8 @@ async function sessionRun(r) {
   record.author.session = session; record.author.label = authorLabel(record.author);
   if (fin.failure) throw new Error(fin.failure);
   await paintChoice(r, fin);
+  // a session that handed in is never thrown away: a final that was not painted leaves it kept, and says how to paint it
+  if (record.failure) { record.finalNotPainted = true; record.failure = `the final was not painted: ${record.failure}; ${keptNote({ subject: spec.variant ? `${spec.id}:${spec.variant}` : spec.id, author: author.key, keptRun: record.author.from ?? record.out })}`; }
 }
 
 /**
@@ -815,6 +834,8 @@ if (render.pool) render.register(runs.length);
 await Promise.all(runs.map(oneRun));
 for (const r of runs) if (r.sessionDir) fs.rmSync(r.sessionDir, { recursive: true, force: true });
 const failed = runs.filter(r => r.record.failure).length + refused.length;
+// every failure a final not painted of a session that handed in: the sessions are kept, and a chain can tell (EXIT_KEPT)
+const keptOnly = failed > 0 && !refused.length && runs.filter(r => r.record.failure).every(r => r.record.finalNotPainted);
 
 let show = runs[0].record.sheetImage;
 if (many) {
@@ -824,4 +845,4 @@ if (many) {
 }
 // Preview is opened without this session's variables, so nothing started from it inherits them
 if (req.open && process.platform === 'darwin') { try { execFileSync('env', ['-i', `HOME=${process.env.HOME}`, `USER=${process.env.USER}`, 'PATH=/usr/bin:/bin', 'open', '-a', 'Preview', show]); } catch (e) { console.error(`paint: could not open the sheet (${e.message})`); } }
-process.exit(failed ? 1 : 0);
+process.exit(keptOnly ? EXIT_KEPT : failed ? 1 : 0);

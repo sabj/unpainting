@@ -44,6 +44,29 @@ export function poolDir(env, root) {
 
 /** A worker failed (not the painting): the job may be tried once more elsewhere. */
 export class WorkerFailure extends Error {}
+/** Both tries of a job failed on their workers: the painting was not painted, through no fault of its own. */
+export class WorkersFailed extends Error {}
+
+/** The pods daemon's heartbeat (pods.json `updated`) is fresh this many seconds. */
+export const HEARTBEAT_S = 120;
+/** A stale heartbeat whose daemon process is gone is waited for this long (it may be restarted) before a painting stops. */
+export const DAEMON_GONE_GRACE_S = 15 * 60;
+/**
+ * The pods daemon as a painting waiting for a pod sees it: 'fresh' (its heartbeat is recent), 'busy' (the heartbeat
+ * is stale but its process lives: it is busy, setting up a pod, and the painting waits), 'gone' (stale, or never
+ * written, and no daemon process: waited for a while, then a plain failure), 'never' (no pods.json and no process).
+ */
+export function podsDaemon({ updated, nowS, processAlive }) {
+  if (updated && nowS - updated < HEARTBEAT_S) return 'fresh';
+  if (processAlive) return 'busy';
+  return updated ? 'gone' : 'never';
+}
+/** Whether the pods daemon's process lives: the pid in pods.pid, alive, and its command the daemon's. */
+export function daemonProcessAlive(dir, ps = pid => execFileSync('ps', ['-p', String(pid), '-o', 'command='], { encoding: 'utf8' })) {
+  let pid; try { pid = Number(fs.readFileSync(path.join(dir, 'pods.pid'), 'utf8').trim()); } catch { return false; }
+  if (!(pid > 0) || !alive(pid)) return false;
+  try { return /render-pool-pods/.test(ps(pid)); } catch { return false; }
+}
 
 // ---- places: claims, waiting, clients ---------------------------------------------------------------------------
 
@@ -266,13 +289,13 @@ export function homeRecords(dir, names) {
  * {done, stopped, endedEarly, render} where render is what the operator reads: worker, seconds waited, painted and
  * copied, cost, and each try. Throws after a second worker failure.
  */
-export async function paintOnPool(job, { dir, env = process.env, local, gpuCount = () => 0, repo, remoteFor = w => new Remote(w), pollMs = 3000 }) {
+export async function paintOnPool(job, { dir, env = process.env, local, gpuCount = () => 0, repo, remoteFor = w => new Remote(w), pollMs = 3000, daemonAlive = () => daemonProcessAlive(dir) }) {
   const asked = Date.now(), tries = [];
   const inputs = jobInputs(job.command.args, { see: f => { try { const s = fs.statSync(f); return s.isDirectory() ? 'dir' : s.isFile() ? 'file' : null; } catch { return null; } }, list: d => fs.readdirSync(d) });
   let avoid = null;
   for (let attempt = 1; attempt <= 2; attempt++) {
     const id = `${new Date().toISOString().replace(/[-:.TZ]/g, '').slice(0, 14)}-${process.pid}-${Math.random().toString(36).slice(2, 7)}`;
-    const got = await takePlace({ dir, env, id, commit: job.commit, avoid, gpuCount, kind: job.kind, remoteFor, pollMs });
+    const got = await takePlace({ dir, env, id, commit: job.commit, avoid, gpuCount, kind: job.kind, remoteFor, pollMs, daemonAlive, tick: job.tick ?? (() => {}) });
     const waited = (Date.now() - asked) / 1000, t = Date.now();
     try {
       let r;
@@ -295,23 +318,33 @@ export async function paintOnPool(job, { dir, env = process.env, local, gpuCount
       if (fs.existsSync(job.out)) fs.rmSync(job.out, { recursive: true, force: true });
     } finally { release(dir, got.slot); }
   }
-  throw new Error(`render pool: the painting failed on two workers and is not painted anywhere else: ${tries.map(t => `${t.worker}: ${t.why}`).join('; ')}`);
+  throw new WorkersFailed(`render pool: the painting failed on two workers and is not painted anywhere else: ${tries.map(t => `${t.worker}: ${t.why}`).join('; ')}`);
 }
 
 const logLine = (dir, line) => { fs.mkdirSync(dir, { recursive: true }); fs.appendFileSync(path.join(dir, 'log.txt'), line + '\n'); };
 
-/** Wait for a free place (FIFO among the pool's waiting jobs) and claim it. {slot, worker}. */
-async function takePlace({ dir, env, id, commit, avoid, gpuCount, kind, remoteFor, pollMs }) {
+/**
+ * Wait for a free place (FIFO among the pool's waiting jobs) and claim it. {slot, worker}. tick(why) is called at each
+ * look while it waits (final-wait.mjs: a line a minute, and the stop past the final's limit).
+ */
+async function takePlace({ dir, env, id, commit, avoid, gpuCount, kind, remoteFor, pollMs, daemonAlive, tick }) {
   const w = path.join(dir, 'waiting', `${id}.json`); writeJson(w, { id, pid: process.pid, since: Date.now(), commit, kind });
-  const most = Number(env.UNPAINT_POOL_LOCAL ?? DEFAULT_LOCAL);
+  const most = Number(env.UNPAINT_POOL_LOCAL ?? DEFAULT_LOCAL); let goneSince = null;
   try {
     for (;;) {
       const mini = readJson(path.join(dir, 'mini.json')), pods = readJson(path.join(dir, 'pods.json'))?.pods ?? [];
       // the second try goes to another worker when the pool has one, else to the same again
       const only = env.UNPAINT_POOL_ONLY ? env.UNPAINT_POOL_ONLY.split(',') : null, any = places({ pods, mini, local: most, commit, kind, only });
-      // a painting waits for a pod, and a pod comes only from the pods daemon: without it the wait would never end
-      const podsAt = readJson(path.join(dir, 'pods.json'))?.updated;
-      if (POD_KINDS.has(kind) && !(podsAt && Date.now() / 1000 - podsAt < 120)) throw new Error(`render pool: a full-size painting is painted on a pod, and the pods daemon is not running (${path.join(dir, 'pods.json')} ${podsAt ? `last written ${Math.round(Date.now() / 1000 - podsAt)} s ago` : 'is missing'}); start it: python3 tools/cloud/render-pool-pods.py ${dir}`);
+      // a painting waits for a pod, and a pod comes only from the pods daemon: a daemon whose process lives is waited for
+      // however stale its heartbeat (it is busy setting up a pod); one that is gone is waited for a while, then a plain stop
+      const podsAt = readJson(path.join(dir, 'pods.json'))?.updated, nowS = Date.now() / 1000;
+      let why = 'every place is busy';
+      if (POD_KINDS.has(kind)) {
+        const state = podsDaemon({ updated: podsAt, nowS, processAlive: daemonAlive() }), said = `${path.join(dir, 'pods.json')} ${podsAt ? `last written ${Math.round(nowS - podsAt)} s ago` : 'is missing'}`;
+        if (state === 'never') throw new Error(`render pool: a full-size painting is painted on a pod, and the pods daemon is not running (${said}, no daemon process); start it: python3 tools/cloud/render-pool-pods.py ${dir}`);
+        if (state === 'gone') { goneSince ??= nowS; if (nowS - goneSince > DAEMON_GONE_GRACE_S) throw new Error(`render pool: a full-size painting is painted on a pod, and the pods daemon has stopped (${said}, no daemon process for ${Math.round((nowS - goneSince) / 60)} min); start it: python3 tools/cloud/render-pool-pods.py ${dir}`); why = `the pods daemon's process is gone (${said}); waiting ${Math.round(DAEMON_GONE_GRACE_S / 60)} min for it to be started again`; }
+        else { goneSince = null; if (state === 'busy') why = `the pods daemon is busy (${said}; its process lives)`; else why = 'waiting for a pod'; }
+      }
       const held = claims(dir), free = (any.some(p => p.worker.name !== avoid) ? any.filter(p => p.worker.name !== avoid) : any).filter(p => !held[p.slot]);
       // this Mac only while no other GPU painting runs on it; the mini only while its own runner leaves it room
       // (a claim of the mini whose painter has not started yet is not in its count of painters)
@@ -327,6 +360,7 @@ async function takePlace({ dir, env, id, commit, avoid, gpuCount, kind, remoteFo
       }
       const rank = waitRank(dir, id);
       if (open.length > rank) for (const p of open) if (claim(dir, p.slot, { job: id, kind, worker: p.worker.name })) return p;
+      tick(why);
       await sleep(pollMs + Math.random() * 1000);
     }
   } finally { fs.rmSync(w, { force: true }); }

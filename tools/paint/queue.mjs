@@ -36,14 +36,16 @@ export function pool(n) {
  * Resolves, with the number of GPU paintings then running, once fewer than `most` are: paintings started elsewhere
  * (another engineer's check) count against the same places. `most` may be a function, asked each time, so a running
  * queue can be given more or fewer places (jobsNow). `running()` gives the count now; it is asked again every
- * `everyMs`. onWait is told once, when a wait begins.
+ * `everyMs`. onWait is told once, when a wait begins; tick(why) at every look while it waits (final-wait.mjs
+ * waitTicker: a line a minute, and a stop past its limit).
  */
-export async function gpuPlace({ most, running, sleep = ms => new Promise(r => setTimeout(r, ms)), everyMs = 15000, onWait = () => {} }) {
+export async function gpuPlace({ most, running, sleep = ms => new Promise(r => setTimeout(r, ms)), everyMs = 15000, onWait = () => {}, tick = () => {} }) {
   let told = false;
   for (;;) {
     const n = running();
     if (n < (typeof most === 'function' ? most() : most)) return n;
     if (!told) { onWait(n); told = true; }
+    tick(`${n} GPU paintings are running`);
     await sleep(everyMs);
   }
 }
