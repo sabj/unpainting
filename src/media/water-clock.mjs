@@ -8,6 +8,9 @@
 //   last dried or waited on (one sitting). The count of splats is carried from stroke to stroke: brush time, not a
 //   fresh count per stroke, so many short strokes step the sheet as often as one long one of the same length;
 // - a pen steps it once every 60 of its splats (src/media/draw.mjs flowEvery).
+// - a broad wash stroke laid at the painter's fast spacing (1.4 cells between splats, not 0.7: native-body-cadence.mjs)
+//   steps after the same distance of brush travel: its count of splats a step is scaled by 0.7 / spacing, as the
+//   painter's own `every` is.
 // Steps a script asks for (a wait) are posted back to back; the GPU worker joins consecutive steps into one submit
 // (src/media/gpu/worker.mjs pendingSteps).
 
@@ -18,7 +21,7 @@ export const brushEvery = n => Math.max(BRUSH_EVERY, Math.round(BRUSH_EVERY * Ma
 
 /**
  * A clock over one sheet. `advance()` takes one water step. Counts: {steps, strokeSteps, waitSteps, sitting}.
- * stroke(kind) gives the options a stroke is laid with ({between, flowEvery, gpuBetween}); wait(n) steps n times;
+ * stroke(kind, { spacing }) gives the options a stroke is laid with ({between, flowEvery, gpuBetween}); wait(n) steps n times;
  * dried() starts a new sitting.
  */
 export function waterClock(advance) {
@@ -27,9 +30,10 @@ export function waterClock(advance) {
   const tick = () => { advance(); c.steps++; c.strokeSteps++; };
   return {
     counts: c,
-    stroke(kind = 'brush') {
+    stroke(kind = 'brush', { spacing = 0.7 } = {}) {
       if (kind === 'pen') return { flowEvery: PEN_EVERY, gpuBetween: true, between: () => { if (++penCarry >= PEN_EVERY) { penCarry = 0; tick(); } } };
-      const every = brushEvery(++c.sitting);
+      if (!(spacing >= 0.7 && spacing <= 1.4)) throw new RangeError('a brush stroke is spaced 0.7 to 1.4 cells');
+      const every = Math.max(1, Math.round(brushEvery(++c.sitting) * 0.7 / spacing));
       return { flowEvery: every, gpuBetween: true, between: () => { if (++carry >= every) { carry = 0; tick(); } } };
     },
     wait(n) {

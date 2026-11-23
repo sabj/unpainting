@@ -21,7 +21,8 @@
 //   (out/<task>/runaway.json), never scored.
 // Rules the kit enforces (it throws, and you may retry within your budget):
 // - No image files may be read (the targets are in your prompt; your own frames are readable under bench/out/).
-// - Paint only from the box: conc must come from kit.mix() over BRUSH_PAINTS (brush) or INK (pen); total at most 2 (brush), 8 (pen).
+// - Paint only from the box: conc must come from kit.mix() over BRUSH_PAINTS (brush) or INK (pen); total at most 8 (brush and pen alike;
+//   the painter's section brush lays a thinner film than the old row brush: a one-layer dark needs a total of about 6).
 // - Budget 2,500 counted strokes (brush, pen, pencil and eraser) per painting.
 // Recorded and reported, not rejected: the share of small strokes (brush radius under 1.5 mm = 5.8 cells), short
 // strokes (shorter than 3x the brush width) and dots (shorter than the brush width).
@@ -37,6 +38,17 @@
 //   refuses a wet sheet. Both count as strokes, go in the stroke log (tool 'pencil', 'eraser') and in the film.
 //   The sheet keeps the two graphite grades in two pans the kit does not offer (cadred, paynes), so nothing else moves.
 // The pen's ink is soluble (a wash over it rewets it) unless you ask for waterproof ink: kit.open(task, { ink: 'waterproof' }).
+// The engine: the main painter's own (tools/paint-plate.mjs in its default native mode, 'fast'). Every brush is the
+//   painter's section brush (tools/plate/painter-brush.mjs); the GPU runs with the painter's settings (resident sheet,
+//   demand-window reads: tools/painter/native-gpu-env.mjs); a drying takes the painter's fast tail (nativeDryOptions);
+//   a broad wash stroke (radius 4 mm or more, dipped at water 0.5 or more) is laid at the painter's wash spacing of 1.4
+//   cells (nativeBodyCadence), the water stepping after the same brush travel. A stroke here costs what the same
+//   stroke costs the painter.
+// The hand, per point of a stroke: x, y; p pressure (0 to 1.2); r the brush's radius there (cells); v the hand's speed
+//   (mm/s, default the brush's `speed`, 60: slower leaves more paint where it goes); blade, for a flat, the blade's
+//   angle to the heading in degrees (default the brush's `bladeAngle`, 90: square across; 0: on its edge), eased
+//   between points and turning after the path a little late, as a wrist twists a flat. Stroke options: `upright`
+//   (true or 'sweep': the blade keeps one direction on the sheet), `speed` (mm/s for the whole stroke).
 // One painting at a time, on the GPU: if another of your processes still holds the GPU, or the GPU cannot be used, kit.open
 //   STOPS and names what holds it; it never paints on the CPU by itself. Ask for the CPU by name if you want it (far
 //   slower): kit.open(task, { gpu: false }).
@@ -56,10 +68,14 @@ import * as GR from '../src/media/kit-graphite.mjs';
 import { BOX, boxPigment } from '../src/crop/box.mjs';
 import { attachGpu } from '../src/media/gpu/link.mjs';
 import { waterClock } from '../src/media/water-clock.mjs';
+import { painterBrushOptions } from '../tools/plate/painter-brush.mjs';
+import { nativeDryOptions } from '../tools/painter/native-paint-mode.mjs';
+import { nativeBodyCadence } from '../tools/painter/native-body-cadence.mjs';
+import { applyNativeFastGpuEnv } from '../tools/painter/native-gpu-env.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 export const PROTOCOL = 'v2';
-export const BUDGET = 2500, MM = 0.259;
+export const BUDGET = 2500, MM = 0.259, BRUSH_MOST = 8;
 // the targets of this run: the harness installs one coarse map per target in tasks/ next to the kit
 export const TASKS = fs.existsSync(path.join(HERE, 'tasks'))
   ? fs.readdirSync(path.join(HERE, 'tasks')).filter(f => f.endsWith('-coarse.json')).map(f => f.slice(0, -'-coarse.json'.length)).sort() : [];
@@ -162,6 +178,7 @@ export async function open(task, { seed = +(process.env.BENCH_SEED || 1), gpu = 
   const pigments = BOX.map(p => (grade[p.key] ? GR.gradePigment(grade[p.key]) : ink === 'waterproof' && INK.includes(p.key) ? { ...boxPigment(p), omega: 60 } : boxPigment(p)));
   const sheet = S.createSheet(makePaper(W, H, { seed, scale: 1, toothScale: 0.2, coldPress: { mmPerCell: MM } }), pigments);
   if (useGpu) {
+    applyNativeFastGpuEnv();
     try { attachGpu(sheet, O, { mode: 'on', log: () => {} }); } catch (e) { reject(`the GPU could not be used (${String(e.message).slice(0, 200)}). Nothing was painted. Run again; to paint on the CPU on purpose (far slower), open with kit.open('${task}', { gpu: false })`); }
     if (!sheet._gpu) reject(`the GPU could not be used (no GPU sheet was attached). Nothing was painted. Run again; to paint on the CPU on purpose (far slower), open with kit.open('${task}', { gpu: false })`);
   }
@@ -175,11 +192,16 @@ export async function open(task, { seed = +(process.env.BENCH_SEED || 1), gpu = 
   return { sheet, O, W, H };
 }
 
-export const createBrush = opts => BR.createBrush(opts);
+/** A brush: the painter's section brush. radius (cells), flat, capacity, bristles, speed (mm/s), bladeAngle (degrees) and
+ *  the rest of src/media/brush.mjs createBrush's options. */
+export function createBrush(opts = {}) {
+  if (opts.model !== undefined && opts.model !== 'section') reject(`createBrush: the kit's brushes are the painter's section brush; leave out model ("${opts.model}")`);
+  try { return BR.createBrush(painterBrushOptions(opts)); } catch (e) { reject(`createBrush: ${e.message}`); }
+}
 export function dip(brush, { water = 1, conc }) {
   if (!MIXES.has(conc)) reject('dip conc must come from kit.mix()');
   if (INKS.has(conc)) reject('ink (sepia, lampblack) is for the pen only');
-  if (total(conc) > 2) reject(`brush mix total ${total(conc).toFixed(2)} is over 2`);
+  if (total(conc) > BRUSH_MOST) reject(`brush mix total ${total(conc).toFixed(2)} is over ${BRUSH_MOST}`);
   DIPS.set(brush, { water: r4(water), pigments: Array.from(conc, r4) });
   return BR.dip(brush, { water, conc: Array.from(conc) });
 }
@@ -206,19 +228,28 @@ function counted(kind) {
 function own(options, what) {
   if (options == null) return {};
   if (typeof options !== 'object') reject(`${what} options must be an object`);
+  if ('spacing' in options) reject(`${what}: leave out "spacing". The kit spaces a stroke's touches as the main painter does`);
   for (const k of ['between', 'flowEvery', 'gpuBetween']) if (k in options) reject(`${what}: leave out "${k}". The kit moves the water itself while the brush is on the paper; to let time pass call kit.wait(sheet, moments), to dry call kit.dryAll(sheet)`);
   return options;
 }
+// The painter's spacing for this stroke: 1.4 cells for a broad wash, 0.7 otherwise (tools/painter/native-body-cadence.mjs).
+const spacingOf = brush => nativeBodyCadence({ mode: 'fast', enabled: true, technique: (DIPS.get(brush)?.water ?? 0) >= 0.5 ? 'wet on dry' : 'dry brush', radiusCells: brush.radius, mmPerCell: MM, every: 24 }).spacing;
 export function stroke(brush, sheet, pts, options) {
   if (!Array.isArray(pts) || pts.length < 2) reject('a stroke needs a path of at least 2 points');
   options = own(options, 'stroke');
+  for (const q of pts) {
+    if (q?.v !== undefined && !(q.v > 0 && Number.isFinite(q.v))) reject('a point\'s v is the hand\'s speed in mm/s: a number over 0');
+    if (q?.blade !== undefined && !Number.isFinite(q.blade)) reject('a point\'s blade is the flat\'s angle to the heading in degrees: a number');
+  }
+  if (options.speed !== undefined && !(options.speed > 0 && Number.isFinite(options.speed))) reject('stroke speed is the hand\'s speed in mm/s: a number over 0');
   const r = Math.min(brush.radius, ...pts.map(q => q.r ?? brush.radius)), L = lenOf(pts);
   counted('brush');
   if (r < R_MIN) st.small++;
   if (L < 6 * r) st.short++;
   if (L < 2 * r) st.dots++;
-  if (st.log) logLine({ i: used(), tool: 'brush', t: Date.now() - st.t0, brush: { radius: r4(brush.radius), bristles: brush.hairs?.length, capacity: r4(brush.capacity), flat: !!brush.flat }, dip: DIPS.get(brush) ?? null, load: r4(brush.load), dips: brush.dips ?? 0, pts: pts.map(q => ({ x: r4(q.x), y: r4(q.y), p: r4(q.p), ...(q.r != null ? { r: r4(q.r) } : {}) })), options: Object.keys(options).length ? options : null });
-  return BR.stroke(brush, sheet, pts, { ...options, ...(sheet === st.sheet ? st.clock.stroke('brush') : {}) });
+  if (st.log) logLine({ i: used(), tool: 'brush', t: Date.now() - st.t0, brush: { model: brush.model, radius: r4(brush.radius), bristles: brush.hairs?.length, capacity: r4(brush.capacity), flat: !!brush.flat, speed: r4(brush.speed), bladeAngle: r4(brush.bladeAngle) }, spacing: spacingOf(brush), dip: DIPS.get(brush) ?? null, load: r4(brush.load), dips: brush.dips ?? 0, pts: pts.map(q => ({ x: r4(q.x), y: r4(q.y), p: r4(q.p), ...(q.r != null ? { r: r4(q.r) } : {}), ...(q.v != null ? { v: r4(q.v) } : {}), ...(q.blade != null ? { blade: r4(q.blade) } : {}) })), options: Object.keys(options).length ? options : null });
+  const spacing = spacingOf(brush);
+  return BR.stroke(brush, sheet, pts, { ...options, spacing, ...(sheet === st.sheet ? st.clock.stroke('brush', { spacing }) : {}) });
 }
 export function penStroke(pen, sheet, pts, options) {
   if (!Array.isArray(pts) || pts.length < 2) reject('a pen line needs at least 2 points');
@@ -255,7 +286,7 @@ export function dryAll(sheet, O) {
   charge();
   film('painting');   // wet, as the drying finds it
   for (let q = 0; q < 30; q++) st.advance();
-  const r = S.dry(sheet, 30000, O ?? st.O, { levelMax: 140, dt: 14 });
+  const r = S.dry(sheet, 30000, O ?? st.O, nativeDryOptions('fast', { levelMax: 140, dt: 14 }));
   st.work.dryings++; st.clock.dried();
   logLine({ ev: 'dry', after: used(), t: Date.now() - st.t0 });
   film('dried');

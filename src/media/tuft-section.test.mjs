@@ -168,6 +168,27 @@ test('a flat on edge lays a line as thin as the blade, square to it as wide as t
   assert.ok(widths[90] > 10, `square ${widths[90]} mm`);
 });
 
+test('a flat twisted by the wrist along its stroke (a point\'s own blade) goes from square to on edge: wide, then a line', t => {
+  setStrokeVariety(0); t.after(() => setStrokeVariety(1));
+  const mm = 0.25, sheet = createSheet(paperAt(80, 20, mm), pigments), b = flat(mm, 6, { bladeAngle: 90 });
+  dip(b, { water: 1, conc: [0.5, 0] });
+  // square across for the first half, twisted to its edge over the next fifth, on edge to the end
+  stroke(b, sheet, inMm([{ x: 5, y: 10, p: 0.8, blade: 90 }, { x: 40, y: 10, p: 0.8, blade: 90 }, { x: 55, y: 10, p: 0.8, blade: 0 }, { x: 75, y: 10, p: 0.8, blade: 0 }], mm));
+  const square = widthAt(sheet, Math.round(25 / mm)) * mm, edge = widthAt(sheet, Math.round(70 / mm)) * mm;
+  assert.ok(square > 10, `square ${square} mm`);
+  assert.ok(edge <= 3 && square > 4 * edge, `on edge ${edge} mm against ${square} square`);
+});
+
+test('a point\'s own blade equal to the brush\'s bladeAngle lays exactly what the brush alone lays', () => {
+  const mm = 0.25, lay = withBlade => {
+    const sheet = createSheet(paperAt(40, 20, mm), pigments), b = flat(mm, 6, { bladeAngle: 60 });
+    dip(b, { water: 1, conc: [0.5, 0] });
+    stroke(b, sheet, inMm([{ x: 5, y: 10, p: 0.8 }, { x: 35, y: 12, p: 0.6 }].map(q => (withBlade ? { ...q, blade: 60 } : q)), mm));
+    return Float64Array.from(sheet.W, (v, i) => v + sheet.s[i]);
+  };
+  assert.deepEqual(lay(true), lay(false));
+});
+
 test('the footprint of a round is a cone of circles with no gaps along the chain', () => {
   const S = 6, pts = new Float64Array(3 * S), rad = new Float64Array(S);
   for (let j = 0; j < S; j++) { pts[2 * j] = 30 - 4 * j; pts[2 * j + 1] = 20; rad[j] = 8 * roundProfile(0.4 + 0.12 * j); }

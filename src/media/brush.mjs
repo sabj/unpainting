@@ -589,8 +589,10 @@ function sectionStroke(brush, sheet, path, { spacing = 0.7, between, lift = true
       if (brush.flat) {
         const a0 = R * (0.9 + 0.1 * p) * Math.sqrt(Math.min(1, p / 0.05)); // a flat lands and lifts on its whole edge; the corners leave only at the last
         rad.fill(a0); geom.thick = Math.max(0.5, shape.thick * R);
-        // the blade, held at bladeAngle to the heading (the path's, or the fixed one upright), turns after the path
-        const [fx, fy] = upright ? [hx, hy] : [tx, ty], ang = brush.bladeAngle * Math.PI / 180;
+        // the blade, held at bladeAngle to the heading (the path's, or the fixed one upright), turns after the path; a point's
+        // own `blade` (degrees, the same measure) overrides it there, eased between points: the wrist twisting the flat
+        const bladeDeg = a.blade === undefined ? brush.bladeAngle : a.blade + ((b.blade ?? a.blade) - a.blade) * u;
+        const [fx, fy] = upright ? [hx, hy] : [tx, ty], ang = bladeDeg * Math.PI / 180;
         let gx = fx * Math.cos(ang) - fy * Math.sin(ang), gy = fx * Math.sin(ang) + fy * Math.cos(ang);
         const bl = brush._blade;
         if (bl && gx * bl[0] + gy * bl[1] < 0) { gx = -gx; gy = -gy; }

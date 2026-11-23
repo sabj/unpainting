@@ -37,3 +37,10 @@ test('a wait steps n times back to back and starts a new sitting; dried() starts
   c.dried(); assert.equal(c.counts.sitting, 0);
   for (const bad of [0, -1, 1.5, 3000, NaN]) assert.throws(() => c.wait(bad), /whole number of moments/);
 });
+
+test('a stroke at the painter\'s fast spacing steps after the same brush travel: every scaled by 0.7 / spacing', () => {
+  let n = 0; const c = waterClock(() => n++);
+  const o = c.stroke('brush', { spacing: 1.4 }); assert.equal(o.flowEvery, 12);
+  lay(o, 120); assert.equal(n, 10, '120 splats 1.4 apart: the travel of 240 at 0.7, ten steps');
+  assert.throws(() => c.stroke('brush', { spacing: 3 }), /0.7 to 1.4/);
+});
