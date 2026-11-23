@@ -28,7 +28,8 @@ import { toolUseOf, listFiles } from './tool-use.mjs';
 import { PROVIDER_HOSTS, startGate as startNetGate, makeToolbox, toolsText } from './session-net.mjs';
 import { DEFAULT_LOOKS, DEFAULT_WALL_MINUTES, DEFAULT_GRACE_MINUTES, DEFAULT_STEPS, safeRead, writeSession, sessionServer, SIGN_IN_EXPOSURE, finalChoice, sessionCall, readTranscript, reachedOutside, ownFolderOf, ownPictures, runSession } from './session.mjs';
 import { DEFAULT_REVERTS } from './reverts.mjs';
-import { levelOf, handedAt, CODE_PLAN_IS_L4 } from './levels.mjs';
+import { levelOf, handedAt, OWN_SCRIPT_ONLY } from './levels.mjs';
+import { autoPaintingHanded, shapesHanded, checkWithheld } from './level4.mjs';
 import { usageOf, usageLine } from './usage.mjs';
 import { shapesData, namesShapes, resolveNumbered } from './study-shapes.mjs';
 import { stoppedText } from './stage-look.mjs';
@@ -368,27 +369,21 @@ async function paintLookOnce(r, choice, script, plate, at, edit, compiled, ask =
  * What this session is handed beside the subject's inputs, by its level (levels.mjs), each a folder of its own with
  * a paragraph of the task (session.mjs writeSession). A retry (L3, L4): the result it starts from (--previous: the
  * dried full-size painting beside the subject, the replay sheet, the arrows sheet, and what was handed over, to start
- * from). Level 4 also: the code's finished painting with its sheets, and the studies' flat shapes with the plan's
- * wash geometry as data. Never a score, a verdict or anyone's critique: the model judges its own sheet.
+ * from). Level 4 also: Auto's finished painting beside the subject, and the studies' traced shapes offered as
+ * regions (level4.mjs); never the code's plan, Auto's film or its stroke map. Never a score, a verdict or anyone's critique: the model judges its own sheet.
  * `made`: a folder outside the model's folder where the files are made. Returns the list.
  */
 async function handedTo(r, prepared, made) {
   const { spec, authorFull: author } = r, handed = [];
-  if (terms.auto) handed.push({ folder: 'auto-painting', title: 'What the code alone made',
-    words: 'This is what the code alone made of this subject: the automatic painter\'s painting from its own plan (the plan in `auto/`), dried, at full size. Improve on it, change it, or discard it and paint your own. You owe it nothing, and it is not the goal: the subject is.',
-    files: prepared.painting.sheets.map(f => ({ ...f, picture: true, what: /beside/.test(f.name) ? 'the automatic painter\'s painting as it dried, at full size, on the left; the subject on the right' : /replay/.test(f.name) ? 'the replay of that painting: the sheet as the work went on, frames in order, numbered' : 'every stroke of that painting as an arrow from where the brush lands to where it lifts; first strokes blue, last strokes red' })) });
-  if (terms.shapes) {
-    const file = prepared.shapes;
-    handed.push({ folder: 'resources', title: 'The studies\' flat shapes, as data',
-      words: 'Two sets of regions, as data you may select from. `shapes.json`: the block-in study\'s flat shapes exactly as the planner read them, before any is nested, joined or filtered into a wash: each shape\'s number, its outline in sheet millimetres, its colour, its area, whether the planner keeps it as paper, the shape it lies inside, and the named forms it lies in. `washes.json`: the code planner\'s washes as shapes (what the later studies add is among them). In your own script a passage may name the block-in\'s shapes by number (`"shapes": [12, 13]` for its region, `"reserve": [40]` for paper it is laid round, and in a stroke `"along": 12`); the numbers are turned into millimetres for you. Use them, cut them up, or ignore them.',
-      files: [{ from: file, name: 'shapes.json', what: 'the block-in study\'s flat shapes: n, colour, areaMm2, paper, inside, boxMm, forms, polygons' }, { from: prepared.washes, name: 'washes.json', what: 'the plan\'s washes as shapes, in painting order: n, study, stage, kind, what, colour, areaMm2, boxMm, forms, polygons' }] });
-  }
+  // level 4 (level4.mjs): Auto's finished painting beside the subject, and the studies' traced shapes offered as regions
+  if (terms.auto) handed.push(autoPaintingHanded(prepared.painting.sheets));
+  if (terms.shapes) handed.push(shapesHanded(prepared.shapes));
   if (terms.previous) {
     const from = path.resolve(req.previous); let earlier; try { earlier = JSON.parse(fs.readFileSync(path.join(from, 'run.json'), 'utf8')); } catch { throw new Error(`--previous ${from}: no finished run there (run.json)`); }
     const sub = earlier.author?.session?.submitted;
     if (earlier.subject?.id !== spec.id || earlier.author?.key !== author.key || !sub) throw new Error(`--previous ${from}: not a session of ${author.name} on ${spec.id} that handed over a choice`);
-    // below level 4 what it is handed of its previous try must carry nothing of the code's plan: its own script only
-    if (!terms.plan && sub.kind !== 'script') throw new Error(`--previous ${from}: that try handed over ${sub.what}, which carries the code's plan, and ${CODE_PLAN_IS_L4}; a level ${level.name} retry starts from a try that handed over its own script`);
+    // what it is handed of its previous try carries nothing of the code's plan: its own script only, at every level
+    if (sub.kind !== 'script') throw new Error(`--previous ${from}: that try handed over ${sub.what}, not its own script, and ${OWN_SCRIPT_ONLY}; a level ${level.name} retry starts from a try that handed over its own script`);
     const sheets = await writeWorkSheets(from, path.join(made, 'previous'), { whose: 'your previous' });
     // what it handed over, whole: choice.json and every file it names (its script or edited plan, its lines, its forms)
     const folder = path.join(from, 'author', 'folder'), names = ['choice.json', sub.script, sub.plan, sub.tools?.lines, sub.tools?.forms].filter(Boolean), missing = names.filter(n => !fs.existsSync(path.join(folder, n)));
@@ -481,7 +476,7 @@ async function sessionRun(r) {
     const hashOf = f => (f && fs.existsSync(f) ? crypto.createHash('sha256').update(fs.readFileSync(f)).digest('hex') : null);
     record.author.terms = { budget, unit: prepared.record.unit, seed: null, commit: code.commit, dirty: Boolean(code.dirty), level: level.name, tryNumber: req.tryNumber, model: author.id, cli: author.cli, codePlan: terms.plan,
       prepared: { folder: preparedFolder, plan: hashOf(path.join(prepared.plan, 'value-plan.json')), planToEdit: hashOf(path.join(prepared.plan, 'plan-to-edit.json')), shapes: hashOf(prepared.shapes), washes: hashOf(prepared.washes), painting: prepared.painting ? Object.fromEntries(prepared.painting.sheets.map(f => [f.name, hashOf(f.from)])) : null } };
-    say(r, `the code planner's plan was taken prepared (${preparedFolder})${prepared.painting ? ', and its full-size painting with it' : ''}: nothing of it is made on the session's clock${terms.plan ? '' : `; at level ${level.name} it sets the rendering unit only and is not handed to the session (${CODE_PLAN_IS_L4})`}`);
+    say(r, `the code planner's plan was taken prepared (${preparedFolder})${prepared.painting ? ', and its full-size painting with it' : ''}: nothing of it is made on the session's clock${terms.plan ? '' : `; it is not handed to the session (${OWN_SCRIPT_ONLY})`}`);
     // the model's folder: a temporary one outside the repository; it is kept in the run folder when the session ends
     const cwd = r.sessionDir, real = fs.realpathSync(cwd), listing = toEdit(auto.plate), base = await baseOf(r);
     // a choice's tools are checked against the drawing and the forms of this run; nothing is written for a check
@@ -491,10 +486,12 @@ async function sessionRun(r) {
       const handed = await handedTo(r, prepared, path.join(dir, 'handed'));
       if (terms.previous) record.author.previousTry = { tryNumber: req.tryNumber, retries: req.retries, from: path.resolve(req.previous) };
       routes = await closedRoutes(author);
-      // the code's plan and its settings are handed at level 4 only (levels.mjs); below it the folder holds no auto/
+      // the code's plan and its settings are handed at no level (levels.mjs): the folder holds no auto/
       const { prompt, pictures: handedPictures } = writeSession({ dir: cwd, tools: routes.toolbox ? toolsText(routes.toolbox.said) : undefined, packet, sheet: spec.sheet, medium: record.drawing.medium, codePlan: terms.plan, ...(terms.plan ? { auto: { picture: await planPicture({ planPreview: auto.planPreview, run: record }), washesText: washesText(auto), plan: { summary: auto.summary, washes: auto.rows }, toEdit: listing }, settings: settingsList(spec) } : {}),
         forms: record.masks.mask ? await formBoxes(record.masks.mask, record.masks.forms, W) : null, formsIds: record.masks.mask ?? null, looks: looksMost, wallMinutes: wallMost, graceMinutes: graceMost, steps: stepsMost, reverts: revertsMost, briefFile: path.join(HERE, 'SESSION-BRIEF.md'), readmeFile: path.join(HERE, 'SESSION-README.md'), handed,
         drawing: base.listing ? { listing: base.listing, picture: await drawingPicture(allLinesDoc(base.vectors), W) } : null });
+      // nothing withheld is in the folder: the code's plan, its washes, Auto's film or stroke map (level4.mjs)
+      checkWithheld(cwd);
       // what was handed, by hash, as it lies in the session's folder: a retry's first message can be shown to carry it
       const sha = f => crypto.createHash('sha256').update(fs.readFileSync(f)).digest('hex');
       record.author.handed = handed.map(h => ({ folder: h.folder, files: h.files.map(f => ({ name: f.name, sha256: sha(path.join(cwd, h.folder, f.name)), picture: Boolean(f.picture), namedInTheFirstMessage: prompt.includes(`\`${h.folder}/${f.name}\``) })) }));

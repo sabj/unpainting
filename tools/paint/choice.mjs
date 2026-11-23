@@ -11,13 +11,13 @@
 //   "forms": "my-forms.json"       the named forms merged, split, renamed or given another kind (a settings choice)
 //   "perForm": {"cat face": {"study1.clusters": 24, "study3.lay": 1}}    planner settings inside one named form (a settings choice)
 //   "medium": "pencil" | "pen" | "none"   the medium of the drawing, whatever the source shows (any kind of choice)
-// Below level 4 (levels.mjs: no code plan) the only kind is "script": the settings and plan kinds, and "forms" and
-// "perForm", are refused with CODE_PLAN_IS_L4.
+// In a session (levels.mjs: no level has the code's plan) the only kind is "script": the settings and plan kinds, and "forms" and
+// "perForm", are refused with OWN_SCRIPT_ONLY.
 // A choice is refused only when it cannot be read or the painter cannot lay it. A value that may spoil the painting
 // (a per-form setting outside its usual range) is taken as written and listed in the choice's `warnings`.
 import crypto from 'node:crypto';
 import { DRAWING_MEDIA } from './lines-edit.mjs';
-import { CODE_PLAN_IS_L4 } from './levels.mjs';
+import { OWN_SCRIPT_ONLY } from './levels.mjs';
 
 /** The planner settings a session lists, with their meaning in plain words. `per`: one for each study, or the first only. */
 export const SETTINGS = Object.freeze([
@@ -66,8 +66,8 @@ export function settingsList(spec) {
 /**
  * A choice checked: {kind, sets: [[key, value]], script: file name or null, why}. Throws with the reason, said so
  * that its author can correct it. Checks the form only: the planner is what refuses a value it cannot use.
- * `codePlan`: the level hands over the code's plan and planner (level 4); without them a choice is the author's own
- * script, with its lines and medium, and anything else is refused with CODE_PLAN_IS_L4.
+ * `codePlan`: the level hands over the code's plan and planner (the preflight); without them a choice is the author's own
+ * script, with its lines and medium, and anything else is refused with OWN_SCRIPT_ONLY.
  */
 export function readChoice(given, { codePlan = true } = {}) {
   if (!codePlan) return ownScriptOnly(given);
@@ -81,9 +81,9 @@ export function readChoice(given, { codePlan = true } = {}) {
   return { ...got, ...(mine.lines || mine.forms || mine.perForm || mine.medium ? { tools: mine } : {}), warnings };
 }
 
-/** A choice below level 4: the author's own script with its lines and medium (and its erase passages, in the script). */
+/** A session's choice, at every level: the author's own script with its lines and medium (and its erase passages, in the script). */
 function ownScriptOnly(given) {
-  const ONLY = `choice.json: ${CODE_PLAN_IS_L4}. Here your choice is your own painting script: {"kind": "script", "script": "script.json", "why": "..."}, with "lines" and "medium" beside it if you wish`;
+  const ONLY = `choice.json: ${OWN_SCRIPT_ONLY}. Here your choice is your own painting script: {"kind": "script", "script": "script.json", "why": "..."}, with "lines" and "medium" beside it if you wish`;
   if (!given || typeof given !== 'object' || Array.isArray(given)) throw new Error(`choice.json: one JSON object, {"kind": "script", "script": "script.json", "why": "..."}`);
   if (given.kind !== 'script' || given.forms != null || given.perForm != null || given.plan != null || (given.settings && Object.keys(given.settings).length)) throw new Error(ONLY);
   return readChoice(given);

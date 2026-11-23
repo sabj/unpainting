@@ -7,12 +7,12 @@
 //       try's dried full-size painting beside the subject, its replay sheet, its arrows sheet and what it handed over.
 //       No critique and never a score: the model judges its own sheet and writes what it will change. Still no code
 //       plan: its own script is the only choice it may hand in.
-//   L4  the chance to improve on L3 with many resources: a session that starts from the model's L3 result, handed
-//       that the same way, and also the code's plan (to read, edit or discard), the code planner as a tool with its
-//       settings, the code's finished painting with its replay and arrows sheets, and the studies' flat shapes and the
-//       plan's wash geometry as data it may select from and name by number in a script.
-// At every level a look is priced in the same unit: one full look of the automatic plan of the subject is 1.00
-// (counted when the subject is prepared); below level 4 the model is told the unit, never shown that plan.
+//   L4  the chance to improve on L3 with more help (owner, 23 Nov 01:15: a model sees WHAT Auto made, never HOW): a
+//       session that starts from the model's L3 result, handed that the same way (its painting, film and stroke map),
+//       and also the studies' traced shapes as regions it may use, change, redraw or ignore, and Auto's finished
+//       painting beside the subject (level4.mjs). Never the code's plan, the planner, Auto's stroke map or film.
+// At every level the model hands in its own script: planner settings alone, or the code's plan (edited or not), are
+// refused (OWN_SCRIPT_ONLY). Looks are priced by size and share (look-cost.mjs), whatever is in them.
 // How many retries a level has is a setting (--retries, default 1: one L3 session, one L4 session), not a constant.
 // Pure: nothing is read or written here.
 
@@ -22,11 +22,11 @@ export const DEFAULT_RETRIES = 1;
 export const LEVELS = Object.freeze({
   L2: { previousTry: false, codePlan: false, autoPainting: false, shapesData: false, what: 'one go from the same inputs the code planner gets (drawing, studies, named forms), planned by the model itself; no code plan' },
   L3: { previousTry: true, codePlan: false, autoPainting: false, shapesData: false, what: 'L2 again from the model\'s own L2 result: its painting, replay sheet, arrows sheet and what it handed over; it judges its own sheet; no code plan' },
-  L4: { previousTry: true, codePlan: true, autoPainting: true, shapesData: true, what: 'a retry from the model\'s L3 result with many resources: the code\'s plan and planner, the code\'s finished painting, replay and arrows, and the studies\' flat shapes and the plan\'s wash geometry as data' },
+  L4: { previousTry: true, codePlan: false, autoPainting: true, shapesData: true, what: 'a retry from the model\'s L3 result with more help: the studies\' traced shapes as regions it may use or ignore, and Auto\'s finished painting beside the subject; never the code\'s plan, the planner, Auto\'s stroke map or film' },
 });
 
-/** What a session below level 4 is told when it reaches for the code's plan or planner (choice.mjs, session.mjs). */
-export const CODE_PLAN_IS_L4 = 'the code\'s plan and planner are level 4';
+/** What a session is told when it reaches for the code's plan, planner or settings (choice.mjs, session.mjs): at every level. */
+export const OWN_SCRIPT_ONLY = 'the code\'s plan, its planner and its settings are handed over at no level: every level hands in its own script';
 
 /** The level's terms, or a throw naming the levels. */
 export function levelOf(name) {

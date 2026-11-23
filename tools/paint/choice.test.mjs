@@ -77,12 +77,12 @@ test('the medium of the drawing is chosen with any kind of choice: pencil, pen o
   assert.equal(readChoice({ kind: 'settings', settings: {} }).tools, undefined);
 });
 
-test('below level 4 a choice is the model\'s own script with its lines and medium; the code\'s plan and planner are refused as level 4', () => {
+test('at every level a choice is the model\'s own script with its lines and medium; settings and the code\'s plan are refused', () => {
   const own = readChoice({ kind: 'script', script: 'script.json', lines: 'my-lines.json', medium: 'pen', why: 'mine' }, { codePlan: false });
   assert.equal(own.kind, 'script'); assert.equal(choiceKind(own), 'own script with its choice of lines, the drawing in pen');
   for (const bad of [{ kind: 'settings', settings: {} }, { kind: 'settings', settings: { floors: '8,4,2' } }, { kind: 'plan', plan: 'my-plan.json' }, {}, { kind: 'script', script: 'script.json', forms: 'f.json' }, { kind: 'script', script: 'script.json', perForm: { face: { 'study1.clusters': 4 } } }, { kind: 'script', script: 'script.json', plan: 'p.json' }]) {
-    assert.throws(() => readChoice(bad, { codePlan: false }), /^Error: choice\.json: the code's plan and planner are level 4\. Here your choice is your own painting script/, JSON.stringify(bad));
+    assert.throws(() => readChoice(bad, { codePlan: false }), /^Error: choice\.json: the code's plan, its planner and its settings are handed over at no level: every level hands in its own script\. Here your choice is your own painting script/, JSON.stringify(bad));
   }
   assert.throws(() => readChoice([], { codePlan: false }), /one JSON object, \{"kind": "script"/);
-  assert.equal(readChoice({ kind: 'settings', settings: {} }).kind, 'settings', 'level 4 keeps every kind');
+  assert.equal(readChoice({ kind: 'settings', settings: {} }).kind, 'settings', 'the preflight and kept choices still read every kind');
 });

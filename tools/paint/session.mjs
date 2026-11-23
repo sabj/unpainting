@@ -14,7 +14,7 @@
 //
 // The model's commands are request files this module answers (./unpaint plan|look|status|wait): the planner itself
 // runs here, outside the model's folder. The boundary: the folder holds the input pictures the code planner gets and,
-// at level 4 only, the code planner's plan (levels.mjs: below level 4 there is no auto/, the only choice is the model's
+// for the preflight only, the code planner's plan (levels.mjs: no session at any level has auto/, the only choice is the model's
 // own script, and a session that hands in none has handed in nothing); a plan is PAINTED, RENDERED or MEASURED against the subject only by a counted look. So a
 // free plan call answers with whether it compiled and its counts, nothing else; a look is painted, then written into
 // a ledger outside the folder before anything of it is delivered (a painting that failed or left the GPU delivers
@@ -28,7 +28,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawn, execFileSync } from 'node:child_process';
 import { readChoice, choiceKind, choiceKey } from './choice.mjs';
-import { CODE_PLAN_IS_L4 } from './levels.mjs';
+import { OWN_SCRIPT_ONLY } from './levels.mjs';
 import { needsOf } from './author.mjs';
 import { editLine } from '../../src/paint/methods/plan-edit.mjs';
 import { tinyTouchWarning } from './plan-data.mjs';
@@ -125,25 +125,25 @@ export function forLevel(text, codePlan) {
   if (keep != null) throw new Error('brief: a level mark with no <!-- end -->');
   return out.join('\n');
 }
-/** The choice a session starts from: nothing changed (the code planner's plan), or below level 4 its own script, still to be written. */
+/** The choice a session starts from: nothing changed (the code planner's plan), or in every session its own script, still to be written. */
 const startChoice = codePlan => (codePlan ? { kind: 'settings', settings: {}, why: '' } : { kind: 'script', script: 'script.json', why: '' });
-/** The files of the code's plan in a session's folder (level 4 only). */
+/** The files of the code's plan in a session's folder (the preflight only). */
 const AUTO_FILES = ['auto/settings.json', 'auto/plan.json', 'auto/plan-to-edit.json', 'auto/washes.txt', 'auto/plan.png'];
 
 /**
  * The session's folder, written into `dir`: TASK.md (the prompt), README.md, choice.json, the unpaint command,
- * own-script-brief.md, and at level 4 auto/ (the code planner's plan: its picture alone, its washes as a table and as
+ * own-script-brief.md, and for the preflight auto/ (the code planner's plan: its picture alone, its washes as a table and as
  * data, the settings), beside the inputs/ the packet already holds. Nothing here sets a plan against the subject:
  * that is a look. `codePlan`: the level hands over the code's plan and planner (levels.mjs; said by every caller).
  * Without it there is no auto/, the briefs say nothing of the code's plan (forLevel), and choice.json starts as the
  * model's own script, not yet written. `packet` is preparePacket()'s; `auto` {picture: PNG buffer of the plan alone,
- * washesText, plan} (level 4 only); `settings` settingsList() (level 4 only); `forms` [{id, name, kind, boxMm}] with
+ * washesText, plan} (the preflight only); `settings` settingsList() (the preflight only); `forms` [{id, name, kind, boxMm}] with
  * `formsIds` the id map's file, or null. Returns {prompt, files}. Nothing of this machine's paths goes into any file.
  */
 export function writeSession({ dir, packet, sheet, medium, codePlan, auto = null, settings = null, forms = null, formsIds = null, looks, wallMinutes, steps = DEFAULT_STEPS, graceMinutes = DEFAULT_GRACE_MINUTES, reverts = DEFAULT_REVERTS, briefFile, readmeFile, handed = [], drawing = null, tools = TOOLS_OPEN }) {
-  if (typeof codePlan !== 'boolean') throw new Error('session: say whether this level hands over the code\'s plan (codePlan true at level 4, false below)');
-  if (codePlan && !(auto && settings)) throw new Error('session: level 4 hands over the code\'s plan and its settings, and none were given');
-  if (!codePlan && (auto || settings)) throw new Error(`session: ${CODE_PLAN_IS_L4}, and this session's level is below 4; it is not started`);
+  if (typeof codePlan !== 'boolean') throw new Error('session: say whether this level hands over the code\'s plan (codePlan true for the preflight only)');
+  if (codePlan && !(auto && settings)) throw new Error('session: the preflight\'s folder holds the code\'s plan and its settings, and none were given');
+  if (!codePlan && (auto || settings)) throw new Error(`session: ${OWN_SCRIPT_ONLY}; it is not started`);
   const mk = d => fs.mkdirSync(path.join(dir, d), { recursive: true });
   for (const d of [...(codePlan ? ['auto'] : []), 'plans', 'looks', '.requests']) mk(d);
   const put = (f, text) => fs.writeFileSync(path.join(dir, f), text);
@@ -169,9 +169,9 @@ export function writeSession({ dir, packet, sheet, medium, codePlan, auto = null
     put('auto/settings.json', JSON.stringify({ note: 'Write a setting into choice.json under "settings" by its "set" name. "now" is the value the code planner\'s plan in this folder was made with.', settings }, null, 1) + '\n');
     put('auto/plan.json', JSON.stringify(auto.plan, null, 1) + '\n'); if (auto.toEdit) put('auto/plan-to-edit.json', JSON.stringify(auto.toEdit, null, 1) + '\n'); put('auto/washes.txt', auto.washesText); fs.writeFileSync(path.join(dir, 'auto/plan.png'), auto.picture);
   } else {
-    // below level 4 nothing of the code's plan is in the folder, and the words given say nothing of it
+    // in a session nothing of the code's plan is in the folder, and the words given say nothing of it
     const told = ['TASK.md', 'README.md', 'own-script-brief.md'].find(f => /code planner|code's plan|auto\//.test(fs.readFileSync(path.join(dir, f), 'utf8')));
-    if (told || AUTO_FILES.some(f => fs.existsSync(path.join(dir, f)))) throw new Error(`session: ${told ? `${told} speaks of the code's plan` : 'the folder holds the code\'s plan'}, and ${CODE_PLAN_IS_L4}; the session is not started`);
+    if (told || AUTO_FILES.some(f => fs.existsSync(path.join(dir, f)))) throw new Error(`session: ${told ? `${told} speaks of the code's plan` : 'the folder holds the code\'s plan'}, and ${OWN_SCRIPT_ONLY}; the session is not started`);
   }
   if (forms && formsIds) { fs.copyFileSync(formsIds, path.join(dir, 'inputs/forms-ids.png')); put('inputs/forms.json', JSON.stringify(forms.map(f => ({ id: f.id, name: f.name, kind: f.kind, boxMm: f.boxMm ?? null })), null, 1) + '\n'); }
   // the drawing's lines, each one a row an author may choose, weight or move after the washes (lines-edit.mjs): `drawing` {listing, picture}
@@ -209,8 +209,8 @@ export function ledgerLooks(ledger) {
  * session to hand in; `graceMinutes` later over() is true and the command is ended. Nothing else stops a session.
  * `reverts`: returns to an earlier choice allowed (reverts.mjs); `startKey`: the fingerprint of the choice the session
  * starts from. `pictures`: handed pictures that each need a line in seen.md before the first plan (seen.mjs).
- * `codePlan`: the level hands over the code's plan and planner (level 4); without them a plan or a look of anything
- * but the model's own script is refused with CODE_PLAN_IS_L4 (choice.mjs readChoice), and nothing is spent.
+ * `codePlan`: the level hands over the code's plan and planner (the preflight); without them a plan or a look of anything
+ * but the model's own script is refused with OWN_SCRIPT_ONLY (choice.mjs readChoice), and nothing is spent.
  */
 export function sessionServer({ dir, codePlan = true, sheet = null, forms = [], looks: most = DEFAULT_LOOKS, wallMinutes = DEFAULT_WALL_MINUTES, graceMinutes = DEFAULT_GRACE_MINUTES, steps: stepsMost = DEFAULT_STEPS, stepsTaken = () => 0, unit = null, reverts: revertsMost = DEFAULT_REVERTS, startKey = null, pictures = [], compile, look: paintLook, keep = null, checkScript, checkPlan = null, checkTools = null, ledger, now = Date.now, everyMs = 400 }) {
   if (!(most > 0) || !(wallMinutes > 0) || !(stepsMost > 0)) throw new Error('session: the budget is a number of look units and of steps, and the safety stop a number of minutes, each above 0');
@@ -381,7 +381,7 @@ export function sessionServer({ dir, codePlan = true, sheet = null, forms = [], 
  * this session (`good` holds the keys of the choices that did; a choice that changes nothing is the code planner's
  * plan, which compiled before the session began); else the last choice that compiled, with the reason; else nothing
  * (a failed run). `ended` is 'done' or 'budget reached'. `barred(key)`: the hand-in would be a return past the allowed number.
- * `codePlan` false (below level 4): there is no code planner's plan to fall back on; a session whose own script was
+ * `codePlan` false (every session): there is no code planner's plan to fall back on; a session whose own script was
  * never planned and compiled has handed in nothing, and that is its failure, said so.
  * {choice, script, submitted: {kind, what, settings, script, why, from, note}} or {failure}.
  */
@@ -397,7 +397,7 @@ export function finalChoice({ present, lastGood, good = new Set(), ended, barred
   if (p) why = 'it was never planned, so it is not known to compile';
   else if (!why) why = 'it could not be read';
   if (lastGood) return { choice: lastGood.choice, script: lastGood.script, edit: lastGood.edit?.edit ?? null, submitted: say(lastGood, `the last choice that compiled (plan ${lastGood.plan})`, `the final choice.json was not taken: ${why}${cut ? `; ${cut}` : ''}`) };
-  if (!codePlan) return { failure: `nothing handed in: the session's final choice.json was not taken and no script of its own had compiled (${why}); below level 4 nothing stands in for it`, nothingHandedIn: true };
+  if (!codePlan) return { failure: `nothing handed in: the session's final choice.json was not taken and no script of its own had compiled (${why}); at no level does anything stand in for it`, nothingHandedIn: true };
   return { failure: `the session's final choice.json was not taken and no earlier choice had compiled: ${why}` };
 }
 

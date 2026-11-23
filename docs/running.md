@@ -143,40 +143,26 @@ npm run paint -- mittens-closeup,morisot-face paint --author auto,opus,astra --f
 
 **A working session** (`--work session`, the default; code in `tools/paint/session.mjs`). The model gets a folder of
 its own outside the repository and a shell in it. The folder holds the locked inputs with a millimetre grid (source,
-opening drawing, the three studies, the named forms as a picture and as an id map), at level 4 only the code
-planner's own plan of the subject (`auto/`: its picture, every wash as a table and as data, and the planner's
-settings with their present values and meaning), the brief for writing a script, a `README.md` of its
-tools, and `choice.json`. The task is `tools/paint/SESSION-BRIEF.md`; the tools are `tools/paint/SESSION-README.md`.
+opening drawing, the three studies, the named forms as a picture and as an id map), the brief for writing a script, a
+`README.md` of its tools, and `choice.json`. The task is `tools/paint/SESSION-BRIEF.md`; the tools are
+`tools/paint/SESSION-README.md`.
 
-- At levels 2 and 3 there is no `auto/` and the brief and README (cut to the level by their `<!-- L4 -->` and
-  `<!-- L2 L3 -->` marks) do not speak of the code's plan. The only choice is its own script, with lines, medium and
-  erase passages; a settings choice, a plan edit, `"forms"` and `"perForm"` are refused with "the code's plan and
-  planner are level 4". `choice.json` starts naming `script.json`, which the model writes; a session that hands in
-  no script that compiled has handed in nothing, and the run fails with "nothing handed in". The rest of this list is
-  level 4.
-- What it hands over is `choice.json` as it stands at the end, one of three kinds. The code planner tuned
-  (`"kind": "settings"`, any of the listed settings, or another painter option by name; the inputs and the guard are
-  locked): an empty settings choice paints exactly what `--author auto` paints, the same command. The code planner's
-  plan edited wash by wash (`"kind": "plan"`, naming its copy of `auto/plan-to-edit.json`): colour, strength, brush,
-  direction and edge of a wash changed, washes moved, left out or merged, passages of its own added; a wash it does
-  not touch is laid exactly as the code planner lays it (`src/paint/methods/plan-edit.mjs`; the format is in `tools/paint/SESSION-README.md`). Or its own painting script
-  (`"kind": "script"`). Only a choice the planner compiled in the session is painted; otherwise the last one that
-  did, and the record says so. For an edited plan `run.json` holds, under `author.planEdit`, the washes untouched,
-  changed, moved, merged, left out and added, and `untouchedShare`, the share of the code planner's washes left as
-  they were.
-- Beside its kind a choice may use three more tools (`tools/paint/session-tools.mjs`; each format is in
-  `tools/paint/SESSION-README.md`). `"lines"` (any kind): which lines of the drawing are drawn before the washes,
-  which after them over the dry paint, which not at all, and how dark each is, by rules over `drawing/lines.json`
-  (`lines-edit.mjs`). The chosen strokes are written as drawing stems of the run's own and painted through
-  `--drawingfile`, `--drawinglast` and `--drawing`; no stroke's shape changes. `"forms"` (a settings choice): named
-  forms merged, cut out by a polygon, renamed or given another kind (`forms-edit.mjs`). The reviewed id map is never
-  altered: the edit is a receipt of its own in the run folder, marked `edited` with `reviewed: false`, and the
-  run's `masks.from` says so. `"perForm"` (a settings choice): planner settings inside one named form, carried in
-  the wash plan as `@name#FORM=value` (`src/paint/methods/form-read.mjs`). `run.json` holds what was chosen under
-  `author.tools` (`lines`, `forms`, `perForm`), and each plan and look of the session records it too.
-- The boundary: the folder holds the input pictures the code planner gets (the model may compute on them) and the
-  code planner's plan (its picture alone, its washes as a table and as data). A plan is drawn or measured against
-  the subject only by a counted look.
+- At every level the only choice is its own script, with lines, medium and erase passages. No folder holds `auto/`
+  (the code's plan), and a settings choice, a plan edit, `"forms"` and `"perForm"` are refused with "the code's plan,
+  its planner and its settings are handed over at no level". `choice.json` starts naming `script.json`, which the
+  model writes; a session that hands in no script that compiled has handed in nothing, and the run fails with
+  "nothing handed in". (The preflight alone still opens a folder with the code's plan, to check the tools.)
+- Level 4 also gets `auto-painting/final-beside-subject.jpg` (Auto's finished painting beside the subject) and
+  `resources/shapes.json` (the block-in study's traced shapes, which its script may name by number; offered, not
+  required, and maybe wrong). It never gets Auto's replay or arrows sheets, the plan's washes or the plan
+  (`tools/paint/level4.mjs`; a folder holding any of them is not started).
+- Its lines (`"lines"`): which lines of the drawing are drawn before the washes, which after them over the dry paint,
+  which not at all, and how dark each is, by rules over `drawing/lines.json` (`lines-edit.mjs`), and lines of its
+  own. The chosen strokes are written as drawing stems of the run's own and painted through `--drawingfile`,
+  `--drawinglast` and `--drawing`; no stroke's shape changes. `run.json` holds what was chosen under `author.tools`.
+- A kept choice of the older kinds (`--author choice:FOLDER`, `edit:FILE`) is still painted as it was handed over.
+- The boundary: the folder holds the input pictures the code planner gets (the model may compute on them). A plan is
+  drawn or measured against the subject only by a counted look.
 - `./unpaint plan` runs the wash planner on the present choice and answers with whether it compiled and its counts.
   Nothing else: no picture, no wash data. It is not limited.
 - `./unpaint look` shows the plan's picture beside the source and the middle study, each named form measured against
@@ -189,7 +175,7 @@ tools, and `choice.json`. The task is `tools/paint/SESSION-BRIEF.md`; the tools 
 - Budgets are measured, not capped. When the rendering units or `--steps N` (tool calls, default 1000) are used, the
   session is asked to hand in. `--wallminutes N` (default 360) is only a safety stop: at it the session and every
   process it started are ended (SIGTERM, then SIGKILL) and the last choice it had planned is painted. `--minutes` is gone.
-- Levels: `--level L2` (default) is one go, without the code's plan. `--level L3` and `--level L4` are retries from `--previous <run folder>` (an L3 retry refuses a previous try that handed in the code's plan);
+- Levels: `--level L2` (default) is one go, without the code's plan. `--level L3` and `--level L4` are retries from `--previous <run folder>` (a retry refuses a previous try that did not hand in its own script);
   L4 first needs `prepare --level L4`, which paints Auto's full-size painting. See [levels](../bench/docs/levels.md).
 - A session that handed in is never thrown away (`tools/paint/final-wait.mjs`). Its full-size final waits for a GPU
   place (this Mac's, or the render pool's) with a line a minute, is painted again when its worker fails (up to 3

@@ -10,7 +10,7 @@ AI models paint a subject with the simulator's brush and pen, and judges score h
 | L1 | L0 plus harness tips (technique guides and worked examples) |
 | L2 | The same inputs Auto gets (the drawing, the three colour studies, the named forms), not Auto's plan: the model plans the painting itself. One go. |
 | L3 | L2 again, after studying its own L2 painting. Still no Auto plan. |
-| L4 | L3, then one more retry, with many resources: Auto's plan and planner, Auto's finished painting and its film, and the studies' shapes as data |
+| L4 | L3, then one more retry, with more help: the studies' traced shapes as regions it may use, change or ignore (offered, maybe wrong), and Auto's finished painting beside the subject. Never Auto's plan, planner, film or stroke map. |
 
 Details: [levels](docs/levels.md), [rules](docs/rules.md) and [scoring](docs/scoring.md).
 

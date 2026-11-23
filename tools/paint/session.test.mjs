@@ -5,16 +5,18 @@ import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { levelOf, CODE_PLAN_IS_L4 } from './levels.mjs';
+import { levelOf, OWN_SCRIPT_ONLY } from './levels.mjs';
+import { autoPaintingHanded, shapesHanded, checkWithheld, WITHHELD } from './level4.mjs';
 import { DEFAULT_LOOKS, DEFAULT_WALL_MINUTES, DEFAULT_STEPS, forLevel, writeSession, sessionServer, ledgerLooks, safeRead, safeWrite, finalChoice, cleanEnv, seatbelt, sessionCall, readTranscript, reachedOutside, ownFolderOf, ownPictures, runSession } from './session.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'paint-session-test-'));
 const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', 'base64');
-// a session's folder at a level (levels.mjs): level 4 is handed the code's plan in auto/, levels 2 and 3 are not
-function folder({ looks = 2, minutes = 85, handed = [], level = 'L4' } = {}) {
+// a session's folder: at a level (levels.mjs: no level is handed the code's plan), or by default the preflight's folder,
+// which still holds the code's plan in auto/ to check the tools with (codePlan true)
+function folder({ looks = 2, minutes = 85, handed = [], level = null, codePlan: plan = null } = {}) {
   const dir = tmp(); fs.mkdirSync(path.join(dir, 'inputs')); fs.writeFileSync(path.join(dir, 'inputs/source.png'), PNG); fs.writeFileSync(path.join(dir, 'inputs/study-2.png'), PNG);
-  const codePlan = levelOf(level).codePlan;
+  const codePlan = plan ?? (level ? levelOf(level).codePlan : true);
   const out = writeSession({ dir, packet: { files: ['inputs/source.png', 'inputs/study-2.png'], brief: 'HOW TO WRITE A SCRIPT' }, sheet: { widthMm: 280, heightMm: 186.7 }, medium: 'pencil (graphite)', codePlan,
     ...(codePlan ? { auto: { picture: PNG, washesText: 'AUTO WASHES', plan: { summary: { washes: 3 }, washes: [] }, toEdit: { format: 'plan-edit 1', of: 'abc', washes: [] } }, settings: [{ set: 'floors', now: '6,4,2', meaning: 'the least shape' }] } : {}), forms: [{ id: 2, name: 'cat face', kind: 'face', boxMm: [1, 2, 3, 4] }], formsIds: path.join(dir, 'inputs/source.png'),
     looks, wallMinutes: minutes, handed, briefFile: path.join(HERE, 'SESSION-BRIEF.md'), readmeFile: path.join(HERE, 'SESSION-README.md'), drawing: { listing: { format: 'lines 1', strokes: [] }, picture: PNG } });
@@ -27,12 +29,12 @@ const put = (dir, choice) => fs.writeFileSync(path.join(dir, 'choice.json'), JSO
 let seq = 0;
 async function ask(dir, server, cmd) { fs.writeFileSync(path.join(dir, '.requests', `${Date.now() % 1e9}-${++seq}.req`), cmd); await server.tick(); const f = fs.readdirSync(path.join(dir, '.requests')).filter(x => x.endsWith('.ans')).map(x => path.join(dir, '.requests', x)).sort((a, b) => fs.statSync(b).mtimeMs - fs.statSync(a).mtimeMs || b.localeCompare(a)); const all = f.map(x => fs.readFileSync(x, 'utf8')); for (const x of f) fs.rmSync(x); return all[0]; }
 
-test('at level 4 the folder holds the task, the tools, the code planner\'s plan and a choice that changes nothing', () => {
+test('the preflight\'s folder holds the task, the tools, the code planner\'s plan and a choice that changes nothing', () => {
   const { dir, prompt } = folder({ looks: 4 });
   try {
     for (const f of ['TASK.md', 'README.md', 'choice.json', 'unpaint', 'own-script-brief.md', 'auto/plan.png', 'auto/washes.txt', 'auto/plan.json', 'auto/settings.json', 'inputs/forms-ids.png', 'inputs/forms.json']) assert.ok(fs.existsSync(path.join(dir, f)), f);
     assert.deepEqual(JSON.parse(fs.readFileSync(path.join(dir, 'choice.json'), 'utf8')), { kind: 'settings', settings: {}, why: '' });
-    assert.match(prompt, /`280` by `186.7` mm/); assert.match(prompt, /Rendering: `4` units\. A look of the code planner's whole plan on the\s+whole sheet costs about 1 unit/); assert.match(prompt, /Steps: `1000` of your tool calls/); assert.match(prompt, /Time is not budgeted: waiting for a look or for the machine costs\s+you nothing \(a far safety stop ends a session after `85` minutes\)/); assert.match(prompt, /you are allowed to make mistakes/); assert.match(prompt, /you may do it `20` times/); assert.doesNotMatch(prompt, /\bmust\b|\bnever\b|ROUNDS ONLY|sent back/); assert.match(prompt, /exactly the code\s+planner's/); assert.match(prompt, /No score is ever shown/); assert.match(prompt, /light pencil/);
+    assert.match(prompt, /`280` by `186.7` mm/); assert.match(prompt, /Steps: `1000` of your tool calls/); assert.match(prompt, /Time is not budgeted: waiting for a look or for the machine costs\s+you nothing \(a far safety stop ends a session after `85` minutes\)/); assert.match(prompt, /you are allowed to make mistakes/); assert.match(prompt, /you may do it `20` times/); assert.doesNotMatch(prompt, /\bmust\b|\bnever\b|ROUNDS ONLY|sent back/); assert.match(prompt, /No score is ever shown/); assert.match(prompt, /light pencil/);
     assert.doesNotMatch(prompt, /SHEET_W|LOOKS_MOST|WALL_MINUTES|GRACE_MINUTES|REVERTS_MOST|STEPS_MOST|DRAWING_NOTE/);
     const readme = fs.readFileSync(path.join(dir, 'README.md'), 'utf8');
     assert.match(readme, /`inputs\/source.png`: the SUBJECT/); assert.match(readme, /`inputs\/study-2.png`: block-in STUDY 2/); assert.match(readme, /\| `\.\/unpaint look` \|.*\| its cost in look units, of 4 for this try \(the benchmark's budget\) \|/); assert.doesNotMatch(readme, /INPUT_LIST|SHEET_W|LOOKS_MOST|REVERTS_MOST/); assert.match(readme, /"own": \[/); assert.match(readme, /`"medium": "pencil"`, `"pen"` or `"none"` beside any kind of choice/);
@@ -462,9 +464,11 @@ test('with the subject\'s unit a look is quoted from its plan\'s work and charge
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });
 
-test('at levels 2 and 3 the folder holds the code planner\'s inputs and no code plan: no auto/, words that do not speak of it, and the model\'s own script to write', () => {
+test('at every level the folder holds the code planner\'s inputs and no code plan: no auto/, words that do not speak of it, and the model\'s own script to write', () => {
   const prev = tmp(); fs.writeFileSync(path.join(prev, 'a.jpg'), PNG);
-  for (const [level, handed] of [['L2', []], ['L3', [{ folder: 'previous', title: 'Your own previous painting of this subject', words: 'Judge it yourself.', files: [{ from: path.join(prev, 'a.jpg'), name: 'final-beside-subject.jpg', what: 'your painting beside the subject', picture: true }] }]]]) {
+  const previous = { folder: 'previous', title: 'Your own previous painting of this subject', words: 'Judge it yourself.', files: [{ from: path.join(prev, 'a.jpg'), name: 'final-beside-subject.jpg', what: 'your painting beside the subject', picture: true }] };
+  fs.writeFileSync(path.join(prev, 'shapes.json'), '{"shapes": []}');
+  for (const [level, handed] of [['L2', []], ['L3', [previous]], ['L4', [previous, autoPaintingHanded([{ from: path.join(prev, 'a.jpg'), name: 'final-beside-subject.jpg' }, { from: path.join(prev, 'a.jpg'), name: 'replay-sheet-frames-in-order.jpg' }, { from: path.join(prev, 'a.jpg'), name: 'arrows-sheet-strokes-in-order.jpg' }]), shapesHanded(path.join(prev, 'shapes.json'))]]]) {
     const { dir, prompt } = folder({ level, handed });
     try {
       assert.ok(!fs.existsSync(path.join(dir, 'auto')), `${level}: no auto/ folder`);
@@ -477,19 +481,28 @@ test('at levels 2 and 3 the folder holds the code planner\'s inputs and no code 
       assert.match(prompt, /your own painting script/); assert.match(prompt, /has handed in nothing/); assert.match(prompt, /Rendering: `2` units\. One unit is the painting work of one full look/);
       assert.match(readme, /`inputs\/study-2.png`: block-in STUDY 2: the subject simplified to flat shapes \(1 the broad shapes, 2 the middle study, 3 details and accents\)\n/);
       assert.match(readme, /"kind": "erase"/, 'its erase passages are its own to write'); assert.match(readme, /"lines": "my-lines.json"/);
-      if (level === 'L3') assert.match(prompt, /`previous\/final-beside-subject.jpg`/);
+      if (level !== 'L2') assert.match(prompt, /`previous\/final-beside-subject.jpg`/);
+      if (level === 'L4') {
+        // given: Auto's finished painting beside the subject, and the studies' traced shapes, offered and maybe wrong
+        assert.ok(fs.existsSync(path.join(dir, 'auto-painting/final-beside-subject.jpg')) && fs.existsSync(path.join(dir, 'resources/shapes.json')));
+        assert.match(prompt, /offered, not required, and they may be wrong/); assert.match(prompt, /Use them, change them, redraw them, or ignore them/); assert.doesNotMatch(prompt, /\bmust use\b/i);
+        // withheld: the code's plan and planner, the plan's washes, Auto's film (replay sheet) and stroke map (arrows)
+        for (const f of WITHHELD) assert.ok(!fs.existsSync(path.join(dir, f)), `L4 withholds ${f}`);
+        assert.doesNotMatch(prompt, /replay-sheet|arrows-sheet|washes\.json/); assert.doesNotThrow(() => checkWithheld(dir));
+        fs.writeFileSync(path.join(dir, 'auto-painting/arrows-sheet-strokes-in-order.jpg'), 'x'); fs.mkdirSync(path.join(dir, 'auto'));
+        assert.throws(() => checkWithheld(dir), /holds auto, auto-painting\/arrows-sheet-strokes-in-order\.jpg, which no level hands over/);
+      }
     } finally { fs.rmSync(dir, { recursive: true, force: true }); }
   }
   fs.rmSync(prev, { recursive: true, force: true });
-  const l4 = folder({ level: 'L4' });
-  try { for (const f of ['auto/plan.png', 'auto/washes.txt', 'auto/plan.json', 'auto/plan-to-edit.json', 'auto/settings.json']) assert.ok(fs.existsSync(path.join(l4.dir, f)), `L4: ${f}`); assert.match(l4.prompt, /A code planner has already made a plan/); } finally { fs.rmSync(l4.dir, { recursive: true, force: true }); }
+  assert.throws(() => autoPaintingHanded([{ from: 'x', name: 'replay-sheet-frames-in-order.jpg' }]), /no final-beside-subject\.jpg/);
   // the level is always said, and what a level hands over must agree with it
   const dir = tmp(); fs.mkdirSync(path.join(dir, 'inputs'));
   const base = { dir, packet: { files: [], brief: 'B' }, sheet: { widthMm: 280, heightMm: 186.7 }, medium: 'pencil', looks: 2, wallMinutes: 60, briefFile: path.join(HERE, 'SESSION-BRIEF.md'), readmeFile: path.join(HERE, 'SESSION-README.md') };
   try {
     assert.throws(() => writeSession(base), /say whether this level hands over the code's plan/);
-    assert.throws(() => writeSession({ ...base, codePlan: false, auto: { picture: PNG, washesText: '', plan: {} }, settings: [] }), new RegExp(CODE_PLAN_IS_L4));
-    assert.throws(() => writeSession({ ...base, codePlan: true }), /level 4 hands over the code's plan/);
+    assert.throws(() => writeSession({ ...base, codePlan: false, auto: { picture: PNG, washesText: '', plan: {} }, settings: [] }), new RegExp(OWN_SCRIPT_ONLY));
+    assert.throws(() => writeSession({ ...base, codePlan: true }), /the preflight's folder holds the code's plan/);
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });
 
@@ -500,15 +513,18 @@ test('a brief\'s level marks: level 4 text is kept only with the code\'s plan, t
   for (const f of ['SESSION-BRIEF.md', 'SESSION-README.md']) { const t = fs.readFileSync(path.join(HERE, f), 'utf8'); for (const c of [true, false]) assert.doesNotMatch(forLevel(t, c), /<!--/, f); }
 });
 
-test('at levels 2 and 3 the settings choice, the plan edit, forms and perForm are refused as level 4, nothing is spent, and the model\'s own script is planned and looked at', async () => {
-  const { dir, ledger } = folder({ level: 'L2', looks: 3 }); let compiledN = 0;
+test('at every level the settings choice, the plan edit, forms and perForm are refused, nothing is spent, and the model\'s own script is planned and looked at', async () => {
+  for (const level of ['L2', 'L4']) await refusedAt(level);
+});
+async function refusedAt(level) {
+  const { dir, ledger } = folder({ level, looks: 3 }); let compiledN = 0;
   try {
     const server = sessionServer({ dir, ledger, codePlan: false, look: looked, looks: 3, wallMinutes: 85, checkScript: s => s, checkPlan: e => ({ edit: e, record: {} }), checkTools: () => ({ record: {}, said: '', warnings: [] }), compile: async () => { compiledN++; return compiled(1); } });
     assert.match(await ask(dir, server, 'plan'), /^REFUSED, nothing was planned: there is no file script\.json in this folder/, 'its script is still to be written: nothing stands in for it');
-    const L4 = /^REFUSED, nothing was planned( and no look was counted)?: choice\.json: the code's plan and planner are level 4\./;
+    const L4 = /^REFUSED, nothing was planned( and no look was counted)?: choice\.json: the code's plan, its planner and its settings are handed over at no level: every level hands in its own script\./;
     for (const bad of [{ kind: 'settings', settings: {} }, { kind: 'settings', settings: { 'study1.shapes': 60 } }, { kind: 'plan', plan: 'my-plan.json' }, { kind: 'script', script: 'script.json', forms: 'my-forms.json' }, { kind: 'script', script: 'script.json', perForm: { 'cat face': { 'study1.clusters': 24 } } }, { kind: 'script', script: 'script.json', settings: { floors: '8,4,2' } }]) {
       put(dir, bad); fs.writeFileSync(path.join(dir, 'my-plan.json'), '{}'); fs.writeFileSync(path.join(dir, 'script.json'), '{"passages": [1]}');
-      for (const cmd of ['plan', 'look', 'cost']) assert.match(await ask(dir, server, cmd), cmd === 'plan' ? L4 : cmd === 'look' ? /^REFUSED, nothing was planned and no look was counted: choice\.json: the code's plan and planner are level 4/ : L4, `${cmd} ${JSON.stringify(bad)}`);
+      for (const cmd of ['plan', 'look', 'cost']) assert.match(await ask(dir, server, cmd), cmd === 'plan' ? L4 : cmd === 'look' ? /^REFUSED, nothing was planned and no look was counted: choice\.json: the code's plan, its planner and its settings are handed over at no level/ : L4, `${cmd} ${JSON.stringify(bad)}`);
     }
     assert.equal(compiledN, 0, 'nothing of the code\'s plan was planned'); assert.equal(ledgerLooks(ledger).length, 0, 'nothing was spent');
     put(dir, { kind: 'script', script: 'script.json', lines: 'my-lines.json', medium: 'pen', why: 'mine' }); fs.writeFileSync(path.join(dir, 'my-lines.json'), '{}');
@@ -517,9 +533,9 @@ test('at levels 2 and 3 the settings choice, the plan edit, forms and perForm ar
     const rec = await server.stop(), fin = finalChoice({ present: server.present, lastGood: rec.lastGood, good: rec.good, ended: 'done', barred: server.barred, codePlan: false });
     assert.equal(fin.submitted.kind, 'script'); assert.equal(fin.submitted.from, 'choice.json as the session left it');
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
-});
+}
 
-test('at levels 2 and 3 a session that hands in no script of its own has handed in nothing: the code\'s plan is never painted in its place', async () => {
+test('at every level a session that hands in no script of its own has handed in nothing: the code\'s plan is never painted in its place', async () => {
   const { dir, ledger } = folder({ level: 'L3' });
   try {
     const server = sessionServer({ dir, ledger, codePlan: false, look: looked, looks: 2, wallMinutes: 85, checkScript: s => s, compile: async () => compiled(1) });
@@ -529,8 +545,7 @@ test('at levels 2 and 3 a session that hands in no script of its own has handed 
     // a choice that changes nothing is the code planner's plan at level 4, and nothing at all below it
     put(dir, { kind: 'settings', settings: {} });
     fin = finalChoice({ present: server.present, lastGood: null, ended: 'budget reached', codePlan: false });
-    assert.match(fin.failure, /^nothing handed in: .*the code's plan and planner are level 4/);
-    assert.equal(finalChoice({ present: () => ({ choice: { kind: 'settings', sets: [] }, key: 'k' }), lastGood: null, ended: 'done' }).submitted.what, 'nothing changed', 'at level 4 nothing changed is still the code planner\'s plan');
+    assert.match(fin.failure, /^nothing handed in: .*handed over at no level.*at no level does anything stand in for it$/);
     // a script it wrote and planned, then broke, is what it handed in
     fs.writeFileSync(path.join(dir, 'script.json'), '{"passages": [1]}'); put(dir, { kind: 'script', script: 'script.json' });
     assert.match(await ask(dir, server, 'plan'), /^It compiles \(own script\)/);
