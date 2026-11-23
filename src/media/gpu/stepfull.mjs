@@ -36,7 +36,8 @@ const EF_BATCH = Math.max(1, envNum('GPU_EDGE_BATCH', 25));
 // Between strokes' flows (advance, not a dry), a moved outline remakes the feed's geometry only once this many steps have
 // passed since it was last made: the geometry (a pressure solve over the whole wet box, about 200 ms at full size) then
 // trails the wash's front by a few steps while it is being painted. A dry remakes it at once, as the CPU sheet does.
-const EF_STROKE_LAG = 16;
+// Set by the painter's fast mode (tools/painter/native-paint-mode.mjs nativeEdgeLagPolicy: 16); otherwise 0, at once.
+const EF_STROKE_LAG = Math.max(0, envNum('GPU_EDGE_LAG', 0));
 const SPARSE_ALL = typeof process === 'undefined' || process.env.GPU_SPARSE_ALL !== '0';
 const KEEP = []; // Dawn's instance, adapter and device must stay reachable or the GC frees them under the running device
 
