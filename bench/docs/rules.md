@@ -12,7 +12,8 @@ More freedom than before, and mistakes are allowed.
 
 - Its own drawn lines.
 - The drawing medium: pen, pencil or none.
-- Pen ink: waterproof or soluble.
+- Pen ink: waterproof or soluble (at L2 to L4 a model's own pen lines are waterproof unless its settings say `inkfast` 0).
+- Erasing: the kit's eraser at L1; an erase passage in its own script or edited plan at L2 to L4.
 - At L2 and above: Auto's settings, Auto's plan, the pencil lines Auto keeps, the named forms (merge, cut, rename), the paints (up to 14), or a whole script of its own.
 - Where a choice only risks a worse painting, the harness gives a warning, not a refusal. It refuses only to protect the sheet or the rules.
 

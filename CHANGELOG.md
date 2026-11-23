@@ -34,6 +34,7 @@ Results: to be added from the release-candidate run.
 - **Retries are self-study.** The model gets its own painting, replay and stroke map and writes its own assessment. Never a score or a critique. The last try counts, not the best.
 - **What a model may change:** Auto's settings, Auto's plan, its own script, the named forms, the pencil lines, its own drawn lines, pen, pencil or none, up to 14 paints. L4 is also given Auto's finished painting and the studies' flat shapes. [Auto against a model](docs/auto-vs-model.md#what-a-model-may-change-and-what-it-is-not-given).
 - **Level 1 kit:** pencil, eraser, and pen ink waterproof or soluble, with worked tips.
+- **Erasing at every level.** At L2 to L4 an erase passage in a model's own script or edited plan rubs pencil out with the kit's eraser, on dry paper; `./unpaint plan` says what each will take.
 - **A closed workspace.** Each try starts in a fresh folder and branch, earlier tries read-only. The shell has no internet and one fixed toolbox; installs fail; attempts are recorded. [Rules](bench/docs/rules.md).
 - **Budgets measured, not limited.** Rendering in machine-independent units (one full look of Auto's plan is 1.00), 1,000 steps as a runaway guard, six hours as a safety stop. Target about 60 minutes a session. Usage, tool use and cost are recorded.
 - **Scoring by human-ness in the making, plus quality against the original.** Judges read film snapshots of the painting in progress by a written [rubric](bench/docs/human-ness-rubric.md), and quality and likeness beside it; a combined number weighs them 2 to 1. The original is scored too, and a painting's result is its share of the original's. [Scoring](bench/docs/scoring.md).
@@ -54,7 +55,6 @@ Results: to be added from the release-candidate run.
 - Pencil that should have been covered or erased can survive into the finished painting.
 - Paper grain shows when zoomed far in.
 - Fine marks differ between a look and its final: about a fifth apart.
-- At L2 to L4 a session cannot ask for its own erasing; the painter lifts pencil from the lights by itself.
 - `bench/scripts/levels.mjs` still sums the 21 November L1 to L3 design.
 - Planned, not in the first run: a container for replication, hosted judging, the OpenAI models.
 

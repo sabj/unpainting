@@ -232,8 +232,8 @@ At every level:
 - Never given: a score, a judge's verdict, or outside critique.
 - Not allowed: reading the subject's pixels with code ([anti-cheat](../bench/docs/anti-cheat.md)).
 - Fixed: paper, simulator, paint box, brush physics, the three studies, sheet size.
-- Pen ink at L2 to L4 is waterproof.
-- Erasing: the level 1 kit has an eraser. At L2 to L4 the painter lifts pencil from the lights by itself; a session cannot yet ask for its own erasing.
+- Pen ink at L2 to L4: a model's own pen lines, and a pen drawing with lines or a medium of its choosing, are set waterproof before the washes; its settings may make them soluble (`inkfast` 0). Auto's ink is unchanged.
+- Erasing at every level. L1: the kit's eraser. L2 to L4: an erase passage in a model's own script or added to an edited plan rubs pencil out with the same eraser, anywhere in the order, on dry paper only; before the first wash it takes most of the pencil, after a dried wash far less. The painter also lifts pencil from the lights by itself.
 
 ## Notes
 
