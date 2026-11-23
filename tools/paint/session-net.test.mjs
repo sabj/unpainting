@@ -85,4 +85,5 @@ test('the command line starts: a dry run of a model session and of a plan resolv
   assert.equal(plan.code, 0, plan.out.slice(-600)); assert.match(plan.out, /dry run: nothing was started/);
   const session = run(['mittens-closeup', 'paint', '--author', 'argon-m', '--level', 'L2', '--dry-run']);
   assert.equal(session.code, 0, session.out.slice(-600)); assert.match(session.out, /dry run: nothing was started/);
+  assert.match(session.out, /level L2, try 1;.*it gets the code planner's inputs, not its plan, and hands in its own script/); assert.doesNotMatch(session.out, /starts from the code planner's prepared plan/);
 });
