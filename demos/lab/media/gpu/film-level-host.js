@@ -79,12 +79,13 @@ export function adaptLevel(lv, v, written = false) {
   if ((st.fewer || st.subs > 0.75 * lv.subs) && lv.subs < 64) { lv.subs = Math.min(64, 2 * lv.subs); grew = true; }
   if (st.boxes > lv.boxes && lv.boxes < LV_BMAX) { lv.boxes = Math.min(LV_BMAX, 2 * st.boxes); grew = true; }
   // Every iteration and round encoded is a dispatch a step, needed or not (most of the step's time on a small sheet), so
-  // the budgets come down again to twice the most the last 16 reads with solves needed (no lower than 64 iterations and
-  // 8 rounds). A solve or a box that then runs short is counted and grows them at once.
+  // the budgets come down again: the iterations to half as many again as the most the last 16 reads with solves needed
+  // (no fewer than 16; a solve stops at its residual, so the ones encoded past it do nothing), the rounds to twice (no
+  // fewer than 8). A solve or a box that then runs short is counted and grows them at once.
   if (st.solves) { (lv.recent ??= []).push([st.iterations, st.subs]); if (lv.recent.length > 16) lv.recent.shift(); }
   if (!grew && lv.recent?.length >= 4) {
     const pow2 = v => 2 ** Math.ceil(Math.log2(Math.max(1, v)));
-    const it = Math.max(64, 2 * pow2(Math.max(...lv.recent.map(r => r[0])))), sb = Math.max(8, 2 * pow2(Math.max(...lv.recent.map(r => r[1]))));
+    const it = Math.max(16, Math.ceil(1.5 * Math.max(...lv.recent.map(r => r[0])))), sb = Math.max(8, 2 * pow2(Math.max(...lv.recent.map(r => r[1]))));
     if (it < lv.iters || sb < lv.subs) { lv.iters = Math.min(lv.iters, it); lv.subs = Math.min(lv.subs, sb); grew = true; }
   }
   return grew;

@@ -28,3 +28,13 @@ test('light only after a read with steps and no level tile, and nothing written 
   names(lv); adaptLevel(lv, status(0), true); assert.equal(lv.light, false, 'a write since the steps were encoded');
   adaptLevel(lv, status(0)); assert.equal(lv.light, false, 'a read with no steps since says nothing');
 });
+
+test('the iteration budget comes down to half as many again as the most recent solves needed, no fewer than 16', () => {
+  const read = (lv, iterations) => { const v = new Uint32Array(12); v[3] = iterations; v[5] = 4; v[7] = 1; v[11] = 1; adaptLevel(lv, v); };
+  const lv = levelBudget();
+  for (let i = 0; i < 4; i++) read(lv, 10);
+  assert.equal(lv.iters, 16);
+  const lw = levelBudget(); for (let i = 0; i < 4; i++) read(lw, 20); read(lw, 22);
+  assert.equal(lw.iters, 30, "it only comes down here");
+  read(lw, 30); assert.equal(lw.iters, 60, 'a solve near the budget doubles it');
+});
