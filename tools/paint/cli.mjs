@@ -22,13 +22,13 @@ import { planNumbers, planSummary, numbersText, washesText, planPicture, lookPic
 import { lookSets, lookFault, stoppedLookFault, lookSizeNote, LOOK_JOBS, HEAVY_JOBS } from './look.mjs';
 import { toolUseOf, listFiles } from './tool-use.mjs';
 import { PROVIDER_HOSTS, startGate, makeToolbox, toolsText } from './session-net.mjs';
-import { DEFAULT_LOOKS, DEFAULT_WALL_MINUTES, DEFAULT_GRACE_MINUTES, safeRead, writeSession, sessionServer, finalChoice, sessionCall, readTranscript, reachedOutside, ownFolderOf, ownPictures, runSession } from './session.mjs';
+import { DEFAULT_LOOKS, DEFAULT_WALL_MINUTES, DEFAULT_GRACE_MINUTES, DEFAULT_STEPS, safeRead, writeSession, sessionServer, finalChoice, sessionCall, readTranscript, reachedOutside, ownFolderOf, ownPictures, runSession } from './session.mjs';
 import { DEFAULT_REVERTS } from './reverts.mjs';
 import { levelOf, handedAt } from './levels.mjs';
 import { usageOf, usageLine } from './usage.mjs';
 import { shapesData, namesShapes, resolveNumbered } from './study-shapes.mjs';
 import { paintThroughStage, stoppedText } from './stage-look.mjs';
-import { lookCost, regionBox, scriptInRegion } from './look-cost.mjs';
+import { lookCost, regionBox, scriptInRegion, paintedWork, planWork, sweepsInLog, workUnits } from './look-cost.mjs';
 import { preparedRoot, preparedKey, prepareCommand, readPrepared, writePrepared, preparedFilm, SHAPES_FILE, WASHES_FILE } from './prepared.mjs';
 import crypto from 'node:crypto';
 import { writeWorkSheets } from './work-sheets.mjs';
@@ -55,11 +55,19 @@ const ownAuthors = JSON.parse(fs.readFileSync(path.join(HERE, 'authors.json'), '
 const known = new Set(scanOptions(ROOT).keys());
 const code = codeState(ROOT), switches = switchesOf(), jobs = req.jobs ?? DEFAULT_JOBS;
 // the benchmark's resource budget for one try, the same for every model and told to it at the start (session.mjs)
-const looksMost = req.looks ?? DEFAULT_LOOKS, wallMost = req.wallMinutes ?? DEFAULT_WALL_MINUTES, graceMost = req.graceMinutes ?? DEFAULT_GRACE_MINUTES, revertsMost = req.reverts ?? DEFAULT_REVERTS;
-const budget = { looks: looksMost, wallMinutes: wallMost, graceMinutes: graceMost, reverts: revertsMost };
+const looksMost = req.looks ?? DEFAULT_LOOKS, wallMost = req.wallMinutes ?? DEFAULT_WALL_MINUTES, graceMost = req.graceMinutes ?? DEFAULT_GRACE_MINUTES, revertsMost = req.reverts ?? DEFAULT_REVERTS, stepsMost = req.steps ?? DEFAULT_STEPS;
+// the terms of a try: rendering units and steps are its budget; the wall clock is a safety stop only
+const budget = { looks: looksMost, steps: stepsMost, safetyMinutes: wallMost, graceMinutes: graceMost, reverts: revertsMost };
+/** The model's steps so far, counted from its transcript as it is written (each tool call once); read again only when the file grew. */
+function stepCounter(cli, file) {
+  let size = -1, count = 0;
+  return () => { let st; try { st = fs.statSync(file).size; } catch { return count; } if (st !== size) { size = st; count = readTranscript(cli, fs.readFileSync(file, 'utf8')).steps.length; } return count; };
+}
 const BRIEF_FILE = process.env.UNPAINT_AUTHOR_BRIEF || path.join(HERE, 'AUTHOR-BRIEF.md');
 const codeOf = c => ({ commit: c.commit, dirty: Boolean(c.dirty), tracked: c.tracked, untracked: c.untracked.map(u => u.file), diffSha256: c.diffSha256 });
 // the painter's environment: where segmentation lives, and a cache folder keyed on the experiment switches
+/** A plan's washes as the work they hold (look-cost.mjs planWork): stage, layer, and the count of strokes. */
+const passesOf = file => (JSON.parse(fs.readFileSync(file, 'utf8')).passes ?? []).map(p => ({ stage: p.stage ?? null, layer: p.layer ?? null, strokes: p.strokes?.length ?? 0 }));
 /** A session's network gate and toolbox (session-net.mjs), for a command that has them; {gate, toolbox, done()}. */
 async function closedRoutes(author) {
   if (!PROVIDER_HOSTS[author.cli]) return { gate: null, toolbox: null, done: async () => null };
@@ -264,7 +272,7 @@ async function compileOnce(r, choice, script, plate, edit) {
     const numbers = await planNumbers({ plate, planPreview: results.planPreview, run: runOf(record, mine), script });
     // the painter's own count of an edit it applied, with its notes (a colour laid as the nearest that can be, a smaller brush)
     let editRecord = null; if (edit) { try { editRecord = JSON.parse(fs.readFileSync(path.join(plate, 'plan-edit-record.json'), 'utf8')); } catch { /* the session's own count stands */ } }
-    return { ok: true, ...numbers, planPreview: results.planPreview, seconds: done.seconds, plate, editRecord, toolFiles: await toolFiles(r, choice) };
+    return { ok: true, ...numbers, passes: passesOf(path.join(plate, 'value-plan.json')), planPreview: results.planPreview, seconds: done.seconds, plate, editRecord, toolFiles: await toolFiles(r, choice) };
   } catch (e) { return { ok: false, error: tidy(e.message) }; }
 }
 
@@ -317,11 +325,14 @@ async function paintLookOnce(r, choice, script, plate, at, edit, compiled, ask =
       return { ok: false, error: tidy(`${fault}${why ? `: ${why}` : ''}`) };
     }
     const numbers = await planNumbers({ plate, planPreview: results.planPreview ?? compiled.planPreview, run: runOf(record, small), script, painting: results.painting });
+    // the work it really did, by the painter's own counts (look-cost.mjs): what it is charged
+    let work = null, workFault = null;
+    try { work = paintedWork({ sweeps: stoppedAt ? stoppedAt.strokes : sweepsInLog(fs.readFileSync(`${plate}.log`, 'utf8')), passes: passesOf(path.join(plate, 'value-plan.json')), passesDone: stoppedAt?.passesDone ?? null }); } catch (e) { workFault = e.message; say(r, `look ${at.look}: ${e.message}`); }
     say(r, `look ${at.look} painted and dried in ${Math.round(done.seconds / 60)} min (${results.backend.backend}, no fallback); ${numbers.marked.forms} named forms marked`);
     return { ok: true, picture: await lookPicture({ planPreview: results.painting, run: record }), stages: results.strip ? await stagesPicture(results.strip) : null,
       planPicture: compiled.planPreview ? await planPicture({ planPreview: compiled.planPreview, run: record }) : null,
       numbersText: `${stoppedAt ? `${stoppedText(stoppedAt, ask.until)}\n\n` : ''}${numbersText(numbers, { script: Boolean(script), painted: size })}`, marked: numbers.marked, stoppedText: stoppedAt ? stoppedText(stoppedAt, ask.until) : null,
-      painted: { until: ask.until ?? null, stopped: stoppedAt ? { passesDone: stoppedAt.passesDone, passesPlanned: stoppedAt.passesPlanned, strokes: stoppedAt.strokes } : null, region: ask.region?.box ?? null, regionPassages: inRegion ? `${inRegion.kept} of ${inRegion.of} passages` : null, cells: small.sheet.cells, fullCells: full.sheet.cells, size, seconds: done.seconds, waitedSeconds: Math.round((started - asked) / 1000), backend: results.backend, plate, painting: results.painting, strip: results.strip } };
+      painted: { work, workFault, until: ask.until ?? null, stopped: stoppedAt ? { passesDone: stoppedAt.passesDone, passesPlanned: stoppedAt.passesPlanned, strokes: stoppedAt.strokes } : null, region: ask.region?.box ?? null, regionPassages: inRegion ? `${inRegion.kept} of ${inRegion.of} passages` : null, cells: small.sheet.cells, fullCells: full.sheet.cells, size, seconds: done.seconds, waitedSeconds: Math.round((started - asked) / 1000), backend: results.backend, plate, painting: results.painting, strip: results.strip } };
   } catch (e) { return { ok: false, error: tidy(e.message) }; }
 }
 
@@ -373,7 +384,7 @@ async function preparedPlan(r) {
   const folder = preparedAt(r.spec), prepared = readPrepared(folder, { painting: Boolean(terms?.auto), command: prepareLine(r.spec) });
   const results = collectResults(prepared.plan, 'plan');
   if (!results.planPreview) throw new Error(`the prepared plan in ${prepared.plan} has no picture; make it again:\n  ${prepareLine(r.spec)}`);
-  const auto = { ok: true, ...await planNumbers({ plate: prepared.plan, planPreview: results.planPreview, run: r.record, script: null }), planPreview: results.planPreview, seconds: 0, plate: prepared.plan, editRecord: null, toolFiles: [], prepared: true };
+  const auto = { ok: true, ...await planNumbers({ plate: prepared.plan, planPreview: results.planPreview, run: r.record, script: null }), passes: passesOf(path.join(prepared.plan, 'value-plan.json')), planPreview: results.planPreview, seconds: 0, plate: prepared.plan, editRecord: null, toolFiles: [], prepared: true };
   // a plan of the choice that changes nothing is answered from the prepared plan, whoever asks
   planned.set(`${r.spec.id}:${r.spec.variant ?? ''}:${choiceKey(readChoice({ kind: 'settings', settings: {} }), '')}`, Promise.resolve(auto));
   return { auto, prepared, folder };
@@ -434,6 +445,10 @@ async function sessionRun(r) {
     const { auto, prepared, folder: preparedFolder } = await preparedPlan(r);
     if (terms.shapes) numbered = await shapesOf(r, prepared);
     record.author.prepared = { plan: true, painting: Boolean(prepared.painting), from: preparedFolder, commit: prepared.record.commit ?? null, madeAt: prepared.record.made ?? null, planSeconds: prepared.record.plan?.seconds ?? null, paintingSeconds: prepared.record.painting?.seconds ?? null };
+    // the terms of this try, so a rerun has identical terms: budgets, the subject's unit, the seed, the commit, and the prepared inputs by hash
+    const hashOf = f => (f && fs.existsSync(f) ? crypto.createHash('sha256').update(fs.readFileSync(f)).digest('hex') : null);
+    record.author.terms = { budget, unit: prepared.record.unit, seed: null, commit: code.commit, dirty: Boolean(code.dirty), level: level.name, tryNumber: req.tryNumber, model: author.id, cli: author.cli,
+      prepared: { folder: preparedFolder, plan: hashOf(path.join(prepared.plan, 'value-plan.json')), planToEdit: hashOf(path.join(prepared.plan, 'plan-to-edit.json')), shapes: hashOf(prepared.shapes), washes: hashOf(prepared.washes), painting: prepared.painting ? Object.fromEntries(prepared.painting.sheets.map(f => [f.name, hashOf(f.from)])) : null } };
     say(r, `the code planner's plan was taken prepared (${preparedFolder})${prepared.painting ? ', and its full-size painting with it' : ''}: nothing of it is made on the session's clock`);
     // the model's folder: a temporary one outside the repository; it is kept in the run folder when the session ends
     const cwd = r.sessionDir, real = fs.realpathSync(cwd), listing = toEdit(auto.plate), base = await baseOf(r);
@@ -445,14 +460,14 @@ async function sessionRun(r) {
       if (terms.previous) record.author.previousTry = { tryNumber: req.tryNumber, retries: req.retries, from: path.resolve(req.previous) };
       routes = await closedRoutes(author);
       const { prompt, pictures: handedPictures } = writeSession({ dir: cwd, tools: routes.toolbox ? toolsText(routes.toolbox.said) : undefined, packet, sheet: spec.sheet, medium: record.drawing.medium, auto: { picture: await planPicture({ planPreview: auto.planPreview, run: record }), washesText: washesText(auto), plan: { summary: auto.summary, washes: auto.rows }, toEdit: listing }, settings: settingsList(spec),
-        forms: record.masks.mask ? await formBoxes(record.masks.mask, record.masks.forms, W) : null, formsIds: record.masks.mask ?? null, looks: looksMost, wallMinutes: wallMost, graceMinutes: graceMost, reverts: revertsMost, briefFile: path.join(HERE, 'SESSION-BRIEF.md'), readmeFile: path.join(HERE, 'SESSION-README.md'), handed,
+        forms: record.masks.mask ? await formBoxes(record.masks.mask, record.masks.forms, W) : null, formsIds: record.masks.mask ?? null, looks: looksMost, wallMinutes: wallMost, graceMinutes: graceMost, steps: stepsMost, reverts: revertsMost, briefFile: path.join(HERE, 'SESSION-BRIEF.md'), readmeFile: path.join(HERE, 'SESSION-README.md'), handed,
         drawing: base.listing ? { listing: base.listing, picture: await drawingPicture(allLinesDoc(base.vectors), W) } : null });
       // what was handed, by hash, as it lies in the session's folder: a retry's first message can be shown to carry it
       const sha = f => crypto.createHash('sha256').update(fs.readFileSync(f)).digest('hex');
       record.author.handed = handed.map(h => ({ folder: h.folder, files: h.files.map(f => ({ name: f.name, sha256: sha(path.join(cwd, h.folder, f.name)), picture: Boolean(f.picture), namedInTheFirstMessage: prompt.includes(`\`${h.folder}/${f.name}\``) })) }));
       if (terms.previous) { const painting = ['painting.png', 'painting.jpg'].map(f => path.join(path.resolve(req.previous), 'plate', f)).find(f => fs.existsSync(f)); record.author.previousTry.paintingSha256 = sha(painting); record.author.previousTry.painting = painting; }
       fs.writeFileSync(path.join(dir, 'session-prompt.txt'), prompt);
-      const server = sessionServer({ dir: cwd, sheet: { widthMm: spec.sheet.widthMm, heightMm: spec.sheet.heightMm }, forms: record.masks.mask ? await formBoxes(record.masks.mask, record.masks.forms, W) : [], looks: looksMost, wallMinutes: wallMost, graceMinutes: graceMost, reverts: revertsMost, startKey: choiceKey(readChoice({ kind: 'settings', settings: {} }), ''), pictures: handedPictures, checkScript: check, checkPlan: obj => checkEdit(obj, listing), checkTools, ledger: path.join(dir, 'looks.jsonl'), keep: path.join(dir, 'looks'), compile: (choice, script, n, edit) => compileChoice(r, choice, script, path.join(dir, 'plans', String(n)), edit),
+      const server = sessionServer({ dir: cwd, sheet: { widthMm: spec.sheet.widthMm, heightMm: spec.sheet.heightMm }, forms: record.masks.mask ? await formBoxes(record.masks.mask, record.masks.forms, W) : [], looks: looksMost, wallMinutes: wallMost, graceMinutes: graceMost, steps: stepsMost, stepsTaken: stepCounter(author.cli, path.join(dir, 'S.out.txt')), unit: prepared.record.unit, reverts: revertsMost, startKey: choiceKey(readChoice({ kind: 'settings', settings: {} }), ''), pictures: handedPictures, checkScript: check, checkPlan: obj => checkEdit(obj, listing), checkTools, ledger: path.join(dir, 'looks.jsonl'), keep: path.join(dir, 'looks'), compile: (choice, script, n, edit) => compileChoice(r, choice, script, path.join(dir, 'plans', String(n)), edit),
         look: (choice, script, at, edit, compiled, ask) => paintLook(r, choice, script, path.join(dir, 'look-paints', `${at.plan}-${at.look}`), at, edit, compiled, ask) });
       // what nothing of the session may read: this checkout, the checkout it is a worktree of (with every worktree, cache
       // and earlier run under it), the subject list with its inputs, and whatever UNPAINT_SESSION_DENY adds (a:b:c)
@@ -464,7 +479,7 @@ async function sessionRun(r) {
         if (can(path.join(ROOT, 'package.json'))) throw new Error('the session\'s sandbox does not hold: a file of the repository can be read under it; the session is not started');
         if (!can(path.join(cwd, 'README.md'))) throw new Error('the session\'s sandbox cannot be started on this machine (its own folder is not readable under it); the session is not started');
       }
-      say(r, `${author.name} starts its working session (${author.cli}; level ${level.name}, try ${req.tryNumber}; the benchmark's budget for this try: ${wallMost} min on the clock, ${looksMost} look units of rendering, ${revertsMost} returns to an earlier choice${handed.length ? `; handed: ${handed.map(h => h.folder).join(', ')}` : ''}): ${call.closed}`);
+      say(r, `${author.name} starts its working session (${author.cli}; level ${level.name}, try ${req.tryNumber}; the benchmark's budget for this try: ${looksMost} rendering units, ${stepsMost} steps, ${revertsMost} returns to an earlier choice; safety stop at ${wallMost} min${handed.length ? `; handed: ${handed.map(h => h.folder).join(', ')}` : ''}): ${call.closed}`);
       // the folder as the model is given it, so the files it made can be told from the ones it was handed
       const startFiles = listFiles(cwd);
       server.start();
@@ -484,11 +499,11 @@ async function sessionRun(r) {
       fin = done.ended === 'not started' ? { failure: `the model could not be called: ${done.error}` } : finalChoice({ present: server.present, lastGood: kept.lastGood, good: kept.good, ended: done.ended, barred: server.barred });
       const outside = reachedOutside(seen.commands, deny, [cwd, real]), pictures = ownPictures(cwd);
       // a session ended by the budget is not a failure: it is marked, and what it had is painted
-      const budgetReached = kept.budgetReached ?? (done.ended === 'budget reached' ? { what: `${wallMost} minutes of wall time` } : null);
+      const budgetReached = kept.budgetReached ?? (done.ended === 'budget reached' ? { what: `the safety stop (${wallMost} minutes on the clock)`, safetyStop: true } : null);
       session = {
-        ended: done.ended === 'budget reached' ? 'reached the benchmark\'s resource budget' : done.ended, exit: done.exit, error: done.ended === 'budget reached' ? null : done.error, level: level.name, tryNumber: req.tryNumber, budget, budgetReached, looksMost,
+        ended: done.ended === 'budget reached' ? (budgetReached?.safetyStop ? 'cut off by the safety stop' : 'reached the benchmark\'s resource budget') : done.ended, exit: done.exit, error: done.ended === 'budget reached' ? null : done.error, level: level.name, tryNumber: req.tryNumber, budget, budgetReached, looksMost,
         ownMinutes: +(kept.ownSeconds / 60).toFixed(1), waitMinutes: +(kept.waitSeconds / 60).toFixed(1), wallMinutes: +((Date.now() - t0) / 60000).toFixed(1),
-        lookUnits: kept.lookUnits, assessment: terms.previous ? { asked: true, written: Boolean(assessment), text: assessment } : null,
+        lookUnits: kept.lookUnits, steps: kept.steps, assessment: terms.previous ? { asked: true, written: Boolean(assessment), text: assessment } : null,
         looks: kept.looks, selfReviews: reviews, turns: 1, plans: kept.plans.map(({ key, ...p }) => p), reverts: kept.reverts, warningsGiven: kept.warningsGiven, toolCalls: seen.calls, toolCallsTotal: Object.values(seen.calls).reduce((a, b) => a + b, 0),
         // the pictures it was handed: its own line on each (seen.md), and what its command's log shows of a read (null: that log cannot show one)
         pictures: kept.pictures ? { ...kept.pictures, logShowsRead: logReads(author.cli, seen.commands, kept.pictures.handed) } : null,
@@ -505,7 +520,7 @@ async function sessionRun(r) {
       if (fin.submitted) record.author.parity = { ...checkHandedOver(path.join(dir, 'folder'), JSON.parse(fs.readFileSync(path.join(dir, 'handed-over.json'), 'utf8'))), of: path.join(dir, 'handed-over.json') };
       // a session that named the painter, the repository or another session in a command went round its looks: it is not painted
       if (outside.length && !fin.failure) fin = { failure: `the look limit was not held: ${outside.length} of its commands name the painter or a place outside its folder (author/S.commands.txt); nothing of this session is painted`, submitted: fin.submitted };
-      say(r, `session ${session.ended === 'done' ? 'ended' : `ended (${session.ended})`}: ${session.wallMinutes} min on the clock (${session.ownMinutes} its own), ${kept.looks.length} looks for ${kept.lookUnits.spent} of ${looksMost} look units, ${kept.plans.length} plans, ${session.toolCallsTotal} tool calls, ${kept.reverts.count} returns to an earlier choice, ${kept.warningsGiven} warnings given; handed over: ${fin.submitted ? `${fin.submitted.what}${fin.submitted.note ? ` (${fin.submitted.note})` : ''}` : 'nothing'}${outside.length ? `; ${outside.length} COMMANDS NAME PLACES OUTSIDE ITS FOLDER (S.commands.txt)` : ''}${pictures.length ? `; it made ${pictures.length} pictures of its own` : ''}`);
+      say(r, `session ${session.ended === 'done' ? 'ended' : `ended (${session.ended})`}: ${session.wallMinutes} min on the clock (${session.ownMinutes} its own), ${kept.looks.length} looks for ${kept.lookUnits.spent} of ${looksMost} rendering units, ${kept.steps.taken} of ${stepsMost} steps, ${kept.plans.length} plans, ${session.toolCallsTotal} tool calls, ${kept.reverts.count} returns to an earlier choice, ${kept.warningsGiven} warnings given; handed over: ${fin.submitted ? `${fin.submitted.what}${fin.submitted.note ? ` (${fin.submitted.note})` : ''}` : 'nothing'}${outside.length ? `; ${outside.length} COMMANDS NAME PLACES OUTSIDE ITS FOLDER (S.commands.txt)` : ''}${pictures.length ? `; it made ${pictures.length} pictures of its own` : ''}`);
     } finally { if (routes) await routes.done(); fs.rmSync(cwd, { recursive: true, force: true }); }
   }
   record.author.session = session; record.author.label = authorLabel(record.author);
@@ -670,6 +685,8 @@ async function oneRun(r) {
   try { record.sheetImage = (await writeRunSheet(record, path.join(record.out, 'sheet.jpg'))).file; } catch (e) { say(r, `no sheet: ${e.message}`); }
   // what the session cost, measured: its looks, plans, minutes, tokens and cost, the machine's minutes for its looks and
   // for the full-size final (which is painted after the session, outside its clock), and what was taken prepared
+  // the seed the final was painted with (a locked setting: the same for every run of the subject), into the terms
+  if (record.author.terms && Array.isArray(record.argv) && record.argv.includes('--seed')) record.author.terms.seed = record.argv[record.argv.indexOf('--seed') + 1];
   if (record.author.session) {
     let plan = null; try { plan = planSummary(JSON.parse(fs.readFileSync(path.join(record.plate, 'value-plan.json'), 'utf8'))); } catch { /* no plan was made */ }
     const s = record.author.session, usage = usageOf({ subject: record.subject.key, author: record.author, level: s.level ?? record.author.level ?? null, tryNumber: s.tryNumber ?? record.author.tryNumber ?? null, budget: s.budget ?? record.author.budget ?? null, session: s,
@@ -688,7 +705,7 @@ async function oneRun(r) {
  */
 async function prepareRun(r) {
   const { spec, record } = r, folder = preparedAt(spec), plan = path.join(folder, 'plan'), read = f => { try { return JSON.parse(fs.readFileSync(f, 'utf8')); } catch { return null; } };
-  const was = read(path.join(folder, 'prepared.json')) ?? {}, out = { subject: { id: spec.id, variant: spec.variant ?? null, sourceSha256: spec.source.sha256 }, commit: code.commit, dirty: Boolean(code.dirty), diffSha256: code.dirty ? code.diffSha256 : null, sets: req.sets, plan: was.plan ?? null, painting: was.painting ?? null };
+  const was = read(path.join(folder, 'prepared.json')) ?? {}, out = { subject: { id: spec.id, variant: spec.variant ?? null, sourceSha256: spec.source.sha256 }, commit: code.commit, dirty: Boolean(code.dirty), diffSha256: code.dirty ? code.diffSha256 : null, sets: req.sets, plan: was.plan ?? null, unit: was.unit ?? null, painting: was.painting ?? null };
   try {
     if (out.plan && fs.existsSync(path.join(plan, 'value-plan.json'))) say(r, `the plan is already prepared (${plan})`);
     else {
@@ -706,6 +723,16 @@ async function prepareRun(r) {
     fs.writeFileSync(path.join(folder, WASHES_FILE), JSON.stringify(washes) + '\n');
     out.shapes = { file: SHAPES_FILE, shapes: shapes.shapes.length, withOutline: shapes.shapes.filter(x => x.polygons.length).length, washesFile: WASHES_FILE, washes: washes.shapes.length };
     out.made = out.plan.made; writePrepared(folder, out);
+    // the subject's rendering unit (look-cost.mjs): one full look of the automatic plan, painted at look size, counted
+    if (!out.unit) {
+      say(r, 'painting one look of the automatic plan at look size: the subject\'s rendering unit (GPU)');
+      const choice = readChoice({ kind: 'settings', settings: {} }), compiled = await compileChoice(r, choice, null, plan);
+      const got = await paintLookOnce(r, choice, null, path.join(folder, 'unit-look', 'plate'), { plan: 0, look: 0 }, null, compiled, {});
+      if (!got.ok || !got.painted.work) throw new Error(`the unit look was not painted or not counted: ${got.error ?? got.painted?.workFault}`);
+      const w = got.painted.work, pw = planWork(compiled.passes);
+      out.unit = { look: w.sweeps + w.dryings, lookWork: w, plan: pw.sweeps + pw.dryings, planWork: pw, cells: got.painted.cells, seconds: got.painted.seconds, backend: got.painted.backend?.backend ?? null, made: new Date().toISOString() };
+      writePrepared(folder, out); say(r, `rendering unit: ${out.unit.look} (${w.sweeps} brush sweeps and ${w.dryings} dryings in one full look of the automatic plan at ${out.unit.cells} cells across; ${out.unit.seconds} s)`);
+    }
     if (level.autoPainting) {
       if (out.painting && fs.existsSync(path.join(record.out, 'run.json'))) say(r, `the automatic painting is already prepared (${record.out})`);
       else {

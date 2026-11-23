@@ -54,11 +54,11 @@ test('usage: what a session cost, measured; the budget and whether it was reache
   const u = usageOf({ subject: 'mittens:', author: { key: 'opus', name: 'Opus', id: 'm', cli: 'claude', tokens: 1500, tokensIn: 1200, tokensOut: 300, costUSD: 4.25 }, level: 'L4', tryNumber: 2, budget: { looks: 100, wallMinutes: 60, graceMinutes: 10, reverts: 20 }, session,
     final: { seconds: 2400, backend: 'gpu', failure: null }, plan: { washes: 40, strokes: 900, dryings: 6, passages: 31 }, prepared: { plan: true, painting: true, from: 'p' }, commit: 'abc' });
   const { looksEach, ...rest } = u.session; assert.deepEqual(looksEach[0], { look: 1, cost: 0.3, until: 1, region: null, machineSeconds: 420 });
-  assert.deepEqual(rest, { ended: 'reached the benchmark\'s resource budget', wallMinutes: 70.2, ownMinutes: 18.5, waitMinutes: 51.7, looks: 4, lookUnits: { spent: 2.3, budget: 5 }, plans: 2, plansRefused: 1, toolCalls: 81, toolCallsByKind: { shell: 60, 'unpaint look': 4 }, selfReviews: 1, assessmentWritten: true, reverts: { count: 2, allowed: 20, refused: 0 }, warningsGiven: 5, picturesHanded: ['a.jpg', 'b.jpg'], picturesDescribed: 1 });
+  assert.deepEqual(rest, { ended: 'reached the benchmark\'s resource budget', wallMinutes: 70.2, ownMinutes: 18.5, waitMinutes: 51.7, steps: null, cutOffBySafetyStop: false, looks: 4, lookUnits: { spent: 2.3, budget: 5 }, plans: 2, plansRefused: 1, toolCalls: 81, toolCallsByKind: { shell: 60, 'unpaint look': 4 }, selfReviews: 1, assessmentWritten: true, reverts: { count: 2, allowed: 20, refused: 0 }, warningsGiven: 5, picturesHanded: ['a.jpg', 'b.jpg'], picturesDescribed: 1 });
   assert.deepEqual(u.model, { tokensIn: 1200, tokensOut: 300, tokens: 1500, costUSD: 4.25, costFrom: 'reported by the command' });
   assert.deepEqual([u.machine.lookGpuMinutes, u.machine.lookPaintings, u.machine.planCpuMinutes, u.machine.finalGpuMinutes], [20, 3, 1.5, 40]); assert.deepEqual(u.work, { washes: 40, strokes: 900, dryings: 6, passages: 31 });
   assert.equal(u.budget.reached.what, '60 minutes of wall time'); assert.match(u.budget.note, /Recorded, not a failure/); assert.equal(u.prepared.plan, true); assert.deepEqual([u.level, u.try], ['L4', 2]);
-  assert.match(usageLine(u), /4 looks for 2\.3 of 5 look units \(20 GPU min\), 2 plans, 70.2 wall min \(18.5 its own\), 81 tool calls, 1500 tokens, \$4.25, 2 returns to an earlier choice; final 40 GPU min; REACHED THE BENCHMARK'S RESOURCE BUDGET/);
+  assert.match(usageLine(u), /4 looks for 2\.3 of 5 rendering units, \? of \? steps \(20 GPU min\), 2 plans, 70.2 wall min \(18.5 its own\), 81 tool calls, 1500 tokens, \$4.25, 2 returns to an earlier choice; final 40 GPU min; REACHED THE BENCHMARK'S RESOURCE BUDGET/);
   const quiet = usageOf({ subject: 's', author: { key: 'astra', name: 'Astra' }, level: 'L2', tryNumber: 1, budget: {}, session: { ended: 'done' } });
   assert.equal(quiet.budget.reached, null); assert.equal(quiet.model.costFrom, 'not reported by this command'); assert.equal(quiet.machine.finalGpuMinutes, null);
 });
@@ -91,12 +91,14 @@ test('prepared inputs: kept for a subject, a commit and the run\'s settings; a s
     const folder = path.join(root, 'mittens', 'abcdef01');
     assert.throws(() => readPrepared(folder, { command }), /the automatic plan of this subject is not prepared .* a session never makes it on its own clock\. Make it once with:\n {2}npm run paint -- mittens prepare --level L4/);
     writePrepared(folder, { commit: 'abcdef01', plan: { seconds: 80 }, painting: null }); fs.mkdirSync(path.join(folder, 'plan'));
+    assert.throws(() => readPrepared(folder, { command }), /the subject's rendering unit \(one full look of the automatic plan, counted\) is not prepared/);
+    writePrepared(folder, { commit: 'abcdef01', plan: { seconds: 80 }, unit: { look: 300, plan: 960 }, painting: null });
     assert.throws(() => readPrepared(folder, { command }), /its value-plan\.json/);
     for (const f of ['value-plan.json', 'plan-to-edit.json']) fs.writeFileSync(path.join(folder, 'plan', f), '{}');
     assert.equal(readPrepared(folder, { command }).painting, null); assert.throws(() => readPrepared(folder, { painting: true, command }), /the block-in study's flat shapes as data \(level 4 hands them to the session\) is not prepared/); fs.writeFileSync(path.join(folder, 'shapes.json'), '{}');
     assert.throws(() => readPrepared(folder, { painting: true, command }), /the plan's washes as data \(level 4 hands them to the session\)/); fs.writeFileSync(path.join(folder, 'washes.json'), '{}');
     assert.throws(() => readPrepared(folder, { painting: true, command }), /the automatic painter's full-size painting of this subject \(level 4 hands it to the session\) is not prepared/);
-    writePrepared(folder, { commit: 'abcdef01', plan: { seconds: 80 }, painting: { seconds: 900 } }); fs.mkdirSync(path.join(folder, 'painting')); fs.writeFileSync(path.join(folder, 'painting', 'run.json'), '{}');
+    writePrepared(folder, { commit: 'abcdef01', plan: { seconds: 80 }, unit: { look: 300, plan: 960 }, painting: { seconds: 900 } }); fs.mkdirSync(path.join(folder, 'painting')); fs.writeFileSync(path.join(folder, 'painting', 'run.json'), '{}');
     assert.throws(() => readPrepared(folder, { painting: true, command }), /the automatic painting's final-beside-subject\.jpg/);
     fs.mkdirSync(path.join(folder, 'sheets')); for (const f of Object.values(SHEET_FILES)) fs.writeFileSync(path.join(folder, 'sheets', f), 'x');
     assert.deepEqual(readPrepared(folder, { painting: true, command }).painting.sheets.map(s => s.name), Object.values(SHEET_FILES));

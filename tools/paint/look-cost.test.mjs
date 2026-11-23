@@ -27,3 +27,15 @@ test('a region look of a script paints the passages that touch the box, and what
   const got = scriptInRegion(script, [65, 55, 90, 80]);
   assert.deepEqual(got.script.passages.map(p => p.id), ['face', 'cheek', 'eye', 'ground'], 'in the script\'s own order; the wash a kept passage is dropped into is kept'); assert.deepEqual([got.kept, got.of], [4, 6]); assert.equal(script.passages.length, 6); assert.deepEqual(got.script.palette, ['ochre']);
 });
+
+test('rendering by the work done: brush sweeps and dryings, against one full automatic look; quoted from the plan, charged from the painter', async () => {
+  const { planWork, paintedWork, workUnits, sweepsInLog, dryingsOf, workCostLine } = await import('./look-cost.mjs');
+  const passes = [{ stage: 1, layer: 1, strokes: 40 }, { stage: 1, layer: 1, strokes: 20 }, { stage: 2, layer: 2, strokes: 30 }, { stage: 3, layer: 3, strokes: 7 }];
+  assert.deepEqual(planWork(passes), { sweeps: 97, dryings: 3 }); assert.deepEqual(planWork(passes, { until: 1 }), { sweeps: 60, dryings: 1 }); assert.equal(dryingsOf([]), 0);
+  assert.equal(workUnits(planWork(passes), 100), 1, 'the automatic plan against itself is exactly one unit'); assert.equal(workUnits(planWork(passes, { until: 1 }), 100), 0.61); assert.equal(workUnits({ sweeps: 0, dryings: 1 }, 100), LEAST_LOOK_COST);
+  assert.equal(workUnits(planWork(passes), 100, 0.5), 0.5, 'a region quote is its share of the passages');
+  assert.deepEqual(paintedWork({ sweeps: 55, passes, passesDone: 2 }), { sweeps: 55, dryings: 1 }); assert.deepEqual(paintedWork({ sweeps: 97, passes }), { sweeps: 97, dryings: 3 });
+  assert.throws(() => paintedWork({ sweeps: null, passes }), /did not report how many brush sweeps/); assert.throws(() => workUnits({ sweeps: 1, dryings: 0 }, 0), /no rendering unit: prepare it again/);
+  assert.equal(sweepsInLog('x\n952 brush sweeps, 144 frames, 1221 s\n'), 952); assert.equal(sweepsInLog('nothing'), null);
+  assert.match(workCostLine(passes, { plan: 100 }, 4), /^ A look of this plan is quoted at 1 of your 4 units left; stopped early less \(--until 1: 0\.61, --until 2: 0\.92\)/);
+});

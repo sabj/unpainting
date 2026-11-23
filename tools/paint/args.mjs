@@ -1,7 +1,7 @@
 // The command line of `npm run paint`:
 //   npm run paint -- <subject[,subject...]> plan|paint|prepare|look|preflight [--author auto|<model key>[,...]] [--studies locked|author]
 //                    [--work session|reply] [--level L2|L3|L4] [--retries N] [--try N] [--previous <dir>]
-//                    [--looks N] [--wallminutes N] [--graceminutes N] [--reverts N] [--from <dir>] [--lines FILE.json|standard]
+//                    [--looks N] [--wallminutes N] [--graceminutes N] [--steps N] [--reverts N] [--from <dir>] [--lines FILE.json|standard]
 //                    [--set key=value ...] [--jobs N] [--out <dir>] [--dry-run] [--no-open]
 // Nothing here touches a file: it turns the words into one request object, or throws with the usage.
 
@@ -35,11 +35,12 @@ export const USAGE = `usage: npm run paint -- <subject[,subject...]> plan|paint|
                         (default 5). A full look of the whole plan on the whole sheet costs 1; a look stopped at
                         a stage costs that stage's share of the washes; a look of a region the share of
                         the script's passages that touch it. The cost is told before it is spent. Machine seconds are recorded, never charged
-  --wallminutes N       the benchmark's resource budget, time: minutes on the wall clock for one try, looks and
-                        planning included (default 60). When either budget is reached the session is asked to
-                        hand in what it has and the run says so; it is not a failure. The full-size final is
-                        painted after the session, outside this clock
-  --graceminutes N      minutes a session has to hand in once the time budget is reached (default 10)
+  --wallminutes N       the safety stop, not a budget: minutes on the wall clock after which a session is cut off and
+                        marked so (default 360). Waiting for a look, a queue or the provider is never charged
+  --graceminutes N      minutes a session has to hand in after the safety stop (default 10)
+  --steps N             the benchmark's budget of the model's own steps: its tool calls (default 1000). When the
+                        rendering units or the steps are used the session is asked to hand in what it has and the
+                        run says so; it is not a failure. The full-size final is painted after the session
   --reverts N           how often a session may go back to a choice it had left (default 20); every return is
                         counted and reported, and past this number a return is refused
   --from <dir>          paint what the sessions of an earlier run handed over (its --out folder), calling no model:
@@ -67,12 +68,12 @@ export const USAGE = `usage: npm run paint -- <subject[,subject...]> plan|paint|
 A subject may name a variant kept in tools/paint/variants.json: h36:approved.
 "all" is every registered subject not already named: all, or a,b,all to paint a and b first.`;
 
-const VALUED = new Set(['--author', '--studies', '--set', '--out', '--jobs', '--work', '--looks', '--wallminutes', '--graceminutes', '--reverts', '--level', '--try', '--retries', '--until', '--region', '--previous', '--from', '--lines']);
+const VALUED = new Set(['--author', '--studies', '--set', '--out', '--jobs', '--work', '--looks', '--wallminutes', '--graceminutes', '--steps', '--reverts', '--level', '--try', '--retries', '--until', '--region', '--previous', '--from', '--lines']);
 const FLAGS = new Set(['--dry-run', '--no-open']);
 
 /**
  * {subjects: [{id, variant}], mode, prepare, authors, studies, work, level, tryNumber, previous, looks,
- * wallMinutes, graceMinutes, reverts, retries, look, until, region, from, sets: [[key, value]], jobs, out, dryRun, open}. `prepare`: the word was
+ * wallMinutes, graceMinutes, steps, reverts, retries, look, until, region, from, sets: [[key, value]], jobs, out, dryRun, open}. `prepare`: the word was
  * prepare; `mode` is then plan (the plan alone) or paint (level 4: the painting too). Throws on anything unknown.
  */
 export function parseArgs(argv) {
@@ -117,7 +118,7 @@ export function parseArgs(argv) {
   const looks = given['--looks'] === undefined ? null : Number(given['--looks']);
   if (looks !== null && !(looks > 0 && looks <= 100000)) throw new Error('--looks: the rendering budget of a try in units, a number above 0 (a full look costs 1)');
   const retries = whole('--retries', 1, 1000) ?? 1, until = whole('--until', 1, 9);
-  const wallMinutes = whole('--wallminutes', 1, 100000), graceMinutes = whole('--graceminutes', 0, 600), reverts = whole('--reverts', 0, 100000), tryNumber = whole('--try', 1, 100000) ?? 1;
+  const wallMinutes = whole('--wallminutes', 1, 100000), graceMinutes = whole('--graceminutes', 0, 600), steps = whole('--steps', 1, 1000000), reverts = whole('--reverts', 0, 100000), tryNumber = whole('--try', 1, 100000) ?? 1;
   const sets = given['--set'].map(s => {
     const at = s.indexOf('=');
     if (at < 1 || at === s.length - 1) throw new Error(`--set ${s}: write key=value`);
@@ -128,7 +129,7 @@ export function parseArgs(argv) {
   const jobs = given['--jobs'] === undefined ? null : Number(given['--jobs']);
   if (jobs !== null && !(Number.isInteger(jobs) && jobs >= 1 && jobs <= 16)) throw new Error('--jobs: a whole number of paintings at once, 1 to 16');
   if (preflight && (authors.includes('auto') || authors.some(a => a.includes(':')))) throw new Error('preflight checks models through the session harness: give --author <model key>[,<model key>...]');
-  return { subjects, mode, prepare, preflight, look, until, region: given['--region'] ?? null, authors, studies, work, level, tryNumber, retries, previous: given['--previous'] ?? null, looks, wallMinutes, graceMinutes, reverts, from: given['--from'] ?? null, lines: given['--lines'] ?? null, sets, jobs, out: given['--out'] ?? null, dryRun: flags.has('--dry-run'), open: !flags.has('--no-open') };
+  return { subjects, mode, prepare, preflight, look, until, region: given['--region'] ?? null, authors, studies, work, level, tryNumber, retries, previous: given['--previous'] ?? null, looks, wallMinutes, graceMinutes, steps, reverts, from: given['--from'] ?? null, lines: given['--lines'] ?? null, sets, jobs, out: given['--out'] ?? null, dryRun: flags.has('--dry-run'), open: !flags.has('--no-open') };
 }
 
 function list(s) { return s.split(',').map(x => x.trim()).filter(Boolean); }

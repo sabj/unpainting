@@ -47,6 +47,7 @@ export function prepareCommand({ subject, level = 'L2', sets = [] }) {
 export function readPrepared(folder, { painting = false, command }) {
   const miss = what => new Error(`${what} is not prepared for this code and these settings (looked in ${folder}). It is a prepared input: a session never makes it on its own clock. Make it once with:\n  ${command}`);
   let record; try { record = JSON.parse(fs.readFileSync(path.join(folder, 'prepared.json'), 'utf8')); } catch { throw miss('the automatic plan of this subject'); }
+  if (!(record.unit?.look > 0) || !(record.unit?.plan > 0)) throw miss('the subject\'s rendering unit (one full look of the automatic plan, counted)');
   const plan = path.join(folder, 'plan');
   for (const f of ['value-plan.json', 'plan-to-edit.json']) if (!fs.existsSync(path.join(plan, f))) throw miss(`the automatic plan of this subject (its ${f})`);
   const shapes = path.join(folder, SHAPES_FILE), washes = path.join(folder, WASHES_FILE);

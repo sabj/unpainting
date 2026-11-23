@@ -69,3 +69,36 @@ export function scriptInRegion(script, box) {
   for (let grew = true; grew;) { grew = false; for (const p of all) if (keep.has(p.id) && p.into && !keep.has(p.into)) { keep.add(p.into); grew = true; } }
   return { script: { ...script, passages: all.filter(p => keep.has(p.id)) }, kept: keep.size, of: all.length };
 }
+
+/**
+ * RENDERING charged by the work a look really does, counted the same on any machine: its brush sweeps (every stroke
+ * the painter lays) and its dryings (each wet sitting of the plan is dried once before the next). Both are fixed by
+ * the plan, not by the machine. One unit is that sum for one full look of the code planner's plan of the subject
+ * (painted at look size when the subject was prepared, prepared.mjs `unit`), so a full look of the automatic plan
+ * costs exactly 1.00. A look is quoted from its plan before it is painted and charged the painter's own counts after.
+ */
+/** The work a plan holds, to a stage: {sweeps, dryings}. `passes`: the plan's washes in painting order, each {stage, layer, strokes (a count)}. */
+export function planWork(passes, { until = null } = {}) {
+  const upTo = passes.filter(p => until == null || (Number(p.stage) || 0) <= until);
+  return { sweeps: upTo.reduce((a, p) => a + (p.strokes || 0), 0), dryings: dryingsOf(upTo) };
+}
+/** How often the sheet is dried over these washes: once a wet sitting (consecutive washes of one layer are one sitting). */
+export const dryingsOf = passes => passes.reduce((n, p, i) => n + (i === 0 || p.layer !== passes[i - 1].layer ? 1 : 0), 0);
+/** The work a painted look did, from the painter's own counts: the sweeps it laid, and the dryings of the washes it got through. `passesDone`: null for a whole look. */
+export function paintedWork({ sweeps, passes, passesDone = null }) {
+  if (!Number.isInteger(sweeps) || sweeps < 0) throw new Error('the painter did not report how many brush sweeps it laid: the look cannot be charged');
+  return { sweeps, dryings: dryingsOf(passesDone == null ? passes : passes.slice(0, passesDone)) };
+}
+/** Units of a piece of work, against the subject's unit (the full automatic look's sweeps plus dryings). `share`: a region's share of the passages. */
+export function workUnits(work, unit, share = 1) {
+  if (!(unit > 0)) throw new Error('the subject has no rendering unit: prepare it again (a full look of the automatic plan sets it)');
+  return round(Math.max(LEAST_LOOK_COST, ((work.sweeps + work.dryings) * share) / unit));
+}
+/** The brush sweeps a painter's log reports at its end ("N brush sweeps, ..."), or null. */
+export const sweepsInLog = text => { const m = [...String(text).matchAll(/(\d+) brush sweeps, \d+ frames/g)].pop(); return m ? Number(m[1]) : null; };
+
+/** The costs of a plan's looks in one line, by its work, for the answer of a plan: quoted before anything is spent. `unit`: {plan}. */
+export function workCostLine(passes, unit, left) {
+  const stages = [...new Set(passes.map(p => Number(p.stage) || 0))].sort((a, b) => a - b), q = until => workUnits(planWork(passes, { until }), unit.plan);
+  return ` A look of this plan is quoted at ${q(null)} of your ${left} units left${stages.length > 1 ? `; stopped early less (${stages.slice(0, -1).map(s => `--until ${s}: ${q(s)}`).join(', ')})` : ''}; a look of a region of your own script is quoted at the share of its passages that touch the region. A look is charged what it really took (its brush sweeps and dryings, as the painter counts them).`;
+}

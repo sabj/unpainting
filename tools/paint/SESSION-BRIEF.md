@@ -43,14 +43,18 @@ You have this folder and a shell. `README.md` lists the tools; read it first.
 Your work is measured, not capped: how many looks you take, how many plans, how long you work, how many tool calls.
 None of that is held against you, and no number of them is too many or too few.
 
-One thing is limited, and it is the benchmark's, not a judgment of your work: **the machines' budget for one try**,
-the same for every model. It is `WALL_MINUTES` minutes on the clock from when you start, with the time your looks and
-plans take included, and `LOOKS_MOST` look units of rendering. A look of your whole plan on the whole sheet costs 1
-unit. A look stopped after a stage you name (`./unpaint look --until 2`) costs that stage's share of your plan's
-washes, and a look of a region of your own script (`--region`) costs the share of its passages that touch the region: where and when you look is yours
-to choose. The cost is told before it is spent (`./unpaint plan` lists it; `./unpaint cost ...` prices any look and
-paints nothing). `./unpaint status` shows what is used, and every answer of the tools says it too. When the budget is reached you are asked to hand in what you have: no further look is painted, `./unpaint
-plan` still checks that your final choice compiles, and `GRACE_MINUTES` minutes later the session is ended. So keep
+Two things are limited, and they are the benchmark's, not a judgment of your work: **the budget for one try**, the
+same for every model and every machine. Rendering: `LOOKS_MOST` units. A look of the code planner's whole plan on the
+whole sheet costs about 1 unit; a look costs the painting work it really takes (its brush sweeps and its dryings),
+so a look stopped after a stage you name (`./unpaint look --until 2`) or of a region of your own script (`--region`)
+costs less: where and when you look is yours to choose. Each look is quoted before it is painted (`./unpaint plan`
+lists it; `./unpaint cost ...` prices any look and paints nothing) and charged what it really took after it; a look
+is refused only when its quote is more than you have left. Steps: `STEPS_MOST` of your tool calls (shell commands,
+`./unpaint` among them, and file reads and writes). Time is not budgeted: waiting for a look or for the machine costs
+you nothing (a far safety stop ends a session after `WALL_MINUTES` minutes). `./unpaint status` shows what is used,
+and every answer of the tools says it too. When the budget is reached you are asked to hand in what you have: no
+further look is painted, `./unpaint plan` still checks that your final choice compiles, and soon after the session is
+ended. So keep
 `choice.json` holding something you would hand in, from early on.
 
 **The one thing barred** is fitting the picture by trial instead of painting it: keeping a change only when a look

@@ -1,5 +1,5 @@
 // What a session cost, measured and never capped: one usage.json a run, so a table can set a score beside its cost.
-// The benchmark's resource budget (looks, wall minutes, returns to an earlier choice) is recorded with what was used
+// The benchmark's resource budget (rendering units, steps, returns to an earlier choice; the wall clock a safety stop only) is recorded with what was used
 // of it, and whether it was reached. Pure: nothing is read or written here.
 
 const minutes = s => (s == null ? null : +(s / 60).toFixed(1));
@@ -17,6 +17,7 @@ export function usageOf({ subject, author, level, tryNumber, budget, session, fi
     budget: { ...budget, reached: session.budgetReached ?? null, note: session.budgetReached ? `reached the benchmark's resource budget (${session.budgetReached.what}); the session was asked to hand in what it had. Recorded, not a failure` : null },
     session: {
       ended: session.ended, wallMinutes: session.wallMinutes ?? null, ownMinutes: session.ownMinutes ?? null, waitMinutes: session.waitMinutes ?? null,
+      steps: session.steps ?? null, cutOffBySafetyStop: Boolean(session.budgetReached?.safetyStop),
       looks: looks.length, lookUnits: session.lookUnits ?? null, looksEach: looks.map(l => ({ look: l.look, cost: l.cost ?? 1, until: l.ask?.until ?? null, region: l.ask?.region?.box ?? null, machineSeconds: l.painted?.seconds ?? null })), plans: plans.length, plansRefused: plans.filter(p => !p.ok).length, toolCalls: session.toolCallsTotal ?? null, toolCallsByKind: session.toolCalls ?? null,
       selfReviews: (session.selfReviews ?? []).filter(r => r.written).length, assessmentWritten: session.assessment ? session.assessment.written : null, reverts: session.reverts ?? null, warningsGiven: session.warningsGiven ?? null,
       picturesHanded: session.pictures?.handed ?? [], picturesDescribed: session.pictures ? Object.keys(session.pictures.said ?? {}).length : 0,
@@ -33,11 +34,13 @@ export function usageOf({ subject, author, level, tryNumber, budget, session, fi
     },
     work: plan ? { washes: plan.washes ?? null, strokes: plan.strokes ?? null, dryings: plan.dryings ?? null, passages: plan.passages ?? null } : null,
     prepared: prepared ?? null,
+    // the terms the try ran under (cli.mjs): budgets, the subject's unit, seed, commit, prepared inputs by hash; a rerun with the same terms is the same try
+    terms: author.terms ?? null,
   };
 }
 
 /** One line of a usage record, for the log. */
 export function usageLine(u) {
   const s = u.session, m = u.model, g = u.machine;
-  return `${s.looks} looks for ${s.lookUnits?.spent ?? '?'} of ${s.lookUnits?.budget ?? '?'} look units (${g.lookGpuMinutes ?? '?'} GPU min), ${s.plans} plans, ${s.wallMinutes ?? '?'} wall min (${s.ownMinutes ?? '?'} its own), ${s.toolCalls ?? '?'} tool calls, ${m.tokens ?? '?'} tokens${m.costUSD != null ? `, $${Number(m.costUSD).toFixed(2)}` : ''}, ${s.reverts?.count ?? 0} returns to an earlier choice; final ${g.finalGpuMinutes ?? '?'} GPU min${u.budget.reached ? `; REACHED THE BENCHMARK'S RESOURCE BUDGET (${u.budget.reached.what})` : ''}`;
+  return `${s.looks} looks for ${s.lookUnits?.spent ?? '?'} of ${s.lookUnits?.budget ?? '?'} rendering units, ${s.steps?.taken ?? '?'} of ${s.steps?.budget ?? '?'} steps (${g.lookGpuMinutes ?? '?'} GPU min), ${s.plans} plans, ${s.wallMinutes ?? '?'} wall min (${s.ownMinutes ?? '?'} its own), ${s.toolCalls ?? '?'} tool calls, ${m.tokens ?? '?'} tokens${m.costUSD != null ? `, $${Number(m.costUSD).toFixed(2)}` : ''}, ${s.reverts?.count ?? 0} returns to an earlier choice; final ${g.finalGpuMinutes ?? '?'} GPU min${u.budget.reached ? `; REACHED THE BENCHMARK'S RESOURCE BUDGET (${u.budget.reached.what})` : ''}`;
 }

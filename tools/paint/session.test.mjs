@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { DEFAULT_LOOKS, DEFAULT_WALL_MINUTES, writeSession, sessionServer, ledgerLooks, safeRead, safeWrite, finalChoice, cleanEnv, seatbelt, sessionCall, readTranscript, reachedOutside, ownFolderOf, ownPictures, runSession } from './session.mjs';
+import { DEFAULT_LOOKS, DEFAULT_WALL_MINUTES, DEFAULT_STEPS, writeSession, sessionServer, ledgerLooks, safeRead, safeWrite, finalChoice, cleanEnv, seatbelt, sessionCall, readTranscript, reachedOutside, ownFolderOf, ownPictures, runSession } from './session.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'paint-session-test-'));
@@ -29,13 +29,13 @@ test('the folder holds the task, the tools, the code planner\'s plan and a choic
   try {
     for (const f of ['TASK.md', 'README.md', 'choice.json', 'unpaint', 'own-script-brief.md', 'auto/plan.png', 'auto/washes.txt', 'auto/plan.json', 'auto/settings.json', 'inputs/forms-ids.png', 'inputs/forms.json']) assert.ok(fs.existsSync(path.join(dir, f)), f);
     assert.deepEqual(JSON.parse(fs.readFileSync(path.join(dir, 'choice.json'), 'utf8')), { kind: 'settings', settings: {}, why: '' });
-    assert.match(prompt, /`280` by `186.7` mm/); assert.match(prompt, /It is `85` minutes on the clock from when you start, with the time your looks and\s+plans take included, and `4` look units of rendering\. A look of your whole plan on the whole sheet costs 1\s+unit/); assert.match(prompt, /you are allowed to make mistakes/); assert.match(prompt, /you may do it `20` times/); assert.doesNotMatch(prompt, /\bmust\b|\bnever\b|ROUNDS ONLY|sent back/); assert.match(prompt, /exactly the code\s+planner's/); assert.match(prompt, /No score is ever shown/); assert.match(prompt, /light pencil/);
-    assert.doesNotMatch(prompt, /SHEET_W|LOOKS_MOST|WALL_MINUTES|GRACE_MINUTES|REVERTS_MOST|DRAWING_NOTE/);
+    assert.match(prompt, /`280` by `186.7` mm/); assert.match(prompt, /Rendering: `4` units\. A look of the code planner's whole plan on the\s+whole sheet costs about 1 unit/); assert.match(prompt, /Steps: `1000` of your tool calls/); assert.match(prompt, /Time is not budgeted: waiting for a look or for the machine costs\s+you nothing \(a far safety stop ends a session after `85` minutes\)/); assert.match(prompt, /you are allowed to make mistakes/); assert.match(prompt, /you may do it `20` times/); assert.doesNotMatch(prompt, /\bmust\b|\bnever\b|ROUNDS ONLY|sent back/); assert.match(prompt, /exactly the code\s+planner's/); assert.match(prompt, /No score is ever shown/); assert.match(prompt, /light pencil/);
+    assert.doesNotMatch(prompt, /SHEET_W|LOOKS_MOST|WALL_MINUTES|GRACE_MINUTES|REVERTS_MOST|STEPS_MOST|DRAWING_NOTE/);
     const readme = fs.readFileSync(path.join(dir, 'README.md'), 'utf8');
     assert.match(readme, /`inputs\/source.png`: the SUBJECT/); assert.match(readme, /`inputs\/study-2.png`: block-in STUDY 2/); assert.match(readme, /\| `\.\/unpaint look` \|.*\| its cost in look units, of 4 for this try \(the benchmark's budget\) \|/); assert.doesNotMatch(readme, /INPUT_LIST|SHEET_W|LOOKS_MOST|REVERTS_MOST/); assert.match(readme, /"own": \[/); assert.match(readme, /`"medium": "pencil"`, `"pen"` or `"none"` beside any kind of choice/);
     assert.ok(fs.statSync(path.join(dir, 'unpaint')).mode & 0o100, 'the command can be run');
     assert.ok(!fs.existsSync(path.join(dir, 'auto/beside.png')) && !fs.existsSync(path.join(dir, 'auto/numbers.txt')), 'nothing at the start sets a plan against the subject: that is a look');
-    assert.equal(DEFAULT_LOOKS, 5, 'five full looks\' worth of rendering'); assert.equal(DEFAULT_WALL_MINUTES, 60, 'one try is meant to finish within the hour, looks included');
+    assert.equal(DEFAULT_LOOKS, 5, 'five full looks\' worth of rendering'); assert.equal(DEFAULT_WALL_MINUTES, 360, 'the wall clock is a far safety stop, not a budget');
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });
 
@@ -43,7 +43,7 @@ test('a plan answers with counts only and looks are counted: after the last look
   const { dir, ledger } = folder({ looks: 2 }); let n = 0;
   try {
     const server = sessionServer({ dir, ledger, look: looked, looks: 2, wallMinutes: 85, checkScript: s => { if (!s.passages) throw new Error('painting script: no passages'); return s; }, compile: async (choice) => (choice.sets.some(([k]) => k === 'bogus') ? { ok: false, error: '--set bogus: not an option' } : compiled(++n)) });
-    assert.match(await ask(dir, server, 'status'), /0 of 85 minutes used on the clock.*0 of 2 look units spent on 0 looks, 0 of 20 returns to an earlier choice\. Plans made: 0\./);
+    assert.match(await ask(dir, server, 'status'), /0 of 2 rendering units spent on 0 looks, 0 of 1000 steps \(your tool calls\) taken, 0 of 20 returns to an earlier choice\. Plans made: 0\. Time is not budgeted\./);
     const free = await ask(dir, server, 'plan');
     assert.match(free, /^It compiles \(nothing changed\): 10 shapes, 21 washes, 100 strokes, widest wash brush 17 mm\. A look of this plan costs 1 of your [\d.]+ units left; a look of a region of your own script costs the share of its passages that touch the region\. Nothing else is shown without a look\./);
     assert.deepEqual(fs.readdirSync(path.join(dir, 'plans')), [], 'a free plan leaves no data and no picture in the folder'); assert.doesNotMatch(free, /rgb|box|covers|plan\.json/);
@@ -80,7 +80,7 @@ test('a look is spent before it is delivered, and the count outlives the server'
     assert.equal(ledgerLooks(ledger).length, 1); await a.stop();
     // a delivery that fails outright still leaves the look spent
     fs.rmSync(path.join(dir, 'looks'), { recursive: true }); fs.symlinkSync(path.dirname(ledger), path.join(dir, 'looks'));
-    const b = mk(); assert.match(await ask(dir, b, 'status'), /1 of 2 look units spent/, 'a new server goes on from the ledger');
+    const b = mk(); assert.match(await ask(dir, b, 'status'), /1 of 2 rendering units spent/, 'a new server goes on from the ledger');
     assert.match(await ask(dir, b, 'look'), /^LOOK 2 \(/); assert.ok(!fs.existsSync(path.join(path.dirname(ledger), '2')), 'looks/ as a link is replaced by a real folder');
     // the same look again renders nothing and costs nothing; a changed choice would cost a unit that is not left
     assert.match(await ask(dir, b, 'look'), /^LOOK 3 \(nothing changed\), cost 0 units \(looked at before: nothing was rendered\), 0 of 2 left/);
@@ -98,7 +98,7 @@ test('a look is a real painting: one that fails or leaves the GPU costs no look;
       look: async (choice, script, at, edit, got) => { seenArgs.push({ kind: choice.kind, at, compiled: got.ok }); if (fail) return { ok: false, error: fail }; paints++; return looked(); } });
     // the painter fell back to the CPU: nothing is shown, nothing is counted, and the ledger says why
     const refused = await ask(dir, server, 'look');
-    assert.match(refused, /^NOT PAINTED, no look was counted: the painting did not stay on the GPU/); assert.match(refused, /0 of 3 look units spent/);
+    assert.match(refused, /^NOT PAINTED, no look was counted: the painting did not stay on the GPU/); assert.match(refused, /0 of 3 rendering units spent/);
     assert.ok(!fs.existsSync(path.join(dir, 'looks/1')), 'nothing of a failed painting reaches the folder'); assert.equal(ledgerLooks(ledger).length, 0);
     assert.ok(fs.readFileSync(ledger, 'utf8').includes('"notPainted"'));
     // painted: the look is counted, delivered, and kept outside the folder with the choice as it was looked at
@@ -118,30 +118,42 @@ test('a look is a real painting: one that fails or leaves the GPU costs no look;
     fs.writeFileSync(path.join(dir, 'script.json'), '{"palette": ["ochre"], "passages": [1, 2, 3, 4]}');
     assert.match(await ask(dir, server, 'look'), /^NOT PAINTED, nothing was spent: this look costs 1 unit \(the whole plan, \d+ washes, the whole sheet\) and you have 0 of 3 units left/); assert.equal(paints, 3, 'no painting is started for a look that cannot be paid for');
     const rec = await server.stop();
-    assert.deepEqual(rec.looks.map(l => [l.look, l.cost]), [[1, 1], [2, 0], [3, 1], [4, 1]]); assert.deepEqual(rec.lookUnits, { spent: 3, budget: 3 }); assert.equal(rec.budgetReached.what, '3 look units of rendering'); assert.equal(rec.looks[0].painted.cells, 543);
+    assert.deepEqual(rec.looks.map(l => [l.look, l.cost]), [[1, 1], [2, 0], [3, 1], [4, 1]]); assert.deepEqual(rec.lookUnits, { spent: 3, budget: 3 }); assert.equal(rec.budgetReached.what, '3 rendering units'); assert.equal(rec.looks[0].painted.cells, 543);
     // the free plan stays compile-only
     assert.match(await ask(dir, sessionServer({ dir, ledger, keep, look: looked, looks: 3, wallMinutes: 85, checkScript: s => s, compile: async () => compiled(1) }), 'plan'), /^It compiles \(own script\).*Nothing else is shown without a look\./);
   } finally { fs.rmSync(dir, { recursive: true, force: true }); fs.rmSync(path.dirname(ledger), { recursive: true, force: true }); }
 });
 
-test('the budget of a try is the wall clock, looks included: when it is reached no look is painted, a plan still is, the session is asked to hand in, and it is ended after the minutes to hand in', async () => {
-  const { dir, ledger } = folder({ looks: 5, minutes: 60 }); let clock = 1000;
+test('time is not a budget: a look that waits an hour costs nothing of it; the far safety stop cuts a session off and marks it so', async () => {
+  const { dir, ledger } = folder({ looks: 5, minutes: 360 }); let clock = 1000;
   try {
-    const server = sessionServer({ dir, ledger, looks: 5, wallMinutes: 60, graceMinutes: 10, now: () => clock, checkScript: s => s, compile: async () => compiled(1), look: async () => { clock += 25 * 60000; return looked(); } });
+    const server = sessionServer({ dir, ledger, looks: 5, wallMinutes: 360, graceMinutes: 10, now: () => clock, checkScript: s => s, compile: async () => compiled(1), look: async () => { clock += 60 * 60000; return looked(); } });
     server.begin();
     assert.match(await ask(dir, server, 'look'), /^LOOK 1 \(/); assert.equal(server.over(), false);
-    assert.match(await ask(dir, server, 'status'), /25 of 60 minutes used on the clock \(looks and planning included; 0 of them your own work\), 1 of 5 look units spent/);
-    clock += 10 * 60000; put(dir, { kind: 'settings', settings: { 'study1.shapes': 60 } });
-    assert.match(await ask(dir, server, 'look'), /^LOOK 2 \(/, 'a look started inside the budget is painted and shown');
-    assert.equal(server.wallSeconds(), 3600); assert.equal(server.over(), false, 'the budget is reached, and the session has its minutes to hand in');
-    put(dir, { kind: 'settings', settings: { 'study1.shapes': 70 } });
+    assert.match(await ask(dir, server, 'status'), /1 of 5 rendering units spent on 1 look, 0 of 1000 steps[\s\S]*Time is not budgeted\./);
+    clock += 300 * 60000; put(dir, { kind: 'settings', settings: { 'study1.shapes': 70 } });
+    assert.equal(server.wallSeconds(), 21600); assert.equal(server.over(), false, 'the safety stop is reached, and the session has its minutes to hand in');
     const refused = await ask(dir, server, 'look');
-    assert.match(refused, /^NOT PAINTED, no look was counted: the benchmark's resource budget for this try is reached \(60 minutes of wall time\)\. This is the benchmark's limit on its machines, not a judgment of your work\./); assert.match(refused, /Hand in what you have now.*The session is ended 10 minutes after the budget was reached/);
+    assert.match(refused, /^NOT PAINTED, no look was counted: the benchmark's resource budget for this try is reached \(the safety stop \(360 minutes on the clock\)\)/); assert.match(refused, /Hand in what you have now.*The session is ended 10 minutes after the safety stop/);
     assert.match(await ask(dir, server, 'plan'), /^It compiles \(settings\)[\s\S]*THE BENCHMARK'S RESOURCE BUDGET IS REACHED/, 'the hand-in can still be checked');
     clock += 10 * 60000; assert.equal(server.over(), true);
     const rec = await server.stop();
-    assert.deepEqual(rec.budgetReached, { what: '60 minutes of wall time', atWallMinutes: 60, looks: 2, lookUnits: 2 }); assert.equal(rec.looks.length, 2); assert.equal(rec.wallSeconds, 4200); assert.ok(rec.waitSeconds >= 3000 && rec.ownSeconds <= 1200, 'the machine\'s minutes and its own are measured apart');
-    assert.ok(fs.readFileSync(ledger, 'utf8').includes('"budgetReached"'), 'reaching the budget is written down, not hidden');
+    assert.deepEqual(rec.budgetReached, { what: 'the safety stop (360 minutes on the clock)', safetyStop: true, atWallMinutes: 360, looks: 1, lookUnits: 1, steps: 0 }); assert.ok(rec.waitSeconds >= 3600, 'the hour the look waited is measured apart');
+    assert.ok(fs.readFileSync(ledger, 'utf8').includes('"budgetReached"'), 'reaching the stop is written down, not hidden');
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('steps are the model\'s tool calls: at the allowance it is asked to hand in and no look is painted; fifty steps later it is ended', async () => {
+  const { dir, ledger } = folder({ looks: 5 }); let taken = 0;
+  try {
+    const server = sessionServer({ dir, ledger, looks: 5, steps: 100, stepsTaken: () => taken, checkScript: s => s, compile: async () => compiled(1), look: looked });
+    server.begin(); taken = 99;
+    assert.match(await ask(dir, server, 'status'), /99 of 100 steps \(your tool calls\) taken/); assert.equal(server.over(), false);
+    taken = 100; const refused = await ask(dir, server, 'look');
+    assert.match(refused, /^NOT PAINTED, no look was counted: the benchmark's resource budget for this try is reached \(100 steps\)/); assert.match(refused, /The session is ended after 50 more steps/);
+    assert.equal(server.over(), false); taken = 150; assert.equal(server.over(), true);
+    const rec = await server.stop(); assert.deepEqual(rec.steps, { taken: 150, budget: 100 }); assert.equal(rec.budgetReached.what, '100 steps'); assert.equal(rec.budgetReached.safetyStop, false);
+    assert.equal(DEFAULT_STEPS, 1000);
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });
 
@@ -232,7 +244,7 @@ test('the model\'s command writes a request and prints its answer, and time spen
     await server.stop();
     const live = sessionServer({ dir, ledger, look: looked, looks: 2, wallMinutes: 85, checkScript: s => s, compile: async () => compiled(1), everyMs: 50 }); live.start();
     const out = await new Promise((res, rej) => import('node:child_process').then(cp => cp.execFile(path.join(dir, 'unpaint'), ['status'], { cwd: dir }, (e, so) => (e ? rej(e) : res(so)))));
-    await live.stop(); assert.match(out, /0 of 2 look units spent/);
+    await live.stop(); assert.match(out, /0 of 2 rendering units spent/);
     assert.throws(() => execFileSync(path.join(dir, 'unpaint'), ['paint'], { cwd: dir, stdio: 'pipe' }), e => e.status === 2 && /usage: \.\/unpaint/.test(String(e.stdout)));
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });
@@ -423,5 +435,23 @@ test('a look to a stage or of a region is priced from the plan before it is pain
     assert.match(await ask(dir, server, 'plan --fast'), /^REFUSED: \.\/unpaint plan takes no further words/); assert.match(await ask(dir, server, 'look; rm -rf x'), /^REFUSED: a request is one of status, plan, look, cost/);
     const rec = await server.stop();
     assert.deepEqual(rec.looks.map(l => [l.cost, l.ask.until, l.ask.region?.box ?? null]), [[0.3, 1, null], [0.4, 3, [50, 0, 150, 50]], [0.5, null, [0, 0, 100, 100]], [0.8, 3, null]]); assert.deepEqual(rec.lookUnits, { spent: 2, budget: 2 }); assert.equal(rec.looks[0].estimate.washes, 3);
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('with the subject\'s unit a look is quoted from its plan\'s work and charged the painter\'s own count; a quote over what is left is refused', async () => {
+  const { dir, ledger } = folder({ looks: 2 }); let work = { sweeps: 45, dryings: 3 };
+  try {
+    const passes = [{ stage: 1, layer: 1, strokes: 60 }, { stage: 2, layer: 2, strokes: 37 }];
+    const server = sessionServer({ dir, ledger, looks: 2, unit: { plan: 99, look: 48 }, checkScript: s => s, compile: async () => ({ ...compiled(1), passes }), look: async () => { const l = await looked(); return { ...l, painted: { ...l.painted, work } }; } });
+    assert.match(await ask(dir, server, 'plan'), /A look of this plan is quoted at 1 of your 2 units left; stopped early less \(--until 1: 0\.62\)/);
+    assert.match(await ask(dir, server, 'look'), /^LOOK 1 \(nothing changed\), cost 1 unit \(quoted 1; charged what it really did\), 1 of 2 left/, 'the full automatic look, counted, is one unit');
+    work = { sweeps: 20, dryings: 1 }; put(dir, { kind: 'settings', settings: { 'study1.shapes': 60 } });
+    assert.match(await ask(dir, server, 'look'), /^LOOK 2 \(settings\), cost 0\.44 units \(quoted 1; charged what it really did\), 0\.56 of 2 left/);
+    put(dir, { kind: 'settings', settings: { 'study1.shapes': 70 } });
+    assert.match(await ask(dir, server, 'look'), /^NOT PAINTED, nothing was spent: this look costs 1 unit/);
+    const l = ledgerLooks(ledger); assert.deepEqual(l.map(x => [x.cost, x.quoted]), [[1, 1], [0.44, 1]]); assert.match(l[1].chargedFrom, /painter's count/); assert.deepEqual(l[1].work, { sweeps: 20, dryings: 1 });
+    work = null; put(dir, { kind: 'settings', settings: { 'study1.shapes': 80 } });
+    const s2 = sessionServer({ dir, ledger: `${ledger}2`, looks: 5, unit: { plan: 99, look: 48 }, checkScript: s => s, compile: async () => ({ ...compiled(1), passes }), look: async () => { const x = await looked(); return { ...x, painted: { ...x.painted, work: null, workFault: 'the painter did not report how many brush sweeps it laid' } }; } });
+    assert.match(await ask(dir, s2, 'look'), /cost 1 unit \(quoted 1; charged the quote: the painter did not report how many brush sweeps it laid\)/, 'a look the painter did not count is charged its quote, and says so');
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });
