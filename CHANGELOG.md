@@ -2,49 +2,23 @@
 
 Releases use semver. Each release records its painter and simulator versions ([version guide](docs/versions.md)).
 
-## 0.4.0 benchmark (not released)
+## 0.4.0 (not released)
 
-Written 22 November 2026. This entry covers the benchmark. The painter's changes are in the 0.4.0-rc1 entry below. The benchmark is frozen before its one scored run; nothing here has a result yet.
+Release candidate `v0.4.0-rc1`. Painter **V107-dev**, simulator **105**. 0.4 scores are a new series, not comparable with rounds V1 to V5.
 
-RESULTS: to be filled from the frozen run.
+Results: to be added from the release-candidate run.
 
-0.4 is a new series. Its scores are not comparable with rounds V1 to V5.
+### New in the painter
 
-### Changed
-
-- A ladder of levels replaces the rounds. L0 is nothing, L1 adds harness tips, L2 adds prepared inputs and Auto's plan, L3 adds a retry, L4 adds a second retry with many resources. L0 is defined, not run. See [levels](bench/docs/levels.md).
-- Retries are self-study. The model sees its own painting, replay and stroke map, and writes its own assessment. No score, no critique. Every attempt starts in a fresh branch and workspace.
-- Models get more freedom: their own drawn lines, pen, pencil or none, waterproof or soluble ink, and warnings in place of refusals that only protect the painting.
-- Budgets are measured, not limited. Rendering is charged in a machine-independent unit (one full look of Auto's plan is 1.00), steps are a runaway guard at 1,000, and the clock is a six-hour safety stop. The target is about 60 minutes a session.
-- Usage, tool use and cost are recorded for every session.
-- The model's shell has no internet and one fixed toolbox. Attempts are recorded.
-- Scoring: human-ness from the painting in progress by a written rubric, quality and likeness, and a combined number. The original is scored too, and a painting's result is its share of the original's. Auto is the difficulty index. Anti-cheat and algorithmic measures sit beside the scores. See [scoring](bench/docs/scoring.md).
-- Judges run locally by default.
-- Level 1 has its own targets outside the old public suite, harness tips, and a film of the kit's strokes; the pen's ink is a named choice.
-
-### Retired
-
-- Rounds V1 to V5 as names, the 85-minute model clock, and look counts. They stay as history in the docs.
-
-### Planned, not in 0.4's first run
-
-- A container for replication.
-- Hosted judging through OpenRouter or Together, one setting.
-- The OpenAI models (gpt-6-astra, gpt-6.1-sol, gpt-6.1-terra).
-- Pencil and eraser in the kit.
-
-### First run
-
-- Models: Gemini 4 Argon, Neon and Hydrogen, and Claude Sonnet 5.5, all at medium effort, on subscriptions.
-- Subjects: Mittens and Homer's daughter.
-- A test run with three tries at L3 and L4 comes first, to decide whether the scored run keeps three or scopes back to one.
-- New page: [Auto against a model](docs/auto-vs-model.md).
-
-## 0.4.0-rc1 (not released)
-
-Painter **V107-dev**, simulator **105**, judges **J1**. Changes are against 0.2.1, the last release. There was no 0.3.3 release. Assembled on 2026-11-19.
-
-The painter now lays washes as a painter does: whole shapes, light to dark, each loaded with a mix judged for the shape. It no longer computes paint from the cells a stroke will cover.
+- Washes are whole shapes laid light to dark, each loaded with one mix. No stroke is clipped to cells.
+- A model's [painting script](docs/painting-script.md) is painted as written: passages with shape, paint, brush, paper, strokes and order.
+- Each paint settles as its pigment does (granulation, staining). The sky tube is gone.
+- White gouache lights are a pigment on the sheet. Thin dark lines are laid last at the subject's own darkness, or in pencil.
+- The smallest wash brush is the rigger (1.2 mm), and the darks use the detail brush.
+- Soft edges on planned washes, laid while the wash is wet.
+- The drawing is filmed big forms first, detail last.
+- No settings fitted to one subject: 232 options removed, and a guard fails on a subject name in painting code.
+- The painter stops on a source smaller than the sheet asks for.
 
 | One 100 x 75 mm piece | The plan it replaces | 0.4.0 |
 |---|---|---|
@@ -54,7 +28,45 @@ The painter now lays washes as a painter does: whole shapes, light to dark, each
 | Paint strokes | 2,196 | 74 |
 | Strokes clipped to a cell mask | all | none |
 
-### Changed
+### New in the benchmark
+
+- **A ladder of levels** replaces rounds V1 to V5. L0 nothing (defined, not run), L1 harness tips, L2 prepared inputs and Auto's plan, L3 one retry, L4 one more retry with many resources. [Levels](bench/docs/levels.md).
+- **Retries are self-study.** The model gets its own painting, replay and stroke map and writes its own assessment. Never a score or a critique. The last try counts, not the best.
+- **What a model may change:** Auto's settings, Auto's plan, its own script, the named forms, the pencil lines, its own drawn lines, pen, pencil or none, up to 14 paints. L4 is also given Auto's finished painting and the studies' flat shapes. [Auto against a model](docs/auto-vs-model.md#what-a-model-may-change-and-what-it-is-not-given).
+- **Level 1 kit:** pencil, eraser, and pen ink waterproof or soluble, with worked tips.
+- **A closed workspace.** Each try starts in a fresh folder and branch, earlier tries read-only. The shell has no internet and one fixed toolbox; installs fail; attempts are recorded. [Rules](bench/docs/rules.md).
+- **Budgets measured, not limited.** Rendering in machine-independent units (one full look of Auto's plan is 1.00), 1,000 steps as a runaway guard, six hours as a safety stop. Target about 60 minutes a session. Usage, tool use and cost are recorded.
+- **Scoring by human-ness in the making, plus quality against the original.** Judges read film snapshots of the painting in progress by a written [rubric](bench/docs/human-ness-rubric.md), and quality and likeness beside it; a combined number weighs them 2 to 1. The original is scored too, and a painting's result is its share of the original's. [Scoring](bench/docs/scoring.md).
+- **Auto is the difficulty index.** Raw and Auto-adjusted results are shown side by side. Anti-cheat and image measures sit beside the score.
+- Judges run locally by default.
+
+### Changed for people running it
+
+- `npm run paint` takes `--level L2|L3|L4`, `--retries N`, `--try N` and `--previous <run folder>`. `prepare --level L4` paints Auto's painting first. [Running the painter](docs/running.md#a-model-as-the-author).
+- `--minutes` is gone. `--looks U` is rendering units (default 5), `--steps N` tool calls (default 1000), `--wallminutes N` a safety stop (default 360).
+- `npm run bench:score04 -- RUN_FOLDERS|MANIFEST --out DIR` scores a run. Its tests need Python with `bench/scorer/requirements.txt` and fail if it is missing.
+- Benchmark subjects are painted at source scale. `bench:add-target` needs `--medium pen|pencil|none`.
+- Rounds V1 to V5 are history. Tag `v0.3.2` replays V4 and V5.
+
+### Known limits
+
+- Auto lays some washes as ruler-straight bands.
+- Pencil that should have been covered or erased can survive into the finished painting.
+- Paper grain shows when zoomed far in.
+- Fine marks differ between a look and its final: about a fifth apart.
+- At L2 to L4 a session cannot ask for its own erasing; the painter lifts pencil from the lights by itself.
+- `bench/scripts/levels.mjs` still sums the 21 November L1 to L3 design.
+- Planned, not in the first run: a container for replication, hosted judging, the OpenAI models.
+
+### Docs
+
+- [Auto against a model](docs/auto-vs-model.md): one cat painted by Auto and by a model at L2, step by step.
+- [Painting script](docs/painting-script.md): the script format, with a real passage.
+- [Levels](bench/docs/levels.md), [rules](bench/docs/rules.md), [scoring](bench/docs/scoring.md).
+
+### Painter changes in full (rc1, assembled 19 Nov)
+
+#### Changed
 
 - Washes are whole shapes laid light to dark in three stages, each loaded with one paint mix (`src/paint/methods/puddles.mjs`, `wash-shapes.mjs`, `fair-wash.mjs`, `wash-strokes.mjs`).
 - A wash has a smooth outline in millimetres and strokes that follow it. No stroke is clipped to cells.
@@ -63,7 +75,7 @@ The painter now lays washes as a painter does: whole shapes, light to dark, each
 - Coat strokes are loaded from a swatch and laid in two passes. They were 2.6 to 3 times darker than planned.
 - A recorded run sees every thin-dark pencil stroke, so recorded benchmark runs finish.
 
-### Known problems
+#### Known problems at rc1 assembly
 
 - Plates are plain sketches. Windows, stone and other detail are gone until stroke techniques are wired into the new plan.
 - White Ships comes out grey: no lights are reserved, and one colour laid over another goes to mud.
@@ -72,7 +84,7 @@ The painter now lays washes as a painter does: whole shapes, light to dark, each
 - The 1.0 and 0.26 mm sheets plan separately, and paint laid depends on the cell (1.14 of plan at 1 mm).
 - A plan that names a style still takes the old separation planner. Benchmark plans from models do this.
 
-### Subject to change
+#### Subject to change at rc1 assembly
 
 - How shapes are chosen, so the same picture gives the same washes.
 - Reserved lights, and choosing a wash for what it makes over the wash beneath it.
@@ -83,7 +95,7 @@ The painter now lays washes as a painter does: whole shapes, light to dark, each
 - The copy limits: the planted-pattern test and counts of mixes and washes are to replace the correlation and stroke ceilings.
 - Thin dark lines, gouache lights and coat strands still read the subject at fine scale and have not been reviewed against these rules.
 
-### The full list
+#### The full list
 
 Source scale. The painter does not paint from an enlarged source, and the benchmark no longer asks it to.
 
@@ -112,20 +124,20 @@ Judging painting changes. Checked with unit tests and a run without judge calls 
 - **The copy limits are absolute ceilings.** A plate passes or fails on its own records: guard clean, no paint-time look at the target, `hfCorr` at or under the ceiling for its width, and paint strokes at or under the sheet's stroke ceiling, which is the number of 1.5 mm by 4.5 mm marks that cover the sheet once (`strokeCeiling` in `tools/guard/cheat-risk.mjs`, written to `cheat-risk.json` with the sheet size). The earlier limits against the previous build (hfCorr up by at most 0.02, strokes up by at most 10%) are not used. Strokes and render seconds are reported as a cost beside the verdict.
 - Measured on 11 stored 1,200 px plates from 0.3.1 and 0.3.2 development commits, all painted with no target looks: 5 pass these ceilings. Five are over the `hfCorr` ceiling of 0.645 (three Mittens plates at 0.654 to 0.700 and two h36a plates at 0.734 and 0.755). One Trumbull plate lays 16,823 paint strokes against its ceiling of 10,182.
 
-### Final lights and surface marks
+#### Final lights and surface marks
 
 - **White gouache is a pigment on the sheet.** The finish lays thin lights over dark with the rigger, tinted by a mix of palette paints, in the top layer. The render is Kubelka-Munk with no overlay. The older per-cell overlay (`--smalllights gouache`) stays off.
 - **A thin light qualifies by its step over its dark ring in L*, not by its whiteness.** Isolated lights keep single, smoothly fitted strokes. Strands in a coat are laid with the dry brush, and only where the brush's measured line is within one and a half times the strand. The run card records the decision as `gouache`.
 - **Thin dark lines are laid last, at the subject's own darkness.** Rims, seams, lid lines and dark whiskers are found as ridges darker than their ring, and each is planned with its own step in L* over its sides. Over the dry washes the sheet is read along each line. What is missing is painted with the rigger's point where the point's line fits (no wider than one and a half times the subject's), at a load chosen from a swatch on the run's paper. Every other line is restated in pencil, a 2B pressed by a table read over paint. Planned and painted steps are compared on the sheet, within 3 L* or a quarter of the step, and recorded in `thin-darks.json` and as `thinDarks` on the run card.
 - **Surface marks on an unplanned run follow the region's label.** A vision judge labels the SAM regions on a contact sheet of cut-outs. Coats and dressed stone choose their mark kinds. Anything else, or any doubt, takes none. A judge that cannot run is reported and lays nothing. The run card records it as `surface`.
 
-### Granulation from the pigment
+#### Granulation from the pigment
 
 - **Each box paint settles as its pigment does, always.** The sheet takes each paint's published granulation, flocculation, staining and density (`demos/lab/media/pigment-physical.js`); colour and scattering stay as picked, and picking is unchanged. Before, every paint settled at granulation 0.25 under a sheet-wide scale of 0.25, so an ultramarine wash dried smooth with its pigment slightly on the paper's peaks. `--boxphys` and `--gran` are removed.
 - **The sky tube is removed** (`--skyblue`, `--skygran`, `--skyfloc`, `--skybluewick`, `--skywide`, and the bench base token `_skyb`). It swapped the blue of "sky" cells for a heavily granulating second tube, a switch by region: with no sky segment it took every blue cell off the figure (69% of the painted dog's sheet) and made phthalo blue granulate. A sky now granulates when its pigment does.
 - **Grains stop rolling when the slope is gone** (slide cap 1 on the painter's sheet; `--slidecap` removed). Without it heavy granulation dried as a one-cell checkerboard (the Trumbull sky stipple).
 
-### No subject-fitted settings
+#### No subject-fitted settings
 
 Sam's rule: a constant, rule, option or technique fitted to one benchmark subject is cheating in both painting modes.
 
@@ -135,7 +147,7 @@ Sam's rule: a constant, rule, option or technique fitted to one benchmark subjec
 - **Guard:** `tools/guard/subject-scan.mjs` now reads every JavaScript and Python file under `src/` and `tools/` and fails on a benchmark subject name outside tests, fixtures and reviewed target lists; `src/paint/overfit.test.mjs` fails on any folder or file named tuned, fitted or per-subject.
 - Measured at 480 px, strict (`--notargetlooks 1`), against 033-main 80413b81, one render each: Mittens and Rembrandt byte-identical; dog-paint dE76 13.48 -> 13.47, dark share 0.356 -> 0.356; Trumbull dE76 14.63 -> 15.31, dark share 0.138 -> 0.116 (target 0.143), strokes 1,369 -> 630, hfCorr 0.358 -> 0.391. Trumbull is plainer and scores worse; that is the honest plate.
 
-### Washes, paper lights and dead-code cleanup
+#### Washes, paper lights and dead-code cleanup
 
 - **Crisp value-band boundaries (`tools/plate/sheet.mjs`).** `valueOptions` passes `stepSquint: false, stepHoles: false` to `planLightToDark` so calibrated plans keep unblurred band boundaries (`value.values` is not box-blurred over `2 mm` before cutting bands `1..5`) and do not fill internal paper lights smaller than `minShape`.
 - **Focal detail paper lights (`src/paint/methods/light-to-dark.mjs`).** `lights` uses `DETAIL ? keepByDetail(closedInferred, w, h, minShape, DETAIL, detailScale) : removeSmall(...)` (matching `shadowMask`), preserving small paper highlights inside focal detail segments (whiskers, coat and grass blades, window mullions).
@@ -143,7 +155,7 @@ Sam's rule: a constant, rule, option or technique fitted to one benchmark subjec
 - **Paper-white hold (`tools/plate/plan.mjs`).** `--whitefloor` defaults to `0.5` of a glaze (`0.06` optical depth), matching the `0.3.2` contract.
 - **Removed unused modules.** Deleted 23 dead or default-off files under `src/paint/methods/` (`draw-plan*`, `line-dedupe`, `line-fit`, `line-meaning`, `accents`, `puddles`, `local-pans`, `pan-choice`) and their option-ledger entries.
 
-### Drawing and pen-and-wash ink
+#### Drawing and pen-and-wash ink
 
 - **Inking off by default on non-pen sources.** `--outlinemedium` defaults to `graphite` (`--drawing first`), and `--penfirst` is `0.5%` (`src/paint/methods/drawing-stages-auto.mjs`, `src/paint/methods/linework-plan.mjs`, `tools/plate/plan.mjs`) so non-pen paintings and photographs do not auto-trigger `prepInk` or `finishInk`. Pass `--drawing none --outlinemedium none` for no underdrawing.
 - **ControlNet lineart models for staged ink (`src/paint/methods/linework-plan.mjs`).** When `prepInk` or `finishInk` stages run without a pre-supplied line file and `--linemodel` is active, `planLinework` extracts lines with the fused ControlNet lineart models (`traceLineModel` in `src/paint/methods/line-model.mjs`, `strokes: pen`) rather than the luminance ridge walker (`writePenLines`).

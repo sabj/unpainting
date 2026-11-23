@@ -63,10 +63,13 @@ The record gives the source, the sheet, the opening drawing, the three studies a
 input is checked against its sha256 before anything starts. The code is in `tools/paint/`.
 
 ```sh
-npm run paint -- <subject[,subject...]> plan|paint [--author auto|<model key>[,...]] [--studies locked|author]
-                 [--work session|reply] [--looks N] [--minutes N] [--from <dir>]
+npm run paint -- <subject[,subject...]> plan|paint|prepare|look|preflight [--author auto|<model key>[,...]]
+                 [--studies locked|author] [--work session|reply] [--level L2|L3|L4] [--retries N] [--try N]
+                 [--previous <dir>] [--looks U] [--steps N] [--wallminutes N] [--from <dir>]
                  [--set key=value ...] [--jobs N] [--out <dir>] [--dry-run] [--no-open]
 ```
+
+Every option and its default is in `tools/paint/args.mjs`; a wrong option prints that list.
 
 `plan` makes the wash plan only, on the CPU, in minutes. `paint` makes the whole painting on the GPU; one painting
 asked for by itself refuses to start when `--jobs` GPU paintings (default 2) are already running. Before a run the command prints the subject, source, sheet, drawing,
@@ -171,14 +174,17 @@ tools, and `choice.json`. The task is `tools/paint/SESSION-BRIEF.md`; the tools 
 - `./unpaint plan` runs the wash planner on the present choice and answers with whether it compiled and its counts.
   Nothing else: no picture, no wash data. It is not limited.
 - `./unpaint look` shows the plan's picture beside the source and the middle study, each named form measured against
-  the study and marked when it is too dark or too pale, and every wash as data. Looks are stepping back, not search:
-  `--looks N` of them (default 4). A look is written to `<out>/author/looks.jsonl`, outside the model's folder,
+  the study and marked when it is too dark or too pale, and every wash as data. Looks are charged in rendering
+  units: `--looks U` (default 5), where one full look of the whole plan costs 1. A look is written to `<out>/author/looks.jsonl`, outside the model's folder,
   before anything is delivered, so a delivery that fails is still a spent look and a restarted broker goes on from
   the count. No score is shown.
 - The broker never trusts the folder: it follows no symlink, reads only plain files of bounded size, never echoes a
   request or a file, and takes the time of a request from its own clock. Every request is in `looks.jsonl`.
-- `--minutes N` (default 85) is the model's own time; time it waits for the planner is not counted. At the limit the
-  session and every process it started are ended (SIGTERM, then SIGKILL) and the last choice it had planned is painted.
+- Budgets are measured, not capped. When the rendering units or `--steps N` (tool calls, default 1000) are used, the
+  session is asked to hand in. `--wallminutes N` (default 360) is only a safety stop: at it the session and every
+  process it started are ended (SIGTERM, then SIGKILL) and the last choice it had planned is painted. `--minutes` is gone.
+- Levels: `--level L2` (default) is one go. `--level L3` and `--level L4` are retries from `--previous <run folder>`;
+  L4 first needs `prepare --level L4`, which paints Auto's full-size painting. See [levels](../bench/docs/levels.md).
 - Looks while painting are not offered: the painter cannot stop at a passage and go on from there (`--canarystop`
   stops for good), so on this trunk every look is at a plan and nothing painted can be undone or redone.
 - What the session can reach. Nothing of it can read this checkout, the checkout it is a worktree of (every
