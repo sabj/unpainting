@@ -137,6 +137,23 @@
     "from": "prepared fragonard at 3b5366fe (v0.4.0-rc.3; none was prepared at rc.2): one full look of the automatic plan",
     "cellsAcross": 731
    }
+  },
+  {
+   "task": "girtin-trial",
+   "name": "Lindisfarne Castle (trial, not a benchmark subject)",
+   "width": 768,
+   "height": 565,
+   "coarse": {
+    "cols": 24,
+    "rows": 18
+   },
+   "style": "watercolour and bodycolour, no ink: a castle on a high rock under a cloudy sky, smoke along its foot, water and a shore with small figures (after Thomas Girtin)",
+   "medium": "none",
+   "source": "Thomas Girtin, Lindisfarne Castle, Holy Island, 1796-97, The Metropolitan Museum of Art 06.1051.1; CC0",
+   "distributed": true,
+   "file": "targets/girtin-trial.png",
+   "coarseFile": "targets/girtin-trial-coarse.json",
+   "licence": "CC0 (public domain)"
   }
  ]
 }
