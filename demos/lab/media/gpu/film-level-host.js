@@ -6,6 +6,9 @@ import { LV_BMAX, lvxWords } from './film-level-wgsl.js';
 
 // rho g / (3 mu) in 1/(mm s), as film-level.mjs KAPPA; the most CG iterations a step may encode
 const KAPPA = 1000 * 9.81 / (3 * 1e-3) / 1e3, LV_ITMAX = 8192;
+// the kernels' overrides, made once, so the sheet finds each pipeline by the object (stepfull.mjs lvPipe)
+const MEN = [{ LVMEN: 0 }, { LVMEN: 1 }], PAR = [{ LVPAR: 0, LVK0: 1 }, { LVPAR: 0 }, { LVPAR: 1 }];
+const ROUNDS = Array.from({ length: 64 }, (_, r) => ({ LVROUND: r }));
 export const levelOn = o => (o.level ?? 1) > 0;
 const fillOn = o => (o.slide ?? 0) > 0 && (o.fillRef ?? 0.4) > 0;
 
@@ -15,7 +18,7 @@ export const levelBudget = () => ({ iters: 128, subs: 64, boxes: 16, total: null
 /** Bytes of each buffer for a w x h sheet of n cells and `ntiles` 16x16 tiles; the per-cell fields only with `on`. */
 export function levelBuffers(w, h, n, ntiles, on) {
   const cell = on ? n * 16 : 16;
-  return { LVT: ntiles * 32, LVX: lvxWords(w, h, ntiles) * 4, LVS: (16 + 2 * LV_BMAX) * 4, LVR: ntiles * 8, LVA: cell, LVB: cell, LVF: cell, LVP: on ? n * 8 : 16 };
+  return { LVT: ntiles * 32, LVX: lvxWords(w, h, ntiles) * 4, LVS: (16 + 2 * LV_BMAX) * 4, LVR: ntiles * 32, LVA: cell, LVB: cell, LVF: cell, LVP: on ? n * 8 : 16 };
 }
 
 /** The levelling's uniforms for a step of dt on mm cells (film-level.mjs levelFilm). `o.tiltX`, `o.tiltY`: sheet.tilt. */
@@ -40,14 +43,16 @@ export function encodeLevel(run, o, mm, lv, tiles) {
   if (!level) return;
   const R = Math.ceil((o.meniscusMm ?? 0.5) / mm), relax = Math.max(1, R - 1), boxes = lv.boxes;
   run('lv_init', tiles);
-  for (let r = 0; r < relax; r++) run('lv_dist', tiles, { LVMEN: r === relax - 1 ? 1 : 0 });
+  for (let r = 0; r < relax; r++) run('lv_dist', tiles, MEN[r === relax - 1 ? 1 : 0]);
   run('lv_rhs', tiles); run('lv_cg0', boxes);
+  // two dispatches an iteration: the box sums between them are taken in the tile kernels (film-level-wgsl.mjs lv_cg_a)
   for (let it = 0; it < lv.iters; it++) {
-    const par = { LVPAR: it & 1 };
-    run('lv_cg_a', tiles, par); run('lv_cg_b', boxes); run('lv_cg_c', tiles, par); run('lv_cg_d', boxes);
+    const par = it === 0 ? PAR[0] : PAR[1 + (it & 1)];
+    run('lv_cg_a', tiles, par); run('lv_cg_c', tiles, par);
   }
+  if (lv.iters > 0) run('lv_cg_d', boxes, PAR[1 + ((lv.iters - 1) & 1)]);
   run('lv_flux', tiles); run('lv_out', tiles); run('lv_subs', boxes);
-  for (let r = 0; r < lv.subs; r++) { run('lv_s1', tiles, { LVROUND: r }); run('lv_s2', tiles, { LVROUND: r }); }
+  for (let r = 0; r < lv.subs; r++) { run('lv_s1', tiles, ROUNDS[r]); run('lv_s2', tiles, ROUNDS[r]); }
 }
 
 /**
