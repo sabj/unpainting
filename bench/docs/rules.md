@@ -15,7 +15,7 @@ More freedom than before, and mistakes are allowed.
 - Pen ink: waterproof or soluble (at L2 to L4 a model's own pen lines are waterproof unless its settings say `inkfast` 0).
 - Erasing: the kit's eraser at L1; an erase passage in its own script at L2 to L4.
 - At L2 to L4: a whole script of its own (the model plans the painting itself from Auto's inputs), the pencil lines Auto keeps, and the paints (up to 14). Auto's plan and planner are given at no level: a settings choice or a plan edit is refused, and a session that hands in no script of its own has handed in nothing (a failed painting).
-- At L4 also: the studies' traced shapes as regions its script may name, change or ignore, and Auto's finished painting as a picture.
+- At L4 also: the studies' traced shapes as regions its script may name, change or ignore. Nothing of Auto at any level.
 - Where a choice only risks a worse painting, the harness gives a warning, not a refusal. It refuses only to protect the sheet or the rules.
 
 ## What is fixed

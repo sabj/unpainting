@@ -36,11 +36,11 @@ test('handed pictures: a line each in seen.md; what a command\'s log can show of
   assert.deepEqual(logReads('codex', ['sips -g pixelWidth previous/final-beside-subject.jpg'], files), { [files[0]]: null, [files[1]]: null }, 'codex\'s log cannot show a picture being read: null, never a guess');
 });
 
-test('a level is a named setting: L2 one go without the code\'s plan, L3 a retry from the L2 result, L4 a retry from the L3 result with Auto\'s painting and the traced shapes, never the code\'s plan; no critique at any level', () => {
+test('a level is a named setting: L2 one go without the code\'s plan, L3 a retry from the L2 result, L4 a retry from the L3 result with the traced shapes, nothing of Auto; no critique at any level', () => {
   assert.deepEqual(Object.keys(LEVELS), ['L2', 'L3', 'L4']); assert.throws(() => levelOf('L9'), /one of L2, L3, L4/); assert.equal(DEFAULT_RETRIES, 1);
   assert.deepEqual(handedAt(levelOf('L2'), {}), { previous: false, plan: false, auto: false, shapes: false }, 'L2 gets the code planner\'s inputs, not its plan');
   assert.deepEqual(handedAt(levelOf('L3'), { previous: 'l2-run' }), { previous: true, plan: false, auto: false, shapes: false }, 'L3 gets its own previous painting and nothing of the code\'s');
-  assert.deepEqual(handedAt(levelOf('L4'), { previous: 'l3-run' }), { previous: true, plan: false, auto: true, shapes: true }, 'L4 gets Auto\'s finished painting and the traced shapes, never the code\'s plan');
+  assert.deepEqual(handedAt(levelOf('L4'), { previous: 'l3-run' }), { previous: true, plan: false, auto: false, shapes: true }, 'L4 gets the traced shapes, nothing of Auto');
   assert.ok(Object.values(LEVELS).every(l => l.codePlan === false), 'no level hands over the code\'s plan');
   assert.deepEqual(handedAt(levelOf('L3'), { tryNumber: 3, retries: 3, previous: 'run' }), { previous: true, plan: false, auto: false, shapes: false }, 'the number of retries is a setting');
   assert.throws(() => handedAt(levelOf('L2'), { previous: 'run' }), /L2 is one go from the prepared inputs/); assert.throws(() => handedAt(levelOf('L2'), { tryNumber: 2 }), /L2 is one go/);
@@ -134,8 +134,8 @@ test('the sheets of a finished painting: beside the subject, the frames in order
   } finally { for (const d of [run, to]) fs.rmSync(d, { recursive: true, force: true }); }
 });
 
-test('a level 4 prepare paints the automatic painting with its frames kept, and the prepared key does not change for it', () => {
-  assert.deepEqual(preparedFilm(levelOf('L4')), [['video', '1'], ['frames', '48']]); assert.deepEqual(preparedFilm(levelOf('L2')), []);
+test('no level\'s prepare paints the automatic painting (level 4 gets nothing of Auto), and the prepared key does not change for it', () => {
+  assert.deepEqual(preparedFilm(levelOf('L4')), []); assert.deepEqual(preparedFilm(levelOf('L2')), []);
   const key = sets => preparedKey({ id: 'm', commit: 'abc', sets });
   assert.equal(key(preparedFilm(levelOf('L4'))), key([]));
 });

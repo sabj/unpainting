@@ -223,7 +223,7 @@ As of 0.4. Levels are in [levels](../bench/docs/levels.md); the session's tools 
 | L1 | L0 and harness tips; a kit with pen, pencil and eraser; ink waterproof or soluble | prepared inputs |
 | L2 | the same inputs Auto gets: the prepared drawing, the three studies, the named forms; it plans the painting itself, as its own script; one go | Auto's plan and planner (no `auto/`; a settings choice or plan edit is refused); study shapes as regions (only the study pictures); anything finer than the 11 forms; Auto's finished painting |
 | L3 | L2 again after studying its own L2 run: its painting beside the subject, replay, stroke map, what it handed over | as L2 |
-| L4 | L3, then one more retry, also given the studies' traced shapes as regions (offered, maybe wrong) and Auto's finished painting beside the subject | Auto's plan, planner and settings; Auto's stroke map and film; the plan's washes |
+| L4 | L3, then one more retry, also given the studies' traced shapes as regions (offered, maybe wrong) | anything of Auto: plan, planner, settings, finished painting, film, stroke map; the plan's washes |
 
 At every level:
 

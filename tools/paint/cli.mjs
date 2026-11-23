@@ -29,7 +29,7 @@ import { PROVIDER_HOSTS, startGate as startNetGate, makeToolbox, toolsText } fro
 import { DEFAULT_LOOKS, DEFAULT_WALL_MINUTES, DEFAULT_GRACE_MINUTES, DEFAULT_STEPS, safeRead, writeSession, sessionServer, SIGN_IN_EXPOSURE, finalChoice, sessionCall, readTranscript, reachedOutside, ownFolderOf, ownPictures, runSession } from './session.mjs';
 import { DEFAULT_REVERTS } from './reverts.mjs';
 import { levelOf, handedAt, OWN_SCRIPT_ONLY } from './levels.mjs';
-import { autoPaintingHanded, shapesHanded, checkWithheld } from './level4.mjs';
+import { shapesHanded, checkWithheld } from './level4.mjs';
 import { usageOf, usageLine } from './usage.mjs';
 import { shapesData, namesShapes, resolveNumbered } from './study-shapes.mjs';
 import { stoppedText } from './stage-look.mjs';
@@ -369,14 +369,12 @@ async function paintLookOnce(r, choice, script, plate, at, edit, compiled, ask =
  * What this session is handed beside the subject's inputs, by its level (levels.mjs), each a folder of its own with
  * a paragraph of the task (session.mjs writeSession). A retry (L3, L4): the result it starts from (--previous: the
  * dried full-size painting beside the subject, the replay sheet, the arrows sheet, and what was handed over, to start
- * from). Level 4 also: Auto's finished painting beside the subject, and the studies' traced shapes offered as
- * regions (level4.mjs); never the code's plan, Auto's film or its stroke map. Never a score, a verdict or anyone's critique: the model judges its own sheet.
+ * from). Level 4 also: the studies' traced shapes offered as regions (level4.mjs); nothing of Auto. Never a score, a verdict or anyone's critique: the model judges its own sheet.
  * `made`: a folder outside the model's folder where the files are made. Returns the list.
  */
 async function handedTo(r, prepared, made) {
   const { spec, authorFull: author } = r, handed = [];
-  // level 4 (level4.mjs): Auto's finished painting beside the subject, and the studies' traced shapes offered as regions
-  if (terms.auto) handed.push(autoPaintingHanded(prepared.painting.sheets));
+  // level 4 (level4.mjs): the studies' traced shapes offered as regions; nothing of Auto
   if (terms.shapes) handed.push(shapesHanded(prepared.shapes));
   if (terms.previous) {
     const from = path.resolve(req.previous); let earlier; try { earlier = JSON.parse(fs.readFileSync(path.join(from, 'run.json'), 'utf8')); } catch { throw new Error(`--previous ${from}: no finished run there (run.json)`); }

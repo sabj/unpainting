@@ -152,10 +152,9 @@ opening drawing, the three studies, the named forms as a picture and as an id ma
   its planner and its settings are handed over at no level". `choice.json` starts naming `script.json`, which the
   model writes; a session that hands in no script that compiled has handed in nothing, and the run fails with
   "nothing handed in". (The preflight alone still opens a folder with the code's plan, to check the tools.)
-- Level 4 also gets `auto-painting/final-beside-subject.jpg` (Auto's finished painting beside the subject) and
-  `resources/shapes.json` (the block-in study's traced shapes, which its script may name by number; offered, not
-  required, and maybe wrong). It never gets Auto's replay or arrows sheets, the plan's washes or the plan
-  (`tools/paint/level4.mjs`; a folder holding any of them is not started).
+- Level 4 also gets `resources/shapes.json` (the block-in study's traced shapes, which its script may name by
+  number; offered, not required, and maybe wrong). No level gets anything of Auto: its plan, the plan's washes, its
+  painting, replay or arrows sheets (`tools/paint/level4.mjs`; a folder holding any of them is not started).
 - Its lines (`"lines"`): which lines of the drawing are drawn before the washes, which after them over the dry paint,
   which not at all, and how dark each is, by rules over `drawing/lines.json` (`lines-edit.mjs`), and lines of its
   own. The chosen strokes are written as drawing stems of the run's own and painted through `--drawingfile`,
@@ -176,7 +175,8 @@ opening drawing, the three studies, the named forms as a picture and as an id ma
   session is asked to hand in. `--wallminutes N` (default 360) is only a safety stop: at it the session and every
   process it started are ended (SIGTERM, then SIGKILL) and the last choice it had planned is painted. `--minutes` is gone.
 - Levels: `--level L2` (default) is one go, without the code's plan. `--level L3` and `--level L4` are retries from `--previous <run folder>` (a retry refuses a previous try that did not hand in its own script);
-  L4 first needs `prepare --level L4`, which paints Auto's full-size painting. See [levels](../bench/docs/levels.md).
+  `prepare` makes the same inputs for every level (the plan, the traced shapes, the unit look); no level needs
+  Auto's full-size painting. See [levels](../bench/docs/levels.md).
 - A session that handed in is never thrown away (`tools/paint/final-wait.mjs`). Its full-size final waits for a GPU
   place (this Mac's, or the render pool's) with a line a minute, is painted again when its worker fails (up to 3
   times), and stops only after 6 hours in all. The run then ends with exit 4 and prints the `--from` command that

@@ -7,10 +7,10 @@
 //       try's dried full-size painting beside the subject, its replay sheet, its arrows sheet and what it handed over.
 //       No critique and never a score: the model judges its own sheet and writes what it will change. Still no code
 //       plan: its own script is the only choice it may hand in.
-//   L4  the chance to improve on L3 with more help (owner, 23 Nov 01:15: a model sees WHAT Auto made, never HOW): a
-//       session that starts from the model's L3 result, handed that the same way (its painting, film and stroke map),
-//       and also the studies' traced shapes as regions it may use, change, redraw or ignore, and Auto's finished
-//       painting beside the subject (level4.mjs). Never the code's plan, the planner, Auto's stroke map or film.
+//   L4  the chance to improve on L3 with one more help (owner, 23 Nov): a session that starts from the model's L3
+//       result, handed that the same way (its painting, film and stroke map), and also the studies' traced shapes as
+//       regions it may use, change, redraw or ignore (level4.mjs). Nothing of Auto: not its plan, planner, settings,
+//       painting, film or stroke map. So no level's prepare paints Auto at full size.
 // At every level the model hands in its own script: planner settings alone, or the code's plan (edited or not), are
 // refused (OWN_SCRIPT_ONLY). Looks are priced by size and share (look-cost.mjs), whatever is in them.
 // How many retries a level has is a setting (--retries, default 1: one L3 session, one L4 session), not a constant.
@@ -22,7 +22,7 @@ export const DEFAULT_RETRIES = 1;
 export const LEVELS = Object.freeze({
   L2: { previousTry: false, codePlan: false, autoPainting: false, shapesData: false, what: 'one go from the same inputs the code planner gets (drawing, studies, named forms), planned by the model itself; no code plan' },
   L3: { previousTry: true, codePlan: false, autoPainting: false, shapesData: false, what: 'L2 again from the model\'s own L2 result: its painting, replay sheet, arrows sheet and what it handed over; it judges its own sheet; no code plan' },
-  L4: { previousTry: true, codePlan: false, autoPainting: true, shapesData: true, what: 'a retry from the model\'s L3 result with more help: the studies\' traced shapes as regions it may use or ignore, and Auto\'s finished painting beside the subject; never the code\'s plan, the planner, Auto\'s stroke map or film' },
+  L4: { previousTry: true, codePlan: false, autoPainting: false, shapesData: true, what: 'a retry from the model\'s L3 result with one more help: the studies\' traced shapes as regions it may use or ignore; nothing of Auto (plan, planner, painting, film or stroke map)' },
 });
 
 /** What a session is told when it reaches for the code's plan, planner or settings (choice.mjs, session.mjs): at every level. */

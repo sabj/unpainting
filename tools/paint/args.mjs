@@ -16,8 +16,8 @@ export const USAGE = `usage: npm run paint -- <subject[,subject...]> plan|paint|
                         session: it opens a picture and says what it shows, runs ./unpaint plan once and writes a
                         file. Nothing is painted. Prints a table and writes preflight.json
   prepare               make the subject's prepared inputs for this code, once, before any session: the code
-                        planner's plan (CPU); with --level L4 also its full-size painting (GPU) and that painting's
-                        sheets. A session finds them in seconds and does not start without them
+                        planner's plan and the studies' traced shapes (CPU) and one look of it (GPU), the same
+                        for every level. A session finds them in seconds and does not start without them
   --author a[,b...]     who writes the wash plan: auto (the code planner, the control), a model key of
                         tools/paint/authors.json or bench/models.json, or script:FILE.json (a kept script).
                         Several authors make a grid, subjects down and authors across. Default auto.
@@ -28,8 +28,8 @@ export const USAGE = `usage: npm run paint -- <subject[,subject...]> plan|paint|
   --level L2|L3|L4      what a session is handed (default L2). L2: the inputs the code planner gets (drawing,
                         studies, named forms), not its plan; the model plans itself, one go. L3: L2 again from
                         the model's own L2 result (--previous). L4: a retry from its L3 result with more
-                        help: the studies' traced shapes as regions it may use or ignore, and Auto's finished
-                        painting beside the subject (never the code's plan, Auto's film or stroke map)
+                        help: the studies' traced shapes as regions it may use or ignore (nothing of Auto:
+                        not its plan, planner, painting, film or stroke map)
   --retries N           retries at a level (L3, L4; default 1), and --try N which of them this is (default 1)
   --previous <dir>      the run folder of the result this retry starts from (its finished full-size painting)
   --looks U             the benchmark's resource budget, rendering: how much a try may spend on looks, in units

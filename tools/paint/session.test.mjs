@@ -6,7 +6,7 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { levelOf, OWN_SCRIPT_ONLY } from './levels.mjs';
-import { autoPaintingHanded, shapesHanded, checkWithheld, WITHHELD } from './level4.mjs';
+import { shapesHanded, checkWithheld, WITHHELD } from './level4.mjs';
 import { DEFAULT_LOOKS, DEFAULT_WALL_MINUTES, DEFAULT_STEPS, forLevel, writeSession, sessionServer, ledgerLooks, safeRead, safeWrite, finalChoice, cleanEnv, seatbelt, sessionCall, readTranscript, reachedOutside, ownFolderOf, ownPictures, runSession } from './session.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -468,7 +468,7 @@ test('at every level the folder holds the code planner\'s inputs and no code pla
   const prev = tmp(); fs.writeFileSync(path.join(prev, 'a.jpg'), PNG);
   const previous = { folder: 'previous', title: 'Your own previous painting of this subject', words: 'Judge it yourself.', files: [{ from: path.join(prev, 'a.jpg'), name: 'final-beside-subject.jpg', what: 'your painting beside the subject', picture: true }] };
   fs.writeFileSync(path.join(prev, 'shapes.json'), '{"shapes": []}');
-  for (const [level, handed] of [['L2', []], ['L3', [previous]], ['L4', [previous, autoPaintingHanded([{ from: path.join(prev, 'a.jpg'), name: 'final-beside-subject.jpg' }, { from: path.join(prev, 'a.jpg'), name: 'replay-sheet-frames-in-order.jpg' }, { from: path.join(prev, 'a.jpg'), name: 'arrows-sheet-strokes-in-order.jpg' }]), shapesHanded(path.join(prev, 'shapes.json'))]]]) {
+  for (const [level, handed] of [['L2', []], ['L3', [previous]], ['L4', [previous, shapesHanded(path.join(prev, 'shapes.json'))]]]) {
     const { dir, prompt } = folder({ level, handed });
     try {
       assert.ok(!fs.existsSync(path.join(dir, 'auto')), `${level}: no auto/ folder`);
@@ -483,19 +483,19 @@ test('at every level the folder holds the code planner\'s inputs and no code pla
       assert.match(readme, /"kind": "erase"/, 'its erase passages are its own to write'); assert.match(readme, /"lines": "my-lines.json"/);
       if (level !== 'L2') assert.match(prompt, /`previous\/final-beside-subject.jpg`/);
       if (level === 'L4') {
-        // given: Auto's finished painting beside the subject, and the studies' traced shapes, offered and maybe wrong
-        assert.ok(fs.existsSync(path.join(dir, 'auto-painting/final-beside-subject.jpg')) && fs.existsSync(path.join(dir, 'resources/shapes.json')));
+        // given: the studies' traced shapes, offered and maybe wrong; nothing of Auto
+        assert.ok(fs.existsSync(path.join(dir, 'resources/shapes.json')));
         assert.match(prompt, /offered, not required, and they may be wrong/); assert.match(prompt, /Use them, change them, redraw them, or ignore them/); assert.doesNotMatch(prompt, /\bmust use\b/i);
-        // withheld: the code's plan and planner, the plan's washes, Auto's film (replay sheet) and stroke map (arrows)
+        // withheld: the code's plan and planner, the plan's washes, Auto's painting, film (replay sheet) and stroke map (arrows)
         for (const f of WITHHELD) assert.ok(!fs.existsSync(path.join(dir, f)), `L4 withholds ${f}`);
-        assert.doesNotMatch(prompt, /replay-sheet|arrows-sheet|washes\.json/); assert.doesNotThrow(() => checkWithheld(dir));
-        fs.writeFileSync(path.join(dir, 'auto-painting/arrows-sheet-strokes-in-order.jpg'), 'x'); fs.mkdirSync(path.join(dir, 'auto'));
-        assert.throws(() => checkWithheld(dir), /holds auto, auto-painting\/arrows-sheet-strokes-in-order\.jpg, which no level hands over/);
+        assert.doesNotMatch(prompt, /auto-painting|Auto|washes\.json/); assert.doesNotThrow(() => checkWithheld(dir));
+        fs.mkdirSync(path.join(dir, 'auto-painting')); fs.writeFileSync(path.join(dir, 'auto-painting/final-beside-subject.jpg'), 'x');
+        assert.throws(() => checkWithheld(dir), /holds auto-painting, auto-painting\/final-beside-subject\.jpg, which no level hands over/, 'Auto\'s finished painting stops a session');
+        fs.mkdirSync(path.join(dir, 'auto')); assert.throws(() => checkWithheld(dir), /holds auto, auto-painting/);
       }
     } finally { fs.rmSync(dir, { recursive: true, force: true }); }
   }
   fs.rmSync(prev, { recursive: true, force: true });
-  assert.throws(() => autoPaintingHanded([{ from: 'x', name: 'replay-sheet-frames-in-order.jpg' }]), /no final-beside-subject\.jpg/);
   // the level is always said, and what a level hands over must agree with it
   const dir = tmp(); fs.mkdirSync(path.join(dir, 'inputs'));
   const base = { dir, packet: { files: [], brief: 'B' }, sheet: { widthMm: 280, heightMm: 186.7 }, medium: 'pencil', looks: 2, wallMinutes: 60, briefFile: path.join(HERE, 'SESSION-BRIEF.md'), readmeFile: path.join(HERE, 'SESSION-README.md') };

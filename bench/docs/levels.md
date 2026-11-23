@@ -12,7 +12,7 @@ The benchmark asks one question: how well does a model paint, and how much of th
 | L1 | L0 plus harness tips: guides to brush technique and worked examples of rendering a shape, painted on blank sheets. | One |
 | L2 | The same inputs Auto gets: the prepared drawing, the three colour studies, the named forms. Not Auto's plan: the model plans the painting itself, as its own script. | One |
 | L3 | L2 again, after studying its own L2 painting. Still no Auto plan. | Two in all |
-| L4 | L3, then one more retry, with more help: the studies' traced shapes as regions it may use, change, redraw or ignore (offered, not required, and maybe wrong); Auto's finished painting, as a picture beside the subject; its own L3 painting with its film and stroke map. Not given: Auto's plan, the planner, Auto's stroke map, Auto's film. | Three in all |
+| L4 | L3, then one more retry, with more help: the studies' traced shapes as regions it may use, change, redraw or ignore (offered, not required, and maybe wrong); its own L3 painting with its film and stroke map. Not given: anything of Auto (its plan, planner, settings, finished painting, film or stroke map). | Three in all |
 
 Notes on each level:
 
@@ -21,11 +21,11 @@ Notes on each level:
 - Test run first: three tries at L3 and at L4, each scored on its own, to see whether the second and third try add anything. After it the owner decides whether the scored run keeps three or scopes back to one. Planned, not yet run.
 - A model has a shell in its own workspace at every level and may write any script it wants.
 - At every level the model hands in its own script (with its choice of lines, medium and erase passages). No session folder holds `auto/`. Auto's settings, or Auto's plan edited or not, are refused with "the code's plan, its planner and its settings are handed over at no level". A session that hands in no script of its own has handed in nothing: a failed painting, never Auto's plan painted in its place.
-- L2 changed on 22 November: it gets Auto's inputs, not Auto's plan. L4 changed on 23 November (the owner: "I dont want it to just steer the code"; a model sees what Auto made, never how). Runs made under the older terms show the harness works; they are not results at those levels.
+- L2 changed on 22 November: it gets Auto's inputs, not Auto's plan. L4 changed on 23 November (the owner: "I dont want it to just steer the code", then "probably not give auto painting in l4"): it gets the traced shapes and nothing of Auto. Runs made under the older terms show the harness works; they are not results at those levels.
 
 ## Retries are self-study
 
-- Before a retry the model is handed its own previous painting beside the original, the replay and its stroke map. At L4 it also gets the traced shapes and Auto's finished painting.
+- Before a retry the model is handed its own previous painting beside the original, the replay and its stroke map. At L4 it also gets the traced shapes.
 - The model writes its own assessment of what to change.
 - It never gets a score, a judge's verdict or any outside critique, at any level.
 - There is no hill climbing: few fixed retries, the last try counts and not the best, reverts are counted, and nothing is measured against the original.
