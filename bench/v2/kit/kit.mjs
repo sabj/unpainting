@@ -18,6 +18,7 @@
 // The film: the sheet is also saved, lossless, every second stroke and after every drying, and thinned at the end to at most
 //   400 frames evenly through the painting: out/<task>/film/frames.json plus fNNNN.webp, the layout the Studio plays. It only
 //   reads the sheet. BENCH_NO_FILM=1 turns it off.
+// The pen's ink is soluble (a wash over it rewets it) unless you ask for waterproof ink: kit.open(task, { ink: 'waterproof' }).
 // One painting at a time, on the GPU: if another of your processes still holds the GPU, or the GPU cannot be used, kit.open
 //   STOPS and names what holds it; it never paints on the CPU by itself. Ask for the CPU by name if you want it (far
 //   slower): kit.open(task, { gpu: false }).
@@ -113,8 +114,9 @@ const total = c => c.reduce((a, b) => a + b, 0);
 /** The coarse map of a task: { cols, rows, palette: [[r,g,b] x8], cells: palette index per cell, value: 0..1 per cell }. */
 export const coarse = task => JSON.parse(fs.readFileSync(path.join(HERE, 'tasks', `${task}-coarse.json`), 'utf8'));
 
-export async function open(task, { seed = +(process.env.BENCH_SEED || 1), gpu = true, threads = 1 } = {}) {
+export async function open(task, { seed = +(process.env.BENCH_SEED || 1), gpu = true, threads = 1, ink = 'soluble' } = {}) {
   if (!TASKS.includes(task)) reject(`task must be one of ${TASKS.join(', ')}`);
+  if (!['soluble', 'waterproof'].includes(ink)) reject('ink must be "soluble" (the default: a wash over it rewets it and it bleeds) or "waterproof" (a wash over it moves none)');
   await takeSlot();
   const map = coarse(task); const W = map.w, H = map.h;
   const out = path.join(HERE, 'out', task); fs.rmSync(out, { recursive: true, force: true }); fs.mkdirSync(path.join(out, 'snaps'), { recursive: true }); fs.mkdirSync(path.join(out, 'frames'), { recursive: true }); fs.mkdirSync(path.join(out, 'film'), { recursive: true });
@@ -127,7 +129,9 @@ export async function open(task, { seed = +(process.env.BENCH_SEED || 1), gpu = 
     const held = takeGpuLock();
     if (held !== true) reject(`the GPU is held by another painting of this session: process ${held.pid}${held.command ? ` (${held.command})` : ''}. One painting runs at a time. Nothing was painted: wait for that process to end or stop it, then run again. To paint on the CPU on purpose (far slower), open with kit.open('${task}', { gpu: false })`);
   } else await S.setThreads(threads);
-  const pigments = BOX.map(p => boxPigment(p));
+  // the pen's ink, by the name the session painter uses (--set ink=waterproof|soluble): waterproof ink holds to the paper
+  // as the painter's set ink does (staining power 60), so later water lifts none of it; soluble is the ink's own profile
+  const pigments = BOX.map(p => (ink === 'waterproof' && INK.includes(p.key) ? { ...boxPigment(p), omega: 60 } : boxPigment(p)));
   const sheet = S.createSheet(makePaper(W, H, { seed, scale: 1, toothScale: 0.2, coldPress: { mmPerCell: MM } }), pigments);
   if (useGpu) {
     try { attachGpu(sheet, O, { mode: 'on', log: () => {} }); } catch (e) { reject(`the GPU could not be used (${String(e.message).slice(0, 200)}). Nothing was painted. Run again; to paint on the CPU on purpose (far slower), open with kit.open('${task}', { gpu: false })`); }
