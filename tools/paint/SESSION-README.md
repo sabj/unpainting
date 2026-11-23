@@ -33,6 +33,10 @@ INPUT_LIST
 - `seen.md`: only when you were handed pictures of a finished painting (`previous/`, `auto-painting/`): one line on
   each, written before your first plan (`TASK.md` says which).
 
+## Tools
+
+TOOLS_NOTE
+
 ## Commands
 
 Run them from this folder. A plan takes from under a minute to several minutes on the CPU. A look is a painting: it

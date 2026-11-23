@@ -22,6 +22,7 @@
 // What this cannot stop: a model drawing its own script's polygons with its own code. Its commands are kept.
 import { travelLine } from './hand-travel.mjs';
 import fs from 'node:fs';
+import { proxyEnv, TOOLS_OPEN } from './session-net.mjs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
@@ -107,11 +108,11 @@ const fill = (text, v) => Object.entries(v).reduce((t, [k, x]) => t.replaceAll(k
  * `settings` settingsList(); `forms` [{id, name, kind, boxMm}] with `formsIds` the id map's file, or null.
  * Returns {prompt, files}. Nothing of this machine's paths goes into any file of the folder.
  */
-export function writeSession({ dir, packet, sheet, medium, auto, settings, forms = null, formsIds = null, looks, wallMinutes, graceMinutes = DEFAULT_GRACE_MINUTES, reverts = DEFAULT_REVERTS, briefFile, readmeFile, handed = [], drawing = null }) {
+export function writeSession({ dir, packet, sheet, medium, auto, settings, forms = null, formsIds = null, looks, wallMinutes, graceMinutes = DEFAULT_GRACE_MINUTES, reverts = DEFAULT_REVERTS, briefFile, readmeFile, handed = [], drawing = null, tools = TOOLS_OPEN }) {
   const mk = d => fs.mkdirSync(path.join(dir, d), { recursive: true });
   for (const d of ['auto', 'plans', 'looks', '.requests']) mk(d);
   const put = (f, text) => fs.writeFileSync(path.join(dir, f), text);
-  const ink = /^ink/.test(medium), v = { SHEET_W: sheet.widthMm, SHEET_H: sheet.heightMm, WALL_MINUTES: wallMinutes, GRACE_MINUTES: graceMinutes, LOOKS_MOST: looks, REVERTS_MOST: reverts,
+  const ink = /^ink/.test(medium), v = { TOOLS_NOTE: tools, SHEET_W: sheet.widthMm, SHEET_H: sheet.heightMm, WALL_MINUTES: wallMinutes, GRACE_MINUTES: graceMinutes, LOOKS_MOST: looks, REVERTS_MOST: reverts,
     DRAWING_NOTE: ink ? 'As prepared, the drawing is waterproof ink laid before the washes; it carries the form and the washes go over it.' : 'As prepared, the drawing is light pencil laid before the washes; it only places the forms, and the paint carries form, value and edge.',
     INPUT_LIST: packet.files.map(f => `- \`${f}\`: ${f.includes('source') ? 'the SUBJECT, the picture to paint' : f.includes('drawing') ? 'the opening DRAWING, already on the sheet before any wash' : f.includes('forms') ? 'the NAMED FORMS, each one flat colour' : `block-in STUDY ${/study-(\d)/.exec(f)?.[1]}: the subject simplified to flat shapes (1 the broad shapes, 2 the middle study, 3 details and accents); the code planner reads its washes from these`}`).join('\n') };
   let prompt = fill(fs.readFileSync(briefFile, 'utf8'), v);
@@ -359,12 +360,14 @@ const q = s => `"${String(s).replace(/[\\"]/g, '\\$&')}"`;
  * port 443 (its own service). Later rules win, so `cwd`, the session's own folder, is allowed again after the denials.
  * `local`: the command talks to its own helper over this machine's loopback, and runs its shell on a pseudo-terminal.
  */
-export function seatbelt({ deny, write, cwd, local = false }) {
+export function seatbelt({ deny, write, cwd, local = false, gated = false, readable = [] }) {
+  // gated: nothing goes out but to this machine's loopback, where the session's gate (session-net.mjs) passes the
+  // model's own service only; readable: folders read again after the denials (the toolbox's Python)
   return ['(version 1)', '(allow default)',
     '(deny file-write*)', `(allow file-write* ${write.map(d => `(subpath ${q(d)})`).join(' ')} (literal "/dev/null") (literal "/dev/dtracehelper") (regex #"^/dev/tty"))`,
     `(deny file-read* file-write* ${deny.map(d => `(subpath ${q(d)})`).join(' ')} (regex #"/unpaint-session-"))`,
-    `(allow file-read* file-write* (subpath ${q(cwd)}))`,
-    '(deny network*)', '(allow network-outbound (remote tcp "*:443") (remote udp "*:53") (remote tcp "*:53") (literal "/private/var/run/mDNSResponder"))', '(allow network-inbound (local udp "*:*"))', '(allow system-socket)',
+    `(allow file-read* file-write* (subpath ${q(cwd)}))`, ...readable.map(d => `(allow file-read* (subpath ${q(d)}))`),
+    '(deny network*)', ...(gated ? ['(allow network-outbound (remote ip "localhost:*"))'] : ['(allow network-outbound (remote tcp "*:443") (remote udp "*:53") (remote tcp "*:53") (literal "/private/var/run/mDNSResponder"))', '(allow network-inbound (local udp "*:*"))']), '(allow system-socket)',
     ...(local ? ['(allow network-bind (local ip "localhost:*"))', '(allow network-inbound (local ip "localhost:*"))', '(allow network-outbound (remote ip "localhost:*"))', '(allow pseudo-tty)', '(allow file-read* file-write* file-ioctl (literal "/dev/ptmx") (regex #"^/dev/ttys[0-9]+$"))'] : []),
   ].join('\n');
 }
@@ -378,7 +381,7 @@ export function seatbelt({ deny, write, cwd, local = false }) {
  * agy: the same profile (its own permission prompts off inside it), with loopback and a pseudo-terminal allowed: it
  * talks to a helper of its own on localhost and runs its shell on a pty.
  */
-export function sessionCall(author, { prompt, cwd, deny = [], images = [], home = os.homedir(), tmp = os.tmpdir() }) {
+export function sessionCall(author, { prompt, cwd, deny = [], images = [], home = os.homedir(), tmp = os.tmpdir(), gate = null, toolbox = null }) {
   const real = d => { try { return fs.realpathSync(d); } catch { return d; } }, all = [...new Set(deny.flatMap(d => [d, real(d)]))];
   if (author.cli === 'claude') {
     const settings = { sandbox: { enabled: true, autoAllowBashIfSandboxed: true, allowUnsandboxedCommands: false }, permissions: { deny: all.map(d => `Read(/${d}/**)`) } };
@@ -394,11 +397,13 @@ export function sessionCall(author, { prompt, cwd, deny = [], images = [], home 
       closed: 'the whole command runs under a seatbelt profile of this harness: it cannot read the repository, the subject list, the caches or other sessions, writes only in its folder and temporary folders, and reaches the network on port 443 only (the command\'s own sandbox is off: two do not nest)' };
   }
   if (author.cli === 'agy') {
-    const profile = seatbelt({ deny: all, write: [...new Set([path.join(home, '.gemini'), real(tmp), '/private/tmp', '/private/var/folders'])], cwd: real(cwd), local: true });
-    return { cmd: 'sandbox-exec', env: { DO_NOT_TRACK: '1' }, unset: [], profile, serial: true,
+    // with a gate (session-net.mjs) its network is the gate's: the model's service only; with a toolbox, its Python is on PATH and installs are answered by shims
+    const readable = toolbox ? [toolbox.dir, path.dirname(path.dirname(toolbox.python)), real(path.dirname(path.dirname(toolbox.python)))] : [];
+    const profile = seatbelt({ deny: all, write: [...new Set([path.join(home, '.gemini'), real(tmp), '/private/tmp', '/private/var/folders'])], cwd: real(cwd), local: true, gated: Boolean(gate), readable: [...new Set(readable)] });
+    return { cmd: 'sandbox-exec', env: { DO_NOT_TRACK: '1', ...(gate ? proxyEnv(gate.url) : {}), ...(toolbox?.env ?? {}) }, unset: [], profile, serial: true, gated: Boolean(gate),
       args: ['-p', profile, 'agy', '-p', prompt, '--model', author.id, '--dangerously-skip-permissions', '--output-format', 'stream-json'],
       probe: file => ({ cmd: 'sandbox-exec', args: ['-p', profile, '/bin/cat', file] }),
-      closed: 'the whole command runs under a seatbelt profile of this harness: neither its shell nor its file tools can read the repository, the subject list, the caches or other sessions, it writes only in its folder, its own settings folder and temporary folders, and reaches the network on port 443 and this machine\'s loopback only (its own permission prompts are off inside the profile)' };
+      closed: `the whole command runs under a seatbelt profile of this harness: neither its shell nor its file tools can read the repository, the subject list, the caches or other sessions, it writes only in its folder, its own settings folder and temporary folders, and ${gate ? 'reaches only this machine\'s loopback, where a gate passes its own service\'s hosts and refuses every other (no downloads, no installs)' : 'reaches the network on port 443 and this machine\'s loopback only'} (its own permission prompts are off inside the profile)` };
   }
   throw new Error(`author ${author.key}: a working session needs a shell, and "${author.cli}" is called without one here (claude, codex and agy can)`);
 }

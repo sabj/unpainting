@@ -23,6 +23,8 @@ export function usageOf({ subject, author, level, tryNumber, budget, session, fi
     },
     // what it did with its tools, from its transcript and its folder (tool-use.mjs); null for a session kept before this was recorded
     toolUse: session.toolUse ?? null,
+    // what of the network it asked for, from the session's gate (session-net.mjs): the hosts passed, and every refusal with its host
+    network: session.network ?? null,
     model: { tokensIn: author.tokensIn ?? null, tokensOut: author.tokensOut ?? null, tokens: author.tokens ?? null, costUSD: author.costUSD ?? null, costFrom: author.costUSD != null ? 'reported by the command' : 'not reported by this command' },
     machine: {
       lookGpuMinutes: minutes(lookSeconds), lookPaintings: looks.filter(l => l.painted?.seconds != null).length, planCpuMinutes: minutes(planSeconds),
