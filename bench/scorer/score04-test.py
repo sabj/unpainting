@@ -335,6 +335,26 @@ class EndToEnd(unittest.TestCase):
         m = make_run(d, "model-run", "astra", reg, src, usage={"level": 2, "session": {"toolCalls": 7}, "model": {"tokens": 5}, "budget": {}})
         return a, m
 
+    def test_the_hosted_route_sees_the_paper_first_as_the_local_one_does(self):
+        a, m = self.runs()
+        j = self.stub()
+        j.settings = lambda env=None: {"route": "openrouter", "label": "J3-open-3x-hosted", "panel": list(PANEL), "host": "stub"}
+        j.record = lambda cfg: {"route": "openrouter", "label": cfg["label"], "endpoint": "stub", "panel": cfg["panel"]}
+        import score_painting as SP
+        from common import load_rgb
+        paper = {SP.data_uri(load_rgb(str(r / "plate" / "f0000.webp")), 640): r.name for r in (a, m)}
+        j.marks = {u: ("Auto" if n == "auto-run" else "model") for u, n in paper.items()}
+        firsts, post = [], j.post
+        def seen(cfg, model, content, max_tokens, num_ctx):
+            imgs = [c["image_url"]["url"] for c in content if c["type"] == "image_url"]
+            if len(imgs) > 1: firsts.append(paper.get(imgs[0]))
+            return post(cfg, model, content, max_tokens, num_ctx)
+        j.post = seen
+        rc = self.S.main([str(a), str(m), "--out", os.path.join(self.tmp.name, "out")], judge=j, say=lambda *x, **k: None)
+        self.assertEqual(rc, 0)
+        self.assertTrue(firsts and all(firsts), f"every sequence a hosted judge saw began with the paper: {firsts}")
+        self.assertEqual(set(firsts), {"auto-run", "model-run"})
+
     def test_two_paintings_and_their_original(self):
         a, m = self.runs()
         j = self.stub()
