@@ -306,6 +306,8 @@ test('a transcript gives the tool calls by kind, the commands, the last message 
   const own = '/private/var/folders/tm/a_b/T/unpaint-session-opus-OLJL43', kept = [`Read ${own}/inputs/source.png`, 'Read /Users/x/.claude/projects/-private-var-folders-tm-a-b-T-unpaint-session-opus-OLJL43/295f/tool-results/b.txt', `Read ${own}/auto/plan.png`];
   assert.deepEqual(reachedOutside(kept, ['/Users/x/repo'], [own]), [], 'the place its command keeps its own long tool results is its own');
   assert.equal(ownFolderOf(kept), own); assert.equal(ownFolderOf(['ls']), null);
+  // an author key with a hyphen (the -m models) names its folder as well
+  for (const key of ['neon-m', 'sonnet-m', 'argon-m']) { const f = `/private/var/folders/tm/a_b/T/unpaint-session-${key}-Ab3dE9`; assert.equal(ownFolderOf([`Read ${f}/inputs/source.png`, `ls ${f}/mine`]), f, key); }
 });
 
 test('pictures the model made itself are found, and the clock ends a session', async () => {

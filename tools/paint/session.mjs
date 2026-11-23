@@ -561,7 +561,7 @@ export function reachedOutside(commands, roots, own = []) {
 /** The folder a kept session worked in, read back from its commands (the path of a session folder they name most). */
 export function ownFolderOf(commands) {
   const seen = new Map();
-  for (const c of commands) for (const m of c.matchAll(/\/[^\s'"`]*?\/unpaint-session-[a-z0-9]+-[A-Za-z0-9]{6}/g)) seen.set(m[0], (seen.get(m[0]) ?? 0) + 1);
+  for (const c of commands) for (const m of c.matchAll(/\/[^\s'"`]*?\/unpaint-session-[a-z0-9]+(?:-[a-z0-9]+)*-[A-Za-z0-9]{6}(?![A-Za-z0-9])/g)) seen.set(m[0], (seen.get(m[0]) ?? 0) + 1);
   return [...seen].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
 }
 
