@@ -1,5 +1,7 @@
 # Benchmark profiles and measurement
 
+History, 22 November 2026: lite and full profiles belong to rounds V4 and V5, with an 85-minute model clock. The 0.4 benchmark measures budgets instead of limiting them ([rules](rules.md#budgets-measured-not-limited)) and has no lite profile in its first run.
+
 The default V4 run is `lite-v2`. V5 and the V1 to V3 toolkit rounds run in full (`full-v2`). Lite cannot run as V5,
 because it has no feedback or repair loop. Both profiles preserve all requested targets, paper dimensions in mm,
 brush widths in mm, the painter recipe, target guards and essential stage evidence, and both paint at the same

@@ -1,6 +1,32 @@
 # unpaint-bench
 
-AI models paint five small targets, each a section of a larger image, with the simulator's brush and pen. In V1 to V3 each painting gets 2,500 strokes and about 15 minutes. In V4 and V5 the model plans each painting and the painter paints it, with 85 minutes of the model's own time per painting. Vision judges score the finished painting and the order it was painted in.
+AI models paint a subject with the simulator's brush and pen, and judges score how human the making looks and how good the painting is. The code planner alone, "Auto", is the reference. 0.4 is a new series: its scores are not comparable with the rounds V1 to V5.
+
+## The ladder, in 0.4
+
+| Level | What the model is given |
+|---|---|
+| L0 | Nothing: the picture, a brush and a pen. Defined, not run. |
+| L1 | L0 plus harness tips (technique guides and worked examples) |
+| L2 | Prepared inputs including Auto's plan. One go. |
+| L3 | L2, then one retry by self-study |
+| L4 | L3, then one more retry, with many resources: Auto's finished painting and the studies' shapes as data |
+
+Details: [levels](docs/levels.md), [rules](docs/rules.md) and [scoring](docs/scoring.md).
+
+- A model may draw its own lines, choose pen, pencil or none, and choose waterproof or soluble ink. It gets warnings, not refusals, where a choice only risks the painting.
+- Retries are self-study. The model sees its own painting, replay and stroke map and writes its own assessment. It never gets a score or a critique.
+- Budgets are measured, not limited: rendering units and steps, with the clock only a six-hour safety stop. Cost and tool use are recorded.
+- Scores: human-ness from the painting in progress, plus quality and likeness, plus a combined number. The original is scored too, and a painting is its share of the original. Auto sets the difficulty.
+- Judges run locally. OpenRouter or Together is a hosted option, planned, not in 0.4's first run.
+
+RESULTS: to be filled from the frozen run.
+
+Not in 0.4's first run: a container for replication, hosted judging, and the OpenAI models (gpt-6-astra, gpt-6.1-sol, gpt-6.1-terra). The first run uses Gemini 4 Argon, Neon and Hydrogen and Claude Sonnet 5.5, all at medium effort.
+
+## History: rounds V1 to V5
+
+Everything below describes the earlier rounds, kept as a record. Their rules (2,500 strokes, 85 minutes of model time, look counts) no longer apply. V1 to V3 each gave 2,500 strokes and about 15 minutes. In V4 and V5 the model planned each painting and the painter painted it. Vision judges scored the finished painting and its order.
 
 ## Rounds
 
@@ -40,7 +66,8 @@ All five rounds were painted with painter V096, sim 100 and judges J1, in releas
 
 ## Method
 
-- [Rules](docs/rules.md): budget, materials and what a script may read
+- [Levels](docs/levels.md): the ladder L0 to L4
+- [Rules](docs/rules.md): what a model may change, the workspace, budgets
 - [Anti-cheat](docs/anti-cheat.md): the guard, a check that blocks target-pixel reads, and the cheat-risk score
 - [Scoring](docs/scoring.md) and [statistics](docs/statistics.md)
 - [Run format](docs/run-format.md): what each try records

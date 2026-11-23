@@ -4,6 +4,8 @@ Every painting records release, painter and sim versions and a commit. Benchmark
 
 ## The four versions
 
+0.4 note: 0.4 benchmark scores are a new series. They are not comparable with scores from earlier releases, and the judge setup for 0.4 (local judges, human-ness rubric, original scored too) is recorded with each result. The J1 and J2 notes below describe the earlier series.
+
 - Release: plain semver in `package.json`, such as `0.1.0`. Each release gets an annotated git tag, `v<release>`, on the main commit that ships it. [CHANGELOG.md](../CHANGELOG.md) lists what each release changed.
 - Painter: the internal V number, such as `V096`. It covers planning, the recipe, methods and techniques (`src/paint`). A painter change takes the next V number. Development candidates may append `-dev`, such as `V097-dev`.
 - Judges: `judgeVersion`, starting at `J1`. A new panel, rubric or image protocol gets a new J number. Scores from different J versions are not compared. J1 uses Kimi-K3, GLM-5.3-Flash and Qwen3.5-9B, rubric `bench-v3-median5`, five calls per judge with the median, and native-size images. All published scores are J1. J2 keeps the J1 panel, rubric and images, but every judge needs all five calls valid, and a reply repaired from text does not count ([scoring](../bench/docs/scoring.md)). J2 is used for test gates; no published score is J2.

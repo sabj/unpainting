@@ -1,5 +1,56 @@
 # Scoring
 
+Updated 22 November 2026 for 0.4. Scores in 0.4 are a new series. They are not comparable with the V1 to V5 rounds, and they never share a table or an average with them. The old rules are kept under [History](#history-how-v1-to-v5-were-scored-judges-j1-and-j2).
+
+## What is scored
+
+Each painting gets several readings. They are kept apart and shown together.
+
+- Human-ness: does the painting, and its replay stopped anywhere, look made by a person? This is the main reading.
+- Quality and likeness: a second reading, beside it.
+- Combined: two parts human-ness to one part quality. The weights are a setting. Both parts stay visible next to it.
+- The original is scored too. A painting's result is its share of the original's score. If the original gets 9 and Auto gets 4.5, Auto gets 50%. A model can go over 100%.
+- Difficulty: Auto is scored on every subject. How far a model gets above Auto is the later index. Raw and difficulty-adjusted results are shown side by side.
+- Kept separate, for reference: the anti-cheat measures and algorithmic measurements. They never change a score.
+
+RESULTS: to be filled from the frozen run.
+
+## Human-ness
+
+- The judge sees one snapshot at a time, with only its percentage complete. It does not know the method.
+- It scores each snapshot 1 to 5 by the [rubric](human-ness-rubric.md): 5 is unmistakably a person's painting in progress, 1 is a finished image uncovered by a filter or wipe. Tells are named by letter (a to j), such as speckle trails, cut wash edges, flat slabs, a feature before its form, a wipe, or texture arriving as a dump.
+- The reading comes from the painting in progress: the mean over the film snapshots, out of 5. It does not come from the finished sheet, which is at its ceiling.
+- Snapshots are taken at many stops, at every level, so a try cannot look human only at the end.
+
+## Quality and likeness
+
+- Judges score each painting against its original, at full size.
+- The original and the painting are scored independently, under one rubric. The original must not score 10 by construction. If it does, the scoring is wrong.
+- A painting's result is its share of its original's score.
+
+## Judges
+
+- Local by default. The scoring scripts run on one machine with no hosted service.
+- OpenRouter or Together is the hosted option, chosen by one setting. Planned, not in 0.4's first run.
+- Each result records the judge version and route. Results from different judges are not compared.
+- A judge never sees a painter's name or level.
+
+## Anti-cheat and algorithmic measures
+
+- Anti-cheat stays as a reference column: see [anti-cheat](anti-cheat.md).
+- Algorithmic measures (value shapes, edges, marks) are computed by code, the same each time. They sit beside the judges' readings.
+
+## Cost and use, shown beside the score
+
+- Tokens, provider cost and machine minutes.
+- Tool use: shell commands, scripts the model wrote and ran, pictures opened, plan and look calls, refusals met, attempts to reach the internet.
+- See [rules](rules.md#budgets-measured-not-limited) and the [run format](run-format.md).
+
+
+# History: how V1 to V5 were scored (judges J1 and J2)
+
+Everything below this line describes the 2025 to early 2026 rounds. It is kept as a record. 0.4 scores use the rules above and are a new series: they are not comparable with any number below.
+
 A try is one model session that paints the requested targets. Each painting gets three things: an automated score for the finished painting, a progression check (an evaluation of saved painting stages), and a share in its try's cheat-risk score. The code is in [../scorer/](../scorer/) and [../scripts/score.mjs](../scripts/score.mjs). Rubric version: `bench-v3-median5`, with the median of five calls per judge.
 
 The painting toolkit given to models writes each final image.

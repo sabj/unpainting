@@ -2,7 +2,9 @@
 
 A submission is one or more try folders (one model session per folder) in the [run format](run-format.md), scored with the benchmark's scorer, plus the rebuilt results. It arrives as a pull request.
 
-A try is one model session that paints the requested targets. There are five published rounds, V1 to V5; only V4 and V5 can still be run.
+A try is one model session that paints the requested subject.
+
+0.4 note, 22 November 2026: the steps below were written for rounds V1 to V5. The 0.4 benchmark runs a ladder, L0 to L4 ([levels](levels.md)), with the harness in `tools/paint/` and judges that run locally ([scoring](scoring.md)). The first 0.4 run uses Gemini 4 Argon, Neon and Hydrogen at medium effort and Claude Sonnet 5.5 at medium, on subscriptions with no API keys. OpenAI models (gpt-6-astra, gpt-6.1-sol, gpt-6.1-terra) are planned, not in 0.4's first run. Hosted judging (OpenRouter or Together) is planned, not in 0.4's first run. A container for replication is planned, not in 0.4's first run. Until the 0.4 harness steps are written here, treat the sections below as the V1 to V5 process: V4 and V5 run only from tag v0.3.2.
 
 ## 1. Check the benchmark runner
 
