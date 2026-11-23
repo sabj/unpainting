@@ -23,4 +23,4 @@ not comparable with any published J1 score.
 - `pencil-control-judge.py`, `pencil-control-table.py`: the pencil control (does the drawing alone move the
   whole-sheet judge?).
 
-Nothing here is a test or is imported by the benchmark.
+Nothing here is a test or is imported by the benchmark. The runnable form is `npm run bench:score04` (`bench/scorer/score04.py`, `bench/docs/scoring.md`).

@@ -69,13 +69,14 @@ def _headers(cfg):
     return h
 
 
-def post(cfg, model, messages, max_tokens=MAX_PREDICT, timeout=600, retries=3, opener=None, sleep=time.sleep, top_logprobs=0):
+def post(cfg, model, messages, max_tokens=MAX_PREDICT, timeout=600, retries=3, opener=None, sleep=time.sleep, top_logprobs=0, num_ctx=NUM_CTX, max_predict=MAX_PREDICT):
     """One chat call. Returns (reply text, usage). Raises RuntimeError when the server cannot be used.
-    top_logprobs > 0 also asks for each reply token's log-probability and its nearest alternatives (usage["logprobs"])."""
+    top_logprobs > 0 also asks for each reply token's log-probability and its nearest alternatives (usage["logprobs"]).
+    num_ctx and max_predict widen the window for a long reading (score04's thirteen-picture sequence)."""
     opener = opener or urllib.request.urlopen
     body = json.dumps({"model": model, "messages": to_ollama(messages), "stream": False, "think": False,
                        "keep_alive": KEEP_ALIVE, **({"logprobs": True, "top_logprobs": top_logprobs} if top_logprobs else {}),
-                       "options": {"temperature": 0, "num_ctx": NUM_CTX, "num_predict": min(max_tokens, MAX_PREDICT)}}).encode()
+                       "options": {"temperature": 0, "num_ctx": num_ctx, "num_predict": min(max_tokens, max_predict)}}).encode()
     last = None
     for i in range(retries):
         try:

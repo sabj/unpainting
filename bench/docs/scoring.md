@@ -2,50 +2,62 @@
 
 Updated 22 November 2026 for 0.4. Scores in 0.4 are a new series. They are not comparable with the V1 to V5 rounds, and they never share a table or an average with them. The old rules are kept under [History](#history-how-v1-to-v5-were-scored-judges-j1-and-j2).
 
+## Running it
+
+```sh
+npm run bench:score04 -- RUN_FOLDER... --out DIR
+npm run bench:score04 -- runs.json --out DIR
+```
+
+`bench/scripts/score04.mjs` runs `bench/scorer/score04.py` under `BENCH_SCORE_PYTHON` (else `python3`), which needs `bench/scorer/requirements.txt`. It writes `DIR/results.json` (every figure, every setting) and `DIR/SCORES.md` (the readable table, faults first), and keeps each judge reply in `DIR/readings/`. A reply is reused only for the same judge, prompt and pictures.
+
+- A run folder holds `run.json` and the painting (`plate/painting.png` or `painting.png`) with its film, `frames.json`, beside it. The original is `run.json`'s `subject.sourceAbs`. The style the judges are told comes from the subject registry.
+- A manifest is JSON: a list, or `{"runs": [...]}`, of folders or of `{folder, label?, subject?, target?, style?}`. Relative paths are read from the manifest's folder.
+- It refuses before any judge call, naming every bad input: no painting, no original on disk, a failed run, no film or one with under 14 frames or missing frame files, a missing rubric, an unknown route, or a hosted route without its key.
+- Exit 0: complete. Exit 1: written, but a reading is short of a judge; the figure is left empty and named under "Faults first". A smaller panel is never used. Exit 2: refused.
+- `npm run bench:test` runs its tests with a stub judge (`bench/scorer/score04-test.py`); no model is needed.
+
 ## What is scored
 
 Each painting gets several readings. They are kept apart and shown together.
 
 - Human-ness: does the painting, and its replay stopped anywhere, look made by a person? This is the main reading.
 - Quality and likeness: a second reading, beside it.
-- Combined: two parts human-ness to one part quality. The weights are a setting. Both parts stay visible next to it.
-- The original is scored too. A painting's result is its share of the original's score. If the original gets 9 and Auto gets 4.5, Auto gets 50%. A model can go over 100%.
-- Difficulty: Auto is scored on every subject. How far a model gets above Auto is the later index. Raw and difficulty-adjusted results are shown side by side.
-- Kept separate, for reference: the anti-cheat measures and algorithmic measurements. They never change a score.
+- Combined: two parts human-ness to one part quality. The weights are a setting (`WEIGHTS` in `bench/scorer/s04_table.py`), written into the results. Both parts stay visible next to it.
+- The original is scored too. A painting's quality is its share of the original's score. If the original gets 9 and Auto gets 4.5, Auto gets 50%. A model can go over 100%.
+- Difficulty: the subject's Auto painting is scored the same way. Each model painting's figures are shown raw and adjusted for Auto side by side: (painting - Auto) / max(top - Auto, top / 5), so 0 is level with Auto. The adjustment needs exactly one Auto painting of the subject among the inputs; otherwise the table says so.
+- Kept separate, for reference: the anti-cheat record and algorithmic measurements. They never change a score.
 
 RESULTS: to be filled from the frozen run.
 
 ## Human-ness
 
-- The judge sees one snapshot at a time, with only its percentage complete. It does not know the method.
-- It scores each snapshot 1 to 5 by the [rubric](human-ness-rubric.md): 5 is unmistakably a person's painting in progress, 1 is a finished image uncovered by a filter or wipe. Tells are named by letter (a to j), such as speckle trails, cut wash edges, flat slabs, a feature before its form, a wipe, or texture arriving as a dump.
-- The reading comes from the painting in progress: the mean over the film snapshots, out of 5. It does not come from the finished sheet, which is at its ceiling.
-- Snapshots are taken at many stops, at every level, so a try cannot look human only at the end.
+- Twelve snapshots evenly through the painting's film, then the finished sheet, are shown to the judge in order, each labelled only with its percentage complete. It does not know the method.
+- It first says whether this is the order and the kind of mark a person would use (yes or no). Then it scores each snapshot 1 to 5 by the [rubric](human-ness-rubric.md): 5 is unmistakably a person's painting in progress, 1 is a finished image uncovered by a filter or wipe. Tells are named by letter (a to j).
+- The figure is the mean of the twelve film snapshots, as a percentage of 5. The finished sheet is shown last but not counted: it is at its ceiling. Also shown: the means of the first, middle and last four, the tally of tells (each judge's first reading, every snapshot shown), and how many readings said yes.
+- The rubric file is `bench/docs/human-ness-rubric.md`. Its sha256 is written into the results; editing it starts a new series.
+- A painting with no film is refused, not scored from its finished sheet.
 
 ## Quality and likeness
 
-- Judges score each painting against its original, at full size.
-- The original and the painting are scored independently, under one rubric. The original must not score 10 by construction. If it does, the scoring is wrong.
-- A painting's result is its share of its original's score.
+- The judge sees one picture alone, at most 768 px on the long side, and scores it as a watercolour from 0 to 10. It is not told whether the picture is an original or a painting.
+- The original and the painting are read the same way, independently, so the original does not score 10 by construction.
+- A painting's figure is its share of its original's score.
 
 ## Judges
 
-- Local by default. The scoring scripts run on one machine with no hosted service.
-- OpenRouter or Together is the hosted option, chosen by one setting. Planned, not in 0.4's first run.
-- Each result records the judge version and route. Results from different judges are not compared.
+- One setting, `JUDGE_ROUTE`: `local` by default, `together` or `openrouter`.
+- `local`: the panel `qwen3.8-flash-next:125b-mlx`, `qwen3.8:27b-mlx`, `gemma4:31b-mlx` through Ollama (`bench/scorer/local_route.py`; `JUDGE_LOCAL_URL`, `JUDGE_LOCAL_PANEL`). One model in memory at a time: every picture for one judge, then it is unloaded. The run waits while the server holds another job's model. Judge label `J3-local-3x`.
+- `together` or `openrouter`: the J1 panel, hosted. Each needs its key (`TOGETHER_API_KEY`, `OPENROUTER_API_KEY`) and stops with a plain message without one. The key is never written into a result. Labels `J4-together-3x`, `J4-openrouter-3x`.
+- Three readings a judge, temperature 0. A judge's figure is the median of its three and needs all three. The panel's figure is the mean of the judges'.
+- The results record the route, endpoint, panel, model digests (local), the judge label, the rubric hash and the prompt hashes. Results with different labels are not compared.
 - A judge never sees a painter's name or level.
 
-## Anti-cheat and algorithmic measures
+## Beside the score
 
-- Anti-cheat stays as a reference column: see [anti-cheat](anti-cheat.md).
-- Algorithmic measures (value shapes, edges, marks) are computed by code, the same each time. They sit beside the judges' readings.
-
-## Cost and use, shown beside the score
-
-- Tokens, provider cost and machine minutes.
-- Tool use: shell commands, scripts the model wrote and ran, pictures opened, plan and look calls, refusals met, attempts to reach the internet.
-- See [rules](rules.md#budgets-measured-not-limited) and the [run format](run-format.md).
-
+- Anti-cheat: the painter's own `cheat-risk.json` beside the painting (risk, fine-detail copy against its ceiling, strokes against the stroke ceiling) and its progression part. Where a level writes none, the table says "none". See [anti-cheat](anti-cheat.md).
+- Algorithmic: `bench/scorer/classic.py` against the original (value shapes, edges, marks, each 0 to 10, and their mean). The larger of the two pictures is brought down to the other; nothing is enlarged.
+- Usage: each run's `usage.json`: rendering units, steps, tool calls and tool use, tokens, cost where reported, wall minutes. A run without one is shown as "none". See [rules](rules.md#budgets-measured-not-limited) and the [run format](run-format.md).
 
 # History: how V1 to V5 were scored (judges J1 and J2)
 
