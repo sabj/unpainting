@@ -85,6 +85,23 @@
    "file": "targets/homer-daughter.png",
    "coarseFile": "targets/homer-daughter-coarse.json",
    "licence": "CC0 (public domain)"
+  },
+  {
+   "task": "fragonard",
+   "name": "Rinaldo in the Enchanted Forest, full size",
+   "width": 1462,
+   "height": 1068,
+   "coarse": {
+    "cols": 24,
+    "rows": 18
+   },
+   "style": "brown wash over chalk on buff paper, no ink: a helmeted knight with sword and shield fighting monsters in a forest, a winged figure and clouds above (Fragonard)",
+   "medium": "pencil",
+   "source": "Jean-Honore Fragonard, Rinaldo in the Enchanted Forest, brown wash over chalk; public domain",
+   "distributed": true,
+   "file": "targets/fragonard.png",
+   "coarseFile": "targets/fragonard-coarse.json",
+   "licence": "public domain"
   }
  ]
 }
