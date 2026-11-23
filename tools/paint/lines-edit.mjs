@@ -24,7 +24,7 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import { autoDraws } from '../../src/paint/methods/drawing-default.mjs';
+import { autoDraws, autoStroke, layInDark } from '../../src/paint/methods/drawing-default.mjs';
 
 export const LINES_EDIT_FORMAT = 'lines-edit 1';
 const DO = ['before', 'after', 'drop'], WEIGHT = [0.1, 4];
@@ -160,8 +160,11 @@ export function applyLinesEdit(vectors, lines, edit, listing, { medium = null } 
   if (!edit && medium == null) throw new Error('lines edit: neither lines nor a medium is chosen');
   const warnings = [], rules = edit ? checkLinesEdit(edit, listing, warnings) : [], state = new Map(), matched = rules.map(() => 0);
   const own = edit ? checkOwnLines(edit.own, { widthMm: vectors.sheetMm, heightMm: vectors.heightMm }, warnings) : [];
-  // every line starts as Auto lays it (drawing-default.mjs): on a pencil drawing the lines tagged drop start dropped
+  // every line starts as Auto lays it (drawing-default.mjs): on a pencil drawing the lines tagged drop start dropped,
+  // but for those that place a form, which start drawn at the lay-in's darkness (a rule that draws hatching draws it as drawn)
   const startsAs = new Map(vectors.strokes.map(s => [s.seq, autoDraws(s, vectors.medium) ? 'before' : 'drop']));
+  const level = layInDark(vectors);
+  vectors = { ...vectors, strokes: vectors.strokes.map(s => (autoDraws(s, vectors.medium) ? autoStroke(s, vectors, level) : s)) };
   for (const s of listing.strokes) {
     const st = { do: startsAs.get(s.id) ?? 'before', weight: 1 };
     rules.forEach((r, i) => { if (!r.test(s)) return; matched[i]++; if (r.do) st.do = r.do; if (r.weight != null) st.weight = r.weight; });
