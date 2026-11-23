@@ -29,7 +29,7 @@ export function lvxWords(w, h, ntiles) {
 // y1, deposit sum, wet count, label, mask of 16-cell children with a level cell, -), the cluster stack, per box 16
 // words (x0, y0, x1, y1, deposit sum, wet count, fill, LT offset, LT tiles, alpha, beta, rz, tol, iterations, state,
 // substeps), the cluster-to-box map, then LT: the tiles holding level cells, grouped by box.
-// LVS (atomic u32): [3] most CG iterations a solve took, [4] solves stopped at u.lvIt, [5] most substeps a box asked
+// LVS (atomic u32): [8] steps with a level tile, [9] those the host encoded without levelling; [3] most CG iterations a solve took, [4] solves stopped at u.lvIt, [5] most substeps a box asked
 // for, [6] boxes that got fewer than they asked for, [7] solves, [11] the most boxes; per box at 16 + 2 b, the largest explicit face flux
 // (most) and the largest outflow over water (worst), as f32 bits.
 // State bits: 1 the box levels, 2 its CG is done.
@@ -45,6 +45,7 @@ export const filmLevelWgsl = ({ channel = 'klAt', count = 'u.nAct' } = {}) => `
 override LVPAR: u32 = 0u;
 override LVROUND: u32 = 0u;
 override LVK0: bool = false;
+override LVLIGHT: bool = false;
 override LVMEN: bool = false;
 const LV_BMAX: u32 = ${LV_BMAX}u;
 const LV_NONE: u32 = 0xffffffffu;
@@ -206,6 +207,8 @@ fn lv_boxes(@builtin(local_invocation_index) li: u32) {
     }
     LVX[0] = nb; LVX[1] = off;
     atomicMax(&LVS[11], nb);
+    // steps with a level tile; LVLIGHT: the host encoded no levelling for this step (film-level-host.mjs), so it went without
+    if (off > 0u) { atomicAdd(&LVS[8], 1u); if (LVLIGHT) { atomicAdd(&LVS[9], 1u); } }
   }
   storageBarrier(); workgroupBarrier();
   for (var b = li; b < LV_BMAX; b += 256u) { atomicStore(&LVS[16u + 2u * b], 0u); atomicStore(&LVS[17u + 2u * b], 0u); }

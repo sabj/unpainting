@@ -319,6 +319,7 @@ export class GpuSheet {
   lvEncode(pass) {
     if (!this.lv || !this.b?.LVX) return;   // (a sheet stood up without its buffers, as the scheduling tests make one)
     const tiles = this.persistent ? this.workers : Math.max(1, Math.min(this.cap, this.ntiles));
+    if (this.lv.since === 0) this.lv.epoch = this.epoch; else if (this.lv.epoch !== this.epoch) this.lv.epoch = -1;
     encodeLevel((name, groups, constants = null) => { pass.setPipeline(constants ? this.lvPipe(name, constants) : this.p[name]); pass.setBindGroup(0, this.bg[name]); pass.dispatchWorkgroups(groups); }, this.o, this.lvMm(), this.lv, tiles);
   }
   /** The levelling's budgets brought up to what the last steps needed (film-level-host.mjs adaptLevel). */
@@ -326,11 +327,11 @@ export class GpuSheet {
     if (!this.lvBig || !levelOn(this.o)) return;
     const v = status ?? new Uint32Array(await this.readWords('LVS', 48));
     this.device.queue.writeBuffer(this.b.LVS, 12, new Uint32Array(9));
-    if (adaptLevel(this.lv, v)) this.setOptions({});
+    if (adaptLevel(this.lv, v, this.lv.epoch !== this.epoch)) this.setOptions({});
   }
   /** The levelling's counts since the sheet was made (the most CG iterations and substeps a step used, the solves and
    *  boxes that got less than they needed), and the budgets now. */
-  levelStats() { const { iters, subs, boxes, total } = this.lv ?? {}; return { ...(total ?? {}), budget: { iterations: iters, subs, boxes } }; }
+  levelStats() { const { iters, subs, boxes, total, lightSteps } = this.lv ?? {}; return { ...(total ?? {}), lightSteps, budget: { iterations: iters, subs, boxes } }; }
 
   bufFor(name) { return name === 'u' ? this.b.U : name === 'rc' ? this.b.RC : name === 'PACK' ? this.pack() : this.b[name]; }
   pack() { return this.b.PACK ?? (this.b.PACK = this.device.createBuffer({ size: 16, usage: GPUBufferUsage.STORAGE })); }

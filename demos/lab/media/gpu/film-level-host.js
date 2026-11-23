@@ -8,12 +8,13 @@ import { LV_BMAX, lvxWords } from './film-level-wgsl.js';
 const KAPPA = 1000 * 9.81 / (3 * 1e-3) / 1e3, LV_ITMAX = 8192;
 // the kernels' overrides, made once, so the sheet finds each pipeline by the object (stepfull.mjs lvPipe)
 const MEN = [{ LVMEN: 0 }, { LVMEN: 1 }], PAR = [{ LVPAR: 0, LVK0: 1 }, { LVPAR: 0 }, { LVPAR: 1 }];
+const LIGHT = { LVLIGHT: 1 };
 const ROUNDS = Array.from({ length: 64 }, (_, r) => ({ LVROUND: r }));
 export const levelOn = o => (o.level ?? 1) > 0;
 const fillOn = o => (o.slide ?? 0) > 0 && (o.fillRef ?? 0.4) > 0;
 
 /** The budgets a sheet starts with: CG iterations and substep rounds encoded a step, workgroups for the per-box kernels. */
-export const levelBudget = () => ({ iters: 128, subs: 64, boxes: 16, total: null, recent: [] });
+export const levelBudget = () => ({ iters: 128, subs: 64, boxes: 16, total: null, recent: [], light: false, since: 0, lightSteps: 0 });
 
 /** Bytes of each buffer for a w x h sheet of n cells and `ntiles` 16x16 tiles; the per-cell fields only with `on`. */
 export function levelBuffers(w, h, n, ntiles, on) {
@@ -39,6 +40,10 @@ export function levelUniforms(o, dt, mm, lv) {
 export function encodeLevel(run, o, mm, lv, tiles) {
   const level = levelOn(o);
   if (!level && !fillOn(o)) return;
+  // light: the last steps read back had no level tile and nothing was written since, so the step encodes only the boxes
+  // (lv_boxes counts a step that then has one in LVS[9]: it goes without levelling, and the next read turns it back on)
+  lv.since++;
+  if (level && lv.light) { lv.lightSteps++; run('lv_tiles', tiles); run('lv_boxes', 1, LIGHT); return; }
   run('lv_tiles', tiles); run('lv_boxes', 1);
   if (!level) return;
   const R = Math.ceil((o.meniscusMm ?? 0.5) / mm), relax = Math.max(1, R - 1), boxes = lv.boxes;
@@ -61,11 +66,13 @@ export function encodeLevel(run, o, mm, lv, tiles) {
  * the iterate it reached, as the CPU's does at 2000; one counted here grows the budget for the next steps. Returns
  * whether a budget changed (the uniforms must be written again). The caller clears LVS words 3 to 11.
  */
-export function adaptLevel(lv, v) {
-  const st = { iterations: v[3], short: v[4], subs: v[5], fewer: v[6], solves: v[7], boxes: v[11] };
-  const t = lv.total ??= { iterations: 0, short: 0, subs: 0, fewer: 0, solves: 0, boxes: 0 };
+export function adaptLevel(lv, v, written = false) {
+  const st = { iterations: v[3], short: v[4], subs: v[5], fewer: v[6], solves: v[7], boxes: v[11], levelSteps: v[8], missed: v[9] };
+  const t = lv.total ??= { iterations: 0, short: 0, subs: 0, fewer: 0, solves: 0, boxes: 0, levelSteps: 0, missed: 0 };
   t.iterations = Math.max(t.iterations, st.iterations); t.subs = Math.max(t.subs, st.subs); t.boxes = Math.max(t.boxes, st.boxes);
-  t.short += st.short; t.fewer += st.fewer; t.solves += st.solves;
+  t.short += st.short; t.fewer += st.fewer; t.solves += st.solves; t.levelSteps += st.levelSteps; t.missed += st.missed;
+  // light while every step since the last read had no level tile and the sheet was not written since they were encoded
+  lv.light = lv.since > 0 && st.levelSteps === 0 && !written; lv.since = 0;
   let grew = false;
   if ((st.short || st.iterations > 0.75 * lv.iters) && lv.iters < LV_ITMAX) { lv.iters = Math.min(LV_ITMAX, 2 * lv.iters); grew = true; }
   if ((st.fewer || st.subs > 0.75 * lv.subs) && lv.subs < 64) { lv.subs = Math.min(64, 2 * lv.subs); grew = true; }
