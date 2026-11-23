@@ -213,7 +213,10 @@ export class GpuSheet {
     // the mask, footprint and damp pores packed four bits a cell on the GPU (ef_pack): an eighth of one field to read
     const encoder = this.device.createCommandEncoder(), pack = encoder.beginComputePass();
     pack.setPipeline(this.p.ef_pack); pack.setBindGroup(0, this.bg.ef_pack); pack.dispatchWorkgroups(Math.ceil(n / 2048)); pack.end();
-    const bits = new Uint32Array(await this.readWords('EFP', Math.ceil(n / 8) * 4, 0, encoder)), M = new Uint8Array(n), ever = new Uint8Array(n), damp = new Uint8Array(n), water = new Uint8Array(n);
+    const bits = new Uint32Array(await this.readWords('EFP', Math.ceil(n / 8) * 4, 0, encoder));
+    // the unpacked fields are kept between refreshes (every cell is written below), not made again each time
+    const U = ef.unpacked?.M.length === n ? ef.unpacked : (ef.unpacked = { M: new Uint8Array(n), ever: new Uint8Array(n), damp: new Uint8Array(n), water: new Uint8Array(n) });
+    const { M, ever, damp, water } = U;
     for (let i = 0; i < n; i++) { const b = (bits[i >>> 3] >>> (4 * (i & 7))) & 15; M[i] = b & 1; ever[i] = (b >> 1) & 1; damp[i] = (b >> 2) & 1; water[i] = b >> 3; }
     // wetBoxes asks M[i] || s[i] > 0.02 capacity[i]: the packed bit answers it with a capacity of 1 and s of 1 or 0
     const boxes = wetBoxes({ w, h, M: damp, s: damp, capacity: ONES(n) }, Math.max(2, this.poreTime.iters));
@@ -238,8 +241,12 @@ export class GpuSheet {
     ef.stale = false;
     const key = `${feeding.length}:${hash}`;
     if (key === ef.key) return;
-    const list = [], G = new Float32Array(4 * n);
-    let b = 0;
+    // EFG holds the geometry of the cells the last refresh wrote (cells lo to hi) and zeros elsewhere: this one clears
+    // those, writes its own and sends the GPU only the span of cells either touched, not the whole 16 bytes a cell sheet
+    if (ef.G?.length !== 4 * n) { ef.G = new Float32Array(4 * n); ef.span = null; }
+    const list = [], G = ef.G;
+    const was = ef.span; if (was) G.fill(0, 4 * was[0], 4 * (was[1] + 1));
+    let b = 0, lo = Infinity, hi = -1;
     for (const box of feeding) {
       const sheet = { w, h, M, ever, resist };
       const grid = contactGrid(box, mm, o.edgeMm ?? 1, this.device.limits);
@@ -262,12 +269,15 @@ export class GpuSheet {
         if (fx[i] > 0) G[4 * i + 3] += fx[i]; else if (fx[i] < 0) G[4 * (i + 1) + 3] -= fx[i];
         if (fy[i] > 0) G[4 * i + 3] += fy[i]; else if (fy[i] < 0) G[4 * (i + w) + 3] -= fy[i];
       }
-      for (const i of order) list.push(i, b);
+      for (const i of order) { list.push(i, b); if (i < lo) lo = i; if (i + w > hi) hi = Math.min(n - 1, i + w); }
       b++;
     }
     const L = new Uint32Array(1 + list.length); L[0] = list.length / 2; L.set(list, 1);
     const q = this.device.queue;
-    q.writeBuffer(this.b.EFL, 0, L); q.writeBuffer(this.b.EFG, 0, G);
+    q.writeBuffer(this.b.EFL, 0, L);
+    const now = hi >= lo ? [lo, hi] : null, from = Math.min(now?.[0] ?? Infinity, was?.[0] ?? Infinity), to = Math.max(now?.[1] ?? -1, was?.[1] ?? -1);
+    if (to >= from) q.writeBuffer(this.b.EFG, 16 * from, G, 4 * from, 4 * (to - from + 1));
+    ef.span = now;
     q.writeBuffer(this.b.EFB, 0, new Uint32Array([b]));
     ef.count = L[0]; ef.boxes = b; this.efWriteRounds(); ef.key = key;
   }
