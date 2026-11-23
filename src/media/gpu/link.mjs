@@ -833,7 +833,7 @@ export class GpuLink {
     this.call({op:'opticalFrame',base:sameBase?null:base});
     this.stats.opticalFrames=(this.stats.opticalFrames??0)+1;
     this.stats.frameBytes=(this.stats.frameBytes??0)+this.n*3;
-    this.stats.opticalReadBytes=(this.stats.opticalReadBytes??0)+this.n*12;
+    this.stats.opticalReadBytes=(this.stats.opticalReadBytes??0)+Math.ceil(this.n*3/4)*4;
     return new Uint8ClampedArray(this.rectData.buffer,0,this.n*3).slice();
   }
   /** The newest dried layer, brought down if the GPU has changed it (a rewet lifts a little of it back). */
