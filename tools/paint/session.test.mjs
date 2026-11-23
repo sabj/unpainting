@@ -194,6 +194,7 @@ test('handed pictures: no plan until each has its line in seen.md; the lines are
     assert.match(await ask(dir, server, 'plan'), /^It compiles/);
     const rec = await server.stop(); assert.deepEqual(rec.pictures.missing, []); assert.match(rec.pictures.said['auto-painting/final-beside-subject.jpg'], /hard edges/);
     assert.deepEqual(ownPictures(dir), [], 'handed pictures are not pictures the model made');
+    assert.equal(fs.statSync(path.join(dir, 'previous', 'final-beside-subject.jpg')).mode & 0o222, 0, 'what it is handed is read-only in its folder'); assert.throws(() => fs.writeFileSync(path.join(dir, 'previous', 'teachers-words.txt'), 'x'), /EACCES/);
   } finally { fs.rmSync(dir, { recursive: true, force: true }); fs.rmSync(from, { recursive: true, force: true }); }
 });
 

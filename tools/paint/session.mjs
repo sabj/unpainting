@@ -130,7 +130,8 @@ export function writeSession({ dir, packet, sheet, medium, auto, settings, forms
   const pictures = [];
   for (const h of handed) {
     mk(h.folder);
-    for (const f of h.files) { const to = path.join(dir, h.folder, f.name); fs.mkdirSync(path.dirname(to), { recursive: true }); fs.copyFileSync(f.from, to); if (f.picture) pictures.push(`${h.folder}/${f.name}`); }
+    for (const f of h.files) { const to = path.join(dir, h.folder, f.name); fs.mkdirSync(path.dirname(to), { recursive: true }); fs.copyFileSync(f.from, to); fs.chmodSync(to, 0o444); if (f.picture) pictures.push(`${h.folder}/${f.name}`); }
+    // what it is handed is read-only: its own copy of each file, which it may read and copy out, never change in place (the originals lie outside its folder, where it cannot write)
     prompt += `\n## ${h.title}\n\n${h.words}\n\n${h.files.map(f => `- \`${h.folder}/${f.name}\`: ${f.what}`).join('\n')}\n`;
   }
   if (pictures.length) prompt += `\n${seenAsk(pictures)}\n`;
