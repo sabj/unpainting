@@ -306,7 +306,9 @@ export class GpuSheet {
       pass.setPipeline(this.efPipe('ef_apply', r)); pass.setBindGroup(0, this.bg.ef_apply); pass.dispatchWorkgroups(groups);
     }
   }
-  /** After each step: has the footprint or the wet box moved since the geometry was made? (ef_watch) */
+  /** After a batch's last step: has the footprint or the wet box moved since the geometry was made? (ef_watch) The host
+   *  reads the answer once a batch and remakes the geometry from the state the batch left, so the steps before the last
+   *  need no look of their own (a whole-sheet pass each, 12 s of GPU on full-size Mittens). */
   efWatch(pass) {
     if (!this.efOn) return;
     pass.setPipeline(this.p.ef_watch); pass.setBindGroup(0, this.bg.ef_watch); pass.dispatchWorkgroups(Math.ceil(this.n / 256));
@@ -504,7 +506,7 @@ export class GpuSheet {
         }
         pores(true);
         if (fuseStep && this.p.p5ab) go('p5ab'); else { go('p5a'); go('p5b'); }
-        finish(s === steps - 1); this.efWatch(pass);
+        finish(s === steps - 1); if (s === steps - 1) this.efWatch(pass);
       }
       return;
     }
@@ -519,7 +521,7 @@ export class GpuSheet {
       }
       go('p3a');
       if ((o.slide ?? 0) > 0) { go('dep_k'); go('slide_out', 12); go('slide_apply', 12); }
-      pores(false); go('p5a'); go('p5b'); finish(s === steps - 1); this.efWatch(pass);
+      pores(false); go('p5a'); go('p5b'); finish(s === steps - 1); if (s === steps - 1) this.efWatch(pass);
     }
   }
 
