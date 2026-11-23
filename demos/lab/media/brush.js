@@ -9,7 +9,7 @@ import { toothRange } from './paper.js';
 import { localRowPlanBound } from './gpu/local-row-plan.js';
 import { checkedStroke } from './gpu/stroke-check.js';
 import { markCpuStrokeCell } from './cpu-stroke-dirty.js';
-import { brushContactLookahead,lookaheadCount } from './cpu-contact-lookahead.js';
+import { brushContactLookahead,sectionContactLookahead,lookaheadCount } from './cpu-contact-lookahead.js';
 import { TUFT, REF_MM, tuftShape, contactShare, roundProfile, kappaOf, headOf, feedRate, moveChain, footprint, exchangeCell, toothReach } from './tuft-section.js';
 
 export function createBrush(opts = {}) {
@@ -538,7 +538,7 @@ function endLine(path, atEnd) {
 }
 // The section brush's stroke (tuft-section.mjs): a towed tuft on the CPU, one film law between it and the paper.
 // `speed` (mm/s) sets how long each cell is in contact; a point's own `v` overrides it.
-function sectionStroke(brush, sheet, path, { spacing = 0.7, between, lift = true, upright = false, speed, candidateMask = null } = {}) {
+function sectionStroke(brush, sheet, path, { spacing = 0.7, between, lift = true, upright = false, speed, candidateMask = null, flowEvery = 0 } = {}) {
   const countContact = candidateMask ? null : strokeContacts(sheet);
   const rec = candidateMask ? null : tapeStroke(brush, sheet, path, { spacing, lift, upright, speed });
   land(brush, path); path = varyPath(brush, path, sheet.paper, lift);
@@ -571,7 +571,16 @@ function sectionStroke(brush, sheet, path, { spacing = 0.7, between, lift = true
   sheet.clock = sheet.clock ?? 0;
   sheet._contactBrush = brush;
   const rad = new Float64Array(S), geom = { pts: null, S, rad, flat: brush.flat, bx: 1, by: 0, thick: 0, onBox: null };
-  if (sheet._cpuDemandWindow) geom.onBox = (x0, y0, x1, y1) => { const r = [x0, y0, x1 - x0 + 1, y1 - y0 + 1]; if (!sheet._cpuDemandWindow.covers(r)) sheet._cpuDemandWindow.require(r); };
+  // A footprint outside the fresh window reads, with it, where the hand goes next (flowEvery steps, the most a stroke lays
+  // before the sheet flows and the window goes stale; 48 when the stroke does not say), so a stroke reads about once a
+  // flow rather than at every step its tuft moves out of the window.
+  const ahead = lookaheadCount(flowEvery) || 48;
+  if (sheet._cpuDemandWindow) geom.onBox = (x0, y0, x1, y1) => {
+    const r = [x0, y0, x1 - x0 + 1, y1 - y0 + 1];
+    if (sheet._cpuDemandWindow.covers(r)) return;
+    const la = ahead ? sectionContactLookahead(brush, path, { k, t, spacing, count: ahead, w, h }) : null;
+    sheet._cpuDemandWindow.require(la ? unionRect(la, r) : r);
+  };
   while (k < path.length) {
     const a = path[k - 1], b = path[k], seg = Math.hypot(b.x - a.x, b.y - a.y) || 1e-6;
     if (t > seg) { t -= seg; k++; continue; }
@@ -641,7 +650,7 @@ function sectionStroke(brush, sheet, path, { spacing = 0.7, between, lift = true
         exchangeCell(sheet, i, hr, capL[j], keep * capL[j], aa, contact, hb[j], g, buf);
         // the lane's head follows what it gave or took
         sat[j] = hr.water / (capL[j] || 1); hb[j] = headOf(sat[j], keep, Hb);
-      });
+      }, band + 0.5);
     }
     steps++; if (between) between(steps);
     t += spacing; brush.travel += spacing; sheet.clock++;

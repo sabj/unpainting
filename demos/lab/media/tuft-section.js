@@ -122,9 +122,11 @@ function boxDist(u, v, a, b, rc) {
  * shape in cells and across its place across the tuft (-1 .. 1). `g` is { pts, S, rad (per point: a round's
  * half-width, a flat's blade half-length), flat, bx, by (blade direction), thick (blade half-thickness), onBox }; onBox,
  * when set, is told the box before any cell is visited. `pad` widens
- * the box the cells are taken from (edge noise). Returns [x0, y0, x1, y1], the box visited.
+ * the box the cells are taken from (edge noise). With `cut`, a cell further than cut from the shape is not visited: each
+ * row is walked only where some part of the shape can come within cut, and only the parts that can are measured; a cell
+ * that is visited gets the same distance and place across as without it. Returns [x0, y0, x1, y1], the box visited.
  */
-export function footprint(g, w, h, pad, visit) {
+export function footprint(g, w, h, pad, visit, cut = Infinity) {
   const { pts, S, rad, flat } = g;
   let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity, rmax = 0;
   for (let j = 0; j < S; j++) { const x = pts[2 * j], y = pts[2 * j + 1]; x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); rmax = Math.max(rmax, rad[j]); }
@@ -132,52 +134,119 @@ export function footprint(g, w, h, pad, visit) {
   const X0 = Math.max(0, Math.floor(x0 - m)), X1 = Math.min(w - 1, Math.ceil(x1 + m)), Y0 = Math.max(0, Math.floor(y0 - m)), Y1 = Math.min(h - 1, Math.ceil(y1 + m));
   if (X1 < X0 || Y1 < Y0) return null;
   g.onBox?.(X0, Y0, X1, Y1);
-  if (flat) return flatFootprint(g, w, X0, Y0, X1, Y1, visit);
+  if (flat) return flatFootprint(g, w, X0, Y0, X1, Y1, visit, cut);
   // per segment: origin, axis, length and the radii at its two ends, flat (7 numbers a segment)
   const ns = S - 1, seg = g._seg && g._seg.length === 7 * ns ? g._seg : (g._seg = new Float64Array(7 * ns));
+  const on = g._on && g._on.length >= ns ? g._on : (g._on = new Int32Array(ns));
   for (let j = 0; j < ns; j++) {
     const ax = pts[2 * j], ay = pts[2 * j + 1], ex = pts[2 * j + 2] - ax, ey = pts[2 * j + 3] - ay, L = Math.hypot(ex, ey), o = 7 * j;
     seg[o] = ax; seg[o + 1] = ay; seg[o + 2] = L > 1e-9 ? ex / L : 1; seg[o + 3] = L > 1e-9 ? ey / L : 0; seg[o + 4] = L; seg[o + 5] = rad[j]; seg[o + 6] = rad[j + 1];
   }
-  for (let y = Y0; y <= Y1; y++) for (let x = X0; x <= X1; x++) {
-    const px = x + 0.5, py = y + 0.5;
-    let best = Infinity, across = 0;
-    for (let o = 0; o < 7 * ns; o += 7) {
-      const ax = seg[o], ay = seg[o + 1], ex = seg[o + 2], ey = seg[o + 3], L = seg[o + 4], r1 = seg[o + 5], r2 = seg[o + 6];
-      const dx = px - ax, dy = py - ay, Y = dx * ex + dy * ey, Xs = -dx * ey + dy * ex;
-      // the cone lies inside the capsule of its wider radius round its axis: a segment that cannot come nearer than the
-      // nearest so far is passed over (the result is the same)
-      const Yc = Y < 0 ? Y : Y > L ? Y - L : 0;
-      if (Math.sqrt(Xs * Xs + Yc * Yc) - (r1 > r2 ? r1 : r2) >= best) continue;
-      const d = L > 1e-6 ? coneDist(Math.abs(Xs), Y, L, r1, r2) : Math.hypot(dx, dy) - Math.max(r1, r2);
-      if (d < best) { best = d; const t = L > 1e-6 ? Math.max(0, Math.min(1, Y / L)) : 0, r = r1 + (r2 - r1) * t; across = r > 1e-6 ? Math.max(-1, Math.min(1, Xs / r)) : 0; }
+  const start = cut < Infinity ? cut + 1e-9 : Infinity;
+  for (let y = Y0; y <= Y1; y++) {
+    const py = y + 0.5;
+    // the segments whose capsule (wider radius, widened by cut) reaches this row, and the span of the row they can reach
+    let n = 0, xa = X0, xb = X1;
+    if (start < Infinity) {
+      let lo = Infinity, hi = -Infinity;
+      for (let j = 0; j < ns; j++) {
+        const o = 7 * j, ax = seg[o], ay = seg[o + 1], bx = ax + seg[o + 2] * seg[o + 4], by = ay + seg[o + 3] * seg[o + 4], Rc = Math.max(seg[o + 5], seg[o + 6]) + start + 1e-6;
+        if (py < Math.min(ay, by) - Rc || py > Math.max(ay, by) + Rc) continue;
+        // the part of the axis within Rc of the row in y, then Rc either side in x
+        let ta = 0, tb = 1;
+        if (by !== ay) { const t1 = (py - Rc - ay) / (by - ay), t2 = (py + Rc - ay) / (by - ay); ta = Math.max(0, Math.min(t1, t2)); tb = Math.min(1, Math.max(t1, t2)); }
+        const xA = ax + (bx - ax) * ta, xB = ax + (bx - ax) * tb;
+        lo = Math.min(lo, xA, xB) - Rc; hi = Math.max(hi, xA, xB) + Rc; on[n++] = o;
+      }
+      if (!n) continue;
+      xa = Math.max(X0, Math.floor(lo - 0.5)); xb = Math.min(X1, Math.ceil(hi - 0.5));
+    } else for (let j = 0; j < ns; j++) on[n++] = 7 * j;
+    for (let x = xa; x <= xb; x++) {
+      const px = x + 0.5;
+      let best = start, across = 0;
+      for (let q = 0; q < n; q++) {
+        const o = on[q], ax = seg[o], ay = seg[o + 1], ex = seg[o + 2], ey = seg[o + 3], L = seg[o + 4], r1 = seg[o + 5], r2 = seg[o + 6];
+        const dx = px - ax, dy = py - ay, Y = dx * ex + dy * ey, Xs = -dx * ey + dy * ex;
+        // the cone lies inside the capsule of its wider radius round its axis: a segment that cannot come nearer than the
+        // nearest so far is passed over (the result is the same)
+        const Yc = Y < 0 ? Y : Y > L ? Y - L : 0;
+        if (Math.sqrt(Xs * Xs + Yc * Yc) - (r1 > r2 ? r1 : r2) >= best) continue;
+        const d = L > 1e-6 ? coneDist(Math.abs(Xs), Y, L, r1, r2) : Math.hypot(dx, dy) - Math.max(r1, r2);
+        if (d < best) { best = d; const t = L > 1e-6 ? Math.max(0, Math.min(1, Y / L)) : 0, r = r1 + (r2 - r1) * t; across = r > 1e-6 ? Math.max(-1, Math.min(1, Xs / r)) : 0; }
+      }
+      if (best === start && start < Infinity) continue;
+      visit(y * w + x, best, across, x, y);
     }
-    visit(y * w + x, best, across, x, y);
   }
   return [X0, Y0, X1, Y1];
 }
-function flatFootprint(g, w, X0, Y0, X1, Y1, visit) {
+function flatFootprint(g, w, X0, Y0, X1, Y1, visit, cut) {
   const { pts, S, rad, bx, by, thick } = g, nx = -by, ny = bx;
-  // sub-points along the chain no further apart than the blade is thick, so the swept blade has no gaps
-  const sub = [];
+  // sub-points along the chain no further apart than the blade is thick, so the swept blade has no gaps: x, y, the
+  // blade's half-length there, the radius of its box's circumcircle, and where it lies along and across the blade
+  let n = 0;
+  for (let j = 0; j + 1 < S; j++) n += Math.max(1, Math.ceil(Math.hypot(pts[2 * j + 2] - pts[2 * j], pts[2 * j + 3] - pts[2 * j + 1]) / Math.max(0.35, 0.7 * thick)));
+  n++;
+  const sub = g._sub && g._sub.length >= 6 * n ? g._sub : (g._sub = new Float64Array(6 * n + 96));
+  const on = g._on && g._on.length >= n ? g._on : (g._on = new Int32Array(n + 16));
+  const ord = g._ord && g._ord.length >= n ? g._ord : (g._ord = new Int32Array(n + 16)), vsS = g._vs && g._vs.length >= n ? g._vs : (g._vs = new Float64Array(n + 16));
+  let o = 0;
+  const put = (x, y, a) => { sub[o] = x; sub[o + 1] = y; sub[o + 2] = a; sub[o + 3] = Math.sqrt(a * a + thick * thick); sub[o + 4] = x * bx + y * by; sub[o + 5] = x * nx + y * ny; o += 6; };
   for (let j = 0; j + 1 < S; j++) {
     const ax = pts[2 * j], ay = pts[2 * j + 1], ex = pts[2 * j + 2] - ax, ey = pts[2 * j + 3] - ay, m = Math.max(1, Math.ceil(Math.hypot(ex, ey) / Math.max(0.35, 0.7 * thick)));
-    for (let q = 0; q < m; q++) { const t = q / m; sub.push(ax + ex * t, ay + ey * t, rad[j] + (rad[j + 1] - rad[j]) * t); }
+    for (let q = 0; q < m; q++) { const t = q / m; put(ax + ex * t, ay + ey * t, rad[j] + (rad[j + 1] - rad[j]) * t); }
   }
-  sub.push(pts[2 * S - 2], pts[2 * S - 1], rad[S - 1]);
-  for (let y = Y0; y <= Y1; y++) for (let x = X0; x <= X1; x++) {
-    const px = x + 0.5, py = y + 0.5;
-    let best = Infinity, across = 0;
-    for (let q = 0; q < sub.length; q += 3) {
-      const dx = px - sub[q], dy = py - sub[q + 1], a = sub[q + 2];
-      // the blade lies within its box's circumcircle: one that cannot come nearer than the nearest so far is passed over
-      // (with a margin over rounding, so the result is the same)
-      if (Math.sqrt(dx * dx + dy * dy) - Math.sqrt(a * a + thick * thick) - 1e-6 >= best) continue;
-      const u = dx * bx + dy * by, v = dx * nx + dy * ny;
-      const d = boxDist(u, v, a, thick, Math.min(thick, a));
-      if (d < best) { best = d; across = a > 1e-6 ? Math.max(-1, Math.min(1, u / a)) : 0; }
+  put(pts[2 * S - 2], pts[2 * S - 1], rad[S - 1]);
+  const start = cut < Infinity ? cut + 1e-9 : Infinity;
+  for (let y = Y0; y <= Y1; y++) {
+    const py = y + 0.5;
+    // the sub-points whose box can come within cut of this row, and the span of the row their circles reach
+    let k = 0, xa = X0, xb = X1;
+    if (start < Infinity) {
+      let lo = Infinity, hi = -Infinity;
+      for (let q = 0; q < o; q += 6) {
+        const Rc = sub[q + 3] + start + 1e-5, dy = py - sub[q + 1];
+        if (dy > Rc || dy < -Rc) continue;
+        const half = Math.sqrt(Rc * Rc - dy * dy);
+        if (sub[q] - half < lo) lo = sub[q] - half;
+        if (sub[q] + half > hi) hi = sub[q] + half;
+        on[k++] = q;
+      }
+      if (!k) continue;
+      xa = Math.max(X0, Math.floor(lo - 0.5)); xb = Math.min(X1, Math.ceil(hi - 0.5));
+    } else for (let q = 0; q < o; q += 6) on[k++] = q;
+    // the sub-points sorted by where they lie across the blade: a cell measures them outward from its own place across,
+    // and stops once the rest lie further across than the nearest so far (a tie goes to the earliest on the chain, so
+    // the first nearest wins as before)
+    for (let r = 0; r < k; r++) {
+      const q = on[r], v = sub[q + 5];
+      let s2 = r;
+      while (s2 > 0 && vsS[s2 - 1] > v) { vsS[s2] = vsS[s2 - 1]; ord[s2] = ord[s2 - 1]; s2--; }
+      vsS[s2] = v; ord[s2] = r;
     }
-    visit(y * w + x, best, across, x, y);
+    let p = 0;
+    for (let x = xa; x <= xb; x++) {
+      const px = x + 0.5, U = px * bx + py * by, V = px * nx + py * ny;
+      while (p > 0 && vsS[p - 1] >= V) p--;
+      while (p < k && vsS[p] < V) p++;
+      let best = start, across = 0, won = k;
+      for (let side = 0; side < 2; side++) {
+        for (let s2 = side ? p - 1 : p; side ? s2 >= 0 : s2 < k; side ? s2-- : s2++) {
+          const lv = (side ? V - vsS[s2] : vsS[s2] - V) - thick - 1e-6;
+          if (lv > best) break;
+          const at = ord[s2], q = on[at], a = sub[q + 2], lu = Math.abs(U - sub[q + 4]) - a - 1e-6;
+          // the blade lies within its box: one whose box cannot come nearer than the nearest so far is passed over (with
+          // a margin over rounding, so the result is the same)
+          if (lu > best || ((lu === best || lv === best) && at > won)) continue;
+          const dx = px - sub[q], dy = py - sub[q + 1];
+          const u = dx * bx + dy * by, v = dx * nx + dy * ny;
+          const d = boxDist(u, v, a, thick, Math.min(thick, a));
+          if (d < best || (d === best && at < won)) { best = d; across = a > 1e-6 ? Math.max(-1, Math.min(1, u / a)) : 0; won = at; }
+        }
+      }
+      if (best === start && start < Infinity) continue;
+      visit(y * w + x, best, across, x, y);
+    }
   }
   return [X0, Y0, X1, Y1];
 }
