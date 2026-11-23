@@ -68,6 +68,23 @@
    "file": "targets/h36-full.png",
    "coarseFile": "targets/h36-full-coarse.json",
    "licence": "noncommercial project use; local branch only, not distributed"
+  },
+  {
+   "task": "homer-daughter",
+   "name": "A Fisherman's Daughter, full size",
+   "width": 1462,
+   "height": 1082,
+   "coarse": {
+    "cols": 24,
+    "rows": 18
+   },
+   "style": "watercolor and gouache over faint pencil, no ink: three girls in straw hats seated on a stone wall looking at a lobster, an upturned boat and grass behind, a sandy shore in front (Winslow Homer)",
+   "medium": "pencil",
+   "source": "Winslow Homer, A Fisherman's Daughter, 1873, Cleveland Museum of Art 1943.660; CC0",
+   "distributed": true,
+   "file": "targets/homer-daughter.png",
+   "coarseFile": "targets/homer-daughter-coarse.json",
+   "licence": "CC0 (public domain)"
   }
  ]
 }

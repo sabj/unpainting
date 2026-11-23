@@ -15,8 +15,8 @@ import { makeWorktree, keepScripts, runTurn, minutes } from './pipeline/harness.
 const V3 = path.join(BENCH, 'v3');
 // Each attempt is stopped after 32 minutes of wall time (the brief says 30): the old round's limit, set for its small
 // sheets. BENCH_V3_ATTEMPT_MIN states another ("time scaled to the sheet": a drying takes longer on a full-size sheet);
-// the brief and the prompts then say that limit less two minutes, and the run record keeps it (settings.sessionCapMin).
-const ATTEMPT_MIN = Math.max(10, Math.min(240, Number(process.env.BENCH_V3_ATTEMPT_MIN) || 32)), SAID_MIN = ATTEMPT_MIN - 2;
+// up to 360, the owner's 6-hour safety stop ("measure, do not limit"); the brief and the prompts then say that limit less two minutes, and the run record keeps it (settings.sessionCapMin).
+const ATTEMPT_MIN = Math.max(10, Math.min(360, Number(process.env.BENCH_V3_ATTEMPT_MIN) || 32)), SAID_MIN = ATTEMPT_MIN - 2;
 const sayLimit = t => (SAID_MIN === 30 ? t : t.replaceAll('About 30 minutes', `About ${SAID_MIN} minutes`).replaceAll('about 30 minutes', `about ${SAID_MIN} minutes`).replaceAll('after 30 minutes', `after ${SAID_MIN} minutes`).replaceAll('stopped at 30', `stopped at ${SAID_MIN}`));
 
 const fill = (t, vals) => Object.entries(vals).reduce((s, [k, v]) => s.replaceAll(`{${k}}`, String(v)), t);
