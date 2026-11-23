@@ -396,7 +396,7 @@ kit.erase(sheet, [{ x: 220, y: 25, p: 0.3 }, { x: 220, y: 145, p: 0.3 }], { widt
 - Physics: on dry, bare paper graphite rubs off; one hard pass takes most of it, a second takes most of the rest.
 - Prevents: a wrong line sealed under a wash. Correct the drawing, and lighten lines in the lights, before the first wash.
 - *Kit only:* `kit.erase(sheet, pts, { width })`, width in cells (default 12); `p` is how hard you rub. It counts as a stroke.
-- At levels 2 to 4 rubbing out is leaving a line out of your drawing, or giving it a lighter weight: decide before the washes.
+- At levels 2 to 4 an erase passage in your own script or edited plan rubs out with this same eraser; leaving a line out of your drawing, or giving it a lighter weight, does it before the washes too.
 
 ### 25. Trying to lift pencil from under a dried wash
 ![](tips/25-erase-pencil-under-wash.png) ![](tips/25-erase-pencil-under-wash-arrows.png)

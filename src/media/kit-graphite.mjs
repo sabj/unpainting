@@ -72,18 +72,23 @@ export function layPencil(sheet, pencil, k, pts, { graphite, seed = 1 }) {
 // tenth); paint and soluble ink lose at most `trace` of what the cell holds.
 const ERASE = Object.freeze({ bare: 0.85, hold: 0.05, trace: 0.02 });
 
-/** Throws, saying why, if this eraser cannot be used here: a width out of range, or any water on the sheet. */
-export function checkEraser(sheet, width) {
+/** The share of a cell's graphite one pass keeps, at rub strength v (pressure times the eraser's cover of the cell) under
+ *  `over` paint laid after the graphite. */
+export const graphiteKeep = (v, over) => 1 - ERASE.bare * v * ERASE.hold / (ERASE.hold + over);
+/** The share of a cell's paint or soluble ink one pass keeps, at rub strength v. */
+export const paintKeep = v => 1 - ERASE.trace * v;
+
+/** Throws, saying why, if this eraser cannot be used here: a width out of range, or water on the sheet (anywhere, or
+ *  with `cells` only in those cells: where the eraser passes). */
+export function checkEraser(sheet, width, cells = null) {
   if (!(width >= 1 && width <= 120)) throw new Error(`eraser width must be 1 to 120 cells, not ${width}`);
-  const wet = wetCells(sheet);
+  const wet = wetCells(sheet, cells);
+  if (wet && cells) throw new Error(`the sheet is wet where the eraser passes (${wet} cells hold water): an eraser on wet paper pills and tears it. Nothing was rubbed. Let the sheet dry first`);
   if (wet) throw new Error(`the sheet is wet (${wet} cells hold water): an eraser on wet paper pills and tears it. Nothing was rubbed. Dry the sheet first (kit.dryAll)`);
 }
 
-/** Rub [{x, y, p}] with an eraser `width` cells across. Refuses a wet sheet. `graphite` lists the graphite pigments;
- *  pigments of staining power 60 or more that are not graphite (waterproof ink) are left alone. */
-export function rubOut(sheet, pts, { width, graphite }) {
-  checkPath(pts, 'an eraser stroke'); checkEraser(sheet, width);
-  sheet._gpu?.syncLower?.(sheet, Infinity);
+/** The cells an eraser `width` cells across touches along pts, each with its rub strength (pressure times cover). */
+function rubbed(sheet, pts, width) {
   const { w, h } = sheet, r = width / 2, R = Math.ceil(r + 1), best = new Map();
   for (let j = 1; j < pts.length; j++) {
     const a = pts[j - 1], b = pts[j], m = Math.max(1, Math.ceil(Math.hypot(b.x - a.x, b.y - a.y) / 0.5));
@@ -96,18 +101,32 @@ export function rubOut(sheet, pts, { width, graphite }) {
       }
     }
   }
+  return best;
+}
+
+/** Rub [{x, y, p}] with an eraser `width` cells across. Refuses a wet sheet (`where: 'path'`: wet where it passes).
+ *  `graphite` lists the graphite pigments; pigments of staining power 60 or more that are not graphite (waterproof ink)
+ *  are left alone. Graphite this module did not lay (the session painter's drawing) is taken as under all the paint in
+ *  its cell. */
+export function rubOut(sheet, pts, { width, graphite, where = 'sheet' }) {
+  checkPath(pts, 'an eraser stroke');
+  if (where !== 'sheet' && where !== 'path') throw new Error(`rubOut: where is 'sheet' or 'path', not ${where}`);
+  const best = where === 'path' ? rubbed(sheet, pts, width) : null;
+  checkEraser(sheet, width, best ? [...best.keys()] : null);
+  sheet._gpu?.syncLower?.(sheet, Infinity);
+  const cells = best ?? rubbed(sheet, pts, width);
   const t = trackOf(sheet), planes = k => [sheet.G[k], sheet.D[k], sheet.P[k], ...sheet.layers.map(L => L[k])];
   const soft = []; for (let k = 0; k < sheet.K; k++) if (!graphite.includes(k) && sheet.pigments[k].omega < 60) soft.push(k);
   let gBefore = 0, gLifted = 0, paintLifted = 0;
-  for (const [i, v] of best) {
+  for (const [i, v] of cells) {
     const paint = paintAt(sheet, i, graphite), over = t.g[i] > 0 ? Math.max(0, paint - t.under[i] / t.g[i]) : paint;
-    const keep = 1 - ERASE.bare * v * ERASE.hold / (ERASE.hold + over);
+    const keep = graphiteKeep(v, over);
     for (const k of graphite) for (const a of planes(k)) { gBefore += a[i]; gLifted += a[i] * (1 - keep); a[i] *= keep; }
     t.g[i] *= keep; t.under[i] *= keep;
-    const tr = 1 - ERASE.trace * v;
+    const tr = paintKeep(v);
     for (const k of soft) for (const a of planes(k)) if (a[i] > 0) { paintLifted += a[i] * (1 - tr); a[i] *= tr; }
   }
   layersChanged(sheet);
   sheet._gpu?.cpuWroteAll?.();
-  return { cells: best.size, graphiteLifted: gLifted, graphiteShare: gBefore > 0 ? gLifted / gBefore : 0, paintLifted };
+  return { cells: cells.size, graphiteBefore: gBefore, graphiteLifted: gLifted, graphiteShare: gBefore > 0 ? gLifted / gBefore : 0, paintLifted };
 }

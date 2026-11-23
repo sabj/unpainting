@@ -32,7 +32,7 @@ export function usageOf({ subject, author, level, tryNumber, budget, session, fi
       finalGpuMinutes: final?.seconds != null ? minutes(final.seconds) : null, finalBackend: final?.backend ?? null, finalFailure: final?.failure ?? null,
       note: 'the full-size final is painted after the session and is outside its clock; machine seconds are recorded beside each look and never charged: looks are charged in units of rendering',
     },
-    work: plan ? { washes: plan.washes ?? null, strokes: plan.strokes ?? null, dryings: plan.dryings ?? null, passages: plan.passages ?? null } : null,
+    work: plan ? { washes: plan.washes ?? null, strokes: plan.strokes ?? null, dryings: plan.dryings ?? null, passages: plan.passages ?? null, ...(plan.erases ? { erases: { passages: plan.erases.passages, strokes: plan.erases.strokes } } : {}) } : null,
     prepared: prepared ?? null,
     // the terms the try ran under (cli.mjs): budgets, the subject's unit, seed, commit, prepared inputs by hash; a rerun with the same terms is the same try
     terms: author.terms ?? null,

@@ -27,6 +27,8 @@ import { labToRgb } from './study-washes.mjs';
 import { labOf } from '../../eval/colour.mjs';
 import { planScriptWashes, checkScript } from './script-washes.mjs';
 import { sweeps, handOf } from './script-marks.mjs';
+import { checkErase, eraseStrokes, eraseLayer } from './erase-passage.mjs';
+import { footprint } from './script-washes.mjs';
 
 export const PLAN_EDIT_FORMAT = 'plan-edit 1';
 /** How a wash may be laid: hard-edged on the dry sheet, against the wash before it while that is damp, or into clean water. */
@@ -142,6 +144,8 @@ export function checkPlanEdit(edit, listing) {
     if (typeof p !== 'object' || Array.isArray(p)) throw Error(`${who}: "own" is one passage, written as own-script-brief.md describes, with "colour" in place of "paint"`);
     if (typeof p.id !== 'string' || !/^[A-Za-z0-9_-]{1,24}$/.test(p.id) || ownIds.has(p.id)) throw Error(`${who}: needs an "id" of its own (letters and digits)`);
     ownIds.add(p.id);
+    // an erase of your own: the pencil rubbed out where it passes, on the sheet as the washes before it leave it
+    if (p.kind === 'erase') { checkErase(p, who); return { type: 'own', id: p.id, passage: p, erase: true, group, lay: 'erase' }; }
     if (!colourOk(p.colour)) throw Error(`${who}: "colour" is [red, green, blue]: what the place is to read as once the passage is down (the mix is made for you, over what is under it)`);
     if (p.brushMm != null && !kit.includes(Number(p.brushMm))) throw Error(`${who}: "brushMm" ${p.brushMm} is not a brush of the kit (${kit.join(', ')} mm)`);
     if (p.brushMm == null && p.kind !== 'wash') throw Error(`${who}: a ${p.kind} passage names its "brushMm"`);
@@ -298,7 +302,16 @@ export function applyPlanEdit(plan, edit, { w, h, k, pigments, paperRGB = null, 
     cur = null;
   };
   let group = null;
-  for (const e of entries) {
+  for (const [ei, e] of entries.entries()) {
+    if (e.erase) {
+      close(); group = null;
+      const strokes = eraseStrokes(e.passage, seed), ids = footprint(strokes, w, h, cellMm); let cells = 0, painted = 0;
+      for (let i = 0; i < n; i++) if (ids[i]) { cells++; if (laid.some(L => L[i] > 0)) painted++; }
+      const stage = Math.max(1, Math.min(5, Math.round(e.passage.stage ?? 2))), prior = entries[ei - 1];
+      const made = eraseLayer(e.passage, strokes, { stage, overPaint: cells ? painted / cells : 0, afterWet: prior != null && !prior.erase, areaMm2: cells * cellMm * cellMm });
+      if (made.instruction.erase.warning) notes.push(made.instruction.erase.warning);
+      layers.push(made.layer); continue;
+    }
     if (e.group !== group) { close(); group = e.group; }
     // a wash that cannot be laid as asked is a fault, kept with the rest; the planner's own wash stands in for it so
     // that the washes after it are checked over what would really be under them
@@ -322,8 +335,8 @@ export function applyPlanEdit(plan, edit, { w, h, k, pigments, paperRGB = null, 
   close();
   record.notes.push(...notes); record.nearest = notes.filter(x => /nearest that can be/.test(x)).length;
   if (!layers.length) throw allFaults(['nothing is left to lay: every wash was left out']);
-  const shapesNow = layers.flatMap(l => l.shapes), instructions = shapesNow.map(sh => instructionOf.get(sh._valuePlan.id) ?? { ...sh._valuePlan, area: sh.area, plannedPigmentMass: sh.amount * sh.area });
-  const byStage = [0, 0, 0, 0]; for (const q of instructions) byStage[Math.min(4, Math.max(1, q.stage)) - 1]++;
-  const summary = { ...plan.summary, source: 'study, edited', washes: instructions.filter(q => q.stage !== 2).length, washesByStage: byStage, stages: byStage.filter(Boolean).length, mixes: mixes.length, plannedStrokes: instructions.reduce((a, q) => a + (q.strokes?.length ?? 0), 0), edit: record };
+  const instructions = layers.flatMap(l => (l._erase ? [l._erase.instruction] : l.shapes.map(sh => instructionOf.get(sh._valuePlan.id) ?? { ...sh._valuePlan, area: sh.area, plannedPigmentMass: sh.amount * sh.area })));
+  const byStage = [0, 0, 0, 0]; for (const q of instructions) if (q.kind !== 'erase') byStage[Math.min(4, Math.max(1, q.stage)) - 1]++;
+  const summary = { ...plan.summary, source: 'study, edited', washes: instructions.filter(q => q.stage !== 2 && q.kind !== 'erase').length, erases: instructions.filter(q => q.kind === 'erase').length, washesByStage: byStage, stages: byStage.filter(Boolean).length, mixes: mixes.length, plannedStrokes: instructions.reduce((a, q) => a + (q.strokes?.length ?? 0), 0), edit: record };
   return { plan: { ...plan, layers, instructions, mixes, summary, geometry: `${plan.geometry} Edited by an author: ${editLine(record)}.` }, record };
 }

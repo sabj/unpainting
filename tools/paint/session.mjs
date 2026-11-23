@@ -270,7 +270,7 @@ export function sessionServer({ dir, sheet = null, forms = [], looks: most = DEF
     const askKey = `${p.key}:${ask.until ?? ''}:${region ? region.box.join(',') : ''}`, costSaid = cost ? `${cost.cost} unit${cost.cost === 1 ? '' : 's'} (${ask.until != null ? `stopped after stage ${ask.until}: ${cost.washes} of the plan's ${cost.of} washes` : `the whole plan, ${cost.of} washes`}${region ? `; the region ${region.name ? `"${region.name}", ` : ''}${region.box.join(', ')} mm, which ${region.passages} of your ${region.of} passages touch` : ', the whole sheet'})` : '';
     const edited = `${editSaid}${p.tools ? ` ${p.tools.said}${got.toolFiles?.length ? ` See ${got.toolFiles.map(f => f.rel).join(', ')}.` : ''}` : ''}${warned(p.warnings)}${back.revert ? `\nThis is a return to a choice you had left: ${back.count} of ${revertsMost} allowed.` : ''}`;
     // ... and of the strokes too small for a wet bed, before anything is painted (plan-data.mjs tinyTouchWarning)
-    const tiny = tinyTouchWarning(s);
+    const tiny = tinyTouchWarning(s) + (s.erases?.said ?? '');
     if (cmd === 'plan') return `It compiles (${what}): ${line}.${travelLine(s.handTravel)}${edited}${tiny}${unit && got.passes ? workCostLine(got.passes, unit, unitsLeft()) : costLine(got.rows ?? [], unitsLeft())} Nothing else is shown without a look.\n${left()}`;
     if (cmd === 'cost') return `This look would cost ${costSaid}. You have ${unitsLeft()} of ${most} units left. Nothing was painted and nothing was spent.${painted.has(askKey) ? ' (You have already looked at exactly this: looking again renders nothing and costs nothing.)' : ''}\n${left()}`;
     // the same look of the same choice was rendered already: it is shown again and costs nothing

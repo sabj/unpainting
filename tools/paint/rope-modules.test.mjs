@@ -61,6 +61,9 @@ test('usage: what a session cost, measured; the budget and whether it was reache
   assert.match(usageLine(u), /4 looks for 2\.3 of 5 rendering units, \? of \? steps \(20 GPU min\), 2 plans, 70.2 wall min \(18.5 its own\), 81 tool calls, 1500 tokens, \$4.25, 2 returns to an earlier choice; final 40 GPU min; REACHED THE BENCHMARK'S RESOURCE BUDGET/);
   const quiet = usageOf({ subject: 's', author: { key: 'astra', name: 'Astra' }, level: 'L2', tryNumber: 1, budget: {}, session: { ended: 'done' } });
   assert.equal(quiet.budget.reached, null); assert.equal(quiet.model.costFrom, 'not reported by this command'); assert.equal(quiet.machine.finalGpuMinutes, null);
+  // a plan with erase passages counts them in its work, beside its washes and strokes
+  const erased = usageOf({ subject: 's', author: { key: 'astra', name: 'Astra' }, level: 'L2', tryNumber: 1, budget: {}, session: { ended: 'done' }, plan: { washes: 3, strokes: 20, dryings: 2, passages: 5, erases: { passages: 2, strokes: 4, said: 'x' } } });
+  assert.deepEqual(erased.work.erases, { passages: 2, strokes: 4 });
 });
 
 test('parity: what was handed over is written down with the hash of each file, and a kept folder that differs is refused', () => {

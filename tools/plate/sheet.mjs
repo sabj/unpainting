@@ -231,6 +231,7 @@ const pencilDraw=(target,gs,pigment,options)=>{
  ctx.layers=ctx.VALUE_PLAN.layers;ctx.steps=5;
  // --washsession 2: within each band step, a region's pigment passes follow one another, so its wash is charged with
  // all its pigments in one wet session (the planner lists them pigment by pigment).
+ if((WASH_SESSION>1||num('darkfirst',0)>0)&&ctx.layers.some(l=>l._erase))throw Error('--washsession 2 and --darkfirst regroup the passes and would move an erase passage out of its place in the order; paint a plan with an erase without them');
  if(WASH_SESSION>1){const step=l=>l.shapes[0]?._valuePlan?.id?.split('/')[1]??String(l.value),first=new Map();ctx.layers.forEach((l,i)=>{const g=step(l)+'|'+l._valuePhase;if(!first.has(g))first.set(g,i);});
   ctx.layers=ctx.layers.map((l,i)=>({l,i,g:first.get(step(l)+'|'+l._valuePhase),r:l._order?.region??0})).sort((a,b)=>a.g-b.g||(a.l._valuePhase==='shadow'?a.i-b.i:a.r-b.r||a.l.pigment-b.l.pigment||a.i-b.i)).map(q=>q.l);}
  // --darkfirst: shadow-phase layers (shadow glazes, deep accents) before the middle layers, light first still

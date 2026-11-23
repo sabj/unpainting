@@ -167,7 +167,7 @@ A passage:
   "id": "p01",
   "what": "<what this is>",
   "stage": 1 | 2 | 3 | 4 | 5,
-  "kind": "wash" | "strokes" | "touches" | "lines",
+  "kind": "wash" | "strokes" | "touches" | "lines" | "erase",
   "region": [[x, y], ...]   or   "regions": [ [[x, y], ...], ... ],
   "paths": [ [[x, y], ...], ... ],
   "paint": { "pigments": { "<key>": <parts> }, "dilution": "very pale" | "pale" | "medium" | "strong" | "rich",
@@ -253,6 +253,12 @@ A passage:
   glaze's own swatch, lighter than the result you want.
 - `charges`: colour dropped into this passage while it is wet; one drop at each `at`.
 - `into`: only the passage IMMEDIATELY before can still be wet. Everything earlier is dry.
+- `erase` (advice, yours to use or not): a pencil lay-in line that the paint has replaced, or a line drawn twice, can
+  be rubbed out. An erase passage takes no paint or brush: `"widthMm"` (the eraser, 0.5 to 10, default 3) and either
+  `strokes` with the pressure at each point (1 a firm rub) or a `region` rubbed in lanes at `handling.pressure`. Put it
+  anywhere in the order. Before the first wash a firm rub takes most of the pencil off; once a wash over the line has
+  dried it takes far less (about a fifth under a pale wash, under a tenth under a dark one). The eraser needs dry
+  paper: leave its `wait` at `dry`, or the painter stops rather than rub wet paper.
 
 ## What the script can and cannot express (write only what is listed here; invent no fields)
 

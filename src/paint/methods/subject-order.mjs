@@ -173,6 +173,7 @@ export function cutBySubject(sh, field, nextId, { rank, ranks, w, phase, seam = 
  */
 export function orderBySubject(layers, { field, strength = 0, w, n, seam = 0 }) {
   if (!field || !(strength > 0) || field.ranks < 2) return { layers, summary: null, order: null };
+  if (layers.some(l => l._erase)) throw Error('subject order: the plan holds an erase passage, which belongs to no subject and cannot be reordered with them; paint it with --subjectorder 0');
   const k = Math.min(1, strength);
   const steps = [...new Set(layers.map(stepOf))];
   const S = Math.max(1, steps.length - 1);

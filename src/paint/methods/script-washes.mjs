@@ -15,12 +15,13 @@ import { filmLab } from './puddles.mjs';
 import { renderLayers } from '../../media/km.mjs';
 import { handOf, PRESSURES, sweeps, scattered, lines, written, handled, chargeDab } from './script-marks.mjs';
 import { makeMark, MARK_KINDS } from '../marks/index.mjs';
+import { checkErase, eraseStrokes, eraseLayer } from './erase-passage.mjs';
 
 /** Swatch lightness (L* on white paper) for each dilution word. */
 export const DILUTION_L = Object.freeze({ 'very pale': 88, pale: 79, medium: 66, strong: 52, rich: 40, dark: 30 });
 /** Water in the brush for each load word (share of its capacity). */
 const LOAD = Object.freeze({ flooded: 0.88, loaded: 0.68, damp: 0.42, dry: 0.22 });
-const KINDS = new Set(['wash', 'strokes', 'touches', 'lines']);
+const KINDS = new Set(['wash', 'strokes', 'touches', 'lines', 'erase']);
 const PAPERS = new Set(['dry', 'damp', 'wet']);
 import { TOUCH_LEAST_MM2, predictedTouchMm2 } from './tiny-touch.mjs';
 import { finalWidthOf, cellsOfFinal } from './look-scale.mjs';
@@ -106,6 +107,7 @@ export function checkScript(script, { keys, sheetWidthMm }) {
     const at = `painting script, passage ${p?.id ?? i}`;
     if (!p?.id || ids.has(p.id)) throw Error(`${at}: needs a unique id`); ids.add(p.id);
     if (!KINDS.has(p.kind)) throw Error(`${at}: kind ${p.kind} is not one of ${[...KINDS].join(', ')}`);
+    if (p.kind === 'erase') { checkErase(p, at); return; }
     if (p.paper != null && !PAPERS.has(p.paper)) throw Error(`${at}: paper ${p.paper} is not dry, damp or wet`);
     if (p.brush != null && !brushes[p.brush]) throw Error(`${at}: brush ${p.brush} is not in the kit`);
     if (p.brush == null && p.kind !== 'wash') throw Error(`${at}: a ${p.kind} passage names its brush`);
@@ -318,13 +320,25 @@ export function planScriptWashes({ script: given, k, w, h, pigments, paperRGB = 
     strokeCount += strokes.length;
     return sh;
   };
-  let prev = null; const washed = [];
+  let prev = null; const washed = [], erases = [];
   for (const p of passages) {
     const stage = Math.max(1, Math.min(5, Math.round(p.stage ?? 2)));
+    // an erase: the session before it is closed and dried (unless it says otherwise), and the eraser goes over the
+    // sheet as it is; what it will take is told from the paint planned under its path so far
+    if (p.kind === 'erase') {
+      close();
+      const strokes = eraseStrokes(p, seed), ids = footprint(strokes, w, h, cellMm); let cells = 0, painted = 0;
+      for (let i = 0; i < n; i++) if (ids[i]) { cells++; if (laid.some(L => L[i] > 0)) painted++; }
+      const afterWet = prev != null && prev.kind !== 'erase'; // every passage of paint leaves the sheet wet
+      const e = eraseLayer(p, strokes, { stage, overPaint: cells ? painted / cells : 0, afterWet, areaMm2: cells * cellMm * cellMm });
+      if (e.instruction.erase.warning) console.log(e.instruction.erase.warning);
+      layers.push(e.layer); instructions.push(e.instruction); erases.push(e.instruction); strokeCount += strokes.length; prev = p;
+      continue;
+    }
     // what the sheet does before this passage: `wait` dry (the default: every earlier passage dried), damp (no drying: it
     // is laid while what is down has just lost its shine, as the next passage of one sitting) or none (straight on)
     const wait = p.wait ?? (p.into != null ? 'damp' : 'dry');
-    const joins = prev != null && (wait === 'damp' || wait === 'none') && (p.into == null || prev.id === p.into);
+    const joins = prev != null && prev.kind !== 'erase' && (wait === 'damp' || wait === 'none') && (p.into == null || prev.id === p.into);
     if (p.into != null && !joins) console.log(`painting script: ${p.id} is to go into ${p.into}, which is not the passage just before it (${prev?.id ?? 'none'}); laid on its own, on a dry sheet`);
     const own = moveOf({ ...p, paper: p.paper ?? (joins && wait === 'damp' ? 'damp' : 'dry') }, joins);
     if (!joins) close();
@@ -354,7 +368,7 @@ export function planScriptWashes({ script: given, k, w, h, pigments, paperRGB = 
     if (c) { const mean = lin.map(v => Math.round(255 * (v / c) ** (1 / 2.2))), a = labOf(mean, 0, paperCol), b = filmLab(u.map(v => v / c), pigments, paperCol); checks.push({ id, subjectL: +a[0].toFixed(1), planL: +b[0].toFixed(1), dE: +Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]).toFixed(1) }); }
   }
   const covered = laid[0].map((_, i) => (laid.some(L => L[i] > 0) ? 1 : 0)).reduce((a, v) => a + v, 0);
-  const summary = { source: 'painting script', author: script.author ?? null, passages: passages.length, sessions: layers.length, washes: instructions.filter(q => q.kind !== 'charge').length, charges, stages: new Set(layers.map(l => l.value)).size, plannedStrokes: strokeCount, paintedShare: covered / n,
+  const summary = { source: 'painting script', author: script.author ?? null, passages: passages.length, sessions: layers.length, washes: instructions.filter(q => q.kind !== 'charge' && q.kind !== 'erase').length, erases: erases.length, charges, stages: new Set(layers.map(l => l.value)).size, plannedStrokes: strokeCount, paintedShare: covered / n,
     kinds: passages.reduce((a, p) => ({ ...a, [p.kind]: (a[p.kind] ?? 0) + 1 }), {}), papers: passages.reduce((a, p) => ({ ...a, [p.paper ?? 'dry']: (a[p.paper ?? 'dry'] ?? 0) + 1 }), {}), lights: lights.length, strokesNotLaid: dropped, smallStrokesLaidDry: laidDry, ...(tinyTouches.length ? { tinyTouches } : {}), colourCheck: checks,
     colourCheckMedianDE: checks.length ? [...checks].sort((a, b) => a.dE - b.dE)[checks.length >> 1].dE : null };
   console.log(`script washes: ${passages.length} passages by ${script.author ?? 'an unnamed author'} in ${layers.length} wet sessions; ${strokeCount} strokes, ${charges} charges; kinds ${JSON.stringify(summary.kinds)}; paper ${JSON.stringify(summary.papers)}; ${lights.length} lights kept; painted ${(100 * summary.paintedShare).toFixed(0)}% of the sheet; colour against the subject's mean over each passage, median dE ${summary.colourCheckMedianDE}`);
