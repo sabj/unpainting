@@ -80,9 +80,15 @@ test('benchmark jobs go first: an operator\'s job takes a place only while none 
   assert.equal(claim(dir, 'mini-0', { job: 'p1', kind: 'profile' }), true);
   assert.equal(claim(dir, 'mini-1', { job: 'p2', kind: 'operator look' }), false, 'one operator job in the whole pool');
   release(dir, 'mini-0');
-  fs.writeFileSync(path.join(dir, 'waiting', 'b.json'), JSON.stringify({ id: 'b', pid: process.pid, since: 1, kind: 'painting' }));
+  fs.writeFileSync(path.join(dir, 'waiting', 'b.json'), JSON.stringify({ id: 'b', pid: process.pid, since: 1, kind: 'look' }));
   assert.equal(claim(dir, 'mini-0', { job: 'p3', kind: 'profile' }), false, 'a benchmark job is waiting');
-  assert.equal(claim(dir, 'mini-0', { job: 'b', kind: 'painting' }), true);
+  assert.equal(claim(dir, 'mini-0', { job: 'b', kind: 'look' }), true);
+  // a final waiting for a pod does not hold an operator's look off the mini; a session's look waiting there does
+  const d2 = tmp(); fs.mkdirSync(path.join(d2, 'waiting'));
+  fs.writeFileSync(path.join(d2, 'waiting', 'f.json'), JSON.stringify({ id: 'f', pid: process.pid, since: 1, kind: 'painting' }));
+  assert.equal(claim(d2, 'mini-0', { job: 'op', kind: 'operator look' }), true, 'only a job waiting for the same kind of place blocks it');
+  release(d2, 'mini-0'); fs.writeFileSync(path.join(d2, 'waiting', 'l.json'), JSON.stringify({ id: 'l', pid: process.pid, since: 2, kind: 'look' }));
+  assert.equal(claim(d2, 'mini-0', { job: 'op', kind: 'operator look' }), false, 'a session\'s look waits for the mini too');
 });
 
 test('the places a job may take: a look this Mac then the mini; a full-size painting a ready pod with the commit and time left', () => {

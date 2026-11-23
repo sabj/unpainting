@@ -72,15 +72,18 @@ export function daemonProcessAlive(dir, ps = pid => execFileSync('ps', ['-p', St
 
 /** Take `slot` for this process; false when it is held. A claim of a process that is gone is cleared first. */
 /** The jobs the benchmark itself paints (cli.mjs: a session's looks, its final, a prepare). Any other kind (an
- * operator's replay or profile) goes after them: it takes a place only while no benchmark job waits, one at a time in
- * the whole pool. */
+ * operator's replay or profile) goes after them: it takes a place only while no benchmark job waits for the same kind of
+ * place, one at a time in the whole pool. */
 export const BENCHMARK_KINDS = new Set(['look', 'look stopped at a stage', 'painting']);
 export function claim(dir, slot, info, isAlive = alive) {
   const f = path.join(dir, 'claims', `${slot}.json`); fs.mkdirSync(path.dirname(f), { recursive: true });
   const held = readJson(f); if (held && !isAlive(held.pid)) fs.rmSync(f, { force: true });
   if (!BENCHMARK_KINDS.has(info.kind)) {
+    // only a benchmark job waiting for the same kind of place (a pod, or this Mac and the mini) holds it back: a final
+    // waiting for a pod does not keep an operator's look off an idle mini
     const w = path.join(dir, 'waiting'), waiting = (fs.existsSync(w) ? fs.readdirSync(w) : []).map(n => readJson(path.join(w, n))).filter(x => x && isAlive(x.pid));
-    if (waiting.some(x => BENCHMARK_KINDS.has(x.kind)) || Object.values(claims(dir, isAlive)).some(c => !BENCHMARK_KINDS.has(c.kind))) return false;
+    const samePlace = x => POD_KINDS.has(x.kind) === POD_KINDS.has(info.kind);
+    if (waiting.some(x => BENCHMARK_KINDS.has(x.kind) && samePlace(x)) || Object.values(claims(dir, isAlive)).some(c => !BENCHMARK_KINDS.has(c.kind))) return false;
   }
   try { fs.writeFileSync(f, JSON.stringify({ ...info, pid: info.pid ?? process.pid, since: Date.now() }), { flag: 'wx' }); return true; } catch (e) { if (e.code === 'EEXIST') return false; throw e; }
 }
