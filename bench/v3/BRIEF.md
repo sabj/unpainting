@@ -56,7 +56,8 @@ you write your first stroke.
 ## Simulator in brief
 
 - `const { sheet, O, W, H } = await kit.open('{CROP}')`: a fresh cold-press sheet, one cell per target pixel,
-  0.259 mm a cell.
+  0.259 mm a cell. The paper's colour is your choice: `kit.open('{CROP}', { paper: [r, g, b] })` for a toned sheet
+  (white is the default); paint only darkens it.
 - `kit.createBrush({ radius, bristles, capacity, flat, belly, feed, give, splay, stiffness, seed })` (radius in
   cells), `kit.dip(brush, { water: 0..1, conc: kit.mix({ sapgreen: 1.2, ochre: 0.3 }) })` (a mix totals at most 8: about 0.5
   a pale tint, 1 to 2 a middle wash, 6 to 8 a strong dark). The brush is the main painter's own. A brush runs out:

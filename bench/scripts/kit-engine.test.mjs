@@ -66,3 +66,23 @@ await kit.finish('v');`);
   assert.deepEqual(s.pts.map(q => [q.v, q.blade]), [[30, 90], [120, 0]]);
   assert.equal(s.brush.bladeAngle, 90); assert.equal(s.brush.flat, true);
 });
+
+test('the paper is the model\'s choice: white by default or an [r, g, b] tone, which tints the sheet and paint only darkens', () => {
+  const probe = paper => run(`import * as kit from './kit.mjs';
+const { sheet, W, H } = await kit.open('sargent', { gpu: false${paper ? `, paper: ${paper}` : ''} });
+const b = kit.createBrush({ radius: 8, bristles: 16, capacity: 60 });
+kit.dip(b, { water: 0.8, conc: kit.mix({ ultramarine: 1 }) });
+kit.stroke(b, sheet, [{ x: 20, y: 30, p: 0.9 }, { x: 120, y: 30, p: 0.9 }]);
+kit.dryAll(sheet);
+const rgb = kit.look(), at = (x, y) => Array.from(rgb.slice((y * W + x) * 3, (y * W + x) * 3 + 3));
+console.log(JSON.stringify({ bare: at(W - 5, H - 5), painted: at(70, 30) }));
+`);
+  const read = r => { assert.equal(r.status, 0, r.stderr); return JSON.parse(r.stdout.trim().split('\n').at(-1)); };
+  const white = read(probe()), buff = read(probe('[228, 214, 186]'));
+  white.bare.forEach((v, c) => assert.ok(Math.abs(v - [240, 237, 228][c] * 0.98) <= 6, `white paper as before: ${white.bare}`));
+  buff.bare.forEach((v, c) => assert.ok(Math.abs(v - [228, 214, 186][c] * 0.98) <= 6, `buff paper: ${buff.bare}`));
+  buff.painted.forEach((v, c) => assert.ok(v < buff.bare[c], 'paint darkens the toned paper'));
+  assert.ok(buff.painted[2] < white.painted[2] && buff.painted[0] <= white.painted[0], 'the same stroke reads darker and warmer on buff');
+  const bad = probe(`'cream'`);
+  assert.notEqual(bad.status, 0); assert.match(bad.stderr, /paper must be "white" \(the default\) or a tone \[r, g, b\]/);
+});

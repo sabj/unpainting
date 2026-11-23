@@ -38,6 +38,8 @@
 //   refuses a wet sheet. Both count as strokes, go in the stroke log (tool 'pencil', 'eraser') and in the film.
 //   The sheet keeps the two graphite grades in two pans the kit does not offer (cadred, paynes), so nothing else moves.
 // The pen's ink is soluble (a wash over it rewets it) unless you ask for waterproof ink: kit.open(task, { ink: 'waterproof' }).
+// The paper's colour is your choice: kit.open(task, { paper: 'white' }) (the default) or a tone, { paper: [r, g, b] }
+//   (0..255; a buff sheet is about [228, 214, 186]). It tints the sheet under everything; paint only darkens it.
 // The engine: the main painter's own (tools/paint-plate.mjs in its default native mode, 'fast'). Every brush is the
 //   painter's section brush (tools/plate/painter-brush.mjs); the GPU runs with the painter's settings (resident sheet,
 //   demand-window reads: tools/painter/native-gpu-env.mjs); a drying takes the painter's fast tail (nativeDryOptions);
@@ -157,8 +159,17 @@ const unitOf = task => { try { return JSON.parse(fs.readFileSync(path.join(HERE,
 /** The coarse map of a task: { cols, rows, palette: [[r,g,b] x8], cells: palette index per cell, value: 0..1 per cell }. */
 export const coarse = task => JSON.parse(fs.readFileSync(path.join(HERE, 'tasks', `${task}-coarse.json`), 'utf8'));
 
-export async function open(task, { seed = +(process.env.BENCH_SEED || 1), gpu = true, threads = 1, ink = 'soluble' } = {}) {
+/** The paper's colour: 'white' (the kit's own sheet) or [r, g, b], each 1 to 255. */
+const WHITE_PAPER = [240, 237, 228];
+export function paperOf(paper = 'white') {
+  if (paper === 'white') return [...WHITE_PAPER];
+  if (Array.isArray(paper) && paper.length === 3 && paper.every(v => Number.isFinite(v) && v >= 1 && v <= 255)) return paper.map(v => Math.round(v));
+  reject(`paper must be "white" (the default) or a tone [r, g, b], each 1 to 255; got ${JSON.stringify(paper)}`);
+}
+
+export async function open(task, { seed = +(process.env.BENCH_SEED || 1), gpu = true, threads = 1, ink = 'soluble', paper = 'white' } = {}) {
   if (!TASKS.includes(task)) reject(`task must be one of ${TASKS.join(', ')}`);
+  const paperRGB = paperOf(paper);
   if (!['soluble', 'waterproof'].includes(ink)) reject('ink must be "soluble" (the default: a wash over it rewets it and it bleeds) or "waterproof" (a wash over it moves none)');
   await takeSlot();
   const map = coarse(task); const W = map.w, H = map.h;
@@ -185,8 +196,8 @@ export async function open(task, { seed = +(process.env.BENCH_SEED || 1), gpu = 
   const log = process.env.BENCH_NO_STROKELOG ? null : [];
   const work = { dryings: 0, waits: 0, waterSteps: 0 };
   const advance = () => { S.step(sheet, O); work.waterSteps++; };
-  st = { work, advance, clock: waterClock(advance), unit: unitOf(task), O, log, logWritten: false, seed, task, out, sheet, pigments, W, H, strokes: 0, pen: 0, pencil: 0, erase: 0, small: 0, short: 0, dots: 0, frames: 0, snaps: [], film: [], t0: Date.now(), backend: sheet._gpu ? 'gpu' : 'cpu', paperRGB: [240, 237, 228], pending: Promise.resolve() };
-  logLine({ ev: 'open', protocol: PROTOCOL, task, seed, W, H, mmPerCell: MM, paper: { toothScale: 0.2, coldPress: true }, backend: st.backend, t0: st.t0 });
+  st = { work, advance, clock: waterClock(advance), unit: unitOf(task), O, log, logWritten: false, seed, task, out, sheet, pigments, W, H, strokes: 0, pen: 0, pencil: 0, erase: 0, small: 0, short: 0, dots: 0, frames: 0, snaps: [], film: [], t0: Date.now(), backend: sheet._gpu ? 'gpu' : 'cpu', paperRGB, pending: Promise.resolve() };
+  logLine({ ev: 'open', protocol: PROTOCOL, task, seed, W, H, mmPerCell: MM, paper: { toothScale: 0.2, coldPress: true, rgb: paperRGB }, backend: st.backend, t0: st.t0 });
   process.on('exit', flushLog); // a script that dies before finish() keeps the strokes it laid
   console.error(`kit v2: ${task} ${W}x${H}, ${st.backend}, budget ${BUDGET} strokes; this is painting ${runsSoFar(task) + 1} of the ${RUNS} you may run in this attempt (charged when it lays its first mark)`);
   return { sheet, O, W, H };
