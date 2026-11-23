@@ -19,6 +19,8 @@ import {nativeBodyCadence} from '../painter/native-body-cadence.mjs';
 import {nativePaintMode, nativeUploadPolicy} from '../painter/native-paint-mode.mjs';
 import {measurePaper as physicalMeasurePaper} from '../../src/paint/methods/wetdry.mjs';
 import {codeHash, digest} from '../../src/paint/run-cache.mjs';
+import {setPaperStore} from '../../src/media/paper.mjs';
+import {diskPaperStore} from '../../src/media/paper-store.mjs';
 import {createStepBacks} from '../../src/paint/step-backs.mjs';
 import fs from 'node:fs';
 import crypto from 'node:crypto';
@@ -214,6 +216,8 @@ if (opt('image','')) bindLineTarget(await lineTargetOf(path.resolve(root, opt('i
 const DRAWING_REGISTRATION = opt('drawingfile','') && opt('drawing','first') !== 'none' ? await registerDrawingFile({ base: opt('drawingfile'), image: path.resolve(root, opt('image','')), root, out, width: num('width', 700), argv, log: console.log }) : null;
 const SWEEP_CACHE = path.dirname(root) === '/root/sweepwork' ? '/root/sweepwork/cache' : null;
 const RUN_CACHE = {dir:process.env.W2_CACHE_DIR || SWEEP_CACHE || path.join(root,'work','cache'),enabled:opt('runcache','1')!=='0'};
+// every paper the run makes (the sheet's, each calibration scrap's) is kept on disk beside the run cache (paper-store.mjs)
+if (RUN_CACHE.enabled) setPaperStore(diskPaperStore(RUN_CACHE.dir, codeHash(root, [], { dependencies: ['src/media/paper.mjs'] })));
 // The target's own line darkness and pixel size, read for --inkdarkmatch, --inkdarkcap and --inkwidthfloor
 // (src/paint/methods/ink-lines-file.mjs); the drawing files are drawn as they are. It runs again in a process that takes
 // over a saved painting (--resumestate).

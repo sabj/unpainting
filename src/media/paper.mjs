@@ -6,7 +6,27 @@ import { paperRelief, HEIGHT_SPAN_UM } from './paper-relief.mjs';
 
 // `scale` is cells per pixel of the picture. Every length below is a paper length, multiplied by it, so the grid
 // does not decide how coarse the paper is.
-export function makePaper(w, h, { seed = 1, fibres = 0.5, tooth = 0.5, fibreLength = 14, cmin = 0.2, cmax = 0.55, scale = 1, toothScale = 1, patternScale = 1, proudBlur = 1, coldPress = null, mmPerCell = 0, relief = 'cold' } = {}) {
+// A paper is a pure function of its size and options, and a run asks for the same one many times (every calibration
+// swatch is laid on a fresh 90 x 90 scrap of the painting's paper). The last few made are kept, and each caller gets
+// its own copy, so nothing one sheet does to its paper reaches another. A store (setPaperStore) keeps them across runs.
+const MADE = new Map(), KEEP = 4;
+let STORE = null;
+/** Keep papers outside this process: store { get(key) -> paper or null, put(key, paper) }, or null for none. */
+export const setPaperStore = store => { STORE = store; };
+const stable = v => (Array.isArray(v) ? v.map(stable) : v && typeof v === 'object' ? Object.fromEntries(Object.keys(v).sort().map(k => [k, stable(v[k])])) : v);
+export function makePaper(w, h, options = {}) {
+  const key = JSON.stringify([w, h, stable(options ?? {})]);
+  let paper = MADE.get(key);
+  if (paper) MADE.delete(key);
+  else {
+    paper = STORE?.get(key) ?? null;
+    if (!paper) { paper = buildPaper(w, h, options); STORE?.put(key, paper); }
+    if (MADE.size >= KEEP) MADE.delete(MADE.keys().next().value);
+  }
+  MADE.set(key, paper);
+  return structuredClone(paper);
+}
+function buildPaper(w, h, { seed = 1, fibres = 0.5, tooth = 0.5, fibreLength = 14, cmin = 0.2, cmax = 0.55, scale = 1, toothScale = 1, patternScale = 1, proudBlur = 1, coldPress = null, mmPerCell = 0, relief = 'cold' } = {}) {
   // Opt-in physical fibres: fibre size and count follow physical area.
   const fs = mmPerCell > 0 ? (280 / 1086) / mmPerCell : scale;
   const n = w * h, fib = new Float32Array(n), c2 = new Float32Array(n), s2 = new Float32Array(n); // fibre amount, and orientation as doubled angles (a fibre has no head or tail)
