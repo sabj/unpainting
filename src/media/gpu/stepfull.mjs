@@ -5,6 +5,7 @@ import { PaperReadback } from './paper-readback.mjs';
 import { PaperGate } from './paper-gate.mjs';
 import {FINISH_WET_SCAN, FINISH_WET_SCAN_14} from './finish-wet-scan.mjs';
 import { edgeFeedWgsl, EF_RMAX, EF_BMAX } from './edge-feed-wgsl.mjs';
+import { boxGeometryKey, keepGeometry } from './edge-geometry-cache.mjs';
 import { filmLevelWgsl } from './film-level-wgsl.mjs';
 import { levelOn, levelBudget, levelBuffers, levelUniforms, encodeLevel, adaptLevel } from './film-level-host.mjs';
 import { wetBoxes, edgeGeometry, prepareEdgeGeometry, finishEdgeGeometry } from './edge-geometry.mjs';
@@ -247,31 +248,39 @@ export class GpuSheet {
     const list = [], G = ef.G;
     const was = ef.span; if (was) G.fill(0, 4 * was[0], 4 * (was[1] + 1));
     let b = 0, lo = Infinity, hi = -1;
+    // each box's geometry is kept by its key (edge-geometry-cache.mjs): only the boxes that changed are solved again
+    const opts = `${mm}:${o.edgeMm ?? 1}:${o.edgeEvap}:${o.reachMm ?? 1.5}:${o.holeSpan ?? 0}`, kept = ef.boxGeo ?? new Map(), seen = new Map();
     for (const box of feeding) {
-      const sheet = { w, h, M, ever, resist };
-      const grid = contactGrid(box, mm, o.edgeMm ?? 1, this.device.limits);
-      let geo;
-      if (grid) {
-        this.contactDistance ??= new GpuContactDistance(this.device);
-        const [field, prepared] = await Promise.all([
-          this.contactDistance.field(this.b.EFP, w, h, grid, o.holeSpan ?? 0),
-          Promise.resolve().then(() => prepareEdgeGeometry(sheet, o, box, mm, ef.scratch)),
-        ]);
-        geo = finishEdgeGeometry(prepared, field);
-        this.gpuDistanceBoxes = (this.gpuDistanceBoxes ?? 0) + 1;
-      } else {
-        geo = edgeGeometry(sheet, o, box, mm, ef.scratch);
+      const sheet = { w, h, M, ever, resist }, bkey = boxGeometryKey(sheet, box, opts, o.holeSpan ?? 0);
+      let geo = kept.get(bkey);
+      if (geo === undefined) {
+        const grid = contactGrid(box, mm, o.edgeMm ?? 1, this.device.limits);
+        if (grid) {
+          this.contactDistance ??= new GpuContactDistance(this.device);
+          const [field, prepared] = await Promise.all([
+            this.contactDistance.field(this.b.EFP, w, h, grid, o.holeSpan ?? 0),
+            Promise.resolve().then(() => prepareEdgeGeometry(sheet, o, box, mm, ef.scratch)),
+          ]);
+          geo = finishEdgeGeometry(prepared, field);
+          this.gpuDistanceBoxes = (this.gpuDistanceBoxes ?? 0) + 1;
+        } else {
+          geo = edgeGeometry(sheet, o, box, mm, ef.scratch);
+        }
+        geo = keepGeometry(geo);
       }
+      seen.set(bkey, geo);
       if (!geo) continue;
       const { order, ex, fx, fy } = geo;
-      for (const i of order) { G[4 * i] = ex[i]; G[4 * i + 1] = fx[i]; G[4 * i + 2] = fy[i]; }
-      for (const i of order) {
-        if (fx[i] > 0) G[4 * i + 3] += fx[i]; else if (fx[i] < 0) G[4 * (i + 1) + 3] -= fx[i];
-        if (fy[i] > 0) G[4 * i + 3] += fy[i]; else if (fy[i] < 0) G[4 * (i + w) + 3] -= fy[i];
+      for (let q = 0; q < order.length; q++) { const i = order[q]; G[4 * i] = ex[q]; G[4 * i + 1] = fx[q]; G[4 * i + 2] = fy[q]; }
+      for (let q = 0; q < order.length; q++) {
+        const i = order[q];
+        if (fx[q] > 0) G[4 * i + 3] += fx[q]; else if (fx[q] < 0) G[4 * (i + 1) + 3] -= fx[q];
+        if (fy[q] > 0) G[4 * i + 3] += fy[q]; else if (fy[q] < 0) G[4 * (i + w) + 3] -= fy[q];
       }
       for (const i of order) { list.push(i, b); if (i < lo) lo = i; if (i + w > hi) hi = Math.min(n - 1, i + w); }
       b++;
     }
+    ef.boxGeo = seen;
     const L = new Uint32Array(1 + list.length); L[0] = list.length / 2; L.set(list, 1);
     const q = this.device.queue;
     q.writeBuffer(this.b.EFL, 0, L);
