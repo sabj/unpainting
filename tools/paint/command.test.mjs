@@ -86,3 +86,12 @@ test('a study setting for one named form goes into the wash plan after the study
   const s = spec({ studies: [{ abs: '/r/a.png', floorMm2: 6, read: { clusters: 20 }, forms: { 3: { clusters: 24, floor: 3 }, 11: { formbase: 0 } } }, { abs: '/r/b.png', floorMm2: 4, read: {}, forms: { 3: { lay: 1 } } }, { abs: '/r/c.png', floorMm2: 2, read: {} }] });
   assert.equal(washPlanOf(s.studies), '/r/a.png:6@clusters=20@clusters#3=24@floor#3=3@formbase#11=0,/r/b.png:4@lay#3=1,/r/c.png:2');
 });
+
+test('the pen\'s ink is chosen by name: waterproof sets it before the washes, soluble lets it rewet, anything else is refused', () => {
+  const ink = v => buildCommand(spec({ otherSets: [['ink', v]] }), { mode: 'paint', out: '/o', known });
+  assert.equal(value(ink('waterproof'), 'inkfast'), '1');
+  assert.equal(value(ink('soluble'), 'inkfast'), '0');
+  assert.ok(!ink('default').argv.includes('--inkfast'));
+  assert.ok(!ink('waterproof').argv.includes('--ink'));
+  assert.throws(() => ink('indian'), /--set ink: waterproof, soluble, default/);
+});
