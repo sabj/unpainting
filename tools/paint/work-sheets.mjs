@@ -10,7 +10,7 @@ import { beside } from './plan-data.mjs';
 
 /** The names the pictures are handed under: plain words that say what each is. */
 export const SHEET_FILES = Object.freeze({ beside: 'final-beside-subject.jpg', replay: 'replay-sheet-frames-in-order.jpg', arrows: 'arrows-sheet-strokes-in-order.jpg' });
-const FRAME = /^f\d{4}\.(jpg|png)$/;
+const FRAME = /^f\d{4}\.(jpg|png|webp)$/;
 const esc = t => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;');
 
 /** At most `most` of `list`, evenly spread, the first and the last kept. */

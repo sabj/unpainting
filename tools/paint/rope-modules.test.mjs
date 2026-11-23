@@ -122,5 +122,8 @@ test('the sheets of a finished painting: beside the subject, the frames in order
     fs.writeFileSync(path.join(run, 'run.json'), JSON.stringify({ ...record, mode: 'plan' })); await assert.rejects(writeWorkSheets(run, to, { whose: 'x' }), /a plan only, not a painting/);
     fs.writeFileSync(path.join(run, 'run.json'), JSON.stringify({ ...record, failure: 'the GPU left' })); await assert.rejects(writeWorkSheets(run, to, { whose: 'x' }), /the painting failed \(the GPU left\)/);
     fs.writeFileSync(path.join(run, 'run.json'), JSON.stringify(record)); for (let i = 1; i < 5; i++) fs.rmSync(path.join(plate, `f000${i}.png`)); await assert.rejects(writeWorkSheets(run, to, { whose: 'x' }), /replay sheet: 1 frames/);
+    // the painter keeps its film's frames as webp (f0000.webp ...): they are frames of the replay too
+    fs.rmSync(path.join(plate, 'f0000.png')); for (let i = 0; i < 4; i++) await sharp({ create: { width: 80, height: 60, channels: 3, background: '#ffffff' } }).webp().toFile(path.join(plate, `f000${i}.webp`));
+    assert.equal((await writeWorkSheets(run, to, { whose: 'x' }))[1].name, SHEET_FILES.replay);
   } finally { for (const d of [run, to]) fs.rmSync(d, { recursive: true, force: true }); }
 });
