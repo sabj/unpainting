@@ -1,6 +1,6 @@
 # Tips: brush technique in this painter, by worked example
 
-Fourteen small examples. Each was painted on a blank sheet (320 x 200 cells, 83 x 52 mm) by the code shown beside it,
+Eighteen small examples. Each was painted on a blank sheet (320 x 200 cells, 83 x 52 mm) by the code shown beside it,
 and the picture is its dried result. None is a picture of anything: they show how the brush, the water and the paper
 behave, and nothing about what to paint.
 
@@ -250,3 +250,87 @@ for (let k = 0; k < 6; k++) { kit.dip(b, { water: 0.85, conc: paint }); kit.stro
 - Prevents: a wash that starts strong and fades to scratches because the brush was never refilled. For a wash, dip
   before every stroke; keep a running brush for dry-brush texture on purpose.
 - *Kit only:* a bigger `capacity` or a shorter stroke lasts longer; `brush.load` tells you what is left.
+
+## Drawing: pencil, pen and ink
+
+What exists, said plainly. **The kit (level 1) has a pen and two inks (`sepia`, `lampblack`) and nothing else to draw
+with: no pencil and no eraser.** The simulator does have graphite (the session painter at levels 2 to 4 lays the
+pencil drawing with it), but the kit does not hand it to you, and nothing anywhere rubs graphite or ink out. So the
+pencil and erasing notes below are for levels 2 to 4 and are words only; the pen examples were painted with the kit.
+
+### 15. The pen line: nib, flex, pressure, speed
+![](tips/15-pen-lines.png) ![](tips/15-pen-lines-arrows.png)
+
+```js
+const fine = kit.createPen({ nib: 0.8, flex: 0.2 });   kit.dipPen(fine, ink);  kit.penStroke(fine, sheet, wave(35, 0.6));    // a fine stiff nib
+const broad = kit.createPen({ nib: 2.4, flex: 0.2 });  kit.dipPen(broad, ink); kit.penStroke(broad, sheet, wave(75, 0.6));   // a broad one
+const flexy = kit.createPen({ nib: 0.8, flex: 2.5 });  kit.dipPen(flexy, ink);
+kit.penStroke(flexy, sheet, wave(115, t => 0.1 + 0.9 * t));                    // pressure opens a flexible nib: thin to thick
+kit.penStroke(flexy, sheet, wave(160, 0.6, t => (t < 0.5 ? 0.5 : 8)));         // v: slow for the first half, fast for the second
+```
+
+- Physics: the nib sets the least width; pressure spreads a flexible nib's tines; a slow pen leaves more ink (darker,
+  a little wider), a fast one less (paler, and it may skip on the paper's grain).
+- Prevents: every line the same weight. A drawing reads by the difference between its thin and its thick lines.
+- *Kit only:* `nib` and `flex` are in cells (0.259 mm); `p` is pressure and `v` speed at each point of the path.
+
+### 16. Hatching and cross-hatching
+![](tips/16-hatching.png) ![](tips/16-hatching-arrows.png)
+
+```js
+const hatch = (x0, gap, slope) => { let k = 0; for (let x = x0; x <= x0 + 70; x += gap, k++) {
+  if (k % 6 === 0) kit.dipPen(pen, ink);                                        // a pen runs out too
+  kit.penStroke(pen, sheet, [{ x, y: 60, p: 0.5 }, { x: x + slope * 0.5, y: 100, p: 0.7 }, { x: x + slope, y: 140, p: 0.4 }]); } };
+hatch(30, 9, 14);                       // wide apart: a light tone
+hatch(125, 4, 14);                      // close: darker
+hatch(220, 4, 14); hatch(234, 4, -14);  // crossed by a second set: darkest
+```
+
+- Physics: ink does not dilute on dry paper, so tone comes from how much paper the lines cover: their spacing, and a
+  second set across the first.
+- Prevents: filling a dark with a solid block of ink, or scribbling. Lines of one set are parallel and drawn the same
+  way; darker means closer or crossed, not pressed harder.
+
+### 17 and 18. A pen line under a wash: soluble ink and waterproof ink
+![](tips/17-pen-under-wash-soluble.png) ![](tips/18-pen-under-wash-waterproof.png)
+
+```js
+const { sheet, O, W, H } = await kit.open('tips');                           // 17: soluble ink, the default
+const { sheet, O, W, H } = await kit.open('tips', { ink: 'waterproof' });    // 18: the same script, waterproof ink
+...three zigzags with the pen; kit.dryAll(sheet, O); then a pale wash over the right two thirds...
+```
+
+- Physics: soluble ink rewets: water laid over it loosens some and the wash carries it, so the line softens and tints
+  the wash. Waterproof ink holds to the paper once dry and the wash passes over it. In these two pictures the
+  difference is small (the soluble lines under the wash are a little softer): a pale wash laid once moves little; a
+  wetter wash, or one worked over twice, moves more.
+- Prevents: a drawing dissolved by its own washes (draw in waterproof ink, or lay each wash once and leave it), and
+  the opposite surprise, a line that was meant to bleed and did not.
+- At levels 2 to 4 the same choice is the setting `"ink": "waterproof"` or `"soluble"`.
+- A pen line over a wash, on dry paper and on damp, is example 8.
+
+### Pencil (levels 2 to 4; the kit has none)
+
+- A pencil line is graphite caught on the tops of the paper's grain: light pressure gives a pale broken line, heavy
+  pressure a dark continuous one that also dents the paper. Decide the weight line by line; a lay-in drawn all at one
+  weight reads as an outline, not a drawing.
+- Under a wash: a pale wash lets every pencil line show; a dark wash hides the light ones and keeps only the heavy. So
+  draw lightly where a pale wash will sit and the line should not show, and expect lines under the darks to vanish.
+- Loose graphite is picked up by the first wet wash over it and greys it a little. Fewer, lighter lines under clean
+  pale colours.
+- Pencil over a dry wash sits on top of the paint, crisp and a little shiny; over a damp wash it digs in and cannot
+  be undone. Wait for the sheet to dry.
+- In the session painter the pencil is your choice of the drawing's lines: which are laid before the washes, which
+  after, which not at all, and each one's weight.
+
+### Erasing and correcting
+
+- **Before paint:** pencil rubs out of dry paper almost completely; heavy lines leave their dent. In the session
+  painter that is simply leaving a line out of your choice, or giving it a lighter weight: decide before the washes.
+- **After a wash has dried over it:** the graphite under the paint is sealed in and does not come off; only pencil
+  drawn on top of the dry wash can be rubbed back, and rubbing lifts some paint with it. Do not plan on it.
+- **A pen line cannot be erased.** Waterproof ink stays for good. Soluble ink can be softened by a wet brush while it
+  is fresh, which spreads it rather than removing it. A wrong pen line is corrected by drawing the right one more
+  firmly beside it, or by a dark wash over both; so draw the pen last where you are unsure.
+- *Kit only:* there is no eraser call. `kit.blot` lifts standing water and the paint in it (example 7), not a dried
+  line.
