@@ -18,11 +18,11 @@ test('TIPS.md shows only pictures that exist, and every example has its script, 
   assert.ok(shown.length >= 18);
   for (const f of shown) assert.ok(fs.existsSync(path.join(V3, f)), f);
   const scripts = fs.readdirSync(TIPS).filter(f => /^\d+-.*\.mjs$/.test(f));
-  assert.equal(scripts.length, 18);
+  assert.equal(scripts.length, 26);
   for (const s of scripts) {
     const stem = s.replace(/\.mjs$/, ''), code = fs.readFileSync(path.join(TIPS, s), 'utf8');
     assert.ok(shown.includes(`tips/${stem}.png`), `${stem} is shown`);
-    if (parseInt(s) >= 9 && parseInt(s) <= 16) assert.ok(shown.includes(`tips/${stem}-arrows.png`), `${stem} shows its stroke paths`);
+    if ((parseInt(s) >= 9 && parseInt(s) <= 16) || parseInt(s) >= 19) assert.ok(shown.includes(`tips/${stem}-arrows.png`), `${stem} shows its stroke paths`);
     // a blank sheet only: no benchmark target is opened, read or named
     assert.deepEqual([...code.matchAll(/kit\.open\('([^']+)'/g)].map(m => m[1]), ['tips'], s);
     assert.ok(!/kit\.coarse|readFile|targets?\//.test(code), `${s} reads nothing`);
@@ -50,7 +50,7 @@ const b = kit.createBrush({ radius: 8, bristles: 16, capacity: 60 });
 for (let k = 0; k < 9; k++) { kit.dip(b, { water: 0.8, conc: kit.mix({ ultramarine: 0.3 }) }); kit.stroke(b, sheet, [{ x: 20, y: 20 + 12 * k, p: 0.8 }, { x: 200, y: 24 + 12 * k, p: 0.8 }]); }
 kit.dryAll(sheet, O); await kit.finish('film');`);
     // the pen's ink is a named choice, by the session painter's names; anything else is refused before a sheet is made
-    fs.writeFileSync(path.join(wb, 'i.mjs'), `import * as kit from './kit.mjs';\ntry { await kit.open('sargent', { gpu: false, ink: 'indian' }); console.log('OPENED'); } catch (e) { console.log(e.message); }\nconst { sheet } = await kit.open('sargent', { gpu: false, ink: 'waterproof' }); console.log('WATERPROOF ' + sheet.pigments.filter(p => p.omega === 60).length); process.exit(0);`);
+    fs.writeFileSync(path.join(wb, 'i.mjs'), `import * as kit from './kit.mjs';\ntry { await kit.open('sargent', { gpu: false, ink: 'indian' }); console.log('OPENED'); } catch (e) { console.log(e.message); }\nconst { sheet } = await kit.open('sargent', { gpu: false, ink: 'waterproof' }); console.log('WATERPROOF ' + sheet.pigments.filter(p => p.omega === 60 && !/graphite/.test(p.name)).length); process.exit(0);`);
     const said = execFileSync(process.execPath, ['i.mjs'], { cwd: wb }).toString();
     assert.match(said, /ink must be "soluble"/); assert.ok(!said.includes('OPENED')); assert.match(said, /WATERPROOF 2/, 'the two inks, and only they, are set');
     execFileSync(process.execPath, ['p.mjs'], { cwd: wb, stdio: 'ignore' });
