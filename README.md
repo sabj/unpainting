@@ -138,9 +138,22 @@ How it is run and scored:
 - Judges read how human the making looks, from the painting in progress, and how good and how like the original it is. A combined number is shown too. The original is scored as well, and a painting's result is its share of the original's score.
 - Judges run locally. Hosted judging (OpenRouter or Together), a container for replication, and the OpenAI models are planned, not in 0.4's first run.
 
-See [levels](bench/docs/levels.md), [rules](bench/docs/rules.md), [scoring](bench/docs/scoring.md) and [how Auto paints against a model](docs/auto-vs-model.md).
+<p align="center"><a href="docs/auto-vs-model.md"><img src="docs/img/auto-vs-model-banner.webp" width="720" alt="Mittens: the picture, Auto's painting, and a model's painting at level 2"></a></p>
 
-RESULTS: to be filled from the frozen run.
+<p align="center">Mittens: the picture, Auto, a model at L2.</p>
+
+<p align="center"><a href="docs/auto-vs-model.md#the-forehead-stripes"><img src="docs/img/auto-vs-model-place-stripes.webp" width="720" alt="The forehead stripes: the model's long wet strokes against Auto's jigsaw shapes of short dry strokes"></a></p>
+
+<p align="center">Forehead stripes: the model on top, Auto below.</p>
+
+- [Auto against a model](docs/auto-vs-model.md): one cat, step by step, and what a model may change at each level.
+- [Painting script](docs/painting-script.md): how a model writes its passages.
+- [Levels](bench/docs/levels.md): what each level is given.
+- [Rules](bench/docs/rules.md): the workspace and the budgets.
+- [Scoring](bench/docs/scoring.md): human-ness in the making, and quality against the original.
+- [Release notes](CHANGELOG.md#040-not-released).
+
+Results: to be added from the release-candidate run.
 
 ### History: rounds V1 to V5
 
