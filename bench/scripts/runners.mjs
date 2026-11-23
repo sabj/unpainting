@@ -40,7 +40,10 @@ export function agyImageNote(files) {
 export function turnCommand(model, { ws, raw, text, images = [], sessionId = null, resume = false, turn = 1, briefFile = null, crops = [], logFile, minutes = 30, done = 'paintings', budget = null }) {
   const effort = model.effort && model.effort !== 'n/a' ? model.effort : null;
   if (model.runner === 'claude') {
-    const common = ['--output-format', 'stream-json', '--verbose', '--model', model.id, ...(effort ? ['--effort', effort] : []), '--disable-slash-commands', '--dangerously-skip-permissions'];
+    const common = ['--output-format', 'stream-json', '--verbose', '--model', model.id, ...(effort ? ['--effort', effort] : []), '--disable-slash-commands', '--dangerously-skip-permissions',
+      // no MCP servers at all: not the operator's own (user or project config) nor the account's claude.ai connectors, which
+      // would otherwise be offered to the model with permissions bypassed; and every MCP tool denied as a second lock
+      '--strict-mcp-config', '--mcp-config', '{"mcpServers":{}}', '--disallowedTools', 'mcp__*'];
     // The shell timeout must exceed bench/paint.sh's 100-second wait.
     // CLAUDE_CODE_DISABLE_AUTO_MEMORY: a git worktree shares its repository's auto-memory folder, which holds the operator's
     // notes and earlier scores; the session must neither be told of it nor read it.

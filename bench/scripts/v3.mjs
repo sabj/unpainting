@@ -79,13 +79,25 @@ async function collect({ ws, crop, n, raw, view, turn }) {
  *  notes, no model context, no files it left lying. */
 async function session({ model, crop, spec, tries, rawTry, dry }) {
   const raw = path.join(rawTry, crop), view = path.join(raw, 'view', `${crop}.png`);
-  fs.rmSync(raw, { recursive: true, force: true }); fs.mkdirSync(path.dirname(view), { recursive: true });
+  // BENCH_V3_FROM_ATTEMPT=n continues a session stopped between attempts: attempts before n are kept as recorded
+  // (raw/a<k>, result-partial.json) and attempt n is handed attempt n-1 as usual. Default 1: a fresh session.
+  const from = Math.max(1, Number(process.env.BENCH_V3_FROM_ATTEMPT) || 1);
+  if (from === 1) fs.rmSync(raw, { recursive: true, force: true });
+  fs.mkdirSync(path.dirname(view), { recursive: true });
   fs.copyFileSync(path.join(spec.base ?? V2, spec.file), view);
   const p = readJson(path.join(V3, 'prompts.json'));
   const attempts = [], res = { crop, attempts, tokens: 0, costUSD: 0, done: null, freshWorkspaceEachAttempt: true };
   const SKIP = /^bench\/(out|tasks|attempts|skills|tips)\/|^bench\/(BRIEF\.md|TIPS\.md|kit\.mjs|guard\.mjs|paint\.mjs|dry-v3\.mjs)$|^node_modules$/;
   let prompt = p.first, images = [view];
-  for (let n = 1; n <= tries; n++) {
+  if (from > 1) {
+    const kept = readJson(path.join(raw, 'result-partial.json'));
+    attempts.push(...kept.attempts.filter(a => a.n < from)); res.tokens = kept.tokens || 0; res.resumedAt = from;
+    const a = attempts.find(x => x.n === from - 1);
+    if (!a) throw new Error(`BENCH_V3_FROM_ATTEMPT=${from}: attempt ${from - 1} is not in ${raw}/result-partial.json`);
+    prompt = fill(sayLimit(p.next), { PREV: from - 1, N: from, OF: tries === 2 ? tries : `up to ${tries}`, STROKES: a.stats?.strokes ?? 'no', MIN: a.min }) + (tries === 2 ? '' : p.done);
+    images = [view, ...(['codex', 'muse', 'agy'].includes(model.runner) ? [path.join(raw, `a${from - 1}`, 'compare.png')] : [])].filter(f => fs.existsSync(f));
+  }
+  for (let n = from; n <= tries; n++) {
     const { ws, cleanup } = makeWorktree();
     const sessionId = ['claude', 'muse'].includes(model.runner) ? crypto.randomUUID() : null;
     let stop = false;
@@ -111,7 +123,7 @@ async function session({ model, crop, spec, tries, rawTry, dry }) {
         const a = await collect({ ws, crop, n, raw, view, turn });
         a.tokens = u.tokens; a.violations = fs.existsSync(env.BENCH_VIOLATIONS) ? fs.readFileSync(env.BENCH_VIOLATIONS, 'utf8').split('\n').filter(Boolean).length : 0;
         a.rejections = 0;
-        attempts.push(a);
+        attempts.push(a); writeJson(path.join(raw, 'result-partial.json'), res);
         prompt = fill(sayLimit(p.next), { PREV: n, N: n + 1, OF: tries === 2 ? tries : `up to ${tries}`, STROKES: a.stats?.strokes ?? 'no', MIN: a.min }) + (tries === 2 ? '' : p.done);
                 // a fresh session has not seen the target: it is attached again, with the comparison where the runner takes pictures
         images = [view, ...(['codex', 'muse', 'agy'].includes(model.runner) ? [path.join(raw, `a${n}`, 'compare.png')] : [])].filter(f => fs.existsSync(f));

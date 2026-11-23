@@ -94,3 +94,13 @@ test('a Claude turn runs with the operator\'s auto-memory folder switched off, o
   const again = turnCommand(claude, { ws: '/ws', raw: os.tmpdir(), text: 'fix', sessionId: 's-1', resume: true });
   for (const c of [first, again]) assert.equal(c.env.CLAUDE_CODE_DISABLE_AUTO_MEMORY, '1');
 });
+
+test('a Claude turn is offered no MCP server: strict MCP config, an empty server list, and every MCP tool denied', () => {
+  const claude = { key: 'c', name: 'C', id: 'claude-x', effort: 'medium', runner: 'claude' };
+  for (const resume of [false, true]) {
+    const { args } = turnCommand(claude, { ws: '/ws', raw: os.tmpdir(), text: 'paint', sessionId: 's-1', resume });
+    assert.ok(args.includes('--strict-mcp-config'));
+    assert.deepEqual(JSON.parse(args[args.indexOf('--mcp-config') + 1]), { mcpServers: {} });
+    assert.equal(args[args.indexOf('--disallowedTools') + 1], 'mcp__*');
+  }
+});
