@@ -59,6 +59,9 @@ test('a wash too thin for half a look cell keeps the cells it touches: no wash o
 test('a cell field the look cannot bring down is refused, never left on the final\'s grid', () => {
   const p = plan([wash('a', 0, 0, 3, 3)]); p.extra = { cover: new Float32Array(W * H) };
   assert.throws(() => shrinkPlan(p, { w: W, h: H }, { w: 4, h: 3, sheetWidthMm: 80 }), /cell field this look cannot bring down \(cover\)/);
+  // the study's shapes are a record on their own stated grid: kept as the final's
+  const s = plan([wash('a', 0, 0, 3, 3)]); s.studyShapes = { pw: W, ph: H, cellMm: 10, label: new Int32Array(W * H) };
+  assert.equal(shrinkPlan(s, { w: W, h: H }, { w: 4, h: 3, sheetWidthMm: 80 }).studyShapes, s.studyShapes);
   const q = plan([wash('a', 0, 0, 3, 3)]); q.instructions.push({ ...q.instructions[0], id: 'orphan' });
   assert.throws(() => shrinkPlan(q, { w: W, h: H }, { w: 4, h: 3, sheetWidthMm: 80 }), /orphan is in the plan's list but in none of its layers/);
 });

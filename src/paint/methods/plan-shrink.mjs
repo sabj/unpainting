@@ -11,6 +11,12 @@ import { passage } from '../../crop/blockin.mjs';
 const SHAPE_OWN = new Set(['ids', 'id', 'box', 'amount', 'area', 'w', '_mask', 'mask', 'graded', '_valuePlan']);
 const fail = what => { throw new Error(`plan shrink: ${what}`); };
 
+/**
+ * Parts of a plan that are a record on a grid of their own, which they state, and are kept as the final's: the study's
+ * flat shapes as the planner read them (study-shapes-out.mjs: pw, ph, cellMm with its labels), written out as data only.
+ */
+const OWN_GRID = new Set(['studyShapes']);
+
 /** The plan's cell fields this module brings down; a grid-sized array anywhere else in a plan is refused, not skipped. */
 const KNOWN = new Set(['ids', 'mask', '_mask', 'graded', 'values', 'bands', 'labels', 'protectedCells']);
 
@@ -96,7 +102,7 @@ function refuseUnknown(plan, N) {
     if (v == null || typeof v !== 'object' || depth > 8) return;
     if (ArrayBuffer.isView(v)) { if (v.length === N && !KNOWN.has(name)) throw new Error(`plan shrink: the plan carries a cell field this look cannot bring down (${name})`); return; }
     if (Array.isArray(v)) { for (const x of v) walk(x, name, depth + 1); return; }
-    for (const [k, x] of Object.entries(v)) walk(x, k, depth + 1);
+    for (const [k, x] of Object.entries(v)) if (!(depth === 0 && OWN_GRID.has(k))) walk(x, k, depth + 1);
   };
   walk(plan, 'plan', 0);
 }
