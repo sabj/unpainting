@@ -12,6 +12,7 @@
     { "key": "hydrogen-m", "name": "Gemini 4 Hydrogen (medium)", "id": "gemini-4-hydrogen-medium", "effort": "medium", "cli": "agy" },
     { "key": "astra-m", "name": "Codex Astra (medium)", "id": "gpt-6-astra", "effort": "medium", "cli": "codex" },
     { "key": "sol-m", "name": "Codex Sol (medium)", "id": "gpt-6.1-sol", "effort": "medium", "cli": "codex" },
+    { "key": "sonnet-m", "name": "Claude Sonnet 5.5 (medium)", "id": "claude-sonnet-5-5", "effort": "medium", "cli": "claude" },
     { "key": "terra-m", "name": "Codex Terra (medium)", "id": "gpt-6.1-terra", "effort": "medium", "cli": "codex" }
   ]
 }
