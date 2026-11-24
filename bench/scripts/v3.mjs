@@ -11,7 +11,7 @@ import { BENCH, RUN_SCHEMA, VERSION_STAMP, V2, readJson, writeJson, validateRun,
 import { turnCommand, usage } from './runners.mjs';
 import { thumb, stageStrip } from './images.mjs';
 import { makeWorktree, keepScripts, runTurn, minutes } from './pipeline/harness.mjs';
-import { closeTurn, closable, probe } from './pipeline/closed.mjs';
+import { closeTurn, closable, probe, guardLog } from './pipeline/closed.mjs';
 
 const V3 = path.join(BENCH, 'v3');
 // The session's clock: 60 minutes (the owner, 23 Nov: "level 1 should be cheap and strict so yeah 60min for now is
@@ -110,7 +110,7 @@ async function session({ model, crop, spec, tries, rawTry, dry }) {
   for (let n = from; n <= tries; n++) {
     const { ws, tmp, scratch, cleanup } = makeWorktree();
     const sessionId = ['claude', 'muse'].includes(model.runner) ? crypto.randomUUID() : null;
-    let stop = false, closed = null;
+    let stop = false, closed = null, log = null;
     try {
       // what the model is shown and what guards its scripts are copied into the attempt's own folder, beside the
       // worktree: under the closed profile nothing of the repository can be read (pipeline/closed.mjs)
@@ -125,22 +125,22 @@ async function session({ model, crop, spec, tries, rawTry, dry }) {
         for (const f of fs.readdirSync(ref, { recursive: true })) { const g = path.join(ref, f); if (fs.statSync(g).isFile()) fs.chmodSync(g, 0o444); }
       }
       const events = path.join(raw, `events-a${n}.jsonl`), stderr = path.join(raw, `stderr-a${n}.log`);
-      // the guard's log of blocked image reads is written by the model's own processes, so it lies in the attempt's
-      // folder (outside the worktree) and is copied to the raw folder when the turn ends
-      const violations = path.join(raw, `a${n}-violations.jsonl`), violationsNow = path.join(tmp, 'guard', 'violations.jsonl'); fs.mkdirSync(path.dirname(violationsNow), { recursive: true });
-      fs.rmSync(violations, { force: true });
-      const env = { BENCH_SEED: '1', BENCH_VIOLATIONS: violationsNow, PYTHONPATH: path.join(tmp, 'pyguard'), BENCH_PYGUARD: path.join(tmp, 'pyguard'), TMPDIR: scratch };
+      // the guard's log of blocked image reads is written by the model's own processes: into a pipe they can only
+      // write to, whose lines are kept in the raw folder, which the session cannot reach (pipeline/closed.mjs guardLog)
+      const violations = path.join(raw, `a${n}-violations.jsonl`);
+      log = guardLog(tmp, violations);
+      const env = { BENCH_SEED: '1', BENCH_VIOLATIONS: log.file, PYTHONPATH: path.join(tmp, 'pyguard'), BENCH_PYGUARD: path.join(tmp, 'pyguard'), TMPDIR: scratch };
       const c = dry ? { cmd: process.execPath, args: ['bench/dry-v3.mjs', crop, String(n)] }
         : turnCommand(model, { ws, raw, text: prompt, images: pictures, sessionId, resume: false, turn: n,
           briefFile: path.join(ws, 'bench', 'BRIEF.md'), crops: [crop], logFile: events, minutes: ATTEMPT_MIN });
       // closed as a level 2 to 4 session is: a seatbelt profile, a network gate, the fixed toolbox, a clean environment;
       // the profile is tried before the model is started
-      closed = await closeTurn(c, { runner: model.runner, tmp, extraEnv: env });
+      closed = await closeTurn(c, { runner: model.runner, tmp, extraEnv: env, rules: log.rules });
       probe(closed, { ownFile: path.join(ws, 'bench', 'BRIEF.md') });
       console.error(`bench:run: ${model.name}, V3, ${crop}, attempt ${n} of up to ${tries}${dry ? ' (dry run)' : ''}, in a fresh worktree and session: ${closed.closed}`);
       const turn = await runTurn(closed, { cwd: ws, env: closed.env, base: {}, piped: true, events, stderr, capMs: ATTEMPT_MIN * 60000 });
       const network = await closed.done(); closed = null;
-      if (fs.existsSync(violationsNow)) fs.copyFileSync(violationsNow, violations);
+      await log.stop();
       const u = dry ? { tokens: null, costUSD: null } : usage(model.runner, events);
       res.tokens += u.tokens || 0; res.costUSD += u.costUSD || 0;
       if (n > 1 && fs.existsSync(path.join(ws, 'bench', 'DONE'))) { res.done = { before: n, reason: fs.readFileSync(path.join(ws, 'bench', 'DONE'), 'utf8').trim().slice(0, 400), min: minutes(turn.seconds) }; stop = true; }
@@ -157,6 +157,7 @@ async function session({ model, crop, spec, tries, rawTry, dry }) {
       }
     } finally {
       if (closed) await closed.done();
+      if (log) await log.stop();   // (a second stop answers as the first did)
       keepScripts(ws, path.join(raw, `scripts-a${n}`), SKIP);
       cleanup();
     }

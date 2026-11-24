@@ -7,7 +7,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
 import { REPO } from './lib.mjs';
-import { closeTurn, closable, probe } from './pipeline/closed.mjs';
+import { closeTurn, closable, probe, guardLog } from './pipeline/closed.mjs';
 import { runTurn } from './pipeline/harness.mjs';
 import { segPythonFor } from '../../tools/paint/run.mjs';
 
@@ -74,4 +74,34 @@ test('a closed claude turn has its own sandbox off, no user settings and no kept
     await assert.rejects(() => closeTurn({ cmd: 'codex', args: [] }, { runner: 'codex', tmp }), /no gate yet/);
     await assert.rejects(() => closeTurn({ cmd: 'x', args: [] }, { runner: 'dry-run', tmp, python: '/no/such/python' }), /toolbox needs its Python/);
   } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
+});
+
+test('the guard\'s log cannot be changed by the session it polices: lines leave its folder as written, and the pipe cannot be removed or replaced', { skip }, async () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'unpaint-bench-')), keep = fs.mkdtempSync(path.join(os.tmpdir(), 'kept-')), kept = path.join(keep, 'a1-violations.jsonl'), ws = path.join(tmp, 'ws');
+  fs.mkdirSync(path.join(ws, 'bench'), { recursive: true }); fs.symlinkSync(path.join(REPO, 'node_modules'), path.join(ws, 'node_modules'));
+  const log = guardLog(tmp, kept);
+  // what a session might try after a blocked read: empty the log, remove it, put a file of its own in its place, move its folder
+  const tries = ['node -e \'require("fs").appendFileSync(process.env.BENCH_VIOLATIONS, JSON.stringify({ kind: "readFileSync", path: "target.png" }) + "\\n")\'',
+    'python3 -c \'import os; f = open(os.environ["BENCH_VIOLATIONS"], "a"); f.write("{\\"kind\\": \\"python.open\\"}\\n"); f.close()\'',
+    ': > "$BENCH_VIOLATIONS"; echo emptied $?', 'rm -f "$BENCH_VIOLATIONS"; echo removed $?', 'echo x > "$(dirname "$BENCH_VIOLATIONS")/other"; echo made $?',
+    'mv "$(dirname "$BENCH_VIOLATIONS")" "$(dirname "$BENCH_VIOLATIONS")-gone"; echo moved $?', 'test -p "$BENCH_VIOLATIONS" && echo still a pipe'].join('\n');
+  const turn = await closeTurn({ cmd: '/bin/sh', args: ['-c', tries] }, { runner: 'dry-run', tmp, extraEnv: { BENCH_VIOLATIONS: log.file }, rules: log.rules, env: { ...process.env, UNPAINT_SESSION_DENY: '' } });
+  try {
+    const r = spawnSync(turn.cmd, turn.args, { cwd: ws, env: turn.env, encoding: 'utf8' });
+    assert.match(r.stdout, /still a pipe/, r.stdout + r.stderr); assert.doesNotMatch(r.stdout, /made 0|moved 0/, r.stdout);
+    const end = await log.stop();
+    assert.deepEqual(end, { intact: true, lines: 2 });
+    assert.deepEqual(fs.readFileSync(kept, 'utf8').trim().split('\n').map(l => JSON.parse(l).kind), ['readFileSync', 'python.open']);
+    assert.ok(!fs.existsSync(path.join(path.dirname(log.file), 'other')));
+  } finally { await turn.done(); await log.stop(); fs.rmSync(tmp, { recursive: true, force: true }); fs.rmSync(keep, { recursive: true, force: true }); }
+});
+
+test('a guard log whose pipe is gone when the turn ends is a violation of its own', { skip }, async () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'unpaint-bench-')), keep = fs.mkdtempSync(path.join(os.tmpdir(), 'kept-')), kept = path.join(keep, 'v.jsonl');
+  const log = guardLog(tmp, kept);
+  try {
+    fs.rmSync(log.file); fs.writeFileSync(log.file, '');   // (done here from outside the profile: a pipe swapped for a file)
+    const end = await log.stop();
+    assert.deepEqual(end, { intact: false, lines: 1 }); assert.equal(JSON.parse(fs.readFileSync(kept, 'utf8')).kind, 'guard-log-replaced');
+  } finally { fs.rmSync(tmp, { recursive: true, force: true }); fs.rmSync(keep, { recursive: true, force: true }); }
 });
