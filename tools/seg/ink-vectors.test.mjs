@@ -5,12 +5,14 @@ import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { segPythonFor } from '../paint/run.mjs';
 import sharp from 'sharp';
 import { rasterizeRings, isFill } from '../../src/paint/methods/ink-vectors.mjs';
 
 // The fitter on a small made drawing, soft as the image model's drawings are (every edge spread over 0.8 px): a thin black
 // line, two bars a narrow gap apart, a blot, a thick branch.
-const root = fileURLToPath(new URL('../../', import.meta.url)), python = path.join(root, '.venv-seg/bin/python');
+// (the segmentation python as the painter finds it: a git worktree without its own uses its main checkout's)
+const root = fileURLToPath(new URL('../../', import.meta.url)), python = segPythonFor(root);
 
 test('ink-vectors.py: a thin line thin and dark, a narrow gap open, a blot a fill, a thick branch a line, nothing drawn across a gap', async () => {
   assert.ok(fs.existsSync(python), `the segmentation Python environment is missing (${python}); run npm run doctor`);

@@ -41,16 +41,37 @@ export function switchesOf(env = process.env) {
 }
 
 /**
+ * The main checkout of the linked git worktree at `root`, wherever the worktree lies: its .git is a file naming the
+ * worktree's git folder, whose `commondir` names the shared one. null in a main checkout and outside git.
+ */
+export function mainCheckoutOf(root, read = f => fs.readFileSync(f, 'utf8')) {
+  let gitDir, common;
+  try { gitDir = /^gitdir: (.+)$/m.exec(read(path.join(root, '.git')))?.[1].trim(); } catch { return null; }   // a folder (a main checkout) or none
+  if (!gitDir) return null;
+  gitDir = path.resolve(root, gitDir);
+  try { common = read(path.join(gitDir, 'commondir')).trim(); } catch { return null; }   // a submodule's git folder has none
+  return path.dirname(path.resolve(gitDir, common));
+}
+
+/**
  * PAINTER_SEG_PYTHON and PAINTER_SAM_CHECKPOINT for the painter when the environment names neither and the checkout
  * has none of its own: a git worktree finds them in its main checkout or a sibling worktree. Nothing is invented: a
  * file that is found nowhere is left for the painter to fail on loudly.
  */
-export function segEnvFor(root, env = process.env, exists = fs.existsSync, siblings = dirs) {
-  const out = {}, near = [root, path.dirname(path.dirname(root)), ...siblings(path.dirname(root))];
+export function segEnvFor(root, env = process.env, exists = fs.existsSync, siblings = dirs, main = mainCheckoutOf) {
+  const out = {}, near = [root, main(root), path.dirname(path.dirname(root)), ...siblings(path.dirname(root))].filter(Boolean);
   const first = rel => near.map(d => path.join(d, rel)).find(exists);
   if (!env.PAINTER_SEG_PYTHON && !exists(path.join(root, '.venv-seg/bin/python'))) { const f = first('.venv-seg/bin/python'); if (f) out.PAINTER_SEG_PYTHON = f; }
   if (!env.PAINTER_SAM_CHECKPOINT && !exists(path.join(root, 'work/models/sam_vit_b_01ec64.pth'))) { const f = first('work/models/sam_vit_b_01ec64.pth'); if (f) out.PAINTER_SAM_CHECKPOINT = f; }
   return out;
+}
+
+/**
+ * The segmentation python for the checkout at `root`: PAINTER_SEG_PYTHON, else the checkout's own .venv-seg, else the one
+ * segEnvFor finds for a worktree. The path may not exist: the caller fails on that loudly.
+ */
+export function segPythonFor(root, env = process.env) {
+  return env.PAINTER_SEG_PYTHON ?? segEnvFor(root, env).PAINTER_SEG_PYTHON ?? path.join(root, '.venv-seg', 'bin', 'python');
 }
 function dirs(d) { try { return fs.readdirSync(d, { withFileTypes: true }).filter(e => e.isDirectory()).map(e => path.join(d, e.name)).sort(); } catch { return []; } }
 

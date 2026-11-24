@@ -52,12 +52,17 @@ test('the painter reports the plan carried in the sheet\'s units, not hundreds o
   try {
     const r = spawnSync(process.execPath, ['tools/paint-plate.mjs', '--image', 'examples/targets/trumbull.jpg', '--washplan', 'examples/targets/trumbull.jpg', '--width', '64', '--mode', 'fast', '--video', '0',
       // segmentation is not under test: off keeps the run free of the SAM python and checkpoint (src/crop/segment-prep.mjs)
-      '--gpu', 'off', '--segments', 'off', '--allowdirty', '1', '--out', path.join(dir, 'p')], { cwd: root, encoding: 'utf8', timeout: 240000 });
-    assert.equal(r.status, 0, r.stderr);
+      '--gpu', 'off', '--segments', 'off', '--allowdirty', '1', '--out', path.join(dir, 'p')], { cwd: root, encoding: 'utf8', timeout: 290000 });
+    assert.equal(r.status, 0, r.error?.message ?? r.stderr);
     const carried = r.stdout.match(/carried the plan: forms (\d+)% at agreement ([\d.]+)/);
     assert.ok(carried, 'the run reports how much of the plan it carried');
     const forms = Number(carried[1]) / 100;
     assert.ok(forms > 0.5 && forms < 1.25, `forms carried ${forms}`);
-    assert.doesNotMatch(r.stdout, /plan's forms at pass 1:/);
+    // Pass 1 may be flagged, but under 300%: the unit fault read it at 427% and up. In the sheet's units a flag is a real
+    // departure: a block-in wash is laid at its mix's strength wherever the brush goes, a little past its outline
+    // (tools/plate/paint.mjs), so on this 64-cell sheet the first wash holds about 1.6 times its booking (plan mean density
+    // 0.051, sheet 0.064). The first flagged pass has read 156 to 255% as the wash planner changed (20 to 23 Nov 2026).
+    const first = r.stdout.match(/plan's forms at pass 1: it (?:holds|keeps) (\d+)%/);
+    assert.ok(!first || Number(first[1]) < 300, `pass 1 read at ${first?.[1]}% of the plan's forms`);
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });

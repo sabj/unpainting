@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { gpuPaints, refuseExtraGpuPaint, gpuPaintCount, cacheDirFor, switchesOf, segEnvFor, collectResults } from './run.mjs';
+import { gpuPaints, refuseExtraGpuPaint, gpuPaintCount, cacheDirFor, switchesOf, segEnvFor, mainCheckoutOf, segPythonFor, collectResults } from './run.mjs';
 
 const PS = ` 101 node --max-old-space-size=18432 tools/paint-plate.mjs --gpu on --image a.png
  102 /opt/bin/node tools/paint-plate.mjs --image b.png
@@ -31,6 +31,21 @@ test('segmentation is found in the main checkout or a sibling when the worktree 
   assert.deepEqual(env, { PAINTER_SEG_PYTHON: '/repo/.venv-seg/bin/python', PAINTER_SAM_CHECKPOINT: '/repo/work/other/work/models/sam_vit_b_01ec64.pth' });
   assert.deepEqual(segEnvFor(root, { PAINTER_SEG_PYTHON: '/p', PAINTER_SAM_CHECKPOINT: '/c' }, f => has.has(f), () => []), {});
   assert.deepEqual(segEnvFor(root, {}, () => false, () => []), {});
+});
+
+test('a worktree at any depth finds its main checkout through git, and segmentation there', () => {
+  const root = '/repo/.claude/worktrees/fix', files = { '/repo/.claude/worktrees/fix/.git': 'gitdir: /repo/.git/worktrees/fix\n', '/repo/.git/worktrees/fix/commondir': '../..\n' };
+  const read = f => { if (!(f in files)) throw new Error(`no ${f}`); return files[f]; };
+  assert.equal(mainCheckoutOf(root, read), '/repo');
+  assert.equal(mainCheckoutOf('/repo', read), null, 'a main checkout, whose .git is a folder');
+  const has = new Set(['/repo/.venv-seg/bin/python']);
+  assert.deepEqual(segEnvFor(root, {}, f => has.has(f), () => [], r => mainCheckoutOf(r, read)), { PAINTER_SEG_PYTHON: '/repo/.venv-seg/bin/python' });
+  assert.deepEqual(segEnvFor(root, {}, () => false, () => [], r => mainCheckoutOf(r, read)), {});
+});
+
+test('the segmentation python: the environment\'s, else the checkout\'s own place when none is found', () => {
+  assert.equal(segPythonFor('/nowhere/at/all', { PAINTER_SEG_PYTHON: '/p' }), '/p');
+  assert.equal(segPythonFor('/nowhere/at/all', {}), '/nowhere/at/all/.venv-seg/bin/python');
 });
 
 test('what a run folder holds is read back: a plan, a finished painting, an unfinished one', () => {
