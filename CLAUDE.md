@@ -1,7 +1,8 @@
 # Unpainting Repository Guide
 
 ## Core Rules
-- Single trunk: branch from `integration/0.2` and merge back the same day once tests and `npx knip` pass.
+- Trunk and candidates: `main` is the released trunk; 0.4 is not merged to it yet. A release candidate is a branch `claude/04-rcN`, tagged `v0.4.0-rc.N` when frozen. Find the newest with `git branch --list 'claude/04-rc*'` and `git tag --list 'v0.4.0-rc.*'`, and branch from it.
+- Merge back to the candidate only once tests and `npx knip` pass. Nothing is pushed, tagged or merged to the trunk without the owner's yes.
 - No silent fallbacks: missing Python environments, SAM checkpoints, line files, or GPU errors must fail the run loudly.
 - Run `npm run doctor` before benchmark or canary runs to verify clean git state, line and segmentation Python environments, SAM checkpoint, and the 20 GiB free disk floor.
 - Target guard: never read target pixels during the paint step or add per-subject IDs or hand-placed boxes in painting code.
