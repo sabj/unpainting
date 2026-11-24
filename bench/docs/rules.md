@@ -4,7 +4,7 @@ Updated 23 November 2026 for 0.4 rc7. The 15-minute and 85-minute rules of round
 
 ## The task
 
-Paint the subject as a person with a brush and pen would, through the simulator. The model sees the subject as an image and may look at it again with its own image tool.
+Paint the subject as a person with a brush and pen would, through the simulator. The model sees the subject as an image and may look at it again with its own image tool. Pictures are for looking at, never for code.
 
 ## What a model may change
 
@@ -33,11 +33,11 @@ More freedom than before, and mistakes are allowed.
 - The model has a shell in its own folder and may write and run any code it likes.
 - It cannot reach outside its folder. The one exception is the model tool's own sign-in, which the owner accepted for the first run on his machine. The container for replication is planned, not in 0.4's first run.
 - The shell has no internet and one fixed, pre-installed toolbox, the same for every model. Only the model tool itself reaches its own provider, through a gate on the machine that passes the provider's hosts and refuses every other. Installs fail. Each attempt is recorded.
-- The model may not read the subject's pixels with code. See [anti-cheat](anti-cheat.md).
+- The model may not read the subject's pixels with code. At L2 to L4 the pictures (the subject, the three studies, a retry's own earlier painting, a look's `beside.png` and `stages.png`) can be read by the model tool's own image viewer only: any other program is refused them. The data each level gives (the drawing's lines, the named forms, at L4 the studies' traced shapes) and the model's own dried sheet alone (`looks/N/sheet.png`) are its to read with code. See [anti-cheat](anti-cheat.md#levels-2-to-4-eyes-only).
 
 ## Budgets: measured, not limited
 
-- Looks A look has a fixed price by size, whatever is in it: a half-size look of the whole sheet 0.3, full size 1.0, a look stopped at a stage or of a region its share of that (the share of the plan's washes or passages it paints), never under 0.2. At L2 to L4 a look is painted at half size; at L1 each run of the script is a full-size painting (1.0). The budget for one try is 3.0 at every level. At L2 to L4 the full-size final is not charged; at L1 the painting is its last completed run. How a model paints is never charged: water, strokes, waits and dryings are free; simulation work (cell-steps), sweeps, dryings, seconds, tokens (fresh, cached, output) and steps are recorded in `usage.json` beside the charge. One guard only, as resource management: a painting whose water steps pass ten times those of Auto's painting of the subject is stopped with a plain message, reported as a stop and not scored. The model chooses where and when to look: to a stage, or in a region.
+- Looks A look has a fixed price by size, whatever is in it: a half-size look of the whole sheet 0.3, full size 1.0, a look stopped at a stage or of a region its share of that (the share of the plan's washes or passages it paints), never under 0.2. At L2 to L4 a look is painted at half size; at L1 each run of the script is a full-size painting (1.0). The budget for one try is 3.0 at every level. At L2 to L4 a showing of the original comes from the same budget: the pictures lie in the folder when the session starts, are put away at each plan or look, and `./unpaint show` brings one back, the original for 0.05 (twenty glances are one unit), a study or an earlier painting for nothing; every showing is recorded. At L2 to L4 the full-size final is not charged; at L1 the painting is its last completed run. How a model paints is never charged: water, strokes, waits and dryings are free; simulation work (cell-steps), sweeps, dryings, seconds, tokens (fresh, cached, output) and steps are recorded in `usage.json` beside the charge. One guard only, as resource management: a painting whose water steps pass ten times those of Auto's painting of the subject is stopped with a plain message, reported as a stop and not scored. The model chooses where and when to look: to a stage, or in a region.
 - L1: one attempt; the budget is 3 runs of its script (each run that lays a mark costs 1.0; a fourth is refused before it lays a mark). No limit on strokes. Its clock is the same six-hour safety stop (`BENCH_V3_ATTEMPT_MIN` states a shorter one for a trial; the brief tells the model the limit in force). A level 1 target without its rendering unit has no runaway guard and is not run.
 - Steps (1,000) and the clock (six hours) are runaway guards only. A return to a choice the model had left is counted, and refused past 20 (`--reverts`). The harness records the actual terms in each run's record.
 - Not counted on the model's clock: the prepared inputs, the filmed full-size final, and judging.
@@ -52,7 +52,7 @@ More freedom than before, and mistakes are allowed.
 
 ## Disqualification
 
-A try is disqualified only for reading the subject's pixels with code. A high anti-cheat reading is not a disqualification; see [anti-cheat](anti-cheat.md).
+A try is disqualified only for reading the subject's pixels with code: at L1 a read the kit's guard blocked, or a script that names the target files; at L2 to L4 a read of a picture the sandbox refused, or a script that names a picture. A disqualified L2 to L4 session is recorded and kept, and nothing of it is painted. A high anti-cheat reading is not a disqualification; see [anti-cheat](anti-cheat.md).
 
 ## History
 

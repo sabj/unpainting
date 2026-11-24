@@ -1,15 +1,26 @@
 # Anti-cheat
 
-Updated 22 November 2026. In 0.4 the anti-cheat reading is kept beside the scores as a reference. It never changes a score. The sandbox is also closed: the model's shell has no internet, one fixed toolbox, and no way to read outside its own folder, and attempts are recorded. The look counts and the 100-look hard mode below are history from rounds V1 to V5.
+Updated 23 November 2026. In 0.4 the anti-cheat reading is kept beside the scores as a reference. It never changes a score. The sandbox is also closed: the model's shell has no internet, one fixed toolbox, and no way to read outside its own folder, and attempts are recorded. The look counts and the 100-look hard mode below are history from rounds V1 to V5.
 
 Cheating here means hill-climbing toward the photo: repeatedly changing strokes to reduce image error. This includes fitting strokes pixel by pixel or keeping a stroke only when it improves the match.
 
 - Models can look at the target and at their own painting as often as they like, the way a painter glances at a reference.
 - Their code may not read the target's pixels. Node scripts that import the painting toolkit given to models or the guard (a check that blocks image reads), and Python scripts started with the benchmark runner's environment, block and log image reads. Separate Node processes are not automatically guarded. A blocked read disqualifies the run.
 - Every painting also gets a cheat-risk score: how closely its fine detail copies the photo, whether its stages go light to dark and broad to fine like a person's would, and how much of it is tiny strokes.
-- In 0.4 a look has a fixed price by size, from a budget of 3.0 a try; how a model paints is measured, not limited ([rules](rules.md#budgets-measured-not-limited)). No look shows the target.
+- In 0.4 a look has a fixed price by size, from a budget of 3.0 a try; how a model paints is measured, not limited ([rules](rules.md#budgets-measured-not-limited)). A look shows the dried sheet beside the subject, as pictures to look at only.
 - Retries are self-study: a model gets no score and no critique, and its last try counts, not its best ([levels](levels.md#retries-are-self-study)). That removes the main route to hill climbing across tries.
 - Gentle mode applies these checks. Hard mode, with a look budget, is history (see the end of this page).
+
+## Levels 2 to 4: eyes only
+
+The rule of the older rounds, in the 0.4 session (`tools/paint/eyes-only.mjs`).
+
+- Pictures, for looking at only: `inputs/source.png` (the subject), `inputs/study-1.png` to `study-3.png`, every picture of a retry's own earlier painting (`previous/`), and each look's `beside.png` and `stages.png`, which show the subject.
+- Data, readable by any script: `inputs/forms.json`, `inputs/forms-ids.png`, `inputs/forms.png`, `inputs/drawing.png`, `drawing/lines.json`, `drawing/all-lines.png`, at L4 `resources/shapes.json`, each look's `numbers.txt`, `plan.json`, `plan.png` and `sheet.png` (the model's own dried sheet alone, as its own frames were readable in the older rounds), and the model's own files.
+- Refused: the session's sandbox lets only the model tool's own program read a picture's bytes. A script, `cat`, a copy, a link or a move is refused, and the folders that hold pictures cannot be written from inside the session. The profile is tried before a session starts; a tool whose sandbox cannot hold the pictures is not started.
+- Detected: after the session its transcript and scripts are read. A read the system refused, or a script that names a picture, disqualifies the try (`session.guard` and `session.cheat` in `run.json` and `usage.json`, in level 1's terms). Another shell command that names a picture is recorded, not a disqualification.
+- Counted: the input pictures lie in the folder when the session starts and are put away at each plan or look. `./unpaint show FILE` brings one back. Each showing is recorded (which picture, when); the original costs 0.05 of the 3.0 look units, the others nothing.
+- Not held: a model tool that could be made to run a script inside its own program would read a picture as its viewer does (the claude command was tried and does not; agy and codex were not tried). Whether each tool's viewer opens a picture under the rule is shown by the preflight (`npm run paint -- SUBJECT preflight --author MODEL`), which runs under the same rule. A look's `beside.png` shows the subject for as long as the session lasts, at no further price.
 
 ## Gentle mode
 
