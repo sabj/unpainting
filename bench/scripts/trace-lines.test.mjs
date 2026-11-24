@@ -65,8 +65,10 @@ test('trace-ink draws a long line crossed by others as long lines, not fragments
 
 test('the join finds its candidates near each other: thousands of pieces join quickly, in the same order', () => {
   const many = []; for (let k = 0; k < 1500; k++) many.push([[k * 7, 0], [k * 7 + 5, 0]]);
-  const t0 = Date.now(), out = joinPieces(many, { gap: 4 });
+  // "quickly" is counted, not timed (a busy machine took 21.5 s over a 20 s limit): each of the n searches looks only at
+  // the ends binned near each end, 1.25 n^2 pairs in all here; every end against every other would be 1333 n^2
+  const n = many.length, work = { candidates: 0 }, out = joinPieces(many, { gap: 4, work });
   assert.equal(out.length, 1);
   assert.deepEqual(out[0][0], [0, 0]);
-  assert.ok(Date.now() - t0 < 20000, `${Date.now() - t0} ms`);
+  assert.ok(work.candidates <= 4 * n * n, `${work.candidates} pairs of ends looked at for ${n} pieces (${(work.candidates / n / n).toFixed(1)} n^2)`);
 });
