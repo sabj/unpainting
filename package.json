@@ -9,6 +9,7 @@
   },
   "scripts": {
     "test": "node --test --test-timeout=300000 \"src/**/*.test.mjs\" \"tools/**/*.test.mjs\"",
+    "unpaint": "node tools/unpaint.mjs",
     "paint": "node tools/paint/cli.mjs",
     "example": "node tools/run-plan.mjs examples/plans/graded-wash.json",
     "example:portrait": "node tools/paint-plate.mjs --image examples/targets/sargent-a-tramp.jpg --washplan examples/studies/sargent-a-tramp-study.png --drawing none --width 360 --mode fast --out work/sargent-a-tramp",

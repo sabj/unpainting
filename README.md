@@ -7,9 +7,9 @@
 * You can stop or rewind a painting anywhere between blank paper and the finished sheet. At every point it should look as if a person painted it, in the stroke order as well as the pixels.
 * It unmakes paintings rather than making them from photos. Start with a watercolor or ink-and-wash image.
 
-<p align="center"><img src="docs/img/hero-trumbull.webp" alt="Trumbull College: original photo, stylized target, and the painting building from blank paper to the finished painting"></p>
+<p align="center"><img src="docs/img/hero-rosewalk.webp" alt="Yale Rosewalk: original photo, stylized target, and the painting building from blank paper through ink drawing and washes to the finished painting"></p>
 
-<p align="center">Trumbull College.</p>
+<p align="center">Yale Rosewalk.</p>
 
 Try the [quick start](#try-it), paint by hand in [Paint Lab](https://sabj.github.io/unpainting/demos/lab/), watch mushrooms paint themselves in [Spore Studies](https://sabj.github.io/unpainting/demos/fungi/), or take a painting apart [layer by layer](https://sabj.github.io/unpainting/demos/layers/). The code and docs are AI-written.
 
@@ -64,6 +64,31 @@ npm run example:portrait    # Sargent, A Tramp: study only
 - Python 3 for tracing a drawing, SAM segmentation and scoring ([bench/scorer/requirements.txt](bench/scorer/requirements.txt)).
 - WebGPU uses a local or cloud GPU when available and falls back to the CPU when `--gpu auto` is set.
 
+### One CLI for jobs and benchmarks
+
+`npm run unpaint -- <command>` wraps painting jobs, Auto preparation, cloud GPU pods, benchmark runs, status checks, and scoring in one entry point (dry-run by default for benchmark launches):
+
+```sh
+npm run unpaint -- --help
+
+# Paint or plan a subject
+npm run unpaint -- paint mittens-closeup-qs plan
+
+# Prepare Auto plans, traced shapes, and Auto paintings once per commit (local or pooled)
+npm run unpaint -- prepare core --pool local --jobs 3 --dry-run
+
+# Inspect or control cloud GPU pods (optional; Mac mini works without pods)
+npm run unpaint -- pods status
+npm run unpaint -- pods dry-run
+
+# Plan a full benchmark run (prints every session; add --start to launch, --with-pods to start the pod renter)
+npm run unpaint -- benchmark --out work/bench-04 --set core
+
+# Check pool + run progress, then refresh the manifest and score finished paintings
+npm run unpaint -- status work/bench-04
+npm run unpaint -- score work/bench-04 --manifest-only
+```
+
 ## Time and memory
 
 On a Mac mini (M4, 16 GB) a full-size Auto painting with film (Mittens, 1,086 x 1,448 cells) takes 13 minutes and peaks at 11 GB; a half-size look takes 4 to 7. A rented RTX 4090 pod takes 30 minutes for the same painting (planning runs on its CPU); pods are for many paintings at once. Studies for a new picture need about 100 GB of memory for an hour; shipped pictures come with theirs.
@@ -74,18 +99,18 @@ On a Mac mini (M4, 16 GB) a full-size Auto painting with film (Mittens, 1,086 x 
 
 Fifteen works in four museum groups of three (figural, architectural, landscape, abstract or loose) and a bonus group of three generated pictures ([bench/PICTURES.md](bench/PICTURES.md)). Five core pictures run Auto and levels 1 to 4; the other ten run Auto and level 2.
 
-Every level is one try that hands in the model's own painting script, with a budget of 3.0 look units:
+Every level is one fresh, independent session (all levels and pictures can run at once) that hands in the model's own painting script, with the anti-cheat guard on (code may not read the original's pixels), no judge feedback, a 3.0 look-unit budget, and a 60-minute clock:
 
-- L1: the freehand kit (`bench/kit.mjs`), its technique guides and worked examples. 3 runs of its script, 1.0 unit each.
-- L2: the inputs the code planner gets (prepared drawing, three colour studies, named forms). No code plan.
-- L3: one retry of L2 after self-study of its own painting, film and stroke map.
-- L4: one retry of L3 the same way, plus the studies' traced shapes as regions it may use, change or ignore.
+- **L1** (fixed rounds): the picture, the script format, and painting tips.
+- **L2** (fixed rounds): adds the prepared drawing, colour studies, named forms, and the studies' traced shapes (nothing of Auto).
+- **L3** (fixed rounds): adds Auto's plan (in numbers, to read) and Auto's finished painting, to improve on.
+- **L4** (open session with tools): L3's inputs in a sandboxed workspace with a shell, Python toolbox, and painter commands — same tools and budget for every model family.
 
-Nothing of Auto is given at any level; handing in planner settings or the code's plan is refused.
+Handing in planner settings or Auto's plan as a choice is refused at every level.
 
 - Drawing: pencil, pen (waterproof or soluble) or none, the model's choice.
 - Sheet: a quarter sheet (27.9 × 38.1 cm, 0.26 mm a cell) in the picture's proportions.
-- Looks: 0.3 for a half-size whole look, 1.0 full-size, partial looks their share, minimum 0.2; the final render is free. How a model paints is free and recorded. Water steps over 10× Auto's, 1,000 tool steps and a 6-hour clock only stop a runaway.
+- Looks: 0.3 for a half-size whole look, 1.0 full-size, partial looks (by stage or region) their share, minimum 0.05; the final render is free. How a model paints is free and recorded. Water steps over 10× Auto's and 1,000 tool steps only stop a runaway.
 - Scores: an open-weight panel (GLM-5.3-Flash, Qwen3.8-27B, Gemma-4-31B) scores human-ness from the film (the paper as context, the drawing before the first wash scored beside, then 10 frames from the first wash to the finished sheet) and quality against the original. Combined weights human-ness 2:1 over quality.
 
 <p align="center"><a href="docs/auto-vs-model.md"><img src="docs/img/auto-vs-model-auto-cut.webp" width="720" alt="Mittens: a study, the outline of every wash Auto cuts from it, and a close up of the head"></a></p>
