@@ -1,42 +1,32 @@
 # Honesty
 
-The guard is a check that blocks target-pixel reads during painting. It separates planning from painting. It is on by default.
+The target guard blocks target-pixel reads during painting, separating planning from execution. It is on by default.
 
 ## Rules
 
-- Read the target while planning. Choose stroke paths and paint mixtures before painting.
-- During painting, compare whole shapes and values. Do not read target pixels, choose a stroke's paint load from per-cell errors, or keep a stroke because it reduces pixel error.
-- Mix brush colors from the 16 palette paints in `src/crop/box.mjs`.
+- Read the target while planning; choose stroke paths and paint mixtures before painting starts.
+- During painting, compare only whole shapes (`>= 64` cells). Never read target pixels, set a stroke's load from per-cell errors, or hill-climb strokes against pixel error.
+- Mix brush colours from the 16 palette paints in `src/crop/box.mjs`.
 - Keep guard and stage records beside the painting.
 
 ## Modes
 
 | Mode | Target-pixel reads | Gallery |
 |---|---|---|
-| `gentle` (default) | blocked; whole-shape looks of at least 64 cells allowed | eligible |
-| `hard` | as gentle, with a budget of looks (`--lookbudget N`, default 100) | eligible |
-| `warn` | recorded, not blocked | excluded |
-| `off` | no guard | excluded |
+| `gentle` (default, alias `strict`) | Blocked; whole-shape looks (`>= 64` cells) allowed | Eligible |
+| `hard` | As `gentle`, capped at `--lookbudget N` looks (default 100) | Eligible |
+| `warn` | Recorded, not blocked | Excluded |
+| `off` | No guard | Excluded |
 
-`strict` is an alias for `gentle`.
-
-The painter blocks reads of the target image and its per-cell maps when painting starts. A cell is one square of the simulation grid. A blocked read is recorded and stops the run. Every map made from the target is sealed, in default and strict runs alike: the target and the value plan (`tools/plate/pen.mjs`) and the rest (`tools/guard/seal-maps.mjs`: the separator, the source pixels, edge, high-pass and drag maps). A raw target map still handed on at that point is refused.
-
-## Gentle against hard
-
-Gentle is the default. It allows unlimited shape-level comparisons, which use mean color over a whole shape. It blocks and records every cell-level read of the target. Hard does the same and adds a budget of 100 looks per painting. A look past the budget returns nothing and is counted as refused.
-
-Each run writes its look counts and refusals to `target-guard.json`. Compare modes with the same revision, target, arguments and backend, and keep both run records.
+When painting starts (`TARGET_GUARD.beginPaint()` in `tools/plate/drawing.mjs`), the painter seals the target image and every per-cell map derived from it (`tools/guard/seal-maps.mjs`, `tools/guard/no-target.mjs`). Any cell-level read is recorded and stops the run.
 
 ## Records and checks
 
-| File | Contents | Read it for |
-|---|---|---|
-| `target-guard.json` | mode, shape looks, refusals, blocked reads, and a `painted` / `copied` / `unguarded` category | whether the run followed the rules |
-| `cheat-risk.json` | stage progression, fine-detail copy correlation, small-stroke share, audit result | whether the result needs a closer look |
-| `stages/strip.jpg` | saved stages | a human review of the process |
-
-A high risk score calls for review. Weak technique can raise it without cheating. The [gallery](examples.md) requires paintings with guard records and excludes unresolved flagged benchmark runs.
+| File | Contents |
+|---|---|
+| `target-guard.json` | Guard mode, shape looks, refusals, blocked reads and `painted` / `copied` / `unguarded` verdict |
+| `cheat-risk.json` | Stage progression, fine-detail copy correlation (`hfCorr`), small-stroke share and audit result |
+| `stages/strip.jpg` | Saved stage progression strip |
 
 ```sh
 node tools/guard/promote-check.mjs work/my-picture
@@ -44,14 +34,8 @@ node tools/guard/cheat-test.mjs
 node tools/guard/lint-target-use.mjs
 ```
 
-The promotion check requires a guarded run, no target reads and a risk score. High scores pass with `review: true`. The deliberate-cheat test checks four blocked image-read routes. The source lint checks hill-climbing patterns and target reads in the paint step (from `TARGET_GUARD.beginPaint()` in `tools/plate/drawing.mjs` through `paint.mjs` to the end of painting in `finish.mjs`); `npm test` runs it on the tree. Reviewed exceptions are in `tools/guard/target-use-allow.json`; the three paint-step reads listed there are opt-in paths the guard blocks at run time.
+- `promote-check.mjs`: verifies a guarded run has zero target-pixel reads and a recorded risk score.
+- `cheat-test.mjs`: verifies four deliberate image-read routes are blocked.
+- `lint-target-use.mjs`: static check for hill-climbing patterns and paint-step target reads (run by `npm test`; reviewed exceptions live in `tools/guard/target-use-allow.json`).
 
-## Limits
-
-- Overlapping shape looks could recover finer detail. Gentle mode does not detect that; hard mode limits looks.
-- The painter guard covers its own process. External agents must follow the same rules. The [benchmark guard](../bench/docs/anti-cheat.md) covers Node scripts that import the guard or painting toolkit given to models. The benchmark runner configures Python scripts through `PYTHONPATH`; separate Node processes are not automatically guarded.
-- A detailed plan can carry target edges into every stroke. Zero blocked reads does not prove good technique. The image painter's washes come from block-in studies and its line from a drawing file. Plans still need visual review. `npm run example` uses the bundled stroke plan.
-- The guard blocks experimental flags that read the target. Ink color comes from `--inkprofile`, `--inkk` and `--inkkscale`, not `--inkcolour`. White gouache is a pigment on the sheet, laid in the finish from lights found in the planning data; the older `--smalllights gouache` overlay is applied outside the pigment model and is off.
-- Some [diagnostic measures](judging.md) compare pixels. Do not use them to steer painting.
-
-Results that steered strokes from target pixels are not published. The [painting sequences](examples.md) passed the painter guard. Benchmark paintings used the benchmark's own guard; see its [anti-cheat rules](../bench/docs/anti-cheat.md).
+For the benchmark's runtime guard and cheat-risk formula, see [bench/docs/scoring.md](../bench/docs/scoring.md#anti-cheat).

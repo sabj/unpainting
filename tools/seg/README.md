@@ -64,4 +64,4 @@ u2net takes about 0.7 seconds per image on CPU. The masks are independent of obj
 
 Model licences are listed in [THIRD_PARTY_NOTICES.md](../../THIRD_PARTY_NOTICES.md).
 
-The painter's own line extraction from the subject was removed in 0.4 ([Running the painter](../../docs/running.md#removed-in-04)).
+The painter's own line extraction from the subject was removed in 0.4 ([Running the painter](../../docs/running.md)).

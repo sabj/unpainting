@@ -12,4 +12,4 @@ Generic watercolor methods. A wash is a layer of diluted paint; a glaze is a tra
 node --test src/paint/methods/*.test.mjs
 ```
 
-[techniques.md](../../../docs/techniques.md) indexes the modules here.
+[How it paints](../../../docs/how-it-paints.md) indexes the modules here.

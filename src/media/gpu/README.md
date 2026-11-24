@@ -10,4 +10,4 @@ The WebGPU backend for the sheet in `src/media/sheet.mjs`. It keeps the sheet on
 
 `node tools/paint-plate.mjs` uses the GPU by default when an adapter is present (`--gpu auto|on|off`) and prints `sheet backend: gpu` or `cpu`. CPU and GPU runs are each repeatable, but they differ from each other.
 
-Check the GPU backend against the CPU sheet with `node --test src/media/gpu-backend.test.mjs`. The benchmarks and checks are in [tools/gpu/](../../../tools/gpu/). [Cloud rendering](../../../docs/CLOUD.md) covers GPU machines.
+Check the GPU backend against the CPU sheet with `node --test src/media/gpu-backend.test.mjs`. The benchmarks and checks are in [tools/gpu/](../../../tools/gpu/). [Running the painter](../../../docs/running.md#cloud-rendering) covers GPU machines.

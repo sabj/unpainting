@@ -1,11 +1,8 @@
-# The benchmark's pictures
+# Benchmark pictures
 
-The 0.4 benchmark paints fifteen pictures: four groups of three museum works, and a bonus group of three pictures
-made with an image generator. Five are the core, one from each group; all fifteen are the extended set.
-[README](README.md#the-pictures) says what each set runs.
+The 0.4 benchmark paints fifteen pictures: four groups of three museum works and a bonus group of three pictures made with an image generator. Five form the core (one per group); all fifteen form the extended set ([README](README.md#pictures)).
 
-Museum records were read on 23 November 2026. The medium, size and credit line are the museum's words. The same
-credits, with the files in the repository, are in [NOTICE](../NOTICE) sections 5 and 6.
+Museum records were read on 23 November 2026. Medium, size and credit lines use each museum's words; see [NOTICE](../NOTICE) sections 5 and 6.
 
 ## Museum works
 
@@ -24,17 +21,14 @@ credits, with the files in the repository, are in [NOTICE](../NOTICE) sections 5
 | Abstract or loose | Extended | Berthe Morisot, A Woman Seated at a Bench on the Avenue du Bois, 1885 | The Metropolitan Museum of Art (48.10.8) | Watercolor over traces of graphite | sheet: 20 x 28 cm | Public domain (Open Access, CC0) | Harris Brisbane Dick Fund, 1948 | [Met 337864](https://www.metmuseum.org/art/collection/search/337864) · [our file, Commons, CC0](https://commons.wikimedia.org/wiki/File:A_Woman_Seated_at_a_Bench_on_the_Avenue_du_Bois_MET_DP807732.jpg) |
 | Abstract or loose | Extended | Paul Cézanne, Bathers Under a Bridge (recto); Study after Houdon's Ecorché (verso), 1900–06 (recto); the recto is painted | The Metropolitan Museum of Art (55.21.2) | Watercolor over graphite (recto); graphite (verso) | Sheet: 21 x 27.2 cm | Public domain (Open Access, CC0) | Maria DeWitt Jesup Fund, 1951; acquired from The Museum of Modern Art, Lillie P. Bliss Collection | [Met 334173](https://www.metmuseum.org/art/collection/search/334173) · [our file, Commons, CC0 and PD-Art](https://commons.wikimedia.org/wiki/File:Bathers_by_a_Bridge_(recto);_Study_after_Houdon%27s_Ecorch%C3%A9_(verso)_MET_DP805572.jpg) |
 
-- Art Institute of Chicago: the record marks the work public domain, and the museum releases such images under
-  [CC0](https://www.artic.edu/open-access/open-access-images).
-- The Met: the record marks the work public domain; [Open Access](https://www.metmuseum.org/hubs/open-access) images
-  are CC0. Our files are the Met's own files as donated to Wikimedia Commons.
-- The National Gallery's and the Brooklyn Museum's pages refuse scripts; both were read by hand on 23 November 2026.
-- Manet's Morisot with a Fan is painted as a detail. Every other picture is the whole sheet.
+- Art Institute of Chicago public-domain works are released under [CC0](https://www.artic.edu/open-access/open-access-images).
+- Metropolitan Museum of Art public-domain works are released under [Open Access CC0](https://www.metmuseum.org/hubs/open-access); our files come from the Met's Wikimedia Commons donations.
+- National Gallery of Art and Brooklyn Museum records were read by hand on 23 November 2026.
+- Manet's *Morisot with a Fan* is painted as a detail; every other picture is the whole sheet.
 
-## Bonus group: made with an image generator
+## Bonus group: generated pictures
 
-Each started from a photograph and was modified with an image generator. There is no museum original; the nominal size
-is what the model is told.
+Each started from a photograph and was stylized with an image generator. Nominal sizes are given to the model.
 
 | Set | Picture | Source photograph | Modified with an image generator | Size | Rights | File |
 |---|---|---|---|---|---|---|
@@ -76,11 +70,8 @@ Made with an image generator:
 
 ## Private set
 
-Beach and Overlook: photographs by Sam Jackson, modified with an image generator (Nano Banana, Google, or the image generator in Codex, OpenAI; which one was not recorded for this picture).
-Not distributed.
+Beach and Overlook: photographs by Sam Jackson, modified with an image generator (Nano Banana, Google, or the image generator in Codex, OpenAI; which one was not recorded for this picture). Not distributed.
 
 ## Earlier benchmarks
 
-Rounds V1 to V5 painted five small targets: Hills, France, Ships, Mittens and Trumbull ([sizes](crops/README.md)).
-Ships is Sargent's White Ships, carried into 0.4 at a larger size. Trumbull and the first Mittens are optional.
-Hills and France are in no 0.4 set. Their targets, paintings and scores stay in the repository.
+Rounds V1 to V5 painted five small targets: Hills, France, Ships, Mittens and Trumbull ([sizes](crops/README.md)). Ships is Sargent's *White Ships*, carried into 0.4 at full size. Trumbull and the first Mittens are optional; Hills and France are in no 0.4 set, though their historical files and scores remain in the repository.

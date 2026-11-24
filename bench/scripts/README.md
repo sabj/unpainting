@@ -17,5 +17,5 @@ Try the benchmark runner without provider API keys:
 npm run bench:run -- --dry-run
 ```
 
-[bench/README.md](../README.md) lists the rounds and docs. [Adding a model](../docs/adding-a-model.md) walks through a new run.
+[bench/README.md](../README.md) lists the rounds, docs and how to add a model.
 

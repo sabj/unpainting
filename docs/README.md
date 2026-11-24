@@ -1,34 +1,28 @@
-# unpainting docs
+# Documentation
 
-The [project README](../README.md) has the quick start. The [0.3.0 release notes](../CHANGELOG.md#030--2026-11-07) show measured runtime changes and visual comparisons, followed by implementation details.
+Start with the [project README](../README.md) or [Running the painter](running.md).
 
-## Use it
+## Running
 
-- [Running the painter](running.md): commands, outputs, tests and Paint Lab
-- [Painting sequences](examples.md): recorded paintings, stage by stage
-- [Cloud rendering](CLOUD.md): optional batch rendering on rented machines
-- [Versions](versions.md): releases, painter and sim versions, tags, and how to benchmark a newer painter or sim
+- [Running the painter](running.md): examples, painting your own image, `npm run paint`, CLI flags, tests, Paint Lab and cloud rendering.
 
 ## How it paints
 
-- [How it paints](how-it-paints.md): the pipeline contract, stage by stage from subject to finished plate
-  - [Pigments and paper](pigments-and-paper.md): pigment optics and layers, the paint box, water and drying
-  - [Ink](ink.md): the dip pen, pencil, the drawing file and drawing order
-  - [Brush and wash techniques](techniques/README.md): each wash, lifting and line technique and its code
-- [Methods, techniques and tuned settings](techniques.md): an index of the modules and recipe flags
-- [Plan format](plan-format.md): the JSON stroke plan, line files and the V6 draft plan
-- [Painting script](painting-script.md): how a model writes passages (shape, paint, brush, paper, strokes), with a real passage
+- [How it paints](how-it-paints.md): the stage-by-stage pipeline contract, recipe flags and techniques.
+- [Pigments and paper](pigments-and-paper.md): Kubelka-Munk layering, the 16-pigment box, cold-press paper relief and drying.
+- [Ink](ink.md): dip-pen physics, pencil and ink drawing stages, `--inkrecipe wash` and drawing order.
 
-## Checking the work
+## Scripts and plans
 
-- [Judging](judging.md): repeatable image measurements, stage checks and AI image judges
-- [How Auto paints, and how a model's script differs](auto-vs-model.md): Auto's method on one cat, step by step, and how a model's own script differs in kind
-- [Honesty](honesty.md): the check that blocks target-pixel reads, and its records
-- The benchmark has its own docs in [bench/](../bench/README.md)
+- [Auto vs model script](auto-vs-model.md): how the code planner ("Auto") cuts washes from studies on Mittens, and how a model's script differs.
+- [Painting script](painting-script.md): the `painting-script 2` format models write, with a real passage.
+- [Plan format](plan-format.md): low-level JSON stroke plans (`tools/run-plan.mjs`), line files and value plans.
 
-## Background
+## Judging and benchmark
 
-- [Prior work and credits](reading-list.md): the papers and projects the painter builds on
-- [Open problems](future-ideas.md): untested ideas and known defects
+- [Judging](judging.md): repeatable image measurements, stage checks, stroke-size gates and blind vision-judge rounds.
+- [Honesty](honesty.md): the runtime guard that blocks target-pixel reads during painting.
+- [Benchmark](../bench/README.md): pictures, L1–L4 ladder, budgets, replication and [scoring](../bench/docs/scoring.md).
+- [Reading list](reading-list.md): papers and projects the simulator builds on.
 
-Paint Lab, the browser version, is [demos/lab/](../demos/lab/), live at <https://sabj.github.io/unpainting/demos/lab/>. Images are in [img/](img/), with rights in [NOTICE](../NOTICE).
+Paint Lab lives in [demos/lab/](../demos/lab/) and at <https://sabj.github.io/unpainting/demos/lab/>. Image credits are in [NOTICE](../NOTICE).

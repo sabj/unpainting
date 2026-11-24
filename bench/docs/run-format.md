@@ -33,7 +33,7 @@ The record keeps each model in its own role. `painter` is the model that painted
 | `benchmark` | string | `unpaint-bench` |
 | `protocol` | string | `v2` |
 | `round` | string, required | `V1` to `V5` |
-| `release` | string, required | the release semver that painted the try, such as `0.1.0` ([versions](../../docs/versions.md)) |
+| `release` | string, required | the release semver that painted the try, such as `0.1.0` ([versions](../../docs/running.md#versions)) |
 | `painterVersion` | string, required | the painter V number, such as `V096` |
 | `simVersion` | string, required | the sim number, such as `100` |
 | `commit` | string or null, required | the git commit of this repo that painted the try; null for tries painted outside it |
@@ -71,7 +71,7 @@ The record keeps each model in its own role. `painter` is the model that painted
 | `cheat.disqualified` | boolean, required | true after a blocked read or a target hit in the audit |
 | `cheat.readTargetPixels` | boolean | same as disqualified in v2 |
 | `cheat.reason` | string | why, when disqualified |
-| `cheat.risk` | object | `{score, level, parts}`; see [anti-cheat.md](anti-cheat.md) |
+| `cheat.risk` | object | `{score, level, parts}`; see [scoring.md](scoring.md#anti-cheat) |
 | `cheat.progressionRisk` | object | `{score, level}` |
 | `cheat.review` | object | `{status: "flagged" or "cleared", finding}` or null |
 | `complete` | boolean | every requested target has a final painting |

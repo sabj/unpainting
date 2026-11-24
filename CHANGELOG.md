@@ -1,6 +1,6 @@
 # Changelog
 
-Releases use semver. Each release records its painter and simulator versions ([version guide](docs/versions.md)).
+Releases use semver. Each release records its painter and simulator versions ([version guide](docs/running.md#versions)).
 
 ## 0.4.0 (not released)
 
@@ -32,13 +32,13 @@ Results: to be added from the release-candidate run.
 
 ### New in the benchmark
 
-- **A ladder of levels** replaces rounds V1 to V5. L0 nothing (defined, not run), L1 the freehand kit with tips, L2 the same inputs Auto gets and not Auto's plan (the model plans the painting itself), L3 a retry from its own L2 painting, still without Auto's plan, L4 one more retry with many resources, Auto's plan and planner among them. [Levels](bench/docs/levels.md).
+- **A ladder of levels** replaces rounds V1 to V5. L0 nothing (defined, not run), L1 the freehand kit with tips, L2 the same inputs Auto gets and not Auto's plan (the model plans the painting itself), L3 a retry from its own L2 painting, still without Auto's plan, L4 one more retry with many resources, Auto's plan and planner among them. [Levels](bench/README.md#levels).
 - **Retries are self-study.** The model gets its own painting, replay and stroke map and writes its own assessment. Never a score or a critique. The last try counts, not the best.
 - **What a model may change:** at every level from L2 its own script, the pencil lines, its own drawn lines, pen, pencil or none, up to 14 paints. At L4 also Auto's settings, Auto's plan and the named forms, and it is given Auto's finished painting and the studies' flat shapes.
-- **Level 2 gets Auto's inputs, not Auto's plan** (the owner's change of 22 November). At L2 and L3 the session folder has no `auto/`, the brief does not speak of Auto's plan, and a settings choice or a plan edit is refused with "the code's plan and planner are level 4". A session that hands in no script of its own has handed in nothing and is a failed painting; Auto's plan is never painted in its place. Looks are still priced with one full look of Auto's plan as 1.00. [Auto against a model](docs/auto-vs-model.md#what-a-model-may-change-and-what-it-is-not-given).
+- **Level 2 gets Auto's inputs, not Auto's plan** (the owner's change of 22 November). At L2 and L3 the session folder has no `auto/`, the brief does not speak of Auto's plan, and a settings choice or a plan edit is refused with "the code's plan and planner are level 4". A session that hands in no script of its own has handed in nothing and is a failed painting; Auto's plan is never painted in its place. Looks are still priced with one full look of Auto's plan as 1.00. [Auto against a model](docs/auto-vs-model.md).
 - **Level 1 kit:** pencil, eraser, and pen ink waterproof or soluble, with worked tips.
 - **Erasing at every level.** At L2 to L4 an erase passage in a model's own script (at L4 also in an edited plan) rubs pencil out with the kit's eraser, on dry paper; `./unpaint plan` says what each will take.
-- **A closed workspace.** Each try starts in a fresh folder and branch, earlier tries read-only. The shell has no internet and one fixed toolbox; installs fail; attempts are recorded. [Rules](bench/docs/rules.md).
+- **A closed workspace.** Each try starts in a fresh folder and branch, earlier tries read-only. The shell has no internet and one fixed toolbox; installs fail; attempts are recorded. [Rules](bench/README.md#rules-and-budgets).
 - **Budgets measured, not limited.** Rendering in machine-independent units (one full look of Auto's plan is 1.00), 1,000 steps as a runaway guard, six hours as a safety stop. Target about 60 minutes a session. Usage, tool use and cost are recorded.
 - **Scoring by human-ness in the making, plus quality against the original.** Judges read film snapshots of the painting in progress by a written [rubric](bench/docs/human-ness-rubric.md), and quality and likeness beside it; a combined number weighs them 2 to 1. The original is scored too, and a painting's result is its share of the original's. [Scoring](bench/docs/scoring.md).
 - **Auto is the difficulty index.** Raw and Auto-adjusted results are shown side by side. Anti-cheat and image measures sit beside the score.
@@ -65,7 +65,7 @@ Results: to be added from the release-candidate run.
 
 - [Auto against a model](docs/auto-vs-model.md): one cat painted by Auto and by a model at L2, step by step.
 - [Painting script](docs/painting-script.md): the script format, with a real passage.
-- [Levels](bench/docs/levels.md), [rules](bench/docs/rules.md), [scoring](bench/docs/scoring.md).
+- [Levels](bench/README.md#levels), [rules](bench/README.md#rules-and-budgets), [scoring](bench/docs/scoring.md).
 
 ### Painter changes in full (0.4.0-rc.1, assembled 19 Nov)
 
@@ -501,7 +501,7 @@ These are off by default.
 
 Painter V101, sim 102, judges J1. Tag `v0.2.1`.
 
-By default, 0.2.1 scores the same as 0.2.0 on the published Opus 5.5 V5 plans (J1 6.18 against 6.15, +0.5%) and 3.1% lower on the pen-and-wash set (5.40 against 5.58). Pen and wash is opt-in, and with it the set scores 6.3% above 0.2.0. See the [comparison](docs/release-performance-0.2.1.md).
+By default, 0.2.1 scores the same as 0.2.0 on the published Opus 5.5 V5 plans (J1 6.18 against 6.15, +0.5%) and 3.1% lower on the pen-and-wash set (5.40 against 5.58). Pen and wash is opt-in, and with it the set scores 6.3% above 0.2.0.
 
 | Target | 0.2.0 J1 | 0.2.1 J1 | Score change |
 |---|---:|---:|---:|
@@ -542,7 +542,7 @@ These are off by default. None was positive beyond noise against 0.2.0.
 
 Painter V100, sim 102, judges J1. Tag `v0.2.0`.
 
-On the published Opus 5.5 V5 plans, 0.2.0 scores 7% higher than 0.1.1 (J1 6.36 against 5.93) and paints them in 46% less time. It is better on four of five targets, from +4% on White Ships to +18% on South France, and 4% lower on Trumbull. See the [comparison](docs/release-performance-0.2.0.md).
+On the published Opus 5.5 V5 plans, 0.2.0 scores 7% higher than 0.1.1 (J1 6.36 against 5.93) and paints them in 46% less time. It is better on four of five targets, from +4% on White Ships to +18% on South France, and 4% lower on Trumbull.
 
 ### Drawing
 
@@ -604,7 +604,7 @@ Release 0.1.0: painter V096, sim 100. All published benchmark rounds V1-V5 use i
 - `npm run bench:run` runs V3, V4 and V5 on your own machine, with dry runs of each in `npm run bench:test` ([bench/README.md](bench/README.md#reproduce)).
 - The painter runs one default recipe, a preset of painter settings, unless `--recipe none` is given. It sets planning from light to dark with shaped brush marks, four intermediate layers, parallel sky sweeps and raw sienna in the shadow glaze. It also sets stone blocks on buildings, two touch-up passes, and a drawing first and last on cold-press paper. A plan based on Trumbull groups regions by lightness and picks a fixed palette of seven paints. Other subjects use `--palettewide 1`.
 - `--recipe v096` selects the default recipe.
-- Paint modules are sorted into `src/paint/methods` (generic methods), `src/paint/techniques` (techniques for a kind of problem) and `src/paint/tuned` (settings fitted to benchmark images). Image-specific constants live in `src/paint/tuned`, and the default recipe lists its method, technique and tuned flags apart. [docs/techniques.md](docs/techniques.md) lists each part.
+- Paint modules are sorted into `src/paint/methods` (generic methods), `src/paint/techniques` (techniques for a kind of problem) and `src/paint/tuned` (settings fitted to benchmark images). Image-specific constants live in `src/paint/tuned`, and the default recipe lists its method, technique and tuned flags apart. [docs/how-it-paints.md](docs/how-it-paints.md) lists each part.
 - Added `--valueplan`, the drawing material profiles, `--paperrgb`, `--shaperefit`, `--touchpoints` and the raw sienna paint. `examples/plans/trumbull-values.json` is Trumbull's value plan.
 - The default recipe leaves the drawing medium to the plan. A value plan's `drawing` section chooses whether to draw, in what medium and ink, how much, which lines, how heavily and how many closing pen strokes ([docs/plan-format.md](docs/plan-format.md#value-plans-the-drawing-section)). Without one, the painter picks graphite or ink from the target, with its default stroke-count limits. Trumbull's plan specifies heavy sepia ink. Command-line flags still override the plan.
 - Only typed options count toward the unused-option exit, so unused recipe settings do not fail a run.

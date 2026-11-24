@@ -54,6 +54,6 @@ Run this from the main checkout. Use `ln -sfn`: a plain `ln -s` onto an existing
 
 Only add images you have permission to distribute. Record the source and rights in [NOTICE](NOTICE) and [examples/SOURCES.md](examples/SOURCES.md). Code contributions are MIT licensed. Image rights are separate, and NOTICE sets the terms for the bundled photographs and their derivatives.
 
-Keep credentials in ignored `.env` files. See [docs/CLOUD.md](docs/CLOUD.md) for the optional cloud tools.
+Keep credentials in ignored `.env` files. See [docs/running.md](docs/running.md#cloud-rendering) for the optional cloud tools.
 
 [tools/README.md](tools/README.md) maps the command-line tools. [docs/README.md](docs/README.md) maps the painter.

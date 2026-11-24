@@ -29,4 +29,4 @@ The washes come from block-in studies (`methods/study-washes.mjs`):
 node --test src/paint/*.test.mjs src/paint/*/*.test.mjs src/paint/*/*/*.test.mjs
 ```
 
-[Methods, techniques and tuned settings](../../docs/techniques.md) lists every module and recipe flag. [How it paints](../../docs/how-it-paints.md) explains the stages.
+[How it paints](../../docs/how-it-paints.md) explains the stages, modules and recipe flags.

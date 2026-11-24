@@ -1,24 +1,35 @@
 # How it paints
 
-This is the pipeline contract for painter 0.4 (`package.json`). It follows one picture from subject to finished plate and says, for each stage, which files do the work, what goes in and out, which flags control it, and where a choice belongs. Read it before you add a rule, a flag or a mode. A pipeline change merges only together with its update to this page.
+This is the pipeline contract for painter 0.4 (`package.json`). It follows one picture from subject to finished plate and says, for each stage, which files do the work, what goes in and out, which flags control it, and where a choice belongs. A pipeline change merges only together with its update to this page.
 
 A painting takes three inputs: the target image, a drawing file and one or more block-in studies. The painter lays the drawing, lets it dry, then lays the washes the studies describe, light to dark. It saves the sheet as it goes, so you can stop or rewind anywhere between blank paper and the finished painting.
 
 ![Trumbull College: photograph, target, and the painting building from blank paper](img/hero-trumbull.webp)
 
-The [README diagram](../README.md#how-does-it-work) shows the whole loop on one screen. The paintings and swatches on this page were made with release 0.1.0 (painter V096, sim 100), before 0.4 changed how the drawing and the washes are planned.
+The [README diagram](../README.md#how-it-works) shows the whole loop. The paintings and swatches on this page were made with release 0.1.0 (painter V096, sim 100).
 
 ## Rules that apply at every stage
 
-These are the project's looking-and-cheating rules. Each stage section below says where they bite.
-
-- **Two modes, both kept.** Default: the painter looks at the subject while painting, once a passage, at shape scale. Strict (`--notargetlooks 1`): no target reads after planning. Never delete, rename or rebuild either. Every score names its mode, and scores from the two modes are never compared or averaged.
-- **No gains, no fitted values.** A model-settable gain or calibration that covers an engine error, a constant fitted to one subject, or anything tuned to raise a score is banned in both modes. A rule is stated in painter or physical terms and is the same for every subject. No subject names or ids in painting code.
+- **Two modes, both kept.** Default: the painter looks at the subject while painting, once a passage, at shape scale. Strict (`--notargetlooks 1`): no target reads after planning. Every score names its mode, and scores from the two modes are never compared or averaged.
+- **No gains, no subject-fitted values.** A model-settable gain or calibration that covers an engine error, a constant fitted to one subject, or anything tuned to raise a score is banned in both modes. Every rule is stated in painter or physical terms and is the same for every subject. `tools/guard/subject-scan.mjs` (`src/paint/overfit-scan.test.mjs`) fails `npm test` if any JavaScript or Python file under `src/` or `tools/` names a benchmark subject outside reviewed allowlists, and `src/paint/overfit.test.mjs` fails on any file or folder named `tuned`, `fitted` or `per-subject`.
 - **Copying test.** Looking, colour checks, corrections and line drawing are art at brush and shape scale. Pixel by pixel, or with so many strokes that marks stop reading as brushwork, they are copying. Hill climbing (look, correct, look again until it converges) is copying too.
-- **Strokes per 100 cm2** is reported with every score. A count far above a human painting of that size is a cheating flag.
-- **The plan's inputs are the drawing file and the studies.** The painter never extracts line from the subject and never plans washes from it. A choice the painter makes is a rule in painter terms, the same for every study.
-- **Fail loudly.** A missing Python environment, SAM checkpoint, line file, study or GPU stops the run. `npm run doctor` (`tools/doctor.mjs`, `src/paint/doctor.mjs`) checks them before any benchmark run. An option removed in 0.4 stops the run with its reason (`src/paint/removed-options.mjs`; the list is in [Running the painter](running.md#removed-in-04)).
-- **New logic goes in small modules** under `src/` or `tools/` with unit tests, not into `tools/paint-plate.mjs` or the stage files in `tools/plate/`.
+- **Strokes per 100 cm²** is reported with every score.
+- **The plan's inputs are the drawing file and the studies.** The painter never extracts line from the subject and never plans washes from it.
+- **Fail loudly.** A missing Python environment, SAM checkpoint, line file, study or GPU stops the run. `npm run doctor` (`tools/doctor.mjs`, `src/paint/doctor.mjs`) checks them before any benchmark run. An option removed in 0.4 stops the run with its reason (`src/paint/removed-options.mjs`).
+- **New logic goes in small modules** under `src/` or `tools/` with unit tests, not into `tools/paint-plate.mjs` or `tools/plate/`.
+
+## Default recipe
+
+The default recipe (`src/paint/recipe.mjs`) puts these flags in front of the command line (`--recipe none` turns it off; `default`, `general` and `combined` are identical):
+
+- `--physical 1`: physical brush sizes, water and loads (`src/paint/brushes.json`).
+- `--palettewide 1`: palette paints chosen per area of the picture.
+- `--paperbase source`, `--paperrgb auto`: paper colour from the target's sheet.
+- `--paper coldpress`, `--paperphysical 1`: cold-press tooth, fibre and relief in millimetres.
+- `--loadedcontact 1`: a loaded brush touches the paper's pits.
+- `--drawing first`: the drawing goes down before the washes.
+- `--frames 8`, `--marks 1`: about 8 recorded wash frames and every stroke in `marks.json`.
+- `--shapedmarks 1`: shaped plane marks (`src/paint/techniques/shaped-marks.mjs`).
 
 ## The stages at a glance
 
@@ -39,103 +50,88 @@ flowchart TD
 
 `tools/paint-plate.mjs` runs seven code stages in order, all in `tools/plate/`, sharing one `ctx` object:
 
-| Code stage | File | Pipeline stages it holds |
+| Code stage | File | Pipeline stages |
 |---|---|---|
-| 1 | `tools/plate/setup.mjs` | options, the source image, the target guard, the line source (1, 2) |
-| 2 | `tools/plate/plan.mjs` | palette, the medium, the study wash plan (3, 4) |
-| 3 | `tools/plate/sheet.mjs` | brushes, the sheet, looks, marks, scrap swatches (5, 6, 7) |
-| 4 | `tools/plate/pen.mjs` | film frames, the pen drawing's plan (8) |
+| 1 | `tools/plate/setup.mjs` | options, source image, target guard, line source (1, 2) |
+| 2 | `tools/plate/plan.mjs` | palette, medium, study wash plan (3, 4) |
+| 3 | `tools/plate/sheet.mjs` | brushes, sheet, looks, marks, scrap swatches (5, 6, 7) |
+| 4 | `tools/plate/pen.mjs` | film frames, pen drawing plan (8) |
 | 5 | `tools/plate/drawing.mjs` | order of work, drawing passes (8) |
-| 6 | `tools/plate/paint.mjs` | the paint loop (5, 6, 7) |
-| 7 | `tools/plate/finish.mjs` | lifting, the closing pen, output files (9) |
+| 6 | `tools/plate/paint.mjs` | paint loop (5, 6, 7) |
+| 7 | `tools/plate/finish.mjs` | lifting, closing pen, output files (9) |
 
 `tools/plate/load-order.mjs` fixes the import order; `tools/plate/source.mjs` gives tests the stage source text.
 
-A "where choices live" line names one of four homes:
+Choices belong in one of four homes:
 
-- **plan**: the drawing file, the studies and the options a planner passes, decided before painting.
-- **technique library**: a named technique in `src/paint/techniques/` or `src/paint/methods/`, with no subject names and no numbers taken from a plate.
-- **painter rule**: a universal rule in painter terms (for example "wait for the shine to go off").
-- **physics**: the sheet model decides it (`src/media/`). Nothing above may patch it.
+- **plan**: the drawing file, studies and planner options decided before painting.
+- **technique library**: a named technique in `src/paint/techniques/` or `src/paint/methods/`.
+- **painter rule**: a universal rule in painter terms (for example, waiting for the shine to go off).
+- **physics**: the sheet model (`src/media/`).
 
 ## 1. Planning
 
-The planner prepares the inputs before the first mark: a drawing file, the studies, the paints and the sheet.
+The planner prepares the inputs before the first mark: a drawing file, studies, paints and the sheet.
 
-- **The drawing.** An image model draws a clean line drawing of the subject. `tools/seg/trace-drawing.py` traces it and `tools/seg/order-strokes.mjs` orders the strokes as a hand draws, structure first (`tools/seg/pencil-hand.mjs` for pencil). The result is a line file, `--drawingfile STEM` ([line files](plan-format.md#line-files)).
-- **The studies.** An image model simplifies the whole subject into a couple of dozen flat shapes of clean colour, lights left as paper. A coarse study makes the first layer; richer ones make later layers. `--washplan STUDY.png[:MIN[:glaze]],...` lists them.
-- **Who plans.** The V6 draft (`bench/v6/TASK.md`) has a model call those tools and write `plan.json`; `bench/v6/plan-args.mjs` maps it to painter options. It is not yet run. The model chooses the medium, the ink level, the studies for each layer with their least size and glaze, the paints, and when to stop. The V4 and V5 tasks are retired; tag v0.3.2 replays them.
-- **Skills a planner reads.** `.agents/skills/painting-planner/SKILL.md` and `.agents/skills/watercolor-technique/SKILL.md`, installed for Claude Code under `.claude/skills/`.
-- **Stroke plans.** Ordered brush paths, loads and drying commands, run with `node tools/run-plan.mjs <file>`. Examples: `examples/plans/graded-wash.json`, `examples/plans/glazes.json`, `examples/plans/drying-dry-between.json`, `examples/plans/drying-too-wet.json`.
-- **Recipe and plan file.** A recipe is a preset of painter flags placed before the user's flags (`src/paint/recipe.mjs`). A value plan file (`--valueplan`) can set the sheet, the drawing stages, the paints and the order (`src/paint/pipeline-plan.mjs`, resolved plan written to `pipeline-plan.json`). The painter reports any plan key nothing reads (`src/paint/plan-keys.mjs`) and exits 3 after writing its outputs.
-- **The record.** `src/paint/run-methods.mjs` writes the line source, the line file and the studies to the log and the run card.
+- **Drawing**: an image model draws a clean line drawing of the subject; `tools/seg/trace-drawing.py` traces it and `tools/seg/order-strokes.mjs` orders the strokes (`tools/seg/pencil-hand.mjs` for pencil), producing `--drawingfile STEM` ([line files](plan-format.md#line-files)).
+- **Studies**: an image model simplifies the subject into flat shapes of clean colour, lights left as paper (`--washplan STUDY.png[:MIN[:glaze]],...`).
+- **Skills**: `.agents/skills/painting-planner/SKILL.md` and `.agents/skills/watercolor-technique/SKILL.md`.
+- **Stroke plans**: ordered brush paths, loads and drying commands run with `node tools/run-plan.mjs <file>` ([plan-format.md](plan-format.md)).
+- **Value plan file**: `--valueplan` can set the sheet, drawing stages, paints and order (`src/paint/pipeline-plan.mjs`, written to `pipeline-plan.json`). Unused keys are reported (`src/paint/plan-keys.mjs`, exit 3).
+- **Record**: `src/paint/run-methods.mjs` writes the line source, line file and studies to the log and `run-card.json` (`src/paint/run-card.mjs`).
 
-**Inputs:** target image, drawing file, studies. **Outputs:** `pipeline-plan.json`, `plan.jpg`, `run-card.json` (`src/paint/run-card.mjs`).
 **Controls:** `--drawingfile`, `--washplan`, `--paints`, `--sheetmm`, `--seed`, `--valueplan`.
-**Where choices live:** plan.
-**Rules here:** no subject ids in painting code. A study is the planner's simplification; the painter does not re-read the subject to refine it.
-**Teacher's view:** squint until detail goes and make a value study in a few flat shapes. Choose what to leave out.
 
 ## 2. Segmentation
 
-- `src/crop/segment-prep.mjs` runs `tools/seg/segments.py` (`tools/seg/sam_regions.py`) on the target before any painting. The map is cached by target SHA-256 and script version (`--segcache`). Without SAM and its checkpoint the run fails; `--segments off` is for tests. `src/crop/segments.mjs` reads the regions.
-- **Device.** `PAINTER_SEG_DEVICE=mps|cpu|cuda` makes the device an explicit choice; unset keeps `mps`, else `cuda`, else `cpu`. The device is logged and written to `segments.json` and the run card. A SAM job that uses no CPU for 10 minutes is killed and the run fails, naming the image and the device. Many concurrent SAM jobs on Metal can wedge; when Metal is busy, run SAM on the CPU with `PAINTER_SEG_DEVICE=cpu`.
+- `src/crop/segment-prep.mjs` runs `tools/seg/segments.py` (`tools/seg/sam_regions.py`) on the target before painting, cached by target SHA-256 (`--segcache`). Without SAM and its checkpoint the run fails (`--segments off` is for tests). `src/crop/segments.mjs` reads the regions.
+- `PAINTER_SEG_DEVICE=mps|cpu|cuda` selects the device (default `mps`, then `cuda`, then `cpu`), logged to `segments.json` and `run-card.json`.
 
 **Controls:** `--segments`, `--segcache`, `PAINTER_SEG_DEVICE`.
-**Rules here:** the regions are computed before painting and sealed with the target. A missing checkpoint is a loud failure.
 
 ## 3. Shapes from the studies
 
-`src/paint/methods/study-washes.mjs` reads the wash plan from the studies. It never reads the subject; the subject is used only to register the study and to score the plate.
+`src/paint/methods/study-washes.mjs` builds the wash plan from the studies without reading the subject.
 
-- Registration: `tools/painter/study-load.mjs` scales each study to the sheet. A study whose proportions differ from the sheet's by more than 2% stops the run.
-- Shapes: the study's colours are clustered; each cluster's connected parts are shapes; slivers join their neighbour. Each shape has one colour and one mix (`src/paint/methods/study-shapes.mjs`, `src/paint/methods/puddles.mjs`). A near-white shape is bare paper.
-- Order: lightest and largest first. A darker shape on a lighter one of like hue is a second wash over it once it is dry. The darkest small shapes come last.
-- Layers: each later study adds only what is darker or stronger than the layers before it, above its least size. A `glaze` layer is a few connected dark glazes.
-- Palette: `src/crop/palette.mjs`, `src/crop/palettewide.mjs`, `src/crop/pigments.mjs` (the pans in `src/crop/box.mjs`), or the paints a plan names (`--paints`).
-- `flat:` before the study list lays the same shapes as plain flat fills, for tests. `--drawingonly 1` lays no washes.
+- **Registration**: `tools/painter/study-load.mjs` scales each study to the sheet (a > 2% aspect mismatch stops the run).
+- **Shapes**: each study's colours are clustered; connected components become shapes (`src/paint/methods/study-shapes.mjs`, `src/paint/methods/puddles.mjs`); slivers join a neighbour; near-white shapes stay bare paper.
+- **Order**: lightest and largest first, darker shapes over dry washes, darkest accents last. A soft named form (face, fur, sky, water) starts with one pale base wash into clean water (`src/paint/methods/form-base.mjs`, `@formbase`), except on line-led pen-and-wash works.
+- **Layers**: each later study adds only what is darker or stronger than earlier layers above its `MIN` size floor. A `glaze` layer lays a few connected dark glazes.
+- **Palette**: `src/crop/palette.mjs`, `src/crop/palettewide.mjs`, `src/crop/pigments.mjs` (`src/crop/box.mjs`), or `--paints`.
 
-**Inputs:** the registered studies. **Outputs:** shapes with a mix, an order and lanes; `plan.jpg`; `value-plan.json`.
-
-A soft named form (a face, fur, a sky, water) is begun with one pale wash over the whole form, into clean water (`src/paint/methods/form-base.mjs`, setting `@formbase`). Not on a line-led picture (pen and wash, where the drawing carries the forms): there the whole-form wash lifts pen ink that still rewets and flattens the lights the drawing leaves, so a form has a base wash only where the study's settings ask for one.
 **Controls:** `--washplan`, `--paints`.
-**Where choices live:** plan for which studies and how many layers; painter rule for the shapes, mixes and order.
-**Rules here:** a wash is a whole shape with one mix, never a per-cell map.
-**Teacher's view:** link small pieces of similar value into one shape. Mix the colour. Reserve the paper whites and go round them.
 
 ## 4. Technique per shape
 
-The study plan chooses, by its own rules, the brush for each shape, wet or dry, where to charge in a second colour, and when to wait.
+The study plan chooses each shape's brush, paper moisture, wet-in-wet colour charges and drying waits.
 
-- In the larger washes, a warmer and a cooler neighbour's mix are dropped in while wet. The load varies along a wash. Close values are laid against each other damp, for soft edges. A broken mass such as foliage is laid in loose dabs of a round.
-- Move names (`wet on wet`, `wet on dry`, `dry brush`, with aliases such as `wet in wet` and `glaze`) are normalised in `src/paint/techniques/passage-plan.mjs`. `src/paint/techniques/README.md` indexes the library.
-- Per-pass scrap swatch: the painter tries a loaded brush on a scrap of the same paper and charges each passage by what the swatch held (`src/paint/methods/scrap-swatch.mjs`; a wet-into-wet swatch's bed is wetted as the sheet's is, `tools/painter/wet-bed-prep.mjs`). A script wash's swatch is laid in lanes lapped as the wash's own lanes are (the lanes state their lap, to a tenth of the brush; `src/paint/methods/instrument-cal.mjs`): a tuft levels with the wet film it finds, so lanes lapped further leave less than their sum, and the charge follows the lap.
-- Index of modules: [methods and techniques](techniques.md).
+| Technique | What it does | Code |
+|---|---|---|
+| Flat wash, wet on dry | Parallel overlapping sweeps across dry paper; dries with a hard edge | `TECHNIQUES['wet on dry']`, `src/media/wash.mjs`, `src/paint/methods/sweep-fill.mjs` |
+| First wash | Fuller mop load so the first pale wash reaches the bottom of the paper tooth | `TECHNIQUES['first wash']` |
+| Wet on wet | Clean water laid first (`"role": "clean-water"`), then pigment charged in for soft edges | `TECHNIQUES['wet on wet']`, `tools/painter/wet-bed-prep.mjs`, `wet-bed-wait.mjs` |
+| Graded wash | Brush reloaded along a sweep from dark to light | `--gradedwash`, `gradientSweepAngle` in `src/media/wash.mjs` |
+| Glaze | Transparent wash over dried, fixed paint (`"operation": "dry"`) | `TECHNIQUES.glazed`, `dry` and `fix` in `src/media/sheet.mjs` |
+| Dry brush | Low water load (~20%) dragged across the paper tooth, leaving broken marks | `TECHNIQUES['dry brush']`, `src/media/brush.mjs` |
+| Softened edge | Clean damp brush drawn along a wet wash edge | `src/paint/techniques/soften-lift.mjs`, `tools/painter/soften-lift-run.mjs` |
+| Masking, lifting, blotting | Protect paper with resist, lift wet pigment with a thirsty brush, or blot standing water | `applyResist`, `liftResist`, `blot` in `src/media/sheet.mjs`; `thirsty` in `src/media/brush.mjs` |
 
-A plan cannot yet set these per shape (`bench/v6/TASK.md`, "Not yet executable").
-
-**Where choices live:** painter rule, the same for every study. A subject-fitted value is not allowed.
-**Teacher's view:** hard edge is wet on dry; soft edge is wet into wet or a damp brush along it; lose an edge where two neighbours match in value.
+Move names (`wet on wet`, `wet on dry`, `dry brush`, `glaze`) are normalized in `src/paint/techniques/passage-plan.mjs`. Before laying a passage, the painter tests the loaded brush on a scrap of the same paper and calibrates the charge from what the scrap held (`src/paint/methods/scrap-swatch.mjs`, `src/paint/methods/instrument-cal.mjs`).
 
 ## 5. Brush and stroke application
 
-The painter dips a brush, tries it on scrap, lays a stroke along a path, and reloads when the load runs out. A light brush touches the tops of the paper's tooth: each fibre is compared with the tooth level under it (`src/media/paper.mjs`), so a dry brush marks the hills and skips the hollows. Pressure sets how many hairs touch and how deep they reach into the tooth. A load is spent only on paper the brush paints (`src/paint/methods/brushes.mjs`).
+The painter dips a brush, tests it on scrap, lays a stroke along a path and reloads when depleted. A light brush touches only the peaks of the paper tooth (`src/media/paper.mjs`); pressure sets how many bristles touch and how deep they reach (`src/paint/methods/brushes.mjs`).
 
-- Brushes: `src/media/brush.mjs` (bristles and load), `src/paint/brushes.json` (real brush sizes), `src/paint/methods/brushes.mjs` (`--physical 1`).
-- Paths: `src/paint/methods/sweep-fill.mjs` (parallel sweeps that carry the bead), `src/paint/methods/wash-strokes.mjs`, `src/media/wash.mjs`, `src/paint/methods/lay.mjs`, `src/paint/methods/mop-lanes.mjs`.
-- A script's washes (`src/paint/methods/script-marks.mjs` `sweeps`, `LANE_HAND`): the lanes are laid as a hand lays them. Each lane laps the one before by 30 to 55% of the width the brush really lays at its pressure, so lanes run into one wash; the lanes turn steadily across the wash as a wrist pivots, bow along the arm's arc, the pressure swells along a stroke, and two to four lanes are one load. A part of a wash's region too short for lanes along the passage's direction (its lanes would be under two and a half brush widths long, and it is clearly longer another way) is laid along its own length: a band of shadow is a stroke or two along the band, not a row of dashes across it. `--handlanes` (default 1) is the amount of it (0: a ruler's lanes); `--seed` is the hand: another seed lays the same script visibly differently.
-- Loop: `tools/plate/paint.mjs`. The stroke record (`src/paint/stroke-ledger.mjs`) is kept in every run; `--marks 1` ships the full tape.
-- Optics: `src/media/km.mjs` (Kubelka-Munk absorption and scattering) turns layers into colour.
+- **Brushes**: `src/media/brush.mjs`, `src/paint/brushes.json`, `src/paint/methods/brushes.mjs` (`--physical 1`).
+- **Paths**: `src/paint/methods/sweep-fill.mjs`, `src/paint/methods/wash-strokes.mjs`, `src/media/wash.mjs`, `src/paint/methods/lay.mjs`, `src/paint/methods/mop-lanes.mjs`.
+- **Script washes** (`src/paint/methods/script-marks.mjs`): lanes overlap by 30–55% of the brush width, pivot and bow like a wrist and arm (`--handlanes 1`, `--seed`), and turn along narrow bands rather than dashing across them.
+- **Loop and optics**: `tools/plate/paint.mjs`, `src/paint/stroke-ledger.mjs` (`--marks 1`), and Kubelka-Munk layering in `src/media/km.mjs`.
 
-**Outputs:** strokes on the sheet, `marks.json`, frames.
-**Controls:** `--physical`, `--marks`.
-**Where choices live:** painter rule (the biggest brush that fits; load as the technique needs) and physics.
-**Rules here:** one skilled stroke is worth many naive ones. Strokes per 100 cm2 is reported with the score.
-**Teacher's view:** the biggest brush that fits the shape; a few long strokes for broad passages; a small round only for detail.
+**Controls:** `--physical`, `--marks`, `--handlanes`, `--seed`.
 
 ## 6. Wet physics and drying
 
-The sheet holds five things per cell: standing water, water in the pores, pigment floating, pigment settled, pigment in the pores. The paper is sized. A loaded brush's free liquid stays on the surface where it lands, and the dry pores take only their share, so a lane leaves a wet edge for the next one to join. Water keeps moving after the brush has gone. It spreads, soaks in and evaporates fastest at a wash's edge, so edges dry darker. Settling pigment collects in hollows and gives granulation, each paint by its own published rating ([pigments and paper](pigments-and-paper.md#paper)).
+Each cell tracks standing water, pore water, floating pigment, settled pigment and pore pigment. Water spreads, soaks in and evaporates fastest at a pinned wash edge, leaving darker rims. Settling pigment collects in hollows according to each paint's granulation and flocculation ratings ([pigments and paper](pigments-and-paper.md)).
 
 ![A real wash by Winslow Homer beside a simulated flat wash and graded wash on the default cold-press paper](img/paper-texture.webp)
 
@@ -145,92 +141,53 @@ The sheet holds five things per cell: standing water, water in the pores, pigmen
 |---|---|---|
 | ![Rose dropped onto paper wetted with clean water, spreading while wet](img/pipeline-wet-wash.webp) | ![Broken dry brush stroke showing bare paper](img/pipeline-dry-brush.webp) | ![The same two strokes, dried between at left and flooded at right](img/drying.webp) |
 
-A dried wash becomes its own layer. A glaze is a transparent wash over dried paint, and the layers mix optically.
+A dried wash fixes as its own layer; transparent glazes over it mix optically:
 
 ![Three transparent glazes, each dried before the next](img/glazes.webp)
 
-- Paper: `src/media/paper.mjs` (the relief in micrometres from `src/media/paper-relief.mjs`, 0.1 to a few mm), `src/media/sheet-size.mjs`. The sheet fits the target inside a 6 x 4 in postcard by default; `--sheetmm` sets the width and `--width` the cell count. The painter stops on a `--width` above the source's width unless `--sourcescale` states the enlargement (`tools/plate/source-scale.mjs`).
-- Water and pigment: `src/media/sheet.mjs` with `src/media/sheet-kernel.mjs` (the CPU step) and `src/media/gpu/stepfull.mjs`, `src/media/gpu/stepfull.wgsl` (the GPU step). [Pigments and paper](pigments-and-paper.md) has the details.
-- Timing: `src/paint/methods/wetdry.mjs` (paper wetness and waiting for the paper to dry) and `tools/painter/wet-bed-wait.mjs` (a wet-into-wet passage is charged once the shine goes off the typical cell of its bed). `src/paint/methods/wash-session.mjs` keeps passages in one wet session; sessions never cross a glaze or shadow boundary.
-- Softening: `src/paint/techniques/soften-lift.mjs` and `tools/painter/soften-lift-run.mjs`, a clean damp brush along a wash's soft edge while it is wet.
-- Checks: `src/media/checks.mjs` counts physics violations; `--strict 1` makes them stop the run. Without it the run continues and writes `continued-checks.json`.
+- **Paper and solver**: `src/media/paper.mjs`, `src/media/paper-relief.mjs`, `src/media/sheet.mjs` (`src/media/sheet-kernel.mjs` on CPU; `src/media/gpu/stepfull.mjs` and `stepfull.wgsl` on GPU).
+- **Timing and checks**: `src/paint/methods/wetdry.mjs`, `src/paint/methods/wash-session.mjs`, and `src/media/checks.mjs` (`--strict 1` stops on physics check violations; otherwise `continued-checks.json` records them).
 
-**Known defect:** the study plan's charged-in wet washes fail the wet-bed check on small test sheets (`src/paint/study-wet-bed.test.mjs`, skipped).
-
-**Controls:** `--paper`, `--paperphysical`, `--physics key=value`.
-**Where choices live:** physics. A painter rule may choose when to lay (wait, prewet, lane by lane) but may not change what water and pigment do.
-**Rules here:** no gain or calibration may cover an engine error. Fix the physics or the timing. CPU and GPU runs are each repeatable but differ from each other.
-**Teacher's view:** wetness and paint strength are chosen together. Timing is the technique: stop touching a wash once it starts to set, and wait for full dryness before a glaze.
+**Controls:** `--paper`, `--paperphysical`, `--physics key=value`, `--strict`.
 
 ## 7. Looks
 
-A look is the painter stepping back to compare whole shapes with the subject. There are two modes.
+A look is the painter comparing whole shapes with the subject during painting:
 
 | | Default | Strict (`--notargetlooks 1`) |
 |---|---|---|
-| Target reads after planning | each passage once as it is laid, as its shape mean | none |
-| Passages | the charge follows what the sheet already holds of the passage's pans | the charge frozen at planning |
+| Target reads after planning | Each passage once as it is laid, as its shape mean | None |
+| Passage charge | Adjusted by the shape's deficit (`src/paint/methods/shape-deficit.mjs`, `--feedback`) | Frozen at planning |
 
-- `src/paint/step-backs.mjs` gates every painting-time look: a passage may look as it is laid, and any other look returns null. No step-back is planned. It writes `step-backs.json`. `src/paint/painting-look.mjs` is the strict switch under it. `tools/plate/setup.mjs` makes both.
-- The passage charge look (`--feedback`) is the one look a passage takes: its charge is the shape's lack against what the plan booked (`src/paint/methods/shape-deficit.mjs`).
-- The target guard blocks cell-level reads of the target, and of every map made from it (`tools/guard/seal-maps.mjs`), when painting starts and records every look (`tools/guard/no-target.mjs`). [Honesty](honesty.md) has the modes and `target-guard.json`. `tools/guard/step-backs.test.mjs` checks that the guard's looks are exactly the passage looks.
-- Frozen replay for a benchmark: `--notargetlooks 1 --feedback 0 --targetguard strict`.
+`src/paint/step-backs.mjs` and `src/paint/painting-look.mjs` gate painting-time looks and write `step-backs.json`. The target guard (`tools/guard/no-target.mjs`, `tools/guard/seal-maps.mjs`) seals per-cell target maps when painting starts and writes `target-guard.json` ([honesty.md](honesty.md)).
 
 **Controls:** `--notargetlooks`, `--targetguard`, `--lookbudget`, `--feedback`.
-**Where choices live:** painter rule. Looks are at shape scale and fixed in advance.
-**Rules here:** no per-cell target reads in either mode. No loop of look, correct, look.
-**Teacher's view:** step back a few times; compare shapes, not pixels.
 
 ## 8. Lines
 
-A pen drawing goes down first and dries before the washes. A pencil drawing goes down in phases with them, as a person works (src/paint/methods/drawing-phases.mjs): the lay-in and the lines that place the first washes before them, each other line just before the later wash whose edge it draws or that covers it, on dry paper, and detail no wash claims with the last stage; each phase is filmed big forms first and dried into the paper before the next wash. An author may time any line (before, with stage N, after). The pen is a dip pen with a finite load of ink. Speed, pressure, load and paper change its line: a slow line is wide and dark, a pressed nib spreads, a fresh dip leaves a wide first mark and an empty nib thins, skips and needs a dip.
+A pen drawing goes down first and dries before the washes. A pencil drawing goes down in phases with the washes (`src/paint/methods/drawing-phases.mjs`): lay-in lines before the first washes, each other line on dry paper just before the wash that needs it, and unclaimed detail with the last stage. An author script may also time lines explicitly (`before`, `stage N`, `after`).
 
 ![One pen running dry: the line thins and breaks as its load empties](img/pen-line.webp)
 
 ![A pen line that changes pressure and speed, fresh ink pulled with clean water, and ink drawn over a dried wash](img/technique-inking.webp)
 
-- Source of lines: the drawing file only (`--drawingfile`, `src/paint/line-source.mjs`). With none the run prints `!!! NO LINE` and draws no line. `src/paint/methods/drawing-registration.mjs` maps the file onto the target.
-- As drawn: the pen or pencil draws the file's lines as they are. Nothing cuts, smooths, re-decides or re-measures them (`src/paint/methods/ink-lines-file.mjs`). Only the target's line darkness is read, before painting, to set the pen's load: `--inkdarkmatch`, `--inkdarkcap`, `--inkwidthfloor` (`src/paint/methods/ink-match.mjs`, `src/paint/methods/ink-scrap.mjs`).
-- Filmed as drawn: with the film on (`--video 1`) the drawing's strokes are laid big forms first, detail last (`--drawingorder forms`, the default: the drawing's passes in turn over the whole sheet, the largest form first in each; `file` keeps the file's own order, which may finish one form before the next is placed), a few to a frame at equal shares of the hand's time, so the film shows the drawing being drawn (`src/paint/methods/drawing-film.mjs`). `--drawingfilm` (default 0.2) is the opening drawing's frames as a share of the washes' `--frames`; a closing pen is filmed at the same pace. What is laid is the same as in one step.
-- Hand: `src/paint/methods/drawing-file.mjs`, `src/paint/methods/drawing-hand.mjs`, `src/paint/methods/stroke-order.mjs` (chain, order, taper). Pencil: `src/paint/methods/pencil-hand.mjs`, `src/paint/methods/pencil-line.mjs`. Fine sheet: `src/paint/methods/ink-res.mjs`.
-- Medium: `--outlinemedium graphite` (default), `ink` or `auto`; `--inkrecipe wash` turns ink on. `src/paint/methods/medium-decision.mjs`, `src/paint/methods/outline-medium.mjs`, `src/paint/methods/material-profiles.mjs`, `src/media/pen.mjs`, `src/media/graphite.mjs`. Under `--subjectmedium none|pencil` any drawing is a light graphite drawing (`src/paint/subject-medium.mjs`).
-- Stages and closing pen: `src/paint/methods/drawing-stages.mjs` cuts the linked stages (`prep`, `prepInk`, `finishInk`) from the drawing file. A closing pen needs `--drawinglast FILE` or a finish stage (`--stages ...finishink`); otherwise `--drawing both` logs `!!! NO CLOSING LINE` and skips it.
+- **Line source**: `--drawingfile` (`src/paint/line-source.mjs`, `src/paint/methods/drawing-registration.mjs`, `src/paint/methods/ink-lines-file.mjs`). Only target line darkness is read before painting (`--inkdarkmatch`, `--inkdarkcap`, `--inkwidthfloor`; `src/paint/methods/ink-match.mjs`, `src/paint/methods/ink-scrap.mjs`).
+- **Film**: with `--video 1`, strokes are filmed big forms first (`--drawingorder forms`, `src/paint/methods/drawing-film.mjs`, `--drawingfilm 0.2`).
+- **Hand and fine sheet**: `src/paint/methods/drawing-file.mjs`, `drawing-hand.mjs`, `stroke-order.mjs`, `pencil-hand.mjs`, `pencil-line.mjs`, `ink-res.mjs`, `fine-erase.mjs`.
+- **Medium and stages**: `--outlinemedium graphite|ink|auto`, `--inkrecipe wash|v2`, `--stages prep,prepink,finishink` (`src/paint/methods/medium-decision.mjs`, `outline-medium.mjs`, `drawing-stages.mjs`, [ink.md](ink.md)).
 
-**Inputs:** the drawing file, the target's line darkness (read before painting). **Outputs:** the opening drawing, `ink.jpg`, `ink-lines.json`.
 **Controls:** `--drawingfile`, `--drawinglast`, `--drawing first|last|both|none`, `--outlinemedium`, `--inkrecipe`, `--stages`.
-**Where choices live:** plan (which drawing, which medium, how much ink) and physics (ink and wash edges).
-**Rules here:** each line in the file is a stroke a hand could pull. The painter adds no line of its own.
-**Teacher's view:** contour drawing is slow looking, one line at a time. In line and wash, the line gives edge and structure, the wash gives tone and colour.
 
 ## 9. Finish
 
-- Lifting, the closing pen and the output files: `tools/plate/finish.mjs`. The closing pen runs after every wash and the final dry gate.
-- Output: `painting.png`, `wash.jpg`, `ink.jpg`, `frames.json` and stage frames (`src/paint/film-timeline.mjs`), `run-card.json`, `target-guard.json`, `cheat-risk.json`, the mark tape, the census (`tools/speed/census-write.mjs`), and `pipeline-plan.json`.
-
-**Controls:** `--drawing`, `--frames`, `--marks`.
+`tools/plate/finish.mjs` runs lifting, the closing pen (after all washes and the final dry gate) and writes `painting.png`, `wash.jpg`, `ink.jpg`, `frames.json`, stage frames (`src/paint/film-timeline.mjs`), `run-card.json`, `target-guard.json`, `cheat-risk.json`, `marks.json`, census data (`tools/speed/census-write.mjs`) and `pipeline-plan.json`.
 
 ## 10. Eval
 
-Eval scores a finished painting and its saved stages. Judges are advisory: no verdict is fed back into the painter.
+Eval scores a finished painting and its saved stages without feeding back into the painter:
 
-- Guard and risk: `tools/guard/cheat-risk.mjs` (stage progression, fine-detail copy correlation, small-stroke share), `tools/guard/promote-check.mjs`, `tools/guard/lint-target-use.mjs`, [honesty](honesty.md).
-- Metrics: `src/eval/colour.mjs` (CIEDE2000), `src/eval/fidelity.mjs`, `src/eval/values.mjs`, `src/eval/stages.mjs` (do the frames follow the order a person paints in), `src/eval/score.mjs`. Some compare pixel by pixel and are for diagnosis only. [Judging](judging.md).
-- Judge: `tools/judge/judge-plate.mjs`, `tools/judge/stage-check.mjs`, `tools/judge/concert-judge.mjs`. J1 is noisy: score at least three times and judge by the mean.
-- Strokes: `src/paint/stroke-ledger.mjs` records them. `tools/stroke-gate.mjs` and `tools/stroke-stats.mjs` measure sizes ([stroke statistics](stroke-stats.md)). `bench/scripts/copy-limits.mjs` reports strokes per 100 cm2. [Benchmark scoring](../bench/docs/scoring.md) and [anti-cheat](../bench/docs/anti-cheat.md) cover the rounds.
-- Compare on the same terms: same batch, same judge route, same scoring size, same mode.
-
-**Where choices live:** eval only. Nothing here steers a painting.
-**Rules here:** every score carries its mode and strokes per 100 cm2. Judge cheating by the playback, not by a flag alone.
-**Teacher's view:** judge by how it was made: how many marks, whether each reads as a brush or pen mark, how many times it looked.
-
-## Limits
-
-- The material model is not calibrated against a real sheet of paper.
-- A plan cannot yet set a shape's brush, wetness or charge.
-- CPU and GPU runs are each repeatable, but they differ from each other.
-
-Commands are in [Running the painter](running.md). Image rights are in [NOTICE](../NOTICE).
-
-## Designed paths must leave execution evidence
-
-`bench/designed-paths.json` is the execution contract: required paths must leave evidence; every other row says "not yet on" and why. Run `node tools/designed-paths-check.mjs <finished-run-folder>`. It writes `designed-paths-check.txt` and JSON, reports RAN or DID NOT RUN for every row with its evidence, and exits 4 if required execution evidence is absent. A requested flag alone never proves execution.
+- **Guard and copy risk**: `tools/guard/cheat-risk.mjs`, `tools/guard/promote-check.mjs`, `tools/guard/lint-target-use.mjs` ([honesty.md](honesty.md)).
+- **Metrics and judges**: `src/eval/` and `tools/judge/` ([judging.md](judging.md)).
+- **Strokes**: `src/paint/stroke-ledger.mjs`, `tools/stroke-gate.mjs`, `tools/stroke-stats.mjs` ([judging.md#stroke-sizes](judging.md#stroke-sizes)), and `bench/scripts/copy-limits.mjs` (strokes per 100 cm²).
+- **Benchmark scoring**: [bench/docs/scoring.md](../bench/docs/scoring.md).
+- **Execution evidence**: `node tools/designed-paths-check.mjs <run-folder>` checks `bench/designed-paths.json` and exits 4 if required execution evidence is missing.

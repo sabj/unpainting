@@ -10,4 +10,4 @@ Named painting techniques.
 node --test src/paint/techniques/*.test.mjs
 ```
 
-[techniques.md](../../../docs/techniques.md) lists each module.
+[How it paints](../../../docs/how-it-paints.md) lists each module.

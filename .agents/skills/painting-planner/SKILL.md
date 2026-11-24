@@ -59,7 +59,7 @@ A closing pen is an exception. It needs its own line file (`--drawinglast`) or a
 
 ## Marks
 
-In a stroke plan, choose contact, direction, pressure change, reload and lift for each mark's job. Use broad contact for broad passages. Limit strokes so a wash is not rebuilt from many small dabs. Run the [stroke-size gate](../../../docs/stroke-stats.md) on explicit stroke plans before painting and recorded runs afterward. The default warning concerns only tiny paint carrying broad low-detail wash interiors: at most 30% of each interior's carried area or visible paint contribution. Declare broadAreas and exempt detail features on explicit stroke plans. Keep counts as secondary diagnostics and pen detail separate. These are provisional limits; a pass still needs visual review.
+In a stroke plan, choose contact, direction, pressure change, reload and lift for each mark's job. Use broad contact for broad passages. Limit strokes so a wash is not rebuilt from many small dabs. Run the [stroke-size gate](../../../docs/judging.md#stroke-sizes) on explicit stroke plans before painting and recorded runs afterward. The default warning concerns only tiny paint carrying broad low-detail wash interiors: at most 30% of each interior's carried area or visible paint contribution. Declare broadAreas and exempt detail features on explicit stroke plans. Keep counts as secondary diagnostics and pen detail separate. These are provisional limits; a pass still needs visual review.
 
 ## Review
 

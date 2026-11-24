@@ -12,4 +12,4 @@ Target analysis for the automatic stroke planner. These modules read the target 
 
 Run the tests with `node --test "src/crop/*.test.mjs"`.
 
-[Ink](../../docs/ink.md) covers line finding. [Pigments and paper](../../docs/pigments-and-paper.md) covers paint selection, and [Techniques](../../docs/techniques/README.md) lists each technique and its code.
+[Ink](../../docs/ink.md) covers line finding. [Pigments and paper](../../docs/pigments-and-paper.md) covers paint selection, and [How it paints](../../docs/how-it-paints.md#4-technique-per-shape) lists each technique and its code.

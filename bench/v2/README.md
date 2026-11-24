@@ -23,6 +23,6 @@ The model sees each target as an image. Its code cannot read target pixels.
 - [kit/py/sitecustomize.py](kit/py/sitecustomize.py) does the same for every Python process.
 - [kit/cheat-test.mjs](kit/cheat-test.mjs) and [kit/cheat-test.py](kit/cheat-test.py) try six ways to read a target. All six are blocked and logged.
 
-[Anti-cheat](../docs/anti-cheat.md) covers the audit and the cheat-risk score.
+[Scoring](../docs/scoring.md#anti-cheat) covers the audit and the cheat-risk score.
 
 The briefs and technique guides are publication copies; session inputs can differ.
