@@ -154,17 +154,19 @@ export async function formBoxes(maskFile, forms, sheetWidthMm) {
  * The author's packet in `dir`: inputs/ (the gridded pictures), and the prompt as one text. The pictures are named by
  * their path inside the folder; nothing of this machine's paths or of the person running it goes into the prompt.
  */
-export async function preparePacket({ dir, root, run, drawingPng, briefFile }) {
+export async function preparePacket({ dir, root, run, drawingPng, briefFile, formsPicture = true, only = null }) {
   const inp = path.join(dir, 'inputs'); fs.mkdirSync(inp, { recursive: true });
   const inputs = [], W = run.sheet.widthMm;
-  const put = async (file, what, image) => { fs.writeFileSync(path.join(inp, file), await gridImage(image, W)); inputs.push({ file: `inputs/${file}`, what }); };
+  // `only`: the pictures a level is given, by file name (level 1 in fixed rounds: the subject alone)
+  const put = async (file, what, image) => { if (only && !only.includes(file)) return; fs.writeFileSync(path.join(inp, file), await gridImage(image, W)); inputs.push({ file: `inputs/${file}`, what }); };
   await put('source.png', 'the SUBJECT: the picture to paint', run.subject.sourceAbs);
   await put('drawing.png', `the DRAWING: the opening drawing (${run.drawing.medium.split(',')[0]})`, drawingPng);
   for (const [i, s] of run.studies.entries()) await put(`study-${i + 1}.png`, `STUDY ${i + 1}, the ${s.role}: the subject simplified into flat shapes, lights left as paper`, s.abs);
   let forms = null;
   if (run.masks?.mask) {
     forms = await formBoxes(run.masks.mask, run.masks.forms, W);
-    await put('forms.png', 'the NAMED FORMS: each named form of the subject as one flat colour (the FORMS list names them)', run.masks.formsPng);
+    // in fixed rounds the named forms are names and boxes only (FORMS): the picture of them is a mask, and is not sent
+    if (formsPicture) await put('forms.png', 'the NAMED FORMS: each named form of the subject as one flat colour (the FORMS list names them)', run.masks.formsPng);
   }
   const brushes = JSON.parse(fs.readFileSync(path.join(root, 'src/paint/brushes.json'), 'utf8')).brushes;
   const template = fs.readFileSync(briefFile, 'utf8');
@@ -173,7 +175,7 @@ export async function preparePacket({ dir, root, run, drawingPng, briefFile }) {
   const leak = [os.homedir(), os.userInfo().username].find(w => w && prompt.includes(w));
   if (leak) throw new Error('author: the prompt would carry a path or name of this machine; it is not sent');
   fs.writeFileSync(path.join(dir, 'prompt.txt'), prompt);
-  return { dir, prompt, brief, images: inputs.map(i => path.join(dir, i.file)), files: inputs.map(i => i.file) };
+  return { dir, prompt, brief, forms, images: inputs.map(i => path.join(dir, i.file)), files: inputs.map(i => i.file) };
 }
 
 /** The prompt of the one retry: the first prompt, the refused answer and why it was refused. */

@@ -37,7 +37,7 @@ test('handed pictures: a line each in seen.md; what a command\'s log can show of
 });
 
 test('a level is a named setting: L2 one go without the code\'s plan, L3 a retry from the L2 result, L4 a retry from the L3 result with the traced shapes, nothing of Auto; no critique at any level', () => {
-  assert.deepEqual(Object.keys(LEVELS), ['L2', 'L3', 'L4']); assert.throws(() => levelOf('L9'), /one of L2, L3, L4/); assert.equal(DEFAULT_RETRIES, 1);
+  assert.deepEqual(Object.keys(LEVELS), ['L1', 'L2', 'L3', 'L4']); assert.throws(() => levelOf('L9'), /one of L1, L2, L3, L4/); assert.equal(DEFAULT_RETRIES, 1);
   assert.deepEqual(handedAt(levelOf('L2'), {}), { previous: false, plan: false, auto: false, shapes: false }, 'L2 gets the code planner\'s inputs, not its plan');
   assert.deepEqual(handedAt(levelOf('L3'), { previous: 'l2-run' }), { previous: true, plan: false, auto: false, shapes: false }, 'L3 gets its own previous painting and nothing of the code\'s');
   assert.deepEqual(handedAt(levelOf('L4'), { previous: 'l3-run' }), { previous: true, plan: false, auto: false, shapes: true }, 'L4 gets the traced shapes, nothing of Auto');

@@ -29,6 +29,8 @@ import { toolUseOf, listFiles } from './tool-use.mjs';
 import { PROVIDER_HOSTS, startGate as startNetGate, makeToolbox, toolsText } from './session-net.mjs';
 import { DEFAULT_LOOKS, DEFAULT_WALL_MINUTES, DEFAULT_GRACE_MINUTES, DEFAULT_STEPS, safeRead, writeSession, sessionServer, SIGN_IN_EXPOSURE, finalChoice, sessionCall, readTranscript, transcriptFile, reachedOutside, ownFolderOf, ownPictures, runSession } from './session.mjs';
 import { DEFAULT_REVERTS } from './reverts.mjs';
+import { roundsRun } from './rounds-run.mjs';
+import { ROUNDS_CLIS, ROUNDS_AT_ONCE } from './rounds-call.mjs';
 import { levelOf, handedAt, OWN_SCRIPT_ONLY } from './levels.mjs';
 import { shapesHanded, checkWithheld } from './level4.mjs';
 import { usageOf, usageLine } from './usage.mjs';
@@ -107,9 +109,11 @@ try {
   // a model works as a session (the default) or answers in one reply; its column is named for what it does
   authors = req.authors.map(a => authorOf(a, ownAuthors, models)).map(a => (a.cli && !['script', 'edit', 'choice'].includes(a.cli) ? { ...a, work: req.work, brief: req.work === 'reply' ? briefName(BRIEF_FILE) : null } : a));
   if (req.work === 'session') for (const a of authors) if (a.work) sessionCall(a, { prompt: '', cwd: '' });
+  // fixed rounds (rounds.mjs): no shell, no tools; every author's command must be one rounds can call
+  if (req.work === 'rounds') { for (const a of authors) if (a.work && !ROUNDS_CLIS[a.cli]) throw new Error(`--work rounds: ${a.key} is called with "${a.cli}", which rounds cannot call (${Object.keys(ROUNDS_CLIS).join(', ')} can)`); }
   if (req.from && !fs.existsSync(req.from)) throw new Error(`--from ${req.from}: no such folder`);
   // what a session of this level and try is handed; the level's terms and the command line must agree
-  if (!req.prepare && !req.from && req.work === 'session' && authors.some(a => a.work === 'session')) {
+  if (!req.prepare && !req.from && (req.work === 'session' || req.work === 'rounds') && authors.some(a => a.work === req.work)) {
     terms = handedAt(level, { tryNumber: req.tryNumber, retries: req.retries, previous: req.previous });
     if (req.previous && !fs.existsSync(req.previous)) throw new Error(`--previous ${req.previous}: no such folder`);
     if (req.previous && (authors.length !== 1 || req.subjects.length !== 1)) throw new Error('--previous names one model\'s previous try of one subject: give one subject and one author');
@@ -150,7 +154,7 @@ const outRoot = path.resolve(req.out ?? path.join(ROOT, 'work', 'paint', `${stam
 const runs = [];
 for (const spec of specs) for (const author of authors) {
   const out = req.prepare ? path.join(preparedAt(spec), 'painting') : many ? path.join(outRoot, runFolder(spec, author.key === 'auto' ? 'auto' : author.name)) : outRoot;
-  const scriptFile = author.key === 'auto' || author.work === 'session' || author.cli === 'edit' || author.cli === 'choice' ? null : path.join(out, 'author', 'script.json');
+  const scriptFile = author.key === 'auto' || author.work === 'session' || author.work === 'rounds' || author.cli === 'edit' || author.cli === 'choice' ? null : path.join(out, 'author', 'script.json');
   let command;
   try { command = buildCommand(spec, { mode: req.mode, out: path.join(out, 'plate'), known, dirty: code.dirty, segEnv, script: scriptFile ? { file: scriptFile, paints: ['(the script\'s palette)'] } : null }); } catch (e) { fail(e.message); }
   const pinned = spec.drawing.files.every(f => f.sha256);
@@ -167,7 +171,7 @@ for (const spec of specs) for (const author of authors) {
       masks: spec.masks.receipt ? { receipt: spec.masks.receipt, from: spec.masks.from, mask: spec.masks.mask, review: spec.masks.review, forms: spec.masks.forms, read: command.masksRead,
         whyNotRead: command.masksRead ? null : 'an authored script is laid as written' } : { receipt: null, none: spec.masks.none },
       author: { key: author.key, name: author.name, label: authorLabel(author), id: author.id ?? null, cli: author.cli ?? null, effort: author.effort ?? null, work: author.work ?? null, brief: author.brief ?? null, wrote: author.wrote ?? null,
-        ...(author.work === 'session' ? { level: level.name, tryNumber: req.tryNumber, budget, looksMost, from: req.from ? path.join(path.resolve(req.from), many ? runFolder(spec, author.name) : '') : null } : {}) },
+        ...(author.work === 'session' || author.work === 'rounds' ? { level: level.name, tryNumber: req.tryNumber, budget, looksMost, from: req.from ? path.join(path.resolve(req.from), many ? runFolder(spec, author.name) : '') : null } : {}) },
       settings: command.settings, switches, code: codeOf(code),
       environment: command.env, command: shellLine(command), argv: command.argv, results: null, exit: null, seconds: null, failure: null,
     },
@@ -199,7 +203,7 @@ const SHOWN = /^(study washes: \d|wash plan:|plan values|phases|!!!|UNUSED|IGNOR
  * a minute, is painted again when its worker fails, and stops only past the stated limit, with the session kept.
  */
 async function paintOnce(r, commandFor, plate, logFile) {
-  const final = req.mode === 'paint' && r.authorFull.work === 'session';
+  const final = req.mode === 'paint' && (r.authorFull.work === 'session' || r.authorFull.work === 'rounds');
   if (!final) return paintTry(r, commandFor, plate, logFile, null);
   const tick = waitTicker({ what: 'a place to paint the final', say: text => say(r, `final: ${text}`) });
   const got = await paintWithRetries(() => paintTry(r, commandFor, plate, logFile, tick), { tries: FINAL_TRIES, say: text => say(r, text), clear: () => fs.rmSync(plate, { recursive: true, force: true }) });
@@ -304,7 +308,7 @@ async function compileOnce(r, choice, script, plate, edit) {
     if (script) fs.writeFileSync(scriptFile, JSON.stringify(script, null, 1) + '\n');
     if (edit) fs.writeFileSync(editFile, JSON.stringify(edit, null, 1) + '\n');
     const command = buildCommand(mine, { mode: 'plan', out: plate, known, dirty: codeState(ROOT).dirty, segEnv, script: script ? { file: scriptFile, paints: script.palette } : null, edit: edit ? { file: editFile } : null });
-    const done = await planSlot(() => runPainter(command, { cwd: ROOT, logFile: `${plate}.log` })), results = collectResults(plate, 'plan');
+    const done = await planSlot(() => render.plan(command, { cwd: ROOT, logFile: `${plate}.log` })), results = collectResults(plate, 'plan');
     if ((done.exit !== 0 && done.exit !== 3) || !results.planPreview || !fs.existsSync(path.join(plate, 'value-plan.json'))) {
       // an edited plan that cannot be laid as asked: every fault of it, as the painter wrote them out, not the first alone
       let faults = null; try { faults = JSON.parse(fs.readFileSync(path.join(plate, 'plan-edit-faults.json'), 'utf8')).message; } catch { /* another failure */ }
@@ -339,7 +343,8 @@ async function paintLookOnce(r, choice, script, plate, at, edit, compiled, ask =
   const { spec, record } = r, scriptFile = `${plate}.script.json`, editFile = `${plate}.plan-edit.json`;
   try {
     const full = await specWith(r, choice);
-    const small = await specWith(r, choice, lookSets(withChoice(req.sets, choice), full.sheet.cells));
+    // a rounds look records no film (ask.noFilm): the final alone is filmed, so a look does not pay for frames
+    const small = await specWith(r, choice, lookSets(withChoice(req.sets, choice).filter(([k]) => !ask.noFilm || !['video', 'frames'].includes(k)), full.sheet.cells));
     // the code planner's plan is never planned again for the small sheet: the look is painted from the plan this
     // choice was planned with at the final size (plan-file.mjs), with that plan's paints
     let planOf = null;
@@ -377,16 +382,17 @@ async function paintLookOnce(r, choice, script, plate, at, edit, compiled, ask =
       say(r, `look ${at.look} NOT PAINTED: ${fault}${why ? ` (${why})` : ''}`);
       return { ok: false, error: tidy(`${fault}${why ? `: ${why}` : ''}`) };
     }
-    const numbers = await planNumbers({ plate, planPreview: results.planPreview ?? compiled.planPreview, run: runOf(record, small), script, painting: results.painting });
+    // a rounds look sends back the sheet only (ask.sheetOnly): nothing is measured against a study and no picture beside the subject is made
+    const numbers = ask.sheetOnly ? null : await planNumbers({ plate, planPreview: results.planPreview ?? compiled.planPreview, run: runOf(record, small), script, painting: results.painting });
     // the work it really did, by the painter's own counts (look-cost.mjs): what it is charged
     let work = null, workFault = null;
     try { work = paintedWork({ sweeps: stoppedAt ? stoppedAt.strokes : sweepsInLog(fs.readFileSync(`${plate}.log`, 'utf8')), passes: passesOf(path.join(plate, 'value-plan.json')), passesDone: stoppedAt?.passesDone ?? null }); } catch (e) { workFault = e.message; say(r, `look ${at.look}: ${e.message}`); }
     // and what the painter's backend record says of it (water steps, cell-steps): recorded, never charged
     if (work) Object.assign(work, backendWork(plate, cellsOf(small.sheet.cells, spec.sheet)) ?? { waterSteps: null, waterStepsWhy: 'no backend record (a look stopped at a stage writes none)' });
-    say(r, `look ${at.look} painted and dried in ${Math.round(done.seconds / 60)} min (${results.backend.backend}, no fallback); ${numbers.marked.forms} named forms marked`);
-    return { ok: true, picture: await lookPicture({ planPreview: results.painting, run: record }), stages: results.strip ? await stagesPicture(results.strip) : null,
-      planPicture: compiled.planPreview ? await planPicture({ planPreview: compiled.planPreview, run: record }) : null,
-      numbersText: `${stoppedAt ? `${stoppedText(stoppedAt, ask.until)}\n\n` : ''}${numbersText(numbers, { script: Boolean(script), painted: size })}`, marked: numbers.marked, stoppedText: stoppedAt ? stoppedText(stoppedAt, ask.until) : null,
+    say(r, `look ${at.look} painted and dried in ${Math.round(done.seconds / 60)} min (${results.backend.backend}, no fallback)${numbers ? `; ${numbers.marked.forms} named forms marked` : ''}`);
+    return { ok: true, picture: ask.sheetOnly ? null : await lookPicture({ planPreview: results.painting, run: record }), stages: results.strip && !ask.sheetOnly ? await stagesPicture(results.strip) : null,
+      planPicture: compiled.planPreview && !ask.sheetOnly ? await planPicture({ planPreview: compiled.planPreview, run: record }) : null,
+      numbersText: numbers ? `${stoppedAt ? `${stoppedText(stoppedAt, ask.until)}\n\n` : ''}${numbersText(numbers, { script: Boolean(script), painted: size })}` : null, marked: numbers?.marked ?? null, stoppedText: stoppedAt ? stoppedText(stoppedAt, ask.until) : null,
       painted: { work, workFault, until: ask.until ?? null, stopped: stoppedAt ? { passesDone: stoppedAt.passesDone, passesPlanned: stoppedAt.passesPlanned, strokes: stoppedAt.strokes } : null, region: ask.region?.box ?? null, regionPassages: inRegion ? `${inRegion.kept} of ${inRegion.of} passages` : null, cells: small.sheet.cells, fullCells: full.sheet.cells, size, seconds: done.seconds, waitedSeconds: Math.round((started - asked) / 1000), backend: results.backend, plate, painting: results.painting, strip: results.strip, render: rendered } };
   } catch (e) { return { ok: false, error: tidy(e.message) }; }
 }
@@ -649,6 +655,41 @@ async function lookOfChoice(r, fin) {
   say(r, `look painted and dried in ${got.painted.seconds} s on the ${got.painted.backend?.backend}: ${path.join(out, 'beside.png')}${got.painted.stopped ? `; stopped after stage ${req.until}: ${got.painted.stopped.passesDone} of ${got.painted.stopped.passesPlanned} passes` : ''}${got.painted.regionPassages ? `; ${got.painted.regionPassages} in the region` : ''}`);
 }
 
+/**
+ * What a run of fixed rounds borrows from this command (rounds-run.mjs): the same compile, look and final as a
+ * session's, the water-step guard, and a place among the model calls.
+ */
+// replies at once, a provider (rounds-call.mjs): the runs themselves all go on together
+const roundsSlots = Object.fromEntries(Object.entries(ROUNDS_AT_ONCE).map(([cli, n]) => [cli, pool(n)]));
+const roundsLent = {
+  root: ROOT, briefFile: BRIEF_FILE, looksMost, get level() { return level.name; }, get terms() { return terms; }, get previous() { return req.previous ? path.resolve(req.previous) : null; }, say,
+  // level 4's traced shapes: a prepared input, from the prepared folder of this code, else the newest of the subject that holds them (said)
+  shapesFile(r) {
+    const mine = preparedAt(r.spec), root = path.dirname(mine), all = [mine, ...(fs.existsSync(root) ? fs.readdirSync(root).map(d => path.join(root, d)).filter(d => d !== mine).sort((a, b) => (fs.existsSync(path.join(b, 'prepared.json')) ? fs.statSync(path.join(b, 'prepared.json')).mtimeMs : 0) - (fs.existsSync(path.join(a, 'prepared.json')) ? fs.statSync(path.join(a, 'prepared.json')).mtimeMs : 0)) : [])];
+    const folder = all.find(d => fs.existsSync(path.join(d, SHAPES_FILE)));
+    if (!folder) throw new Error(`the studies' traced shapes of ${r.spec.id} are not prepared; level 4 hands them over. Make them once with:\n  ${prepareCommand({ subject: r.spec.id, level: 'L4', sets: req.sets })}`);
+    if (folder !== mine) say(r, `the traced shapes are taken from an earlier prepared folder of this subject (${path.basename(folder)}): none is prepared for this code`);
+    return path.join(folder, SHAPES_FILE);
+  },
+  // the water-step ceiling needs Auto's count of the subject: from the prepared folder of this code, else the
+  // newest prepared folder of the subject, said and recorded (rounds are handed nothing else of what is prepared)
+  guard(r) {
+    const mine = preparedAt(r.spec), root = path.dirname(mine), all = [mine, ...(fs.existsSync(root) ? fs.readdirSync(root).map(d => path.join(root, d)).filter(d => d !== mine && fs.existsSync(path.join(d, 'prepared.json'))).sort((a, b) => fs.statSync(path.join(b, 'prepared.json')).mtimeMs - fs.statSync(path.join(a, 'prepared.json')).mtimeMs) : [])];
+    for (const folder of all) {
+      let unit; try { unit = JSON.parse(fs.readFileSync(path.join(folder, 'prepared.json'), 'utf8')).unit; guardFrom(r, folder, unit); } catch { continue; }
+      r.record.author.waterGuard.from = folder; r.record.author.prepared = { plan: false, painting: false, from: folder, note: 'rounds are handed nothing of the prepared plan; the folder gives the water-step ceiling only' };
+      if (folder !== mine) say(r, `the water-step ceiling (${r.waterMost}) is taken from an earlier prepared folder of this subject (${path.basename(folder)}): none is prepared for this code`);
+      return;
+    }
+    throw new Error(`no prepared folder of ${r.spec.id} holds Auto's water-step count, so the water-step guard has no ceiling; prepare the subject once:\n  ${prepareLine(r.spec)}`);
+  },
+  toolsCheck: async (r, tools) => { try { resolveTools(tools, await baseOf(r)); } catch (e) { throw new Error(tidy(e.message)); } },
+  compile: (r, choice, script, plate) => compileChoice(r, choice, script, plate),
+  look: (r, choice, script, plate, at, compiled, ask) => paintLook(r, choice, script, plate, at, null, compiled, { ...ask, noFilm: true, sheetOnly: true }),
+  paintChoice: (r, fin) => paintChoice(r, fin),
+  slot: cli => roundsSlots[cli],
+};
+
 async function oneRun(r) {
   const { spec, record, authorFull: author } = r;
   fs.mkdirSync(record.out, { recursive: true });
@@ -686,6 +727,8 @@ async function oneRun(r) {
       const fin = { choice, script: choice.kind === 'script' ? checkAuthored(read(choice.script), { sheetWidthMm: spec.sheet.widthMm }).script : null, edit: choice.kind === 'plan' ? read(choice.plan) : null, submitted: { kind: choice.kind, what: choiceKind(choice) } };
       record.author.chose = fin.submitted.what; record.author.label = authorLabel(record.author);
       if (req.look) await lookOfChoice(r, fin); else await paintChoice(r, fin);
+    } else if (author.work === 'rounds') {
+      await roundsRun(r, roundsLent);
     } else if (author.work === 'session') {
       await sessionRun(r);
     } else {

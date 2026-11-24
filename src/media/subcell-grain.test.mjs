@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { makePaper } from './paper.mjs';
-import { subcellLayers } from './subcell-grain.mjs';
+import { subcellLayers, subcellSpread } from './subcell-grain.mjs';
+import { renderLayers, renderCells } from './km.mjs';
 import { gaussianField } from './grain-field.mjs';
 
 const U = { gamma: 0.85 }, P = { gamma: 0 };
@@ -36,4 +37,17 @@ test('granulating paint gathers in the pits of the same paper, evaluated finer; 
 
 test('a paper without a physical relief refuses', () => {
   assert.throws(() => subcellLayers([[cells]], [U], makePaper(20, 16, { seed: 3 }), 4), /no physical relief/);
+});
+
+test('layers spread and composited one at a time give the same picture as all at once, byte for byte', () => {
+  // two paints with real optics, three layers that overlap in part and one that is empty
+  const pigs = [{ gamma: 0.85, K: [0.9, 0.5, 0.1], S: [0.2, 0.3, 0.6] }, { gamma: 0, K: [0.1, 0.4, 0.9], S: [0.5, 0.2, 0.1] }];
+  const n = 20 * 16, N = 4, FN = n * N * N, part = k => Float32Array.from({ length: n }, (_, i) => ((i % 20) > 3 * k && ((i / 20) | 0) < 14 - 2 * k ? 0.15 + 0.1 * Math.sin(i * (0.2 + k)) : 0));
+  const layers = [[part(0), part(1)], [new Float32Array(n), new Float32Array(n)], [part(2), part(0)], [part(1), part(3)]];
+  const base = Uint8Array.from({ length: FN * 3 }, (_, i) => 225 + (i * 7) % 30);
+  const whole = renderLayers(subcellLayers(layers, pigs, paper, N), pigs, base, FN);
+  const spread = subcellSpread(pigs, paper, N), under = Float64Array.from(base, v => v / 255), out = new Uint8ClampedArray(FN * 3);
+  layers.forEach((layer, q) => renderCells([spread(layer)], pigs.map(p => p.K), pigs.map(p => p.S), base, 0, FN, 1, null, q === layers.length - 1 ? out : null, under, under));
+  assert.deepEqual(Buffer.from(out.buffer), Buffer.from(whole.buffer));
+  assert.ok(whole.some((v, i) => v !== base[i]), 'the layers show');
 });

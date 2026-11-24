@@ -429,7 +429,7 @@ class Route(unittest.TestCase):
         hosted = J.settings({"JUDGE_ROUTE": "openrouter", "OPENROUTER_API_KEY": "k"})
         self.assertEqual(local["route"], "local")
         self.assertEqual(local["panel"], hosted["panel"]); self.assertEqual(local["panel"], list(J.PANELS["open3"]["models"]))
-        self.assertEqual((local["panelName"], hosted["panelName"], local["reasoning"], hosted["reasoning"]), ("open3", "open3", "off", "off"))
+        self.assertEqual((local["panelName"], hosted["panelName"], local["reasoning"], hosted["reasoning"]), ("open3", "open3", "low", "low"))
         self.assertEqual((local["label"], hosted["label"]), ("open3-local-3x", "open3-openrouter-3x"))
         # each route serves the same judges under its own names
         self.assertEqual(local["names"], {"zai-org/GLM-5.3-Flash": "glm-5.3-flash:test", "Qwen/Qwen3.8-27B": "qwen3.8:27b-mlx", "google/gemma-4-31b-it": "gemma4:31b-mlx"})
@@ -469,15 +469,30 @@ class Route(unittest.TestCase):
                                           "message": {"content": "x"}, "models": [{"name": t, "digest": "d-" + t} for t in ("glm-5.3-flash:test", "qwen3.8:27b-mlx", "gemma4:31b-mlx")]}).encode())
         usage = [J.post(hosted, m, [{"type": "text", "text": "hi"}], opener=opener)[1] for m in hosted["panel"]]
         self.assertEqual([b["model"] for b in seen], ["z-ai/glm-5.3-flash", "qwen/qwen3.8-27b", "google/gemma-4-31b-it"])
-        self.assertTrue(all(b["provider"]["zdr"] and b["reasoning"] == {"effort": "none"} for b in seen))
+        self.assertTrue(all(b["provider"]["zdr"] and b["reasoning"] == {"effort": "low"} and b["max_tokens"] == 1024 + 6000 for b in seen))
         self.assertEqual(usage[0]["reasoning_tokens"], 40, "a hosted judge that reasons all the same reports it")
         local = J.settings(dict(self.TAGS)); seen.clear()
         J.post(local, "zai-org/GLM-5.3-Flash", [{"type": "text", "text": "hi"}], opener=opener)
-        self.assertEqual((seen[0]["model"], seen[0]["think"]), ("glm-5.3-flash:test", False))
+        self.assertEqual((seen[0]["model"], seen[0]["think"]), ("glm-5.3-flash:test", "low"))
         rl, rh = J.record(local, opener), J.record(hosted)
         for r in (rl, rh):
-            self.assertEqual((r["panelName"], r["reasoning"], r["panel"]), ("open3", "off", list(J.PANELS["open3"]["models"])))
+            self.assertEqual((r["panelName"], r["reasoning"], r["panel"]), ("open3", "low", list(J.PANELS["open3"]["models"])))
         self.assertEqual(rl["digests"]["zai-org/GLM-5.3-Flash"], "d-glm-5.3-flash:test"); self.assertEqual(rh["sentAs"]["Qwen/Qwen3.8-27B"], "qwen/qwen3.8-27b")
+
+    def test_a_dead_judge_is_found_by_one_short_question_before_the_batch(self):
+        hosted = J.settings({"JUDGE_ROUTE": "openrouter", "OPENROUTER_API_KEY": "k"})
+        def answering(dead):
+            def post(cfg, model, content, max_tokens=64, **kw):
+                self.assertEqual((content[0]["text"], len(content), max_tokens), (J.PROBE, 1, 64))
+                if model == dead.get("refuses"):
+                    raise RuntimeError(f"openrouter call failed ({model}): HTTP 400")
+                return ("" if model == dead.get("empty") else '```json\n{"ok": true}\n```'), {}
+            return post
+        self.assertEqual(J.probe(hosted, post=answering({})), list(hosted["panel"]))
+        with self.assertRaisesRegex(J.RouteError, r"2 of 3 gave no valid answer(.|\n)*GLM-5.3-Flash: openrouter call failed(.|\n)*HTTP 400(.|\n)*Qwen3.8-27B: an empty reply"):
+            J.probe(hosted, post=answering({"refuses": "zai-org/GLM-5.3-Flash", "empty": "Qwen/Qwen3.8-27B"}))
+        # the local route is not probed: it would load every model before the first reading
+        self.assertEqual(J.probe(J.settings(dict(self.TAGS)), post=answering({"refuses": "zai-org/GLM-5.3-Flash"})), [])
 
     def test_hosted_call_sends_the_key_but_never_records_it(self):
         cfg = J.settings({"JUDGE_ROUTE": "openrouter", "OPENROUTER_API_KEY": "sekrit-123", "JUDGE_PANEL": "j1"})

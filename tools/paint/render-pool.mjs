@@ -1,6 +1,7 @@
 // The render pool (UNPAINT_RENDER=pool, render.mjs): a painting is painted on whichever machine is free, this Mac,
 // a rented pod or the Mac mini, at the session's commit, and what it wrote comes back into the folder the session
-// reads, as if it had been painted here. One painting a worker. Shared by every command on this Mac through one
+// reads, as if it had been painted here. A worker paints as many at once as it has places (a pod's `slots` in
+// pods.json, measured per GPU type by the pods daemon). Shared by every command on this Mac through one
 // folder (the pool folder: claims, waiting jobs, live clients, the pods' list), so eight sessions in eight commands
 // share the workers and none waits for this Mac's one GPU.
 //
@@ -114,28 +115,38 @@ export function registerClient(dir, { sessions, commit }) {
 
 // ---- workers ------------------------------------------------------------------------------------------------------
 
-/** Kinds of job a pod takes: a full-size painting (a final, a subject's prepared Auto painting), unattended. A look
- * goes to this Mac or the mini: a pod paints a small look about three times slower than the mini and takes minutes to
- * rent, while a session waits on its look. */
+/** Kinds of job only a pod takes: a full-size painting (a final, a subject's prepared Auto painting), unattended. A
+ * look goes to this Mac or the mini first and to a pod that is up when both are full. */
 export const POD_KINDS = new Set(['painting']);
 /**
- * The places a job of `kind` could take now, best first: a look this Mac (no copy) then the mini's places; a painting
- * a pod (one painting a pod). A pod is a place only once it is ready, has a checkout of `commit` and has time left; `avoid` is a worker
- * that failed this job; `only`: the kinds allowed (UNPAINT_POOL_ONLY, for the operator). [{slot, worker: {kind, name, ...}}]
+ * The places a job of `kind` could take now, best first: a look this Mac (no copy), then the mini's places, then the
+ * pods' places; a painting the pods' places only. A pod has `slots` places (pods.json, set by the pods daemon from
+ * what its GPU type was measured to paint at once; 1 when it does not say): pod-<name>, pod-<name>-1, ... A pod is a
+ * place only once it is ready, has a checkout of `commit` and has time left; `avoid` is a worker that failed this
+ * job; `only`: the kinds allowed (UNPAINT_POOL_ONLY, for the operator). [{slot, worker: {kind, name, ...}}]
  */
 export function places({ pods = [], mini = null, local = DEFAULT_LOCAL, commit, kind = 'look', avoid = null, only = null, now = Date.now() }) {
   const out = [];
-  if (POD_KINDS.has(kind)) {
-    for (const p of pods) if (p.ready && p.trees?.[commit.slice(0, 8)] && (p.limit ?? Infinity) * 1000 - now > POD_MARGIN_S * 1000) out.push({ slot: `pod-${p.name}`, worker: { kind: 'pod', name: p.name, host: p.ip, port: p.port, rate: p.rate, tree: p.trees[commit.slice(0, 8)], base: '/root/render-pool' } });
-    return out.filter(p => p.worker.name !== avoid && (!only || only.includes(p.worker.kind)));
+  if (!POD_KINDS.has(kind)) {
+    for (let k = 0; k < local; k++) out.push({ slot: `local-${k}`, worker: { kind: 'local', name: 'this Mac' } });
+    if (mini) for (let k = 0; k < (mini.slots ?? 2); k++) out.push({ slot: `mini-${k}`, worker: { kind: 'mini', name: 'Mac mini', host: mini.host ?? 'mini', slots: mini.slots ?? 2 } });
   }
-  for (let k = 0; k < local; k++) out.push({ slot: `local-${k}`, worker: { kind: 'local', name: 'this Mac' } });
-  if (mini) for (let k = 0; k < (mini.slots ?? 2); k++) out.push({ slot: `mini-${k}`, worker: { kind: 'mini', name: 'Mac mini', host: mini.host ?? 'mini', slots: mini.slots ?? 2 } });
+  // the pods' places level by level, so paintings spread over the pods before any pod takes a second one
+  const up = pods.filter(p => p.ready && p.trees?.[commit.slice(0, 8)] && (p.limit ?? Infinity) * 1000 - now > POD_MARGIN_S * 1000);
+  for (let k = 0; k < Math.max(0, ...up.map(p => p.slots ?? 1)); k++) for (const p of up) if (k < (p.slots ?? 1)) out.push({ slot: k ? `pod-${p.name}-${k}` : `pod-${p.name}`, worker: { kind: 'pod', name: p.name, host: p.ip, port: p.port, rate: p.rate, slots: p.slots ?? 1, tree: p.trees[commit.slice(0, 8)], base: '/root/render-pool' } });
+  // the operator may name the mini for full-size paintings too (UNPAINT_POOL_ONLY=mini, or mini,pod): it is free and
+  // paints one faster than a pod; it comes after the pods, so the mini's places stay with the looks while a pod is free
+  if (POD_KINDS.has(kind) && only?.includes('mini') && mini) for (let k = 0; k < (mini.slots ?? 2); k++) out.push({ slot: `mini-${k}`, worker: { kind: 'mini', name: 'Mac mini', host: mini.host ?? 'mini', slots: mini.slots ?? 2 } });
   return out.filter(p => p.worker.name !== avoid && (!only || only.includes(p.worker.kind)));
 }
+/** The pod places a look leaves alone: one for each live painting waiting, since a painting has nowhere else to go. */
+export function podPlacesKept(dir, isAlive = alive) {
+  const d = path.join(dir, 'waiting');
+  return (fs.existsSync(d) ? fs.readdirSync(d) : []).map(n => readJson(path.join(d, n))).filter(w => w && POD_KINDS.has(w.kind) && isAlive(w.pid)).length;
+}
 
-/** What a pod's time cost for a job held `seconds`, in dollars (its hourly rate); 0 for the Macs. */
-export const costOf = (worker, seconds) => (worker.kind === 'pod' ? +(((worker.rate ?? 0) * seconds) / 3600).toFixed(4) : 0);
+/** What a pod's place cost for a job held `seconds`, in dollars: its hourly rate shared among its places; 0 for the Macs. */
+export const costOf = (worker, seconds) => (worker.kind === 'pod' ? +(((worker.rate ?? 0) / (worker.slots ?? 1) * seconds) / 3600).toFixed(4) : 0);
 
 const SSH_OPTS = ['-o', 'BatchMode=yes', '-o', 'ConnectTimeout=15', '-o', 'ServerAliveInterval=20', '-o', 'LogLevel=ERROR'];
 /** The ssh words for a worker (a pod by address and key, the mini by its ssh name). */
@@ -331,7 +342,8 @@ const logLine = (dir, line) => { fs.mkdirSync(dir, { recursive: true }); fs.appe
  * look while it waits (final-wait.mjs: a line a minute, and the stop past the final's limit).
  */
 async function takePlace({ dir, env, id, commit, avoid, gpuCount, kind, remoteFor, pollMs, daemonAlive, tick }) {
-  const w = path.join(dir, 'waiting', `${id}.json`); writeJson(w, { id, pid: process.pid, since: Date.now(), commit, kind });
+  // (`only`: the kinds of worker this job may take, when the operator named them: the pods daemon rents no pod for a job that cannot use one)
+  const w = path.join(dir, 'waiting', `${id}.json`); writeJson(w, { id, pid: process.pid, since: Date.now(), commit, kind, ...(env.UNPAINT_POOL_ONLY ? { only: env.UNPAINT_POOL_ONLY.split(',') } : {}) });
   const most = Number(env.UNPAINT_POOL_LOCAL ?? DEFAULT_LOCAL); let goneSince = null;
   try {
     for (;;) {
@@ -342,7 +354,8 @@ async function takePlace({ dir, env, id, commit, avoid, gpuCount, kind, remoteFo
       // however stale its heartbeat (it is busy setting up a pod); one that is gone is waited for a while, then a plain stop
       const podsAt = readJson(path.join(dir, 'pods.json'))?.updated, nowS = Date.now() / 1000;
       let why = 'every place is busy';
-      if (POD_KINDS.has(kind)) {
+      // (a painting the operator lets the mini take does not need a pod, so it does not need the daemon)
+      if (POD_KINDS.has(kind) && !any.some(p => p.worker.kind === 'mini')) {
         const state = podsDaemon({ updated: podsAt, nowS, processAlive: daemonAlive() }), said = `${path.join(dir, 'pods.json')} ${podsAt ? `last written ${Math.round(nowS - podsAt)} s ago` : 'is missing'}`;
         if (state === 'never') throw new Error(`render pool: a full-size painting is painted on a pod, and the pods daemon is not running (${said}, no daemon process); start it: python3 tools/cloud/render-pool-pods.py ${dir}`);
         if (state === 'gone') { goneSince ??= nowS; if (nowS - goneSince > DAEMON_GONE_GRACE_S) throw new Error(`render pool: a full-size painting is painted on a pod, and the pods daemon has stopped (${said}, no daemon process for ${Math.round((nowS - goneSince) / 60)} min); start it: python3 tools/cloud/render-pool-pods.py ${dir}`); why = `the pods daemon's process is gone (${said}); waiting ${Math.round(DAEMON_GONE_GRACE_S / 60)} min for it to be started again`; }
@@ -361,6 +374,8 @@ async function takePlace({ dir, env, id, commit, avoid, gpuCount, kind, remoteFo
         }
         open.push(p);
       }
+      // a look takes a pod's place only past the ones the waiting paintings will take
+      if (!POD_KINDS.has(kind)) { let keep = podPlacesKept(dir); for (let i = 0; i < open.length && keep > 0; i++) if (open[i].worker.kind === 'pod') { open.splice(i--, 1); keep--; } }
       const rank = waitRank(dir, id);
       if (open.length > rank) for (const p of open) if (claim(dir, p.slot, { job: id, kind, worker: p.worker.name })) return p;
       tick(why);

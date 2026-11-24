@@ -24,7 +24,15 @@ export const SUBCELL_GAIN = 0.2;
  * w*N x h*N pixel masses, each pixel holding mass per pixel scaled so a cell's N^2 pixels sum to N^2 times its mass
  * (the same areal density on average, so renderLayers composites them as it would the cells).
  */
-export function subcellLayers(layers, pigments, paper, N, { gain = SUBCELL_GAIN } = {}) {
+export function subcellLayers(layers, pigments, paper, N, opts = {}) {
+  return layers.map(subcellSpread(pigments, paper, N, opts));
+}
+/**
+ * The same, a layer at a time: spread(layer) gives that layer's planes at N x N pixels a cell. A caller that
+ * composites each layer as it is made (finish.mjs) holds one layer's planes, not every layer's: a sheet of 165
+ * layers at 2172 x 2896 held 25 GB of them at once.
+ */
+export function subcellSpread(pigments, paper, N, { gain = SUBCELL_GAIN } = {}) {
   const { w, h, mmPerCell } = paper;
   if (!(mmPerCell > 0) || !paper.reliefOf) throw new Error('subcell-grain: the paper has no physical relief (make it with makePaper and mmPerCell or coldPress)');
   const { seed, relief } = paper.reliefOf;
@@ -52,7 +60,7 @@ export function subcellLayers(layers, pigments, paper, N, { gain = SUBCELL_GAIN 
     if (!weights.has(g)) { const a = new Float32Array(FW * FH); for (let q = 0; q < a.length; q++) a[q] = Math.exp((g * (zref[q] - z[q])) / unit); weights.set(g, a); }
     return weights.get(g);
   };
-  return layers.map(layer => layer.map((cells, k) => {
+  return layer => layer.map((cells, k) => {
     const out = new Float32Array(FW * FH);
     // only the cells that hold pigment and one cell about them (the farthest an interpolation reaches): every other
     // pixel is 0 and every other cell's factor 0 after the first pass, as on the whole sheet, so the result is the same
@@ -81,7 +89,7 @@ export function subcellLayers(layers, pigments, paper, N, { gain = SUBCELL_GAIN 
       out[q] = sum[c] > 0 ? (out[q] * cells[c] * N * N) / sum[c] : cells[c];
     }
     return out;
-  }));
+  });
 }
 function axis(F, n, N) {
   const i0 = new Int32Array(F), i1 = new Int32Array(F), t = new Float64Array(F);

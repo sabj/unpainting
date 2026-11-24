@@ -22,7 +22,7 @@ For each painting (s04_runs.py says what a run folder must hold):
     how well the painting is a painting of that picture, 1 to 5 with a reason. At the bottom of the scale it is flagged.
   4 beside, never blended: the painter's cheat-risk record and progression, classic.py against the original, and the
     same figures adjusted for the subject's Auto painting among the inputs.
-  5 the judges are ONE named panel on every route (s04_judge.py: JUDGE_PANEL, open3 by default, reasoning off); the
+  5 the judges are ONE named panel on every route (s04_judge.py: JUDGE_PANEL, open3 by default, reasoning low); the
     route is JUDGE_ROUTE: local by default, openrouter or together with their key. Panel, route and settings are
     written into results.json; a judge that reasoned although the setting is off is named under "Faults first".
   6 usage beside the score: each run's usage.json.
@@ -171,6 +171,9 @@ def main(argv=None, judge=s04_judge, env=None, say=print):
         if bad:
             raise R.Refusal("\n".join(bad))
         jrec = judge.record(cfg)
+        # every judge answers one short question before anything is read (s04_judge.probe): a dead judge stops the batch here
+        if getattr(judge, "probe", None):
+            judge.probe(cfg)
     except (s04_judge.RouteError, R.Refusal, RuntimeError) as x:
         print("bench:score04 refused, nothing was judged:\n" + str(x), file=sys.stderr)
         return 2

@@ -4,7 +4,8 @@
 //   pool                 on a free worker of the render pool (render-pool.mjs: this Mac, a pod or the Mac mini), at
 //                        the session's commit, the painting's files brought back where the session reads them
 // An execution setting, not a painting change: the same command is painted, at the same commit, and the same files
-// come back. The plans (CPU, valuepreviewonly) stay on this Mac either way.
+// come back. A plan preview (CPU, valuepreviewonly: a session's compile of each script) goes the same way as kind
+// 'plan', so the pool's UNPAINT_POOL_ONLY keeps it off this Mac too and its places cap how many run here at once.
 import { runPainter, gpuPaintCount } from './run.mjs';
 import { paintThroughStage } from './stage-look.mjs';
 import { paintOnPool, poolDir, registerClient, DEFAULT_CAP } from './render-pool.mjs';
@@ -36,12 +37,13 @@ export async function paintHere(command, { cwd, logFile, onLine, until = null, p
  * record: never what the model is charged, which stays the painter's own count of its work).
  * `codeState()`: the checkout's {commit, dirty}; the pool paints committed code only, since only a commit travels.
  */
-export function renderer(env, { root, codeState }) {
+export function renderer(env, { root, codeState, run = runPainter }) {
   const mode = renderSetting(env);
   if (mode === 'local') {
     return { mode, pool: false, cap: null, register: () => null,
+      plan: (command, opts) => run(command, opts),
       paint: async (command, opts) => {
-        const t = Date.now(), r = await paintHere(command, opts);
+        const t = Date.now(), r = await paintHere(command, opts, run);
         return { ...r, render: { mode, worker: 'this Mac', workerKind: 'local', waitSeconds: 0, paintSeconds: Math.round((Date.now() - t) / 1000), copySeconds: 0, costUSD: 0 } };
       } };
   }
@@ -52,7 +54,10 @@ export function renderer(env, { root, codeState }) {
     if (!s.commit || s.dirty) throw new Error(`UNPAINT_RENDER=pool paints committed code only (a worker paints at the commit): ${root} ${s.commit ? 'has uncommitted changes' : 'has no commit'}`);
     return s.commit;
   };
+  const paint = (command, opts) => paintOnPool({ ...opts, command, out: outOf(command), commit: committed() }, { dir, env, local: (c, o) => paintHere(c, { ...o, until: opts.until, pauseDir: opts.pauseDir }, run), gpuCount: gpuPaintCount, repo: root });
   return { mode, pool: true, cap, dir,
     register: sessions => registerClient(dir, { sessions, commit: committed() }),
-    paint: (command, opts) => paintOnPool({ ...opts, command, out: outOf(command), commit: committed() }, { dir, env, local: (c, o) => paintHere(c, { ...o, until: opts.until, pauseDir: opts.pauseDir }), gpuCount: gpuPaintCount, repo: root }) };
+    // a plan preview through the pool: {exit, signal, seconds} as runPainter gives it
+    plan: (command, opts) => paint(command, { ...opts, kind: 'plan' }).then(x => x.done),
+    paint };
 }

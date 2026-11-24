@@ -44,7 +44,7 @@ import path from 'node:path';
 import sharp from 'sharp';
 import {makePaper} from '../../src/media/paper.mjs';
 import {paperRelief} from '../../src/media/paper-relief.mjs';
-import {subcellLayers} from '../../src/media/subcell-grain.mjs';
+import {subcellSpread} from '../../src/media/subcell-grain.mjs';
 import {createSheet, step, dry as physicalDry, layersOf, thickness, thicknessTotals, DEFAULTS, coherent} from '../../src/media/sheet.mjs';
 import {attachGpu} from '../../src/media/gpu/link.mjs';
 import {CpuDemandWindow} from '../../src/media/gpu/cpu-demand-window.mjs';
@@ -547,10 +547,10 @@ const renderFine = () => {
   const layers = layersOf(ctx.sheet);
   // on a physical sheet each layer's pigment is spread over the same paper evaluated N times finer (subcell-grain.mjs),
   // not enlarged cells: granulating paint in the fine pits, every cell keeping its own pigment
-  const fineLayers = CP_MM && N > 1 ? subcellLayers(layers, SHEET_PIGS, ctx.sheet.paper, N) : null;
+  const spread = CP_MM && N > 1 ? subcellSpread(SHEET_PIGS, ctx.sheet.paper, N) : null;
   let mIn = 0, mOut = 0;
   layers.forEach((L, q) => {
-    const fine = fineLayers ? fineLayers[q] : L.map(a => lookUp(a, W2, H2, N));
+    const fine = spread ? spread(L) : L.map(a => lookUp(a, W2, H2, N));
     if (micro) for (let k = 0; k < fine.length; k++) { const a = fine[k], g = micro.amp[k]; for (let i = 0; i < FN; i++) { mIn += a[i]; mOut += a[i] * (1 + g * micro.t[i]); } }
     renderCells([fine], Kp, Sp, fbase, 0, FN, 1, null, q === layers.length - 1 ? outF : null, R, R, micro);
   });
