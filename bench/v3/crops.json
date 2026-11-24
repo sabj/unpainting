@@ -205,6 +205,13 @@
      "heightMm": 384.38,
      "cellMm": 0.26
     }
+   },
+   "unit": {
+    "sweeps": 1730,
+    "dryings": 9,
+    "waterSteps": 4598,
+    "from": "prepared prout-laundresses-qs at 32698365: one full look of the automatic plan, 532 cells across",
+    "cellsAcross": 532
    }
   },
   {
@@ -274,6 +281,13 @@
      "heightMm": 274.82,
      "cellMm": 0.26
     }
+   },
+   "unit": {
+    "sweeps": 3233,
+    "dryings": 21,
+    "waterSteps": 12859,
+    "from": "prepared white-ships-1488-qs at 32698365: one full look of the automatic plan, 744 cells across",
+    "cellsAcross": 744
    }
   }
  ]
