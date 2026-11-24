@@ -558,7 +558,7 @@ export function sessionCall(author, { prompt, cwd, deny = [], images = [], home 
     return { cmd: 'sandbox-exec', env: { ...own.env, ...(gate ? proxyEnv(gate.url) : {}), ...(toolbox?.env ?? {}) }, unset: [], profile, gated: Boolean(gate), signIn,
       // its transcript is not its output: it is the log it keeps under its data folder, in a folder named for the session
       log: { root: own.sessions, id },
-      args: ['-p', profile, 'muse', 'exec', '--json', '--model', author.id, ...(author.effort ? ['--effort', author.effort] : []), '--contributor-mode', 'off', '--no-foreign-personal-context', '--disable-web-tools', '--disable-reminders', '--disable-approval', '--disable-sandbox', '--workspace', cwd, '--session-id', id, prompt],
+      args: ['-p', profile, 'muse', 'exec', '--json', '--model', author.id, ...(author.effort ? ['--effort', author.effort] : []), '--contributor-mode', 'off', '--no-foreign-personal-context', '--disable-web-tools', '--disable-reminders', '--disable-request-user-input', '--disable-approval', '--disable-sandbox', '--workspace', cwd, '--session-id', id, prompt],
       probe: file => ({ cmd: 'sandbox-exec', args: ['-p', profile, '/bin/cat', file] }),
       closed: `the whole command runs under a seatbelt profile of this harness (its own sandbox and permission prompts off inside it): neither its shell nor its file tools can read the repository, the subject list, the caches or other sessions, it writes only in its folder, its own settings and data folders and temporary folders, and ${gate ? `of the home folder reads only those, its program and the login keychain (${SIGN_IN_EXPOSURE}); it reaches only this machine's loopback, where a gate passes its own service's hosts and refuses every other (no downloads, no installs)` : 'reaches the network on port 443 and this machine\'s loopback only'}${HELD}`, eyesHeld: Boolean(eyes) };
   }
@@ -722,7 +722,7 @@ export function ownFolderOf(commands) {
 /** Pictures in the session's folder that the harness did not put there (a plan drawn by other means would be one). */
 const HARNESS_PICTURES = new Set(['mine/drawing.png', 'mine/forms.png', 'mine/forms-ids.png']);
 export function ownPictures(dir) {
-  const out = [], walk = d => { for (const e of fs.readdirSync(d, { withFileTypes: true })) { const f = path.join(d, e.name), rel = path.relative(dir, f); if (e.isDirectory()) { if (!['inputs', 'auto', 'looks', 'drawing', 'previous', 'auto-painting', '.requests'].includes(rel)) walk(f); } else if (/\.(png|jpe?g|gif|webp|bmp|tiff?|svg|ppm|pgm|pdf|html?)$/i.test(e.name) && !HARNESS_PICTURES.has(rel)) out.push(rel); } };
+  const out = [], walk = d => { for (const e of fs.readdirSync(d, { withFileTypes: true })) { const f = path.join(d, e.name), rel = path.relative(dir, f); if (e.isDirectory()) { if (!['inputs', 'auto', 'looks', 'drawing', 'previous', 'auto-painting', 'auto-result', '.requests'].includes(rel)) walk(f); } else if (/\.(png|jpe?g|gif|webp|bmp|tiff?|svg|ppm|pgm|pdf|html?)$/i.test(e.name) && !HARNESS_PICTURES.has(rel)) out.push(rel); } };
   walk(dir); return out.sort();
 }
 

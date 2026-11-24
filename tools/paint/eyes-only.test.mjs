@@ -58,6 +58,13 @@ test('the rule names the viewer by its program; with none, no process reads a pi
   assert.doesNotMatch(eyesRule({ cwd: '/t/s', pictures: [], viewers: [] }).join('\n'), /process-path/);
   assert.throws(() => viewersOf('model', () => { throw new Error('not found'); }), /eyes only: the `model` command is not on PATH/);
   assert.deepEqual(viewersOf('model', () => '/no/such/place/model'), ['/no/such/place/model']);
+  // muse is a launcher script beside muse-bin-*: both the launcher and its exec'd binary are recognised as viewers
+  const dir = fs.mkdtempSync(path.join(fs.realpathSync(os.tmpdir()), 'unpaint-muse-viewer-'));
+  try {
+    const launcher = path.join(dir, 'muse'), bin = path.join(dir, 'muse-bin-1.4.25');
+    fs.writeFileSync(launcher, '#!/bin/sh\n'); fs.writeFileSync(bin, ''); fs.writeFileSync(path.join(dir, '.muse-version'), '1.4.25\n');
+    assert.deepEqual(viewersOf('muse', () => launcher), [launcher, bin]);
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });
 
 test('a refused read or a script that names a picture disqualifies the try, in level 1\'s words; showing and looking do not', () => {

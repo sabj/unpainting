@@ -35,7 +35,11 @@ export function viewersOf(cli, which = c => execFileSync('/usr/bin/which', [c], 
   let at; try { at = which(cli); } catch { at = null; }
   if (!at) throw new Error(`eyes only: the \`${cli}\` command is not on PATH, so its image viewer cannot be told from a script; the session is not started`);
   let real = at; try { real = fs.realpathSync(at); } catch { /* as found */ }
-  return [...new Set([at, real])];
+  // muse is a shell launcher that execs a sibling muse-bin-* program beside it; seatbelt checks the exec'd program's path
+  const siblings = cli === 'muse' ? [...new Set([path.dirname(at), path.dirname(real)])].flatMap(d => {
+    try { return fs.readdirSync(d).filter(f => /^muse-bin/.test(f)).flatMap(f => { const p = path.join(d, f); try { return [p, fs.realpathSync(p)]; } catch { return [p]; } }); } catch { return []; }
+  }) : [];
+  return [...new Set([at, real, ...siblings])];
 }
 
 const q = s => `"${String(s).replace(/[\\"]/g, '\\$&')}"`, rx = s => String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
