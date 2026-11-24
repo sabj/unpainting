@@ -27,7 +27,7 @@ import { lookSets, lookCells, lookFromPlan, lookFault, stoppedLookFault, lookSiz
 import { readPlanNote, PLAN_FILE } from '../../src/paint/methods/plan-file.mjs';
 import { toolUseOf, listFiles } from './tool-use.mjs';
 import { PROVIDER_HOSTS, startGate as startNetGate, makeToolbox, toolsText } from './session-net.mjs';
-import { DEFAULT_LOOKS, DEFAULT_WALL_MINUTES, DEFAULT_GRACE_MINUTES, DEFAULT_STEPS, safeRead, writeSession, sessionServer, SIGN_IN_EXPOSURE, finalChoice, sessionCall, readTranscript, reachedOutside, ownFolderOf, ownPictures, runSession } from './session.mjs';
+import { DEFAULT_LOOKS, DEFAULT_WALL_MINUTES, DEFAULT_GRACE_MINUTES, DEFAULT_STEPS, safeRead, writeSession, sessionServer, SIGN_IN_EXPOSURE, finalChoice, sessionCall, readTranscript, transcriptFile, reachedOutside, ownFolderOf, ownPictures, runSession } from './session.mjs';
 import { DEFAULT_REVERTS } from './reverts.mjs';
 import { levelOf, handedAt, OWN_SCRIPT_ONLY } from './levels.mjs';
 import { shapesHanded, checkWithheld } from './level4.mjs';
@@ -67,10 +67,12 @@ const looksMost = req.looks ?? DEFAULT_LOOKS, wallMost = req.wallMinutes ?? DEFA
 // the terms of a try: rendering units and steps are its budget; the wall clock is a safety stop only
 const budget = { looks: looksMost, steps: stepsMost, safetyMinutes: wallMost, graceMinutes: graceMost, reverts: revertsMost };
 /** The model's steps so far, counted from its transcript as it is written (each tool call once); read again only when the file grew. */
-function stepCounter(cli, file) {
+function stepCounter(cli, where) {
   let size = -1, count = 0;
-  return () => { let st; try { st = fs.statSync(file).size; } catch { return count; } if (st !== size) { size = st; count = readTranscript(cli, fs.readFileSync(file, 'utf8')).steps.length; } return count; };
+  return () => { const file = where(); let st; try { st = fs.statSync(file).size; } catch { return count; } if (st !== size) { size = st; count = readTranscript(cli, fs.readFileSync(file, 'utf8')).steps.length; } return count; };
 }
+/** A session's transcript, read where its command keeps it (session.mjs transcriptFile); a log kept outside the run's folder is copied into it first. */
+const transcriptOf = (author, call, dir) => { const f = transcriptFile(call, path.join(dir, 'S.out.txt'), path.join(dir, 'S.log.jsonl')); return readTranscript(author.cli, fs.existsSync(f) ? fs.readFileSync(f, 'utf8') : ''); };
 const BRIEF_FILE = process.env.UNPAINT_AUTHOR_BRIEF || path.join(HERE, 'AUTHOR-BRIEF.md');
 const codeOf = c => ({ commit: c.commit, dirty: Boolean(c.dirty), tracked: c.tracked, untracked: c.untracked.map(u => u.file), diffSha256: c.diffSha256 });
 // the painter's environment: where segmentation lives, and a cache folder keyed on the experiment switches
@@ -523,12 +525,15 @@ async function sessionRun(r) {
       record.author.handed = handed.map(h => ({ folder: h.folder, files: h.files.map(f => ({ name: f.name, sha256: sha(path.join(cwd, h.folder, f.name)), picture: Boolean(f.picture), namedInTheFirstMessage: prompt.includes(`\`${h.folder}/${f.name}\``) })) }));
       if (terms.previous) { const painting = ['painting.png', 'painting.jpg'].map(f => path.join(path.resolve(req.previous), 'plate', f)).find(f => fs.existsSync(f)); record.author.previousTry.paintingSha256 = sha(painting); record.author.previousTry.painting = painting; }
       fs.writeFileSync(path.join(dir, 'session-prompt.txt'), prompt);
-      const server = sessionServer({ dir: cwd, sheet: { widthMm: spec.sheet.widthMm, heightMm: spec.sheet.heightMm }, forms: record.masks.mask ? await formBoxes(record.masks.mask, record.masks.forms, W) : [], looks: looksMost, wallMinutes: wallMost, graceMinutes: graceMost, steps: stepsMost, stepsTaken: stepCounter(author.cli, path.join(dir, 'S.out.txt')), lookSize: lookSizeOf(lookCells(spec.sheet.cells), spec.sheet.cells), reverts: revertsMost, codePlan: terms.plan, startKey: terms.plan ? choiceKey(readChoice({ kind: 'settings', settings: {} }), '') : null, pictures: handedPictures, checkScript: check, checkPlan: terms.plan ? obj => checkEdit(obj, listing) : null, checkTools, ledger: path.join(dir, 'looks.jsonl'), keep: path.join(dir, 'looks'), compile: (choice, script, n, edit) => compileChoice(r, choice, script, path.join(dir, 'plans', String(n)), edit),
+      // the command, once it is made below: its steps are counted from where it keeps its transcript
+      const started = { call: null };
+      const server = sessionServer({ dir: cwd, sheet: { widthMm: spec.sheet.widthMm, heightMm: spec.sheet.heightMm }, forms: record.masks.mask ? await formBoxes(record.masks.mask, record.masks.forms, W) : [], looks: looksMost, wallMinutes: wallMost, graceMinutes: graceMost, steps: stepsMost, stepsTaken: stepCounter(author.cli, () => transcriptFile(started.call, path.join(dir, 'S.out.txt'))), lookSize: lookSizeOf(lookCells(spec.sheet.cells), spec.sheet.cells), reverts: revertsMost, codePlan: terms.plan, startKey: terms.plan ? choiceKey(readChoice({ kind: 'settings', settings: {} }), '') : null, pictures: handedPictures, checkScript: check, checkPlan: terms.plan ? obj => checkEdit(obj, listing) : null, checkTools, ledger: path.join(dir, 'looks.jsonl'), keep: path.join(dir, 'looks'), compile: (choice, script, n, edit) => compileChoice(r, choice, script, path.join(dir, 'plans', String(n)), edit),
         look: (choice, script, at, edit, compiled, ask) => paintLook(r, choice, script, path.join(dir, 'look-paints', `${at.plan}-${at.look}`), at, edit, compiled, ask) });
       // what nothing of the session may read: this checkout, the checkout it is a worktree of (with every worktree, cache
       // and earlier run under it), the subject list with its inputs, and whatever UNPAINT_SESSION_DENY adds (a:b:c)
       const deny = [...sessionDeny(spec), ...runs.filter(o => o !== r && o.sessionDir).map(o => o.sessionDir)];
       const call = sessionCall(author, { prompt, cwd, deny, images: packet.files.filter(f => /source|study-2/.test(f)).map(f => path.join(cwd, f)), gate: routes.gate, toolbox: routes.toolbox });
+      started.call = call;
       // the profile is tried before the model is started: a file of the repository must not be readable under it
       if (call.probe) {
         const can = file => { const p = call.probe(file); try { execFileSync(p.cmd, p.args, { stdio: 'pipe' }); return true; } catch { return false; } };
@@ -551,7 +556,7 @@ async function sessionRun(r) {
       let assessment = null; try { assessment = safeRead(cwd, 'assessment.md').slice(0, 20000); } catch { /* none written */ }
       if (assessment) fs.writeFileSync(path.join(dir, 'assessment.md'), assessment);
       await server.tick(); const kept = await server.stop(); const network = await routes.done(); routes = null;
-      const seen = readTranscript(author.cli, fs.existsSync(path.join(dir, 'S.out.txt')) ? fs.readFileSync(path.join(dir, 'S.out.txt'), 'utf8') : '');
+      const seen = transcriptOf(author, call, dir);
       fin = done.ended === 'not started' ? { failure: `the model could not be called: ${done.error}` } : finalChoice({ present: server.present, lastGood: kept.lastGood, good: kept.good, ended: done.ended, barred: server.barred, codePlan: terms.plan });
       const outside = reachedOutside(seen.commands, deny, [cwd, real]), pictures = ownPictures(cwd);
       // a session ended by the budget is not a failure: it is marked, and what it had is painted
@@ -833,7 +838,7 @@ async function preflightRun(r) {
     server.start();
     done = await modelSlot(() => (call.serial ? agySlot : f => f())(() => { server.begin(); return runSession(call, { cwd, outFile: path.join(dir, 'S.out.txt'), errFile: path.join(dir, 'S.err.txt'), over: server.over }); }));
     await server.tick(); kept = await server.stop(); network = await routes.done(); routes = null;
-    seen = readTranscript(author.cli, fs.existsSync(path.join(dir, 'S.out.txt')) ? fs.readFileSync(path.join(dir, 'S.out.txt'), 'utf8') : '');
+    seen = transcriptOf(author, call, dir);
     try { file = safeRead(cwd, PREFLIGHT_FILE).slice(0, 2000); } catch { /* not written */ }
     fs.writeFileSync(path.join(dir, 'S.commands.txt'), seen.commands.join('\n---\n') + '\n');
   } catch (e) { done = { ...done, error: done.error ?? e.message }; } finally { if (routes) network = await routes.done(); }

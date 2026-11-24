@@ -8,6 +8,10 @@
   "core": { "what": "five pictures, one of each group, on the whole ladder", "pictures": "those marked core", "depth": "full" },
   "extended": { "what": "all fifteen: the core five on the whole ladder, the other ten at Auto and level 2", "pictures": "all", "depth": { "core": "full", "others": "auto-l2" } }
  },
+ "roster": {
+  "what": "the ten models of the 0.4 benchmark (the owner, 23 Nov: \"muse top end, gemini the family, codex the family, anthropic the family\", without Hydrogen, Luna and Haiku), each at medium effort. A key names the model's entry in tools/paint/authors.json (levels 2 to 4) and in bench/models.json (level 1); `node tools/paint/run-sets.mjs check` says whether each has both, the same in both",
+  "models": ["wonderfull-m", "neon-m", "carbon-m", "argon-m", "astra-m", "sol-m", "terra-m", "fable-m", "opus-m", "sonnet-m"]
+ },
  "pictures": [
   { "id": "manet-morisot-fan-crop-qs", "title": "Manet, Morisot with a Fan (the approved crop)", "group": "figural", "core": true, "levelOne": "manet-morisot-fan-crop-full" },
   { "id": "tiepolo-bacchus-qs", "title": "Tiepolo, Bacchus and Ariadne", "group": "figural", "core": false, "levelOne": null },

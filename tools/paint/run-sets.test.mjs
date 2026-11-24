@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { loadRunSets, picturesAt, expandRunSets, isRunSet, levelOneTargets, standardSheetOnly, isBenchmarkPicture, readiness } from './run-sets.mjs';
+import { loadRunSets, picturesAt, expandRunSets, isRunSet, levelOneTargets, standardSheetOnly, isBenchmarkPicture, readiness, rosterEntries } from './run-sets.mjs';
 import { SHEET_RULE, standardSheet } from './sheet-rule.mjs';
 import { reRegistered, ruleIdOf } from './reregister.mjs';
 import { resolveSubject, checkInputs } from './subjects.mjs';
@@ -122,4 +122,32 @@ test('the check says, picture by picture, what is not under the rule or not prep
 test('the check as a command stops plainly when there is no subject list', () => {
   const r = spawnSync(process.execPath, ['tools/paint/run-sets.mjs', 'check', 'core'], { cwd: ROOT, encoding: 'utf8', env: { ...process.env, UNPAINT_SUBJECTS: path.join(ROOT, 'tools', 'paint', 'no-such-SUBJECTS.json') } });
   assert.equal(r.status, 2); assert.match(r.stderr, /run-sets check: no subject list at/);
+});
+
+test('the roster is the ten models of 0.4, each with one entry for level 1 and one for levels 2 to 4, the same in both, at medium effort', () => {
+  const sets = loadRunSets(), rows = rosterEntries(sets);
+  assert.deepEqual(sets.roster, ['wonderfull-m', 'neon-m', 'carbon-m', 'argon-m', 'astra-m', 'sol-m', 'terra-m', 'fable-m', 'opus-m', 'sonnet-m']);
+  assert.deepEqual(rows.filter(r => !r.ok), []);
+  assert.deepEqual(rows.map(r => [r.cli, r.id, r.effort]), [['muse', 'muse-wonder-full-1.0', 'medium'], ['agy', 'gemini-4-neon-medium', 'medium'], ['agy', 'gemini-4-carbon-medium', 'medium'], ['agy', 'gemini-4-argon-medium', 'medium'],
+    ['codex', 'gpt-6-astra', 'medium'], ['codex', 'gpt-6.1-sol', 'medium'], ['codex', 'gpt-6.1-terra', 'medium'], ['claude', 'claude-fable-5-2', 'medium'], ['claude', 'claude-opus-5-5', 'medium'], ['claude', 'claude-sonnet-5-5', 'medium']]);
+  assert.ok(!sets.roster.some(k => /hydrogen|luna|haiku/.test(k)), 'Hydrogen, Luna and Haiku are not in the roster');
+});
+
+test('a roster model without both entries, with entries that differ, or called by a command the gate does not know is named', () => {
+  const doc = { roster: { models: ['a', 'b', 'c', 'd'] }, depths: { d: { levels: ['Auto'] } }, sets: { s: { pictures: 'all', depth: 'd' } }, pictures: [{ id: 'p', title: 'P', group: 'g', core: true }] };
+  const authors = [{ key: 'a', name: 'A', id: 'a-1', effort: 'medium', cli: 'codex' }, { key: 'b', name: 'B', id: 'b-1', effort: 'medium', cli: 'claude' }, { key: 'd', name: 'D', id: 'd-1', effort: 'medium', cli: 'ollama' }];
+  const models = [{ key: 'a', name: 'A', id: 'a-1', effort: 'medium', runner: 'codex' }, { key: 'b', name: 'B', id: 'b-2', effort: 'high', runner: 'claude' }, { key: 'c', name: 'C', id: 'c-1', effort: 'n/a', runner: 'together' }, { key: 'd', name: 'D', id: 'd-1', effort: 'medium', runner: 'ollama' }];
+  const rows = rosterEntries(loadRunSets(doc), authors, models);
+  assert.deepEqual(rows.map(r => r.ok), [true, false, false, false]);
+  assert.deepEqual(rows[1].faults, ['its id differs: b-1 in tools/paint/authors.json, b-2 in bench/models.json', 'its effort differs: medium in tools/paint/authors.json, high in bench/models.json']);
+  assert.deepEqual(rows[2].faults, ['no entry in tools/paint/authors.json (levels 2 to 4)', 'its command together has no gate (tools/paint/session-net.mjs PROVIDER_HOSTS)', 'its entry in bench/models.json names no id or no effort']);
+  assert.deepEqual(rows[3].faults, ['its command ollama has no gate (tools/paint/session-net.mjs PROVIDER_HOSTS)']);
+  assert.throws(() => loadRunSets({ ...doc, roster: { models: ['a', 'a'] } }), /in the roster twice/); assert.throws(() => loadRunSets({ ...doc, roster: {} }), /"roster" needs "models"/);
+  assert.throws(() => rosterEntries(loadRunSets({ ...doc, roster: undefined }), authors, models), /no "roster"/);
+});
+
+test('the check as a command names every roster model before the pictures, with no subject list too', () => {
+  const r = spawnSync(process.execPath, ['tools/paint/run-sets.mjs', 'check', 'core'], { cwd: ROOT, encoding: 'utf8', env: { ...process.env, UNPAINT_SUBJECTS: path.join(ROOT, 'tools', 'paint', 'no-such-SUBJECTS.json') } });
+  assert.match(r.stdout, /^ready {5}model wonderfull-m \(Muse Wonder Full \(medium\); muse, muse-wonder-full-1\.0, effort medium\)$/m);
+  assert.match(r.stdout, /Roster: 10 of 10 models have their entry for level 1 and for levels 2 to 4\./);
 });

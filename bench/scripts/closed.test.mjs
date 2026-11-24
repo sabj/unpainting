@@ -6,17 +6,20 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
-import { REPO } from './lib.mjs';
+import { REPO, loadModels } from './lib.mjs';
 import { closeTurn, closable, probe, guardLog } from './pipeline/closed.mjs';
 import { runTurn } from './pipeline/harness.mjs';
+import { turnCommand } from './runners.mjs';
+import { PROVIDER_HOSTS, allowed } from '../../tools/paint/session-net.mjs';
+import { loadRunSets } from '../../tools/paint/run-sets.mjs';
 import { segPythonFor } from '../../tools/paint/run.mjs';
 
 const PY = segPythonFor(REPO);
 const skip = process.platform !== 'darwin' ? 'the profile is macOS seatbelt' : !fs.existsSync(PY) ? `the toolbox's Python is not at ${PY} (set PAINTER_SEG_PYTHON)` : false;
 
 test('a runner whose service the gate does not know is refused, never started open', () => {
-  for (const r of ['claude', 'agy', 'dry-run']) assert.doesNotThrow(() => closable(r));
-  for (const r of ['codex', 'muse', 'together']) assert.throws(() => closable(r), new RegExp(`the ${r} runner has no gate yet.*It is not started open`));
+  for (const r of ['claude', 'agy', 'codex', 'muse', 'dry-run']) assert.doesNotThrow(() => closable(r));
+  for (const r of ['together', 'ollama']) assert.throws(() => closable(r), new RegExp(`the ${r} runner has no gate yet.*It is not started open`));
 });
 
 test('a closed level 1 turn reads and writes its own folder, and nothing of the repository, the home folder or another attempt', { skip }, async () => {
@@ -71,7 +74,7 @@ test('a closed claude turn has its own sandbox off, no user settings and no kept
     assert.match(claude.profile, /\(deny file-read\* \(subpath "\/home\/x"\)/); assert.match(claude.profile, /\(allow file-read\* \(subpath "\/home\/x\/Library\/Keychains"\)\)/); assert.match(claude.closed, /passes its own service's hosts/);
     const agy = await closeTurn({ cmd: 'agy', args: ['-p', 'P'] }, { runner: 'agy', tmp, home: '/home/x' }); await agy.done();
     assert.match(agy.profile, /\(allow file-write\* \(subpath "\/home\/x\/\.gemini"\)/); assert.match(agy.profile, /Application Support\/antigravity/); assert.equal(agy.env.DO_NOT_TRACK, '1');
-    await assert.rejects(() => closeTurn({ cmd: 'codex', args: [] }, { runner: 'codex', tmp }), /no gate yet/);
+    await assert.rejects(() => closeTurn({ cmd: 'python3', args: [] }, { runner: 'together', tmp }), /no gate yet/);
     await assert.rejects(() => closeTurn({ cmd: 'x', args: [] }, { runner: 'dry-run', tmp, python: '/no/such/python' }), /toolbox needs its Python/);
   } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
 });
@@ -104,4 +107,32 @@ test('a guard log whose pipe is gone when the turn ends is a violation of its ow
     const end = await log.stop();
     assert.deepEqual(end, { intact: false, lines: 1 }); assert.equal(JSON.parse(fs.readFileSync(kept, 'utf8')).kind, 'guard-log-replaced');
   } finally { fs.rmSync(tmp, { recursive: true, force: true }); fs.rmSync(keep, { recursive: true, force: true }); }
+});
+
+test('level 1 builds a closed command for every model of the roster: the tool\'s own line under the profile, its gate its own provider\'s hosts only', { skip }, async () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'unpaint-bench-')), raw = path.join(tmp, 'raw'), ws = path.join(tmp, 'ws'); fs.mkdirSync(raw); fs.mkdirSync(ws);
+  const models = loadModels(), pic = path.join(tmp, 'view', 't.png'); fs.mkdirSync(path.dirname(pic)); fs.writeFileSync(pic, 'png');
+  const reach = { agy: 'daily-cloudcode-pa.googleapis.com', claude: 'api.anthropic.com', codex: 'chatgpt.com', muse: 'api.meta.ai' }, seen = new Set();
+  try {
+    for (const key of loadRunSets().roster) {
+      const model = models.find(m => m.key === key); assert.ok(model, `${key} in bench/models.json`); assert.equal(model.effort, 'medium', key); seen.add(model.runner);
+      const c = turnCommand(model, { ws, raw, text: 'PAINT', images: [pic], sessionId: '0f0e0d0c-0b0a-4908-8706-050403020100', turn: 1 });
+      const turn = await closeTurn(c, { runner: model.runner, tmp, home: '/home/x' }); await turn.done();
+      assert.equal(turn.cmd, 'sandbox-exec'); assert.equal(turn.args[2], model.runner, `${key}: its own command under the profile`); assert.ok(turn.args.includes(model.id), `${key}: its id`);
+      assert.ok(turn.args.some(a => a === 'medium' || a === 'model_reasoning_effort=medium'), `${key}: medium effort is sent`);
+      assert.match(turn.env.HTTPS_PROXY, /^http:\/\/127\.0\.0\.1:\d+$/); assert.doesNotMatch(turn.profile, /\*:443/); assert.match(turn.profile, /\(deny file-read\* \(subpath "\/home\/x"\)/); assert.match(turn.closed, /passes its own service's hosts/);
+      // the gate of this turn is its runner's: its own provider, and no other runner's
+      for (const [r, h] of Object.entries(reach)) assert.equal(allowed(h, PROVIDER_HOSTS[model.runner]), r === model.runner, `${key}: ${h}`);
+      if (model.runner === 'codex') {
+        assert.deepEqual(turn.args.slice(2, 8), ['codex', 'exec', '--ignore-user-config', '--ephemeral', '-c', 'analytics.enabled=false']); assert.deepEqual(turn.args.slice(-2), ['--', 'PAINT']);
+        assert.ok(turn.args.includes('--dangerously-bypass-approvals-and-sandbox')); assert.match(turn.profile, /\(allow file-write\* \(subpath "\/home\/x\/\.codex"\)/);
+      }
+      if (model.runner === 'muse') {
+        assert.deepEqual(turn.args.slice(2, 6), ['muse', 'exec', '--disable-sandbox', '--json']); assert.equal(turn.args.at(-1), 'PAINT'); assert.equal(turn.env.MUSE_NO_AUTO_UPDATE, '1');
+        assert.ok(!turn.args.includes('--max-model-steps') && !turn.args.includes('--max-tool-output-bytes'), 'level 1 sets no step or output limit of the tool\'s');
+        assert.match(turn.profile, /\(allow file-write\* \(subpath "\/home\/x\/\.config\/muse"\) \(subpath "\/home\/x\/\.local\/share\/muse"\)/); assert.match(turn.profile, /\(allow file-read\* \(subpath "\/home\/x\/Library\/Keychains"\)\)/);
+      }
+    }
+    assert.deepEqual([...seen].sort(), ['agy', 'claude', 'codex', 'muse'], 'the roster is run by the four commands');
+  } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
 });
