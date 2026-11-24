@@ -35,6 +35,20 @@ test('pool: only committed code is painted on a worker', () => {
   assert.throws(() => renderer({ UNPAINT_RENDER: 'pool', UNPAINT_POOL_DIR: dir, UNPAINT_POOL_CAP: '0' }, { root: '/r', codeState: () => ({}) }), /UNPAINT_POOL_CAP/);
 });
 
+test('a plan preview goes through the pool as a plan, kept off this Mac by UNPAINT_POOL_ONLY; locally it runs here', async () => {
+  const seen = [], run = async c => { seen.push(c.args); return { exit: 0, signal: null, seconds: 2 }; }, cmd = { cmd: 'node', args: ['--valuepreviewonly', '1', '--out', '/x/plate'] };
+  assert.deepEqual(await renderer({}, { root: '/r', codeState: () => ({}), run }).plan(cmd, { cwd: '/c', logFile: '/l' }), { exit: 0, signal: null, seconds: 2 });
+  const dir = tmp(), clean = () => ({ commit: 'a'.repeat(40), dirty: false });
+  const pooled = renderer({ UNPAINT_RENDER: 'pool', UNPAINT_POOL_DIR: dir }, { root: '/r', codeState: clean, run });
+  assert.equal((await pooled.plan({ ...cmd, args: ['--out', path.join(dir, 'p')] }, { cwd: dir, logFile: path.join(dir, 'p.log') })).exit, 0);
+  assert.equal(seen.length, 2);
+  assert.match(fs.readFileSync(path.join(dir, 'log.txt'), 'utf8'), /^\S+ plan p on this Mac/m);
+  // with this Mac left out and no other worker up, it waits rather than painting here
+  const off = renderer({ UNPAINT_RENDER: 'pool', UNPAINT_POOL_DIR: dir, UNPAINT_POOL_ONLY: 'mini,pod' }, { root: '/r', codeState: clean, run });
+  const waited = await Promise.race([off.plan({ ...cmd, args: ['--out', path.join(dir, 'q')] }, { cwd: dir, logFile: path.join(dir, 'q.log') }).then(() => 'ran'), new Promise(r => setTimeout(() => r('waiting'), 300))]);
+  assert.equal(waited, 'waiting'); assert.equal(seen.length, 2);
+});
+
 const ARGS = ['--max-old-space-size=18432', 'tools/paint-plate.mjs', '--gpu', 'on', '--planfile', '/m/run/plans/5/final-plan.bin', '--washplan', 'edit:/m/run/look.plan-edit.json,/s/studies/a.png:6,/s/studies/b.png:4',
   '--drawingfile', '/m/run/tools/k/lines/opening', '--thingmasks', '/s/forms/cat/receipt.json', '--image', '/s/src.png', '--width', '543', '--out', '/m/run/look-paints/6-1'];
 

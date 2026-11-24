@@ -308,7 +308,7 @@ async function compileOnce(r, choice, script, plate, edit) {
     if (script) fs.writeFileSync(scriptFile, JSON.stringify(script, null, 1) + '\n');
     if (edit) fs.writeFileSync(editFile, JSON.stringify(edit, null, 1) + '\n');
     const command = buildCommand(mine, { mode: 'plan', out: plate, known, dirty: codeState(ROOT).dirty, segEnv, script: script ? { file: scriptFile, paints: script.palette } : null, edit: edit ? { file: editFile } : null });
-    const done = await planSlot(() => runPainter(command, { cwd: ROOT, logFile: `${plate}.log` })), results = collectResults(plate, 'plan');
+    const done = await planSlot(() => render.plan(command, { cwd: ROOT, logFile: `${plate}.log` })), results = collectResults(plate, 'plan');
     if ((done.exit !== 0 && done.exit !== 3) || !results.planPreview || !fs.existsSync(path.join(plate, 'value-plan.json'))) {
       // an edited plan that cannot be laid as asked: every fault of it, as the painter wrote them out, not the first alone
       let faults = null; try { faults = JSON.parse(fs.readFileSync(path.join(plate, 'plan-edit-faults.json'), 'utf8')).message; } catch { /* another failure */ }
