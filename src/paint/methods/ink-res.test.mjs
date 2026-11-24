@@ -185,3 +185,29 @@ test('a frame after a change in a band of rows composes to the same bytes as one
   next[0] = 3; next[(H * W - 1) * 3] = 4;
   assert.deepEqual(a.R.compose(next), b.R.compose(Buffer.from(next)));
 });
+
+test('a composition kept and changed in place is the same bytes as one made whole, frame after frame', () => {
+  // one sheet composes a run of renders that differ by a box, a pixel, nothing, or everything, with the pen drawn on
+  // between; a fresh sheet with the same pen composes each of them whole
+  const want = new Float32Array(W * H).fill(1), other = { points: line.points.map(p => ({ ...p, y: 5 })) };
+  const pen = lines => { const { R } = setup(); for (const l of lines) R.draw([l], want, W, H, { ink: [10], peak: 1 }); return R; };
+  const drawn = [line], R = pen(drawn);
+  let s = 7; const rnd = () => (s = (s * 1103515245 + 12345) >>> 0) / 4294967296;
+  const lo = Buffer.alloc(W * H * 3, 240), kept = [];
+  const steps = ['whole', 'same', 'box', 'box', 'pixel', 'corner', 'same', 'pen', 'same', 'box', 'row', 'column', 'whole', 'pixel'];
+  for (const step of steps) {
+    if (step === 'whole') for (let i = 0; i < lo.length; i++) lo[i] = 150 + ((rnd() * 100) | 0);
+    if (step === 'box') { const x0 = (rnd() * (W - 8)) | 0, y0 = (rnd() * (H - 5)) | 0; for (let y = y0; y < y0 + 1 + ((rnd() * 4) | 0); y++) for (let x = x0; x < x0 + 1 + ((rnd() * 7) | 0); x++) lo[(y * W + x) * 3 + ((rnd() * 3) | 0)] = (rnd() * 255) | 0; }
+    if (step === 'pixel') lo[(((rnd() * H) | 0) * W + ((rnd() * W) | 0)) * 3 + 1] ^= 64;
+    if (step === 'corner') { lo[2] ^= 32; lo[lo.length - 3] ^= 32; }
+    if (step === 'row') for (let x = 0; x < W; x++) lo[(7 * W + x) * 3] ^= 16;
+    if (step === 'column') for (let y = 0; y < H; y++) lo[(y * W + 31) * 3 + 2] ^= 16;
+    if (step === 'pen') { drawn.push(other); R.draw([other], want, W, H, { ink: [10], peak: 1 }); }
+    const whole = pen(drawn).compose(lo), got = R.compose(lo);
+    assert.ok(got.equals(whole), `after "${step}"`);
+    assert.ok(Buffer.from(R.composeKept(lo)).equals(whole), `kept, after "${step}"`);
+    kept.push([got, Buffer.from(got)]);
+  }
+  // a composition handed out is the caller's own: later frames did not write into it
+  for (const [got, then] of kept) assert.ok(got.equals(then));
+});

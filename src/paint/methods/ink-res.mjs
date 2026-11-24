@@ -201,7 +201,10 @@ export function makeInkRes({ N, W2, H2, paperOpts, pigments, main, inkAt = 0, gr
   }
 
   /** The painting at N times its width: `lo` is the painting's own render (RGB bytes, W2 by H2). */
-  function compose(lo) {
+  function compose(lo) { return Buffer.from(composeKept(lo)); }
+  /** The same picture in this sheet's own buffer, not a copy: to be read at once and never written, since the next
+   *  composition changes it in place (the film's recorder copies it into its own slot before it returns). */
+  function composeKept(lo) {
     if (!census) return composeImpl(lo);
     const t = performance.now(); census.inkres.composeCalls++;
     try { return composeImpl(lo); } finally { census.inkres.composeMs += performance.now() - t; }
@@ -222,8 +225,8 @@ export function makeInkRes({ N, W2, H2, paperOpts, pigments, main, inkAt = 0, gr
     hBuf0 = new Float64Array(WH * 3);
     hBuf1 = new Float64Array(WH * 3);
   }
-  function interpRow(src, yOff, dst) {
-    for (let x = 0, o = 0; x < WH; x++, o += 3) {
+  function interpRow(src, yOff, dst, xa = 0, xb = WH - 1) {
+    for (let x = xa, o = xa * 3; x <= xb; x++, o += 3) {
       const a = yOff + x0Tab[x], b = yOff + x1Tab[x], tx = txTab[x], tx0 = 1 - tx;
       dst[o] = src[a] * tx0 + src[b] * tx;
       dst[o + 1] = src[a + 1] * tx0 + src[b + 1] * tx;
@@ -259,39 +262,59 @@ export function makeInkRes({ N, W2, H2, paperOpts, pigments, main, inkAt = 0, gr
       renderVersion = materialVersion;
     }
   }
-  // The last composition and the render it came from: a frame recomposes only the fine rows whose two render rows
-  // changed since (a frame after one mark changes a band of rows), with the same arithmetic, so the same bytes.
+  // The last composition and the render it came from: a frame recomposes only the fine rows and columns whose render
+  // pixels changed since (a frame after one mark changes a box of them), with the same arithmetic, so the same bytes.
+  // The composition is kept in one buffer and changed in place; the render kept beside it is brought up to date over
+  // the changed rows only. (It was copied whole three times a frame: 19 MB each at full size.)
   let lastLo = null, lastOut = null, lastVersion = -1;
   function composeImpl(lo) {
     ensureInkRatio();
     const rowLen = WH * 3, loRow = W2 * 3, src = Buffer.from(lo.buffer, lo.byteOffset, lo.byteLength);
-    let from = 0, to = H2 - 1;
-    if (lastOut && lastVersion === renderVersion && lastLo.length === src.length) {
-      while (from < H2 && src.compare(lastLo, from * loRow, (from + 1) * loRow, from * loRow, (from + 1) * loRow) === 0) from++;
-      if (from === H2) return Buffer.from(lastOut);
-      while (to > from && src.compare(lastLo, to * loRow, (to + 1) * loRow, to * loRow, (to + 1) * loRow) === 0) to--;
+    let from = 0, to = H2 - 1, xa = 0, xb = WH - 1;
+    const kept = !!lastOut && lastVersion === renderVersion && lastLo.length === src.length;
+    if (kept) {
+      const same = y => src.compare(lastLo, y * loRow, (y + 1) * loRow, y * loRow, (y + 1) * loRow) === 0;
+      while (from < H2 && same(from)) from++;
+      if (from === H2) return lastOut;
+      while (to > from && same(to)) to--;
+      // the first and last render pixel that changed in any of those rows, and the fine columns that read them: a fine
+      // column reads its two render pixels (x0Tab, x1Tab, which only grow with x)
+      let c0 = loRow, c1 = -1;
+      for (let y = from; y <= to; y++) {
+        if (y !== from && y !== to && same(y)) continue;
+        const o = y * loRow;
+        let a = 0; while (a < c0 && src[o + a] === lastLo[o + a]) a++; if (a < c0) c0 = a;
+        let b = loRow - 1; while (b > c1 && src[o + b] === lastLo[o + b]) b--; if (b > c1) c1 = b;
+      }
+      const p0 = ((c0 / 3) | 0) * 3, p1 = ((c1 / 3) | 0) * 3;
+      while (xa < WH - 1 && x1Tab[xa] < p0) xa++;
+      while (xb > xa && x0Tab[xb] > p1) xb--;
+    } else {
+      if (!lastOut || lastOut.length !== nH * 3) lastOut = Buffer.allocUnsafe(nH * 3);
+      if (!lastLo || lastLo.length !== src.length) lastLo = Buffer.allocUnsafe(src.length);
     }
-    const out = lastOut && (from > 0 || to < H2 - 1) ? Buffer.from(lastOut) : Buffer.allocUnsafe(nH * 3);
+    const out = lastOut, i0 = xa * 3, i1 = (xb + 1) * 3;
     let r0 = hBuf0, r1 = hBuf1, cy0 = -1, cy1 = -1;
     for (let y = 0; y < HH; y++) {
       const ya = y0Tab[y], yc = y1Tab[y], ty = tyTab[y], ty0 = 1 - ty, row = y * rowLen;
       if ((ya / loRow < from && yc / loRow < from) || (ya / loRow > to && yc / loRow > to)) continue;
       if (ya !== cy0) {
         if (ya === cy1) { const t = r0; r0 = r1; r1 = t; cy1 = cy0; cy0 = ya; }
-        else { interpRow(lo, ya, r0); cy0 = ya; }
+        else { interpRow(lo, ya, r0, xa, xb); cy0 = ya; }
       }
       let rb = r0;
       if (yc !== ya) {
-        if (yc !== cy1) { interpRow(lo, yc, r1); cy1 = yc; }
+        if (yc !== cy1) { interpRow(lo, yc, r1, xa, xb); cy1 = yc; }
         rb = r1;
       }
-      for (let i = 0; i < rowLen; i++) {
+      for (let i = i0; i < i1; i++) {
         const bLo = r0[i] * ty0 + rb[i] * ty;
         const v = Math.round(bLo * invInkL[row + i]);
         out[row + i] = v < 0 ? 0 : v > 255 ? 255 : v;
       }
     }
-    lastLo = Buffer.from(src); lastOut = Buffer.from(out); lastVersion = renderVersion;
+    if (kept) src.copy(lastLo, from * loRow, from * loRow, (to + 1) * loRow); else src.copy(lastLo);
+    lastVersion = renderVersion;
     return out;
   }
 
@@ -344,7 +367,7 @@ export function makeInkRes({ N, W2, H2, paperOpts, pigments, main, inkAt = 0, gr
     wetOn=st.wetOn;Object.assign(stats,st.stats);
     changed();totalVersion.fill(-1);renderVersion=-1;
   }
-  return { N, width: WH, height: HH, draw, settle, compose, composeFine, nativeInk, carry, wet, stats, fine, remapInk, changed, exportState, importState, channel, channels: chans, erased };
+  return { N, width: WH, height: HH, draw, settle, compose, composeKept, composeFine, nativeInk, carry, wet, stats, fine, remapInk, changed, exportState, importState, channel, channels: chans, erased };
 }
 
 
