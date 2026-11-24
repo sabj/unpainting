@@ -33,8 +33,9 @@ want is the last one completed (it ended with `kit.finish`), stop.
   `kit.work()` says which painting this is and how many are left. Nothing else is budgeted: strokes, water, waits and
   dryings are measured and recorded beside your score, never charged. A painting that takes more than 10 times the
   water steps of the code's own painting of this subject is stopped as a runaway, with a message.
-- There is no limit on strokes and no deadline: take the time the painting needs. A far safety stop ends the session
-  after {LIMIT_MIN} minutes. One painting run at a time: do not run several in parallel.
+- There is no limit on strokes. The session has {LIMIT_MIN} minutes on the clock, and the time your paintings take
+  to run is part of it: at {LIMIT_MIN} minutes the session is ended, and the painting of your last completed run is
+  the one that counts. One painting run at a time: do not run several in parallel.
 - Drawing is your choice: pen, pencil or none. No drawing is a normal choice, and lines may go down before the washes,
   between them or after them.
 - End each painting with `await kit.finish(note)`. Outputs land in `bench/out/{CROP}/` (`final.png`, `frames/`,

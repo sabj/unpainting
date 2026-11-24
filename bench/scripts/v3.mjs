@@ -14,11 +14,13 @@ import { makeWorktree, keepScripts, runTurn, minutes } from './pipeline/harness.
 import { closeTurn, closable, probe } from './pipeline/closed.mjs';
 
 const V3 = path.join(BENCH, 'v3');
-// The clock is a safety stop only, as at levels 2 to 4 (tools/paint/session.mjs DEFAULT_WALL_MINUTES): 360 minutes, the
-// owner's 6-hour stop ("measure, do not limit"). BENCH_V3_ATTEMPT_MIN states a shorter one (10 to 360) for a trial;
-// the brief says the limit in force and the run record keeps it (settings.sessionCapMin). Nothing is told two minutes
-// short any more: the stop is far, not a deadline to work towards.
-export const attemptMinutes = (env = process.env) => Math.max(10, Math.min(360, Number(env.BENCH_V3_ATTEMPT_MIN) || 360));
+// The session's clock: 60 minutes (the owner, 23 Nov: "level 1 should be cheap and strict so yeah 60min for now is
+// fine"). It is the wall clock of the one attempt and so includes the time its paintings take. BENCH_V3_ATTEMPT_MIN
+// states another (10 to 360); 360, the six-hour stop of levels 2 to 4 (tools/paint/session.mjs DEFAULT_WALL_MINUTES),
+// stays the most any session may run. The brief says the limit in force and the run record keeps it
+// (settings.sessionCapMin).
+export const LEVEL_ONE_MINUTES = 60, SAFETY_STOP_MINUTES = 360;
+export const attemptMinutes = (env = process.env) => Math.max(10, Math.min(SAFETY_STOP_MINUTES, Number(env.BENCH_V3_ATTEMPT_MIN) || LEVEL_ONE_MINUTES));
 const ATTEMPT_MIN = attemptMinutes(), SAID_MIN = ATTEMPT_MIN;
 const sayLimit = t => t.replaceAll('{LIMIT_MIN}', String(SAID_MIN));
 
