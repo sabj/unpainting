@@ -22,7 +22,8 @@ npm run bench:score04 -- runs.json --out DIR
 Each painting gets several readings. They are kept apart and shown together.
 
 - Human-ness: does the painting, and its film stopped anywhere, look made by a person? This is the main reading.
-- Quality and likeness: a second reading, beside it.
+- Quality: a second reading, beside it.
+- Likeness: a third reading, in its own column: is the painting a painting of its original? It is not part of the combined figure (its weight is the owner's to set). A painting at the bottom of the likeness scale is flagged in the table.
 - Combined: two parts human-ness to one part quality. The weights are a setting (`WEIGHTS` in `bench/scorer/s04_table.py`), written into the results. Both parts stay visible next to it.
 - The original is scored for quality too (it has no film, so no human-ness). A painting's quality is its share of the original's score. If the original gets 9 and Auto gets 4.5, Auto gets 50%. A model can go over 100%.
 - Difficulty: the subject's Auto painting is scored the same way. Each model painting's figures are shown raw and adjusted for Auto side by side: (painting - Auto) / max(top - Auto, top / 5), so 0 is level with Auto. The adjustment needs exactly one Auto painting of the subject among the inputs; otherwise the table says so.
@@ -45,11 +46,29 @@ RESULTS: to be filled from the frozen run.
 - A painting with no film is refused, not scored from its finished sheet.
 - This scheme is named `progress10` and is the default. The first scheme is kept under the name `film13` (`npm run bench:score04 -- ... --snapshots film13`): the opening, twelve snapshots evenly through the whole film by frame number, then the finished sheet, with the mean of the twelve as the figure. Use it to score an old film the old way. **Scores under `progress10` are not comparable with scores under `film13`**, nor with the scheme that stood for a few hours on 23 November (`wash10`: ten frames by frame number, the finished sheet counted), which is gone and refused by name. Every results file and scores table names its scheme. The same pictures go to every judge route, local or hosted.
 
-## Quality and likeness
+## Quality
 
 - The judge sees one picture alone, at most 768 px on the long side, and scores it as a watercolour from 0 to 10. It is not told whether the picture is an original or a painting.
 - The original and the painting are read the same way, independently, so the original does not score 10 by construction.
 - A painting's figure is its share of its original's score.
+- The judge of a painting's quality never sees its original: quality says how good a watercolour it is, not whether it is the right picture. That is likeness.
+
+## Likeness
+
+- The judge sees the original and then the finished painting, each at most 768 px on the long side, and scores from 1 to 5 how well the second is a painting of the first: subject, composition, the pattern of light and dark, colour. It is told the painting is not a copy and need not match mark for mark, and not to judge how well it is painted. It gives one short reason.
+- 5: unmistakably this picture. 3: subject and composition are there, tones or colour plainly differ, or a main part is missing. 1: a different picture, or the subject cannot be recognised.
+- The same panel, three readings a judge; the figure is the mean of the judges' medians.
+- It has its own column beside human-ness and quality. It is not in the combined figure. A figure of 1.5 or under is flagged: the painting may not be a painting of this picture at all, whatever its other scores.
+
+## What the judges are shown, and how large
+
+| Reading | Pictures | Long side | The original shown? |
+|---|---|---|---|
+| Human-ness | the opening paper, the drawing frame, ten stills in progress, the finished sheet | 640 px each | never, on purpose |
+| Quality | the finished painting alone; the original alone, as a separate reading | 768 px | not beside the painting |
+| Likeness | the original, then the finished painting | 768 px each | yes |
+
+A picture larger than its limit is brought down (Lanczos, then JPEG quality 88); one under 384 px is brought up to 384. A full-size sheet is about 1,450 by 1,100 cells, so the judges see it at about half size: fine detail at native resolution is not judged.
 
 ## Judges
 

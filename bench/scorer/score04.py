@@ -15,8 +15,11 @@ For each painting (s04_runs.py says what a run folder must hold):
     way. THE TWO ARE NOT COMPARABLE: results.json and SCORES.md name the scheme. The same pictures go to every judge
     route, local or hosted. Also the thirds, the tally of tells and the whole-sequence yes or no. No film, or a film
     that does not say where its first wash is: refused before any judge is called.
-  2 QUALITY AND LIKENESS: the painting alone and its ORIGINAL alone, 0 to 10; the painting's share of the original's.
+  2 QUALITY: the painting alone and its ORIGINAL alone, 0 to 10, read the same way; the painting's share of the
+    original's. The judge of a painting's quality never sees its original.
   3 COMBINED: two parts human-ness to one part quality (s04_table.WEIGHTS, written into the results).
+  3b LIKENESS, in its own column and NOT in the combined figure: the original and the finished painting shown together,
+    how well the painting is a painting of that picture, 1 to 5 with a reason. At the bottom of the scale it is flagged.
   4 beside, never blended: the painter's cheat-risk record and progression, classic.py against the original, and the
     same figures adjusted for the subject's Auto painting among the inputs.
   5 the judges are ONE named panel on every route (s04_judge.py: JUDGE_PANEL, open3 by default, reasoning off); the
@@ -48,7 +51,7 @@ import s04_judge, s04_readings as R, s04_runs, s04_table as T  # noqa: E402
 
 SEQ_CTX, SEQ_TOKENS = 16384, 3000   # up to fourteen pictures (film13: opening, twelve, finished; progress10: opening, drawing, ten, finished) need a longer window than the scorer's 8,192
 ONE_CTX, ONE_TOKENS = 8192, 1024
-SNAP_PX, ONE_PX = 640, 768
+SNAP_PX, ONE_PX = 640, 768   # the long side each picture is brought down to: film stills, and a picture read alone or beside its original
 
 
 def file_sha(p):
@@ -94,6 +97,7 @@ def jobs_for(paintings, originals, rubric, data_uri):
         texts = [head + "\nOpening: the untouched paper (not scored)"] + [f"Snapshot {k + 1}: {p}{said}" for k, (_, p) in enumerate(snaps)]
         out.append(Job(e["id"], "sequence", [(e["opening"], SNAP_PX)] + [(f, SNAP_PX) for f, _ in snaps], texts, SEQ_CTX, SEQ_TOKENS, lambda raw, n=len(snaps): R.parse_sequence(raw, n), data_uri))
         out.append(Job(e["id"], "single", [(e["painting"], ONE_PX)], [R.SINGLE.format(style=e["style"])], ONE_CTX, ONE_TOKENS, R.parse_single, data_uri))
+        out.append(Job(e["id"], "likeness", [(e["target"], ONE_PX), (e["painting"], ONE_PX)], [R.LIKENESS.format(style=e["style"]) + "\nThe original:", "The painting made of it:"], ONE_CTX, ONE_TOKENS, R.parse_likeness, data_uri))
     for sid, o in originals.items():
         out.append(Job("original--" + sid, "single", [(o["target"], ONE_PX)], [R.SINGLE.format(style=o["style"])], ONE_CTX, ONE_TOKENS, R.parse_single, data_uri))
     return out
@@ -128,7 +132,7 @@ def read_all(jobs, cfg, judge, out, say=print, jrec=None, rubric_sha=None, fresh
                     r, why = R.ask(lambda model, c: judge.post(cfg, model, c, max_tokens=jb.tokens, num_ctx=jb.ctx), m, jb.content(), jb.parse)
                     old = {"ok": bool(r), "judge": m, "kind": jb.kind, "cacheKey": key, "repeat": repeat, "promptSha": jb.promptSha, "imagesSha": jb.imagesSha, "seconds": round(time.time() - t, 1), **(r or {"error": why})}
                     write(f, json.dumps(old, indent=1))
-                    score = (old.get("overall") if jb.kind == "single" else [s["score"] for s in old["snapshots"]]) if r else f"FAILED {why}"
+                    score = (old.get("overall") if jb.kind == "single" else old.get("likeness") if jb.kind == "likeness" else [s["score"] for s in old["snapshots"]]) if r else f"FAILED {why}"
                     say(time.strftime("%H:%M:%S"), jb.key, jb.kind, m, k, score, f"{old['seconds']} s", flush=True)
                 got.setdefault((jb.key, jb.kind), {}).setdefault(m, []).append(old if old.get("ok") else None)
         judge.unload(cfg, m)
@@ -142,7 +146,7 @@ def cheat_summary(c):
 
 
 def main(argv=None, judge=s04_judge, env=None, say=print):
-    ap = argparse.ArgumentParser(prog="bench:score04", description="0.4's scoring: human-ness, quality and likeness, combined; anti-cheat, algorithmic, Auto adjustment and usage beside.")
+    ap = argparse.ArgumentParser(prog="bench:score04", description="0.4's scoring: human-ness, quality, combined; likeness in its own column; anti-cheat, algorithmic, Auto adjustment and usage beside.")
     ap.add_argument("inputs", nargs="+", help="run folders, or a manifest .json listing them")
     ap.add_argument("--out", required=True, help="folder for results.json, SCORES.md and the kept readings")
     ap.add_argument("--snapshots", default=R.DEFAULT_SCHEME, choices=sorted(R.SCHEMES) + sorted(R.GONE), metavar="{" + ",".join(sorted(R.SCHEMES)) + "}", help="what the judges are shown: progress10 (default: opening, drawing frame, ten stills in progress placed by measured progress, the finished sheet beside) or film13 (the first scheme: opening, twelve by frame number, the finished sheet). Scores under one are not comparable with the other")
@@ -185,10 +189,11 @@ def main(argv=None, judge=s04_judge, env=None, say=print):
     for e in paintings:
         h = R.human(got[(e["id"], "sequence")], cfg["panel"], a.snapshots, bool(e["drawing"]))
         q = R.quality(got[(e["id"], "single")], cfg["panel"])
-        faults += [f"{e['id']}, human-ness: {x}" for x in h["faults"]] + [f"{e['id']}, quality: {x}" for x in q["faults"]]
+        lk = R.likeness(got[(e["id"], "likeness")], cfg["panel"])
+        faults += [f"{e['id']}, human-ness: {x}" for x in h["faults"]] + [f"{e['id']}, quality: {x}" for x in q["faults"]] + [f"{e['id']}, likeness: {x}" for x in lk["faults"]]
         rows.append({**{k: e[k] for k in ("id", "label", "subject", "auto", "author", "commit", "folder", "painting", "target", "style", "classic", "usage")},
                      "opening": e["opening"], "drawingFrame": {"file": e["drawing"][0], "pct": e["drawing"][1]} if e["drawing"] else None, "firstWash": e["firstWash"],
-                     "snapshots": [{"file": f, "pct": p, **({"frame": e["frames"][k]} if k < len(e["frames"]) else {"finished": True})} for k, (f, p) in enumerate(e["snapshots"])], "human": h, "quality": q, "cheat": cheat_summary(e["cheat"])})
+                     "snapshots": [{"file": f, "pct": p, **({"frame": e["frames"][k]} if k < len(e["frames"]) else {"finished": True})} for k, (f, p) in enumerate(e["snapshots"])], "human": h, "quality": q, "likeness": lk, "cheat": cheat_summary(e["cheat"])})
     for sid, o in originals.items():
         o["quality"] = R.quality(got[("original--" + sid, "single")], cfg["panel"])
         faults += [f"original of {sid}, quality: {x}" for x in o["quality"]["faults"]]
@@ -201,7 +206,7 @@ def main(argv=None, judge=s04_judge, env=None, say=print):
     T.derive(rows, originals)
     res = {"schema": "unpaint-bench/score04@1", "written": time.strftime("%Y-%m-%d %H:%M"), "series": SERIES + " " + SCHEME_NOTE[a.snapshots], "judge": jrec,
            "rubric": {"path": os.path.relpath(RUBRIC, REPO), "sha256": rubric_sha}, "prompts": R.prompt_hashes(rubric, a.snapshots),
-           "weights": dict(T.WEIGHTS), "readings": R.READINGS, "repeat": a.repeat, "fresh": bool(a.fresh), "snapshots": R.SCHEMES[a.snapshots]["count"], "snapshotScheme": {**R.SCHEMES[a.snapshots], "note": SCHEME_NOTE[a.snapshots]}, "faults": faults, "originals": originals, "paintings": rows}
+           "weights": dict(T.WEIGHTS), "readings": R.READINGS, "repeat": a.repeat, "fresh": bool(a.fresh), "snapshots": R.SCHEMES[a.snapshots]["count"], "snapshotScheme": {**R.SCHEMES[a.snapshots], "note": SCHEME_NOTE[a.snapshots]}, "pictureLongSidePx": {"stills": SNAP_PX, "alone": ONE_PX, "likeness": ONE_PX}, "faults": faults, "originals": originals, "paintings": rows}
     names = ("results.json", "SCORES.md") if a.repeat == 1 else (f"results-repeat-{a.repeat}.json", f"SCORES-repeat-{a.repeat}.md")
     write(os.path.join(a.out, names[0]), json.dumps(res, indent=1))
     write(os.path.join(a.out, names[1]), T.markdown(res))

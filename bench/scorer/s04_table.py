@@ -5,6 +5,7 @@
   adjusted   against the subject's Auto painting among the inputs: (x - Auto) / max(top - Auto, top / 5), the headroom
              rule of bench/scripts/levels.mjs, for human-ness (top 100), the quality score (top 10), combined (top 100)
              and the algorithmic mean (top 10). 0 is level with Auto; negative is below it.
+  likeness   its own reading and column (the original and the painting together, 1 to 5); never part of combined
 Anti-cheat, the algorithmic measurements and usage are shown beside, never blended in.
 """
 
@@ -46,6 +47,12 @@ def derive(paintings, originals, w=WEIGHTS):
                              "combined": headroom_adjusted(p["combined"], a["combined"], 100),
                              "classic": headroom_adjusted((p.get("classic") or {}).get("mean"), (a.get("classic") or {}).get("mean"), 10)}
     return paintings
+
+
+def likeness_text(k):
+    if not k or k.get("score") is None:
+        return "none"
+    return f"{k['score']:.1f} of 5" + (" **FLAGGED: at the bottom of the scale, it may not be a painting of this picture**" if k.get("flagged") else "")
 
 
 def cheat_text(c):
@@ -105,19 +112,19 @@ def markdown(r):
          f"Written {r['written']} by `npm run bench:score04`" + (f", repeat {r['repeat']} of the same paintings (a further scoring, no reading shared with another repeat)" if (r.get("repeat") or 1) > 1 else "") + f". **{r['series']}**", "",
          f"Judge label **{j['label']}**, panel **{j.get('panelName') or 'not named'}**, route `{j['route']}` ({j['endpoint']}), reasoning {j.get('reasoning') or 'not recorded'}; judges " + ", ".join(f"`{m}`" + (f" (served as `{(j.get('sentAs') or {}).get(m)}`)" if (j.get('sentAs') or {}).get(m, m) != m else "") for m in j["panel"]) +
          f"; {r['readings']} readings a judge, a judge's figure the median of its three, the panel's the mean of the judges'. "
-         f"Rubric `{r['rubric']['path']}` sha256 `{r['rubric']['sha256'][:12]}`; prompts sequence `{r['prompts']['sequence'][:12]}`, single `{r['prompts']['single'][:12]}`.", ""]
+         f"Rubric `{r['rubric']['path']}` sha256 `{r['rubric']['sha256'][:12]}`; prompts sequence `{r['prompts']['sequence'][:12]}`, single `{r['prompts']['single'][:12]}`" + (f", likeness `{r['prompts']['likeness'][:12]}`" if r['prompts'].get('likeness') else "") + ".", ""]
     faults = r.get("faults") or []
     L += ["## Faults first", ""] + ([f"- {x}" for x in faults] or ["- None: every reading has all its judges."]) + [""]
     for sid in sorted({p["subject"] for p in r["paintings"]}):
         rows = [p for p in r["paintings"] if p["subject"] == sid]
         o = (r["originals"].get(sid) or {}).get("quality") or {}
         L += [f"## {sid}", "", f"The original scores {_f(o.get('score'))} of 10 read alone; each painting's quality share is its score over that.", "",
-              f"| Picture | HUMAN-NESS (mean of {r['snapshots']} {'stills in progress, from the first wash to just before the finish' if wash else 'film snapshots'}, % of 5) | QUALITY AND LIKENESS (share of the original) | COMBINED ({w['humanness']} parts human-ness to {w['quality']} part quality) | adjusted for Auto: human-ness | quality | combined |",
-              "|---|---|---|---|---|---|---|"]
+              f"| Picture | HUMAN-NESS (mean of {r['snapshots']} {'stills in progress, from the first wash to just before the finish' if wash else 'film snapshots'}, % of 5) | QUALITY (share of the original) | COMBINED ({w['humanness']} parts human-ness to {w['quality']} part quality) | LIKENESS (of 5; not in combined) | adjusted for Auto: human-ness | quality | combined |",
+              "|---|---|---|---|---|---|---|---|"]
         for p in rows:
             a = p["adjusted"]
             adj = ["Auto itself"] * 3 if p["auto"] else [a["note"]] * 3 if a.get("note") else [_sg(a["humanness"]), _sg(a["quality"]), _sg(a["combined"])]
-            L.append(f"| {p['label']} | {_f(p['human']['percent'], 0, '%')} | {_f(p['share'], 0, '%')} ({_f(p['quality']['score'])} of 10) | **{_f(p['combined'], 0, '%')}** | " + " | ".join(adj) + " |")
+            L.append(f"| {p['label']} | {_f(p['human']['percent'], 0, '%')} | {_f(p['share'], 0, '%')} ({_f(p['quality']['score'])} of 10) | **{_f(p['combined'], 0, '%')}** | {likeness_text(p.get('likeness'))} | " + " | ".join(adj) + " |")
         L += ["", "### Human-ness in detail", "", f"| Picture | {'the drawing frame, before the first wash (of 5; not in the mean) | ' if wash else ''}first third | middle | last third (of 5) | the finished sheet (of 5; not in the mean) | tells (each judge's first reading, every snapshot shown) | a person would paint it in this order | one judge's sentence |", "|---|---|---|---|---|---|---|---|" + ("---|" if wash else "")]
         for p in rows:
             h = p["human"]
@@ -137,7 +144,8 @@ def markdown(r):
            if wash else
            f"- HUMAN-NESS (scheme film13, the first one): {r['snapshots']} snapshots evenly through the painting's film and then the finished sheet, shown in order with only their percent complete, scored 1 to 5 under the rubric; the figure is the mean of the {r['snapshots']} film snapshots as a percentage of 5 (the finished sheet is shown but not counted). Thirds: the mean of snapshots 1-4, 5-8, 9-12. NOT comparable with scores under progress10. Tells: ")
           + "; ".join(f"({k}) {v}" for k, v in TELL.items()) + ".",
-          "- QUALITY AND LIKENESS: the picture alone, scored as a watercolour 0 to 10, not told whether it is an original or a painting; the share is the painting's score over its original's, read the same way. May pass 100%.",
+          "- QUALITY: the picture alone, scored as a watercolour 0 to 10, not told whether it is an original or a painting; the share is the painting's score over its original's, read the same way. May pass 100%. The judge of a painting's quality never sees its original.",
+          "- LIKENESS: the original and the finished painting shown together: how well the painting is a painting of that picture (subject, composition, tones, colour; not a pixel-for-pixel copy), 1 to 5 with a reason. It has its own column and is NOT part of the combined figure. FLAGGED: at the bottom of the scale.",
           f"- COMBINED: ({w['humanness']} x human-ness + {w['quality']} x quality share) / {w['humanness'] + w['quality']}; the weights are written into results.json.",
           "- ADJUSTED FOR AUTO: (painting - Auto) / max(top - Auto, top / 5), Auto being the subject's code-planner painting scored the same way; 0 is level with Auto.",
           "- ANTI-CHEAT and PROGRESSION: the painter's own cheat-risk record; ALGORITHMIC: `bench/scorer/classic.py` against the original, no judge; USAGE: the run's usage.json."]

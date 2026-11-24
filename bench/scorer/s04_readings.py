@@ -81,6 +81,17 @@ Blur and smear are failures, not a safe middle. 5 is a competent amateur; 9-10 i
 Reply with JSON only, no prose: {{"composition_values":n,"edges_detail":n,"marks_texture":n,"overall":n}}"""
 CRITERIA = ("composition_values", "edges_detail", "marks_texture")
 
+LIKENESS = """Two pictures follow. The first is an original picture. The second is a painting made of it, in this style: {style}.
+Judge one thing only: how well is the second a painting OF the first? Look at the subject, the composition and the placing of the big shapes, the pattern of light and dark, and the colour. It is a painting, not a copy: do not ask for it to match the original mark for mark or pixel for pixel, and do not judge how well it is painted.
+Score its likeness from 1 to 5:
+5: unmistakably this picture: subject, composition, tones and colour all carried over.
+4: clearly this picture, with one of them noticeably off.
+3: the subject and the composition are there, but tones or colour are plainly different, or a main part is missing.
+2: only loosely this picture: the subject can be made out, the rest is not the original's.
+1: a different picture, or the subject cannot be recognised.
+Reply with JSON only, no prose: {{"likeness":1-5,"why":"one short sentence"}}"""
+LIKENESS_FLAG = 1.5   # a painting whose likeness is at or under this, the bottom of the scale, is flagged in the table
+
 
 class Refusal(Exception):
     """An input that cannot be scored as asked: the message says which and why."""
@@ -110,7 +121,7 @@ def sequence_prompt(scheme, rubric, style, n, drawing):
 
 
 def prompt_hashes(rubric, scheme=DEFAULT_SCHEME):
-    return {"sequence": sha(sequence_prompt(scheme, rubric, "{style}", "{n}", True)), "single": sha(SINGLE)}
+    return {"sequence": sha(sequence_prompt(scheme, rubric, "{style}", "{n}", True)), "single": sha(SINGLE), "likeness": sha(LIKENESS)}
 
 
 def film(painting, least=2):
@@ -285,6 +296,19 @@ def parse_single(raw):
     return None
 
 
+def parse_likeness(raw):
+    """A likeness reply as {likeness: 1 to 5, why}, or None."""
+    for m in reversed(re.findall(r"\{[^{}]*\}", re.sub(r"```(?:json)?", "", raw or ""))):
+        try:
+            d = json.loads(m)
+            v = float(d["likeness"])
+            if 1 <= v <= 5:
+                return {"likeness": v, "why": str(d.get("why", ""))[:200]}
+        except Exception:
+            pass
+    return None
+
+
 def ask(post, model, content, parse, tries=3):
     """(reading, None) or (None, why): up to `tries` calls until a reply parses. `post(model, content)` -> (text, usage)."""
     why = None
@@ -360,3 +384,14 @@ def quality(by_judge, panel):
     med = {m: statistics.median(r["overall"] for r in rs) for m, rs in ok.items()}
     crit = {c: sum(statistics.median(r[c] for r in rs) for rs in ok.values()) / len(ok) for c in CRITERIA}
     return {"score": sum(med.values()) / len(med), "judges": med, "criteria": crit, "spread": max(med.values()) - min(med.values()), "faults": []}
+
+
+def likeness(by_judge, panel):
+    """The likeness figure (1 to 5) from {judge: [three readings]}: the mean of the judges' medians. `flagged`: at the
+    bottom of the scale (LIKENESS_FLAG or under): the painting may not be a painting of its original at all."""
+    ok, faults = _full(by_judge, panel, "likeness")
+    if faults:
+        return {"score": None, "judges": {}, "why": None, "flagged": None, "faults": faults}
+    med = {m: statistics.median(r["likeness"] for r in rs) for m, rs in ok.items()}
+    score = sum(med.values()) / len(med)
+    return {"score": score, "judges": med, "why": ok[panel[0]][0]["why"], "flagged": score <= LIKENESS_FLAG, "flagAt": LIKENESS_FLAG, "faults": []}

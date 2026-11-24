@@ -67,7 +67,7 @@ class StubJudge:
     RouteError = J.RouteError
 
     def __init__(self, broken=None):
-        self.calls, self.events, self.broken = [], [], broken
+        self.calls, self.events, self.broken, self.pairs, self.marks = [], [], broken, [], {}
 
     def settings(self, env=None):
         return {"route": "local", "label": "open3-local-3x", "panelName": "open3", "reasoning": "off", "panel": list(PANEL), "host": "stub"}
@@ -87,6 +87,10 @@ class StubJudge:
             return "not json", {}
         text = content[0]["text"]
         imgs = [c for c in content if c["type"] == "image_url"]
+        if '"likeness"' in text:
+            # the original and the painting together: Auto's is a likeness of 1, any other painting's 4
+            self.pairs.append([c["image_url"]["url"] for c in imgs])
+            return json.dumps({"likeness": 1 if self.marks.get(imgs[1]["image_url"]["url"]) == "Auto" else 4, "why": "the same cat"}), {"prompt_tokens": 7}
         if len(imgs) > 1:
             s = 2 if "Auto" in self.which else 4
             return json.dumps({"sequence": {"human": s > 3, "why": "because"}, "snapshots": [{"pct": 0, "score": s, "tells": ["c"] if s < 3 else []} for _ in imgs[1:]]}), {"prompt_tokens": 10}
@@ -317,6 +321,19 @@ class Readings(unittest.TestCase):
         none = R.human({m: [seq_reading(ten + [5])] * 3 for m in PANEL}, PANEL, "progress10", False)
         self.assertAlmostEqual(none["meanOf5"], 3.0); self.assertIsNone(none["drawing"]); self.assertEqual(none["finished"], 5.0)
 
+    def test_likeness_is_its_own_reading_of_the_original_and_the_painting_together(self):
+        self.assertIn("The first is an original picture. The second is a painting made of it", R.LIKENESS)
+        self.assertIn("not a copy", R.LIKENESS); self.assertIn("do not judge how well it is painted", R.LIKENESS)
+        self.assertEqual(R.parse_likeness('```json\n{"likeness": 4, "why": "same cat, cooler colour"}\n```'), {"likeness": 4.0, "why": "same cat, cooler colour"})
+        self.assertIsNone(R.parse_likeness('{"likeness": 9}')); self.assertIsNone(R.parse_likeness("it looks alike"))
+        mk = lambda v: {"likeness": v, "why": "w"}
+        k = R.likeness({"j1": [mk(4), mk(5), mk(2)], "j2": [mk(3)] * 3, "j3": [mk(5)] * 3}, PANEL)
+        self.assertAlmostEqual(k["score"], 4.0); self.assertEqual((k["flagged"], k["judges"]["j1"]), (False, 4))
+        low = R.likeness({m: [mk(1), mk(1), mk(2)] for m in PANEL}, PANEL)
+        self.assertEqual((low["score"], low["flagged"]), (1.0, True), "at the bottom of the scale: flagged")
+        short = R.likeness({"j1": [mk(4)] * 3}, PANEL)
+        self.assertIsNone(short["score"]); self.assertEqual(len(short["faults"]), 2)
+
     def test_a_judge_short_of_three_readings_empties_the_figure(self):
         by = {m: [seq_reading([4] * 13)] * 3 for m in PANEL}
         by["j2"] = [by["j2"][0], None, by["j2"][0]]
@@ -362,7 +379,7 @@ class Table(unittest.TestCase):
                          "rubric": {"path": "r", "sha256": "f" * 64}, "prompts": {"sequence": "a" * 64, "single": "b" * 64}, "weights": T.WEIGHTS,
                          "readings": 3, "snapshots": 12, "faults": ["x: short"], "originals": {"s": {"quality": {"score": 8}}}, "paintings": rows})
         self.assertIn("## Faults first\n\n- x: short", md)
-        self.assertIn("| model | 70% | 112% (9.00 of 10) | **84%** | +0.50 | +0.75 |", md)
+        self.assertIn("| model | 70% | 112% (9.00 of 10) | **84%** | none | +0.50 | +0.75 |", md)
         self.assertIn("none: no cheat-risk record", md)
         self.assertIn("none: no usage.json", md)
         self.assertIn("0.60 high, REVIEW; fine-detail copy 0.700 of 0.645 allowed OVER", md)
@@ -524,7 +541,7 @@ class EndToEnd(unittest.TestCase):
         firsts, post = [], j.post
         def seen(cfg, model, content, max_tokens, num_ctx):
             imgs = [c["image_url"]["url"] for c in content if c["type"] == "image_url"]
-            if len(imgs) > 1: firsts.append(paper.get(imgs[0]) if len(imgs) == 13 else f"{len(imgs)} pictures")
+            if len(imgs) > 2: firsts.append(paper.get(imgs[0]) if len(imgs) == 13 else f"{len(imgs)} pictures")
             return post(cfg, model, content, max_tokens, num_ctx)
         j.post = seen
         rc = self.S.main([str(a), str(m), "--out", os.path.join(self.tmp.name, "out")], judge=j, say=lambda *x, **k: None)
@@ -557,9 +574,15 @@ class EndToEnd(unittest.TestCase):
         self.assertEqual((res["judge"]["label"], res["judge"]["panelName"], res["judge"]["reasoning"]), ("open3-local-3x", "open3", "off"))
         self.assertEqual(res["rubric"]["path"], "bench/docs/human-ness-rubric.md")
         self.assertIn("new series", res["series"])
-        # 3 judges x (2 sequences + 3 single pictures) x 3 readings; a sequence is the opening, the drawing frame, the ten and the finished sheet, in the wider window
-        self.assertEqual(len(j.calls), 45)
-        self.assertEqual({(n, c) for _, n, c in j.calls}, {(13, 16384), (1, 8192)})
+        # 3 judges x (2 sequences + 3 single pictures + 2 likeness pairs) x 3 readings; a sequence is the opening, the drawing frame, the ten and the finished sheet, in the wider window
+        self.assertEqual(len(j.calls), 63)
+        self.assertEqual({(n, c) for _, n, c in j.calls}, {(13, 16384), (1, 8192), (2, 8192)})
+        # likeness: the judges are shown the original first and the finished painting second, and nothing else is
+        self.assertEqual({tuple(x) for x in j.pairs}, {(uri(str(Path(self.tmp.name) / "source.png"), 768), uri(str(r / "plate" / "painting.png"), 768)) for r in (a, m)})
+        self.assertAlmostEqual(by["model-run"]["likeness"]["score"], 4.0); self.assertEqual(by["model-run"]["likeness"]["flagged"], False)
+        self.assertEqual((by["auto-run"]["likeness"]["score"], by["auto-run"]["likeness"]["flagged"]), (1.0, True))
+        self.assertAlmostEqual(by["model-run"]["combined"], (160 + 87.5) / 3, msg="likeness is not in the combined figure")
+        self.assertEqual(res["pictureLongSidePx"], {"stills": 640, "alone": 768, "likeness": 768})
         self.assertEqual((res["snapshots"], res["snapshotScheme"]["name"]), (10, "progress10"))
         self.assertIn("NOT comparable", res["series"]); self.assertIn("NOT comparable", res["snapshotScheme"]["note"])
         p = by["model-run"]
@@ -570,6 +593,7 @@ class EndToEnd(unittest.TestCase):
         self.assertIn("progress", res["snapshotScheme"]["spacedBy"])
         self.assertEqual(j.events, [(e, m_) for m_ in PANEL for e in ("load", "unload")])
         md = Path(out, "SCORES.md").read_text()
+        self.assertIn("LIKENESS (of 5; not in combined)", md); self.assertIn("| 4.0 of 5 |", md); self.assertIn("1.0 of 5 **FLAGGED: at the bottom of the scale", md)
         self.assertIn("- None: every reading has all its judges.", md)
         self.assertIn("HUMAN-NESS (mean of 10 stills in progress, from the first wash to just before the finish, % of 5)", md)
         self.assertIn("the drawing frame, before the first wash (of 5; not in the mean)", md); self.assertIn("the finished sheet (of 5; not in the mean)", md); self.assertIn("NOT comparable with scores under film13", md)
@@ -577,7 +601,7 @@ class EndToEnd(unittest.TestCase):
         j13 = self.stub(); j13.marks = j.marks
         out13 = os.path.join(self.tmp.name, "out13")
         self.assertEqual(self.S.main([str(a), str(m), "--out", out13, "--snapshots", "film13"], judge=j13, say=lambda *x, **k: None), 0)
-        self.assertEqual({(n, c) for _, n, c in j13.calls}, {(14, 16384), (1, 8192)})
+        self.assertEqual({(n, c) for _, n, c in j13.calls}, {(14, 16384), (1, 8192), (2, 8192)})
         res13 = json.loads(Path(out13, "results.json").read_text())
         self.assertEqual((res13["snapshots"], res13["snapshotScheme"]["name"], res13["paintings"][0]["drawingFrame"]), (12, "film13", None))
         self.assertNotEqual(res13["prompts"]["sequence"], res["prompts"]["sequence"])
@@ -617,7 +641,7 @@ class EndToEnd(unittest.TestCase):
         I.new("RGB", (60, 80), (9, 9, 9)).save(m / "plate" / "painting.png")
         jp = self.stub(); jp.marks = {}
         self.assertEqual(run(jp), 0)
-        self.assertEqual(len(jp.calls), 18, "only the changed painting is read again: alone (9), and its sequence, which shows the finished sheet (9)")
+        self.assertEqual(len(jp.calls), 27, "only the changed painting is read again: alone (9), beside its original (9), and its sequence, which shows the finished sheet (9)")
 
     def test_fresh_reads_again_and_a_repeat_is_kept_apart_for_a_noise_measurement(self):
         a, m = self.runs()
