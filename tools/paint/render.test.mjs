@@ -40,7 +40,8 @@ test('a plan preview goes through the pool as a plan, kept off this Mac by UNPAI
   const seen = [], run = async c => { seen.push(c.args); return { exit: 0, signal: null, seconds: 2 }; }, cmd = { cmd: 'node', args: ['--valuepreviewonly', '1', '--out', '/x/plate'] };
   assert.deepEqual(await renderer({}, { root: '/r', codeState: () => ({}), run }).plan(cmd, { cwd: '/c', logFile: '/l' }), { exit: 0, signal: null, seconds: 2 });
   const dir = tmp(), clean = () => ({ commit: 'a'.repeat(40), dirty: false });
-  const pooled = renderer({ UNPAINT_RENDER: 'pool', UNPAINT_POOL_DIR: dir }, { root: '/r', codeState: clean, run });
+  // (this Mac's place is taken however many GPU paintings the machine running the test has on: UNPAINT_POOL_LOCAL)
+  const pooled = renderer({ UNPAINT_RENDER: 'pool', UNPAINT_POOL_DIR: dir, UNPAINT_POOL_LOCAL: '99' }, { root: '/r', codeState: clean, run });
   assert.equal((await pooled.plan({ ...cmd, args: ['--out', path.join(dir, 'p')] }, { cwd: dir, logFile: path.join(dir, 'p.log') })).exit, 0);
   assert.equal(seen.length, 2);
   assert.match(fs.readFileSync(path.join(dir, 'log.txt'), 'utf8'), /^\S+ plan p on this Mac/m);
