@@ -17,7 +17,9 @@ For each painting (s04_runs.py says what a run folder must hold):
   3 COMBINED: two parts human-ness to one part quality (s04_table.WEIGHTS, written into the results).
   4 beside, never blended: the painter's cheat-risk record and progression, classic.py against the original, and the
     same figures adjusted for the subject's Auto painting among the inputs.
-  5 the judge route is JUDGE_ROUTE (s04_judge.py): local by default, together or openrouter with their key.
+  5 the judges are ONE named panel on every route (s04_judge.py: JUDGE_PANEL, open3 by default, reasoning off); the
+    route is JUDGE_ROUTE: local by default, openrouter or together with their key. Panel, route and settings are
+    written into results.json; a judge that reasoned although the setting is off is named under "Faults first".
   6 usage beside the score: each run's usage.json.
 Three readings a judge; every picture for one judge before the next judge is loaded; on the local route the model is
 unloaded after its readings, and the run waits while the server holds another job's model. Readings are kept in
@@ -166,6 +168,12 @@ def main(argv=None, judge=s04_judge, env=None, say=print):
     for sid, o in originals.items():
         o["quality"] = R.quality(got[("original--" + sid, "single")], cfg["panel"])
         faults += [f"original of {sid}, quality: {x}" for x in o["quality"]["faults"]]
+    # the panel's one reasoning setting is off: a judge whose route reports reasoning tokens all the same is named
+    if jrec.get("reasoning") == "off":
+        for m in cfg["panel"]:
+            n = sum(1 for by in got.values() for r in by.get(m, []) if r and r.get("reasoningTokens"))
+            if n:
+                faults.append(f"{m} reasoned in {n} readings although the panel's reasoning setting is off: its figures are not read as the panel's other routes read them")
     T.derive(rows, originals)
     res = {"schema": "unpaint-bench/score04@1", "written": time.strftime("%Y-%m-%d %H:%M"), "series": SERIES + " " + SCHEME_NOTE[a.snapshots], "judge": jrec,
            "rubric": {"path": os.path.relpath(RUBRIC, REPO), "sha256": rubric_sha}, "prompts": R.prompt_hashes(rubric, a.snapshots),

@@ -221,7 +221,8 @@ def ask(post, model, content, parse, tries=3):
             continue
         r = parse(raw)
         if r:
-            return {**r, "promptTokens": usage.get("prompt_tokens"), "completionTokens": usage.get("completion_tokens")}, None
+            return {**r, "promptTokens": usage.get("prompt_tokens"), "completionTokens": usage.get("completion_tokens"),
+                    **({"reasoningTokens": usage["reasoning_tokens"]} if usage.get("reasoning_tokens") else {})}, None
         why = "no valid reply: " + (raw or "")[:100].replace("\n", " ")
     return None, why
 

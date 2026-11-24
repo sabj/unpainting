@@ -1,32 +1,59 @@
-"""The judge route for 0.4's scoring (score04.py): one setting, JUDGE_ROUTE, local by default.
+"""The judge panel and route for 0.4's scoring (score04.py).
 
-  local       the local panel (local_route.py: Ollama, one model in memory at a time, unloaded after its readings)
-  together    the hosted panel on Together; needs TOGETHER_API_KEY
-  openrouter  the same hosted panel on OpenRouter (zero-data-retention providers only); needs OPENROUTER_API_KEY
+ONE named panel is the default on every route: JUDGE_PANEL=open3, three open-weight models (GLM-5.3-Flash, Qwen3.8-27B,
+Gemma-4-31B) read with one reasoning setting (REASONING: off) wherever they are served. Any other panel is asked for
+by name (PANELS). The route is JUDGE_ROUTE, local by default:
 
-A hosted route with no key fails before any work, with a plain message. The key is sent as a header and is never
-written into a result, a log or an error.
+  local       Ollama (local_route.py): one model in memory at a time, unloaded after its readings
+  openrouter  hosted, zero-data-retention providers only; needs OPENROUTER_API_KEY
+  together    hosted on Together; needs TOGETHER_API_KEY (it serves the j1 panel only)
+
+A panel a route cannot serve is refused before any work, by name: never a different or a smaller panel. The panel's
+name, its models as each route names them, and the reasoning setting are written into every results file
+(record()). The key of a hosted route is sent as a header and is never written into a result, a log or an error.
 """
 import json, os, time, urllib.error, urllib.request
 
 import local_route
 
 ROUTES = ("local", "together", "openrouter")
-# the hosted panel is the J1 panel as score_painting.py names it
-HOSTED_PANEL = ("moonshotai/Kimi-K3", "zai-org/GLM-5.3-Flash", "Qwen/Qwen3.5-9B")
-OPENROUTER_NAMES = {"moonshotai/Kimi-K3": "moonshotai/kimi-k3", "zai-org/GLM-5.3-Flash": "z-ai/glm-5.3-flash", "Qwen/Qwen3.5-9B": "qwen/qwen3.5-9b"}
+READINGS_LABEL = "3x"
+# One reasoning setting for every judge on every route: off. Local: Ollama's think false. OpenRouter: reasoning effort
+# "none". A hosted judge that reasons all the same is named in the results (its usage reports reasoning tokens).
+REASONING = "off"
 HOSTED = {"together": ("https://api.together.xyz/v1/chat/completions", "TOGETHER_API_KEY"),
           "openrouter": ("https://openrouter.ai/api/v1/chat/completions", "OPENROUTER_API_KEY")}
-LABEL = {"local": "J3-local-3x", "together": "J4-together-3x", "openrouter": "J4-openrouter-3x"}
-# JUDGE_HOSTED_PANEL=open3 (openrouter only): three open-weight models, hosted with zero data retention, that can also be run
-# locally. Qwen3.8-Flash-Next is not in it: its only host (23 Nov 2026) offers no zero-data-retention endpoint (HTTP 404).
-OPEN3_PANEL = ("zai-org/GLM-5.3-Flash", "Qwen/Qwen3.8-27B", "google/gemma-4-31b-it")
-OPEN3_NAMES = {"zai-org/GLM-5.3-Flash": "z-ai/glm-5.3-flash", "Qwen/Qwen3.8-27B": "qwen/qwen3.8-27b", "google/gemma-4-31b-it": "google/gemma-4-31b-it"}
-OPEN3_LABEL = "J3-open-3x-hosted"
+# The panels by name. `models`: the judges' own names, the same in every results file whatever the route. Under each
+# route: the name that route serves the model by. A model a route has no name for cannot be read on that route.
+PANELS = {
+    "open3": {"what": "the 0.4 panel: three open-weight models, hosted with zero data retention and runnable locally",
+              "models": ("zai-org/GLM-5.3-Flash", "Qwen/Qwen3.8-27B", "google/gemma-4-31b-it"),
+              "openrouter": {"zai-org/GLM-5.3-Flash": "z-ai/glm-5.3-flash", "Qwen/Qwen3.8-27B": "qwen/qwen3.8-27b", "google/gemma-4-31b-it": "google/gemma-4-31b-it"},
+              # GLM-5.3-Flash has no local tag here: name the one the server holds in JUDGE_LOCAL_TAGS
+              "local": {"Qwen/Qwen3.8-27B": "qwen3.8:27b-mlx", "google/gemma-4-31b-it": "gemma4:31b-mlx"}},
+    "j1": {"what": "the J1 panel of the V1 to V5 rounds (score_painting.py), hosted only",
+           "models": ("moonshotai/Kimi-K3", "zai-org/GLM-5.3-Flash", "Qwen/Qwen3.5-9B"),
+           "openrouter": {"moonshotai/Kimi-K3": "moonshotai/kimi-k3", "zai-org/GLM-5.3-Flash": "z-ai/glm-5.3-flash", "Qwen/Qwen3.5-9B": "qwen/qwen3.5-9b"},
+           "together": {m: m for m in ("moonshotai/Kimi-K3", "zai-org/GLM-5.3-Flash", "Qwen/Qwen3.5-9B")}},
+    "local3": {"what": "the local panel used before 0.4 named one (J3): Qwen3.8-Flash-Next in GLM-5.3-Flash's place, local only",
+               "models": tuple(local_route.DEFAULT_PANEL), "local": {m: m for m in local_route.DEFAULT_PANEL}},
+}
+DEFAULT_PANEL = "open3"
 
 
 class RouteError(Exception):
-    """A route that cannot be used: the message is meant for a person."""
+    """A route or panel that cannot be used: the message is meant for a person."""
+
+
+def _local_tags(env):
+    """{judge: tag} from JUDGE_LOCAL_TAGS ("judge=tag,judge=tag"): the tags this server holds the panel's models under."""
+    out = {}
+    for part in filter(None, (x.strip() for x in (env.get("JUDGE_LOCAL_TAGS") or "").split(","))):
+        if "=" not in part:
+            raise RouteError(f"JUDGE_LOCAL_TAGS is a comma list of judge=tag, not {part!r}")
+        k, v = part.split("=", 1)
+        out[k.strip()] = v.strip()
+    return out
 
 
 def settings(env=None):
@@ -34,44 +61,70 @@ def settings(env=None):
     route = env.get("JUDGE_ROUTE") or "local"
     if route not in ROUTES:
         raise RouteError(f"JUDGE_ROUTE must be one of {', '.join(ROUTES)}, not {route!r}")
+    if env.get("JUDGE_HOSTED_PANEL"):
+        raise RouteError("JUDGE_HOSTED_PANEL is gone: the panel is named by JUDGE_PANEL on every route (open3 is the default)")
+    name = env.get("JUDGE_PANEL") or DEFAULT_PANEL
+    if name == "custom":
+        # a panel of one's own, local only, by its tags: never the default, and labelled as what it is
+        if route != "local" or not env.get("JUDGE_LOCAL_PANEL"):
+            raise RouteError("JUDGE_PANEL=custom is a local panel named by its tags: set JUDGE_ROUTE=local and JUDGE_LOCAL_PANEL")
+        models = names = None
+    elif name not in PANELS:
+        raise RouteError(f"JUDGE_PANEL must be one of {', '.join(PANELS)} (or custom), not {name!r}")
+    else:
+        if env.get("JUDGE_LOCAL_PANEL"):
+            raise RouteError(f"JUDGE_LOCAL_PANEL names a panel of its own: ask for it with JUDGE_PANEL=custom, or unset it to read with {name}")
+        p = PANELS[name]
+        models = list(p["models"])
+        names = {**(p.get(route) or {}), **({k: v for k, v in _local_tags(env).items() if k in models} if route == "local" else {})}
+        short = [m for m in models if not names.get(m)]
+        if short:
+            raise RouteError(f"the {name} panel cannot be read on the {route} route: it has no name there for {', '.join(short)}. " +
+                             ("Pull the model on the judge server and name its tag in JUDGE_LOCAL_TAGS (judge=tag), or use JUDGE_ROUTE=openrouter. " if route == "local" else "") +
+                             "Another panel must be asked for by name (JUDGE_PANEL); none stands in.")
+    label = f"{name}-{route}-{READINGS_LABEL}"
     if route == "local":
         try:
-            cfg = local_route.settings(env)
+            cfg = local_route.settings({**env, **({"JUDGE_LOCAL_PANEL": ",".join(names[m] for m in models)} if models else {})})
         except ValueError as e:
             raise RouteError(str(e)) from None
-        return {**cfg, "route": "local", "label": LABEL["local"]}
+        if models is None:
+            models, names = list(cfg["panel"]), {m: m for m in cfg["panel"]}
+        return {**cfg, "panel": models, "names": names, "panelName": name, "reasoning": REASONING, "route": "local", "label": label}
     url, key_name = HOSTED[route]
     if not env.get(key_name):
         raise RouteError(f"JUDGE_ROUTE={route} needs {key_name}, and it is not set. Set it in the environment, or use JUDGE_ROUTE=local.")
-    panel, label = list(HOSTED_PANEL), LABEL[route]
-    if env.get("JUDGE_HOSTED_PANEL"):
-        if env["JUDGE_HOSTED_PANEL"] != "open3" or route != "openrouter":
-            raise RouteError("JUDGE_HOSTED_PANEL can only be open3, and only with JUDGE_ROUTE=openrouter")
-        panel, label = list(OPEN3_PANEL), OPEN3_LABEL
-    return {"route": route, "label": label, "url": url, "host": url.split("/")[2], "panel": panel,
-            "keyName": key_name, "env": env}
+    return {"route": route, "label": label, "url": url, "host": url.split("/")[2], "panel": models, "names": names, "panelName": name,
+            "reasoning": REASONING, "keyName": key_name, "env": env}
+
+
+def sent_name(cfg, model):
+    """The name this route serves a judge by (the judge's own name when the settings carry none: a stub)."""
+    return (cfg.get("names") or {}).get(model, model)
 
 
 def post(cfg, model, content, max_tokens=1024, num_ctx=local_route.NUM_CTX, opener=None, sleep=time.sleep):
     """One call with one user message. Returns (reply text, usage). Raises RuntimeError when the route fails."""
     messages = [{"role": "user", "content": content}]
     if cfg["route"] == "local":
-        return local_route.post(cfg, model, messages, max_tokens=max_tokens, opener=opener, sleep=sleep, num_ctx=num_ctx, max_predict=max_tokens)
+        return local_route.post(cfg, sent_name(cfg, model), messages, max_tokens=max_tokens, opener=opener, sleep=sleep, num_ctx=num_ctx, max_predict=max_tokens)
     opener = opener or urllib.request.urlopen
-    payload = {"model": {**OPENROUTER_NAMES, **OPEN3_NAMES}[model] if cfg["route"] == "openrouter" else model, "messages": messages,
+    payload = {"model": sent_name(cfg, model), "messages": messages,
                "max_tokens": max_tokens, "temperature": 0}
     if cfg["route"] == "openrouter":
         payload["provider"] = {"zdr": True, "data_collection": "deny"}
-        # hosted judges think before they answer; with the answer's own limit their thinking used it all and the reply
-        # came back empty (23 Nov 2026: most 13-picture readings). Thinking is kept short and given its own room.
+        # reasoning off, as on the local route (REASONING). A model that reasons all the same is given room, so its
+        # answer is not cut short (23 Nov 2026: thinking used the answer's own limit and replies came back empty),
+        # and its reasoning tokens are reported, so the results can name it.
         payload["max_tokens"] = max_tokens + 6000
-        payload["reasoning"] = {"effort": "low"}
+        payload["reasoning"] = {"effort": "none"}
     hdr = {"Authorization": "Bearer " + cfg["env"][cfg["keyName"]], "User-Agent": "unpaint-bench-judge/1", "Content-Type": "application/json"}
     last = None
     for i in range(3):
         try:
             o = json.load(opener(urllib.request.Request(cfg["url"], json.dumps(payload).encode(), hdr), timeout=300))
-            return o["choices"][0]["message"].get("content") or "", {**o.get("usage", {}), "provider": o.get("provider") or cfg["route"]}
+            u = o.get("usage") or {}
+            return o["choices"][0]["message"].get("content") or "", {**u, "reasoning_tokens": (u.get("completion_tokens_details") or {}).get("reasoning_tokens"), "provider": o.get("provider") or cfg["route"]}
         except urllib.error.HTTPError as e:
             last = f"HTTP {e.code}"
             if e.code not in (408, 409, 429, 500, 502, 503, 504):
@@ -83,14 +136,18 @@ def post(cfg, model, content, max_tokens=1024, num_ctx=local_route.NUM_CTX, open
 
 
 def record(cfg, opener=None):
-    """What the results keep about the route. On the local route a panel model the server does not hold is an error."""
-    out = {"route": cfg["route"], "label": cfg["label"], "endpoint": cfg["host"], "panel": list(cfg["panel"])}
+    """What every results file keeps about the judges: the panel by name, its models as this route serves them, and
+    the settings they were read with. On the local route a panel model the server does not hold is an error."""
+    sent = {m: sent_name(cfg, m) for m in cfg["panel"]}
+    out = {"route": cfg["route"], "label": cfg["label"], "endpoint": cfg["host"], "panelName": cfg.get("panelName"), "panel": list(cfg["panel"]),
+           "sentAs": sent, "reasoning": cfg.get("reasoning", REASONING)}
     if cfg["route"] == "local":
-        out["digests"] = local_route.digests(cfg, opener)
-        out["options"] = {"think": False, "temperature": 0}
+        held = local_route.digests({**cfg, "panel": list(sent.values())}, opener)
+        out["digests"] = {m: held[sent[m]] for m in cfg["panel"]}
+        out["options"] = {"reasoning": out["reasoning"], "think": False, "temperature": 0}
     else:
         out["digests"] = None
-        out["options"] = {"temperature": 0}
+        out["options"] = {"reasoning": out["reasoning"], "temperature": 0, **({"sent": {"reasoning": {"effort": "none"}, "provider": {"zdr": True, "data_collection": "deny"}}} if cfg["route"] == "openrouter" else {})}
     return out
 
 
@@ -108,14 +165,14 @@ def unload(cfg, model, opener=None):
     if cfg["route"] != "local":
         return
     opener = opener or urllib.request.urlopen
-    body = json.dumps({"model": model, "keep_alive": 0}).encode()
+    body = json.dumps({"model": sent_name(cfg, model), "keep_alive": 0}).encode()
     opener(urllib.request.Request(cfg["url"] + "/api/generate", body, local_route._headers(cfg)), timeout=120).read()
 
 
 def wait_turn(cfg, model, opener=None, sleep=time.sleep, say=print, every=30):
     """Wait while the local server holds any model other than `model`: another job is using it."""
     while True:
-        other = [m for m in loaded(cfg, opener) if m != model]
+        other = [m for m in loaded(cfg, opener) if m != sent_name(cfg, model)]
         if not other:
             return
         say(f"waiting: the judge server holds {', '.join(other)} (another job); checking again in {every} s", flush=True)

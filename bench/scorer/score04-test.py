@@ -66,10 +66,10 @@ class StubJudge:
         self.calls, self.events, self.broken = [], [], broken
 
     def settings(self, env=None):
-        return {"route": "local", "label": "J3-local-3x", "panel": list(PANEL), "host": "stub"}
+        return {"route": "local", "label": "open3-local-3x", "panelName": "open3", "reasoning": "off", "panel": list(PANEL), "host": "stub"}
 
     def record(self, cfg):
-        return {"route": "local", "label": cfg["label"], "endpoint": "stub", "panel": cfg["panel"], "digests": {m: "d-" + m for m in PANEL}}
+        return {"route": "local", "label": cfg["label"], "endpoint": "stub", "panelName": cfg["panelName"], "reasoning": cfg["reasoning"], "panel": cfg["panel"], "digests": {m: "d-" + m for m in PANEL}, "options": {"reasoning": "off", "think": False, "temperature": 0}}
 
     def wait_turn(self, cfg, model):
         self.events.append(("load", model))
@@ -300,35 +300,65 @@ class Table(unittest.TestCase):
 
 
 class Route(unittest.TestCase):
-    def test_local_by_default(self):
-        self.assertEqual(J.settings({})["route"], "local")
-        self.assertEqual(J.settings({})["label"], "J3-local-3x")
+    TAGS = {"JUDGE_LOCAL_TAGS": "zai-org/GLM-5.3-Flash=glm-5.3-flash:test"}
+
+    def test_one_named_panel_is_the_default_on_every_route(self):
+        local = J.settings(dict(self.TAGS))
+        hosted = J.settings({"JUDGE_ROUTE": "openrouter", "OPENROUTER_API_KEY": "k"})
+        self.assertEqual(local["route"], "local")
+        self.assertEqual(local["panel"], hosted["panel"]); self.assertEqual(local["panel"], list(J.PANELS["open3"]["models"]))
+        self.assertEqual((local["panelName"], hosted["panelName"], local["reasoning"], hosted["reasoning"]), ("open3", "open3", "off", "off"))
+        self.assertEqual((local["label"], hosted["label"]), ("open3-local-3x", "open3-openrouter-3x"))
+        # each route serves the same judges under its own names
+        self.assertEqual(local["names"], {"zai-org/GLM-5.3-Flash": "glm-5.3-flash:test", "Qwen/Qwen3.8-27B": "qwen3.8:27b-mlx", "google/gemma-4-31b-it": "gemma4:31b-mlx"})
+
+    def test_a_panel_a_route_cannot_serve_is_refused_by_name_never_swapped(self):
+        with self.assertRaisesRegex(J.RouteError, "open3 panel cannot be read on the local route: it has no name there for zai-org/GLM-5.3-Flash.*JUDGE_LOCAL_TAGS"):
+            J.settings({})
+        with self.assertRaisesRegex(J.RouteError, "open3 panel cannot be read on the together route"):
+            J.settings({"JUDGE_ROUTE": "together", "TOGETHER_API_KEY": "k"})
+        with self.assertRaisesRegex(J.RouteError, "JUDGE_HOSTED_PANEL is gone"):
+            J.settings({"JUDGE_ROUTE": "openrouter", "OPENROUTER_API_KEY": "k", "JUDGE_HOSTED_PANEL": "open3"})
+        with self.assertRaisesRegex(J.RouteError, "ask for it with JUDGE_PANEL=custom"):
+            J.settings({**self.TAGS, "JUDGE_LOCAL_PANEL": "a:1b"})
+        with self.assertRaisesRegex(J.RouteError, "JUDGE_PANEL must be one of"):
+            J.settings({"JUDGE_PANEL": "mine"})
+
+    def test_any_other_panel_is_asked_for_by_name(self):
+        self.assertEqual(J.settings({"JUDGE_PANEL": "local3"})["label"], "local3-local-3x")
+        self.assertEqual(J.settings({"JUDGE_PANEL": "local3"})["panel"], list(J.local_route.DEFAULT_PANEL))
+        self.assertEqual(J.settings({"JUDGE_PANEL": "j1", "JUDGE_ROUTE": "together", "TOGETHER_API_KEY": "k"})["panel"], list(J.PANELS["j1"]["models"]))
+        c = J.settings({"JUDGE_PANEL": "custom", "JUDGE_LOCAL_PANEL": "a:1b,b:2b"})
+        self.assertEqual((c["panel"], c["label"]), (["a:1b", "b:2b"], "custom-local-3x"))
 
     def test_hosted_route_without_a_key_fails_plainly(self):
-        for route, key in (("together", "TOGETHER_API_KEY"), ("openrouter", "OPENROUTER_API_KEY")):
+        for route, key, panel in (("together", "TOGETHER_API_KEY", "j1"), ("openrouter", "OPENROUTER_API_KEY", "open3")):
             with self.assertRaisesRegex(J.RouteError, f"needs {key}, and it is not set"):
-                J.settings({"JUDGE_ROUTE": route})
+                J.settings({"JUDGE_ROUTE": route, "JUDGE_PANEL": panel})
         with self.assertRaisesRegex(J.RouteError, "must be one of"):
             J.settings({"JUDGE_ROUTE": "elsewhere"})
 
-    def test_open_panel_on_openrouter(self):
-        env = {"JUDGE_ROUTE": "openrouter", "OPENROUTER_API_KEY": "k", "JUDGE_HOSTED_PANEL": "open3"}
-        cfg = J.settings(env)
-        self.assertEqual((cfg["label"], cfg["panel"]), ("J3-open-3x-hosted", list(J.OPEN3_PANEL)))
-        self.assertEqual(J.settings({k: v for k, v in env.items() if k != "JUDGE_HOSTED_PANEL"})["panel"], list(J.HOSTED_PANEL))
+    def test_the_same_reasoning_setting_is_sent_on_both_routes_and_recorded(self):
+        hosted = J.settings({"JUDGE_ROUTE": "openrouter", "OPENROUTER_API_KEY": "k"})
         seen = []
         def opener(req, timeout=None):
-            seen.append(json.loads(req.data))
-            return io.BytesIO(json.dumps({"choices": [{"message": {"content": "ok"}}]}).encode())
-        for m in J.OPEN3_PANEL:
-            J.post(cfg, m, [{"type": "text", "text": "hi"}], opener=opener)
+            seen.append(json.loads(req.data) if req.data else req.full_url)
+            return io.BytesIO(json.dumps({"choices": [{"message": {"content": "ok"}}], "usage": {"completion_tokens_details": {"reasoning_tokens": 40}},
+                                          "message": {"content": "x"}, "models": [{"name": t, "digest": "d-" + t} for t in ("glm-5.3-flash:test", "qwen3.8:27b-mlx", "gemma4:31b-mlx")]}).encode())
+        usage = [J.post(hosted, m, [{"type": "text", "text": "hi"}], opener=opener)[1] for m in hosted["panel"]]
         self.assertEqual([b["model"] for b in seen], ["z-ai/glm-5.3-flash", "qwen/qwen3.8-27b", "google/gemma-4-31b-it"])
-        self.assertTrue(all(b["provider"]["zdr"] for b in seen))
-        with self.assertRaises(J.RouteError):
-            J.settings({**env, "JUDGE_ROUTE": "together", "TOGETHER_API_KEY": "k"})
+        self.assertTrue(all(b["provider"]["zdr"] and b["reasoning"] == {"effort": "none"} for b in seen))
+        self.assertEqual(usage[0]["reasoning_tokens"], 40, "a hosted judge that reasons all the same reports it")
+        local = J.settings(dict(self.TAGS)); seen.clear()
+        J.post(local, "zai-org/GLM-5.3-Flash", [{"type": "text", "text": "hi"}], opener=opener)
+        self.assertEqual((seen[0]["model"], seen[0]["think"]), ("glm-5.3-flash:test", False))
+        rl, rh = J.record(local, opener), J.record(hosted)
+        for r in (rl, rh):
+            self.assertEqual((r["panelName"], r["reasoning"], r["panel"]), ("open3", "off", list(J.PANELS["open3"]["models"])))
+        self.assertEqual(rl["digests"]["zai-org/GLM-5.3-Flash"], "d-glm-5.3-flash:test"); self.assertEqual(rh["sentAs"]["Qwen/Qwen3.8-27B"], "qwen/qwen3.8-27b")
 
     def test_hosted_call_sends_the_key_but_never_records_it(self):
-        cfg = J.settings({"JUDGE_ROUTE": "openrouter", "OPENROUTER_API_KEY": "sekrit-123"})
+        cfg = J.settings({"JUDGE_ROUTE": "openrouter", "OPENROUTER_API_KEY": "sekrit-123", "JUDGE_PANEL": "j1"})
         seen = []
         def opener(req, timeout=None):
             seen.append(req)
@@ -345,7 +375,7 @@ class Route(unittest.TestCase):
         self.assertNotIn("sekrit", str(e.exception))
 
     def test_local_call_widens_the_window_and_unloads(self):
-        cfg = J.settings({})
+        cfg = J.settings({"JUDGE_PANEL": "custom", "JUDGE_LOCAL_PANEL": "m"})
         seen = []
         def opener(req, timeout=None):
             seen.append(json.loads(req.data) if req.data else req.full_url)
@@ -415,8 +445,8 @@ class EndToEnd(unittest.TestCase):
     def test_the_hosted_route_sees_the_paper_first_as_the_local_one_does(self):
         a, m = self.runs()
         j = self.stub()
-        j.settings = lambda env=None: {"route": "openrouter", "label": "J3-open-3x-hosted", "panel": list(PANEL), "host": "stub"}
-        j.record = lambda cfg: {"route": "openrouter", "label": cfg["label"], "endpoint": "stub", "panel": cfg["panel"]}
+        j.settings = lambda env=None: {"route": "openrouter", "label": "open3-openrouter-3x", "panelName": "open3", "reasoning": "off", "panel": list(PANEL), "host": "stub"}
+        j.record = lambda cfg: {"route": "openrouter", "label": cfg["label"], "endpoint": "stub", "panelName": "open3", "reasoning": "off", "panel": cfg["panel"], "options": {"reasoning": "off", "temperature": 0}}
         import score_painting as SP
         from common import load_rgb
         paper = {SP.data_uri(load_rgb(str(r / "plate" / "f0000.webp")), 640): r.name for r in (a, m)}
@@ -454,7 +484,7 @@ class EndToEnd(unittest.TestCase):
         self.assertIsNotNone(by["model-run"]["classic"]["mean"])
         self.assertEqual(by["model-run"]["label"], "astra L2")
         self.assertEqual(res["weights"], {"humanness": 2, "quality": 1})
-        self.assertEqual(res["judge"]["label"], "J3-local-3x")
+        self.assertEqual((res["judge"]["label"], res["judge"]["panelName"], res["judge"]["reasoning"]), ("open3-local-3x", "open3", "off"))
         self.assertEqual(res["rubric"]["path"], "bench/docs/human-ness-rubric.md")
         self.assertIn("new series", res["series"])
         # 3 judges x (2 sequences + 3 single pictures) x 3 readings; a sequence is the opening, the drawing frame and the ten, in the wider window

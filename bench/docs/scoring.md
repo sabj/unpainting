@@ -50,14 +50,14 @@ RESULTS: to be filled from the frozen run.
 
 ## Judges
 
-- The 0.4 panel is three open-weight models: GLM-5.3-Flash, Qwen3.8-27B and Gemma-4-31B. The defaults of the routes are not this panel: name it as below.
-- `JUDGE_ROUTE` picks where: `local` (the default), `openrouter` or `together`.
-- Hosted, the 0.4 panel: `JUDGE_ROUTE=openrouter JUDGE_HOSTED_PANEL=open3` (`z-ai/glm-5.3-flash`, `qwen/qwen3.8-27b`, `google/gemma-4-31b-it`), zero-data-retention providers only. Judge label `J3-open-3x-hosted`. Needs `OPENROUTER_API_KEY`.
-- `local`: Ollama (`bench/scorer/local_route.py`; `JUDGE_LOCAL_URL`, `JUDGE_LOCAL_PANEL`). Its default panel is `qwen3.8-flash-next:125b-mlx`, `qwen3.8:27b-mlx`, `gemma4:31b-mlx`; for the 0.4 panel, name its three models' Ollama tags in `JUDGE_LOCAL_PANEL`. One model in memory at a time: every picture for one judge, then it is unloaded. The run waits while the server holds another job's model. Judge label `J3-local-3x`.
-- `openrouter` without `JUDGE_HOSTED_PANEL`, or `together`: the J1 panel (Kimi-K3, GLM-5.3-Flash, Qwen3.5-9B), labels `J4-openrouter-3x`, `J4-together-3x`. `together` needs `TOGETHER_API_KEY`.
+- ONE panel is the default on every route: `open3`, three open-weight models, GLM-5.3-Flash, Qwen3.8-27B and Gemma-4-31B, read with one reasoning setting, off, wherever they are served (`bench/scorer/s04_judge.py`: `PANELS`, `REASONING`).
+- `JUDGE_ROUTE` picks where: `local` (the default), `openrouter` or `together`. The judge label names panel and route: `open3-local-3x`, `open3-openrouter-3x`.
+- `openrouter`: `z-ai/glm-5.3-flash`, `qwen/qwen3.8-27b`, `google/gemma-4-31b-it`, zero-data-retention providers only, reasoning effort `none`. Needs `OPENROUTER_API_KEY`. A judge that reasons all the same is named under "Faults first".
+- `local`: Ollama (`bench/scorer/local_route.py`; `JUDGE_LOCAL_URL`), thinking off: `qwen3.8:27b-mlx`, `gemma4:31b-mlx`, and GLM-5.3-Flash under the tag named in `JUDGE_LOCAL_TAGS` (`zai-org/GLM-5.3-Flash=<tag>`). Without that tag the local route refuses the panel by name; nothing stands in. One model in memory at a time: every picture for one judge, then it is unloaded. The run waits while the server holds another job's model.
+- Any other panel is asked for by name, `JUDGE_PANEL`: `j1` (Kimi-K3, GLM-5.3-Flash, Qwen3.5-9B; hosted, the only panel `together` serves; needs `TOGETHER_API_KEY`), `local3` (the local panel used before 0.4 named one: Qwen3.8-Flash-Next in GLM-5.3-Flash's place), or `custom` with `JUDGE_LOCAL_PANEL` (local tags of your own). Its name is in the label and in the results.
 - A hosted route without its key stops with a plain message before any work. The key is never written into a result.
 - Three readings a judge, temperature 0. A judge's figure is the median of its three and needs all three. The panel's figure is the mean of the judges'.
-- The results record the route, endpoint, panel, model digests (local), the judge label, the rubric hash and the prompt hashes. Results with different labels are not compared.
+- Every results file records the panel by name, its models and what each was served as, the reasoning setting, the route, endpoint, model digests (local), the judge label, the rubric hash and the prompt hashes. Results with different labels are not compared.
 - A judge never sees a painter's name or level.
 
 ## Beside the score
