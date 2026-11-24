@@ -146,7 +146,11 @@ def build(drawing, lines_doc, sheet_mm, zoom=4, ink=.06, orphan_mm=.6, sigma=.6,
             Q = np.c_[xs, ys].astype(float); m = Q.mean(0); _, _, vt = np.linalg.svd(Q - m, full_matrices=False); d = vt[0]
             if abs(d[1]) > abs(d[0]) and d[1] < 0 or abs(d[0]) >= abs(d[1]) and d[0] < 0: d = -d
             with np.errstate(all='ignore'): u = (Q - m) @ d   # (Accelerate's matmul warns spuriously)
-            nearest = int(owner[int(m[1]), int(m[0])]) or int(lab.ravel()[of[near[int(m[1]), int(m[0])]]])
+            # the line it follows: the line owning its middle, else the nearest line. Its middle can lie on an earlier small
+            # mark (owner already holds that mark's own number, past the lines): that is not a line, so the nearest line
+            # is taken (before: an index past the end of the lines, and the fit stopped)
+            nearest = int(owner[int(m[1]), int(m[0])])
+            if not 1 <= nearest <= len(L): nearest = int(lab.ravel()[of[near[int(m[1]), int(m[0])]]])
             kid = len(L) + len(extra) + 1; owner[ys, xs] = kid; param[ys, xs] = (u - u.min()) / max(1e-9, u.max() - u.min())
             extra.append({'after': nearest - 1, 'path': np.vstack([m + u.min() * d, m + u.max() * d]), 'part': 'small'})
     # FILLS: a mass of ink (a leaf mass, a blot, a pane) is one stroke of its own, whole, whatever lines the tracer ran

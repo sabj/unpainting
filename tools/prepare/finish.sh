@@ -24,7 +24,8 @@ $HERE/vectors.sh $i-std-layin guides/$i-layin.png $SRC $MM pencil | tail -1
 PICK_JSON=$R/segaudit/pick-$i.json $V $HERE/pick.py $i | grep -v Warn | tail -1
 [[ -f segaudit/seed-choice.json ]] && cp segaudit/seed-choice.json segaudit/seed-choice.json.prev
 python3 $HERE/seedchoice.py pick-$i.json
-SD=$(python3 -c "import json;print(json.load(open('segaudit/seed-choice.json'))['$i']['seed'])"); sf=-s$SD; [[ $SD == 42 ]] && sf=""
+NAME=$(field $i "s['name']")   # the seed choice is kept under the subject's name, which is not always its id (white-ships-1488 is sargent-ships-large)
+SD=$(python3 -c "import json,sys;print(json.load(open('segaudit/seed-choice.json'))[sys.argv[1]]['seed'])" $NAME); sf=-s$SD; [[ $SD == 42 ]] && sf=""
 PIC=none; [[ ${BY_HAND[(Ie)$i]} == 0 ]] && grep -q '"measured_class": "ink"' classify/$i.json && PIC=ink
 (cd $REPO && $V tools/seg/tag-medium.py $R/$O/$i-std-layin-vectors.json $R/$SRC --mode contour --picture $PIC --study $R/studies/$i-study-s3L8$sf.png --out $R/$O/$i-std-layin-v2-vectors.json) | grep -v Warn | tail -1
 cp $O/$i-std-layin-lines.json $O/$i-std-layin-v2-lines.json
