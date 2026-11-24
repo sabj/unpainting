@@ -16,13 +16,14 @@ POOL_DIR/pods.json, which the sessions read to find a free place. A pod with a p
   Stop: touch POOL_DIR/STOP-PODS (every pod is deleted and this ends). Log: POOL_DIR/pods.log.
 The RunPod calls are the cloud helper's (render-batch.py, api.py: the key is read there and never printed).
 Run it detached:  nohup python3 tools/cloud/render-pool-pods.py <pool dir> > /dev/null 2>&1 &"""
-import argparse, importlib.util, json, math, os, shlex, subprocess, sys, threading, time
+import argparse, importlib.util, io, json, math, os, shlex, subprocess, sys, tarfile, threading, time
 from pathlib import Path
 
 ap = argparse.ArgumentParser()
 ap.add_argument("pool"); ap.add_argument("--cap", type=int, default=int(os.environ.get("UNPAINT_POOL_CAP", "10")))
 ap.add_argument("--hours", type=float, default=8.0, help="no pod is rented after this many hours; the daemon then ends when none is left")
 ap.add_argument("--limit-min", type=int, default=240, help="each pod deletes itself this many minutes after it is made")
+ap.add_argument("--end-min", type=int, default=0, help="no pod lives past this many minutes after the daemon starts: a pod rented late gets the time left, not --limit-min (0: every pod gets --limit-min)")
 ap.add_argument("--helper", default=str(Path(__file__).resolve().parent / "render-batch.py"))
 ap.add_argument("--per-pod", type=int, default=int(os.environ.get("UNPAINT_POOL_PER_POD", "0")), help="the most paintings at once on every pod; 0 (default): by GPU type (SLOTS)")
 ap.add_argument("--gb-a-painting", type=float, default=float(os.environ.get("UNPAINT_POOL_GB_A_PAINTING", "36")), help="memory one painting needs at its peak; a pod paints no more at once than its memory holds")
@@ -49,6 +50,8 @@ VCPU_A_PAINTING = 2.2
 LOOK_WAIT_S = 30  # a look that has waited this long for this Mac and the mini wants a pod's place
 lock = threading.Lock()
 tree_lock = threading.Lock()
+T_START = time.time()
+shipping = set()  # the pods a checkout is being copied to now, one thread a pod
 st = {"pods": [], "adding": 0, "spentUSD": 0.0}
 
 
@@ -113,7 +116,7 @@ def live_clients():
 
 def demand(now):
     """(jobs that want a pod's place: paintings waiting, looks waiting over LOOK_WAIT_S, every job on a pod; the commits waiting jobs need)."""
-    n, commits = 0, set()
+    n, commits = 0, {}
     for f in list((POOL / "waiting").glob("*.json")) + list((POOL / "claims").glob("pod-*.json")):
         try:
             w = json.loads(f.read_text())
@@ -122,10 +125,16 @@ def demand(now):
         if not alive(int(w["pid"])): continue
         # a waiting job whose command may not use a pod (UNPAINT_POOL_ONLY without "pod") wants none
         if f.parent.name == "waiting" and w.get("only") and "pod" not in w["only"]: continue
-        if f.parent.name == "waiting" and w.get("commit"): commits.add(w["commit"])
+        if f.parent.name == "waiting" and w.get("commit"): commits[w["commit"]] = commits.get(w["commit"], 0) + 1
         if f.parent.name == "claims" or w.get("kind") == "painting" or now - float(w.get("since") or 0) / 1000 > LOOK_WAIT_S:
             n += 1
     return n, commits
+
+
+def in_order(wanted, clients):
+    """The commits the pods should hold, the one most jobs wait for first, then the live commands' own."""
+    first = sorted(wanted, key=lambda c: (-wanted[c], c))
+    return first + sorted({c[2] for c in clients} - set(first))
 
 
 def claimed(name):
@@ -179,16 +188,46 @@ def ssh(pod, cmd, timeout=600, data=None):
     return subprocess.run(["ssh", "-p", str(pod["port"]), *rb.SSH, f"root@{pod['ip']}", cmd], input=data, capture_output=True, timeout=timeout)
 
 
+def changed_since(base8, sha, tree):
+    """(a tar.gz of the files of `sha` that differ from the pod's first checkout `base8`, with the new code state; the
+    files gone since), or None when the two cannot be compared (the whole checkout is sent then). Paths as a bundle
+    has them: under the checkout's own absolute path, the folders a bundle leaves out left out."""
+    r = subprocess.run(["git", "-C", str(REPO), "diff", "--name-status", "--no-renames", base8, sha], capture_output=True, text=True)
+    if r.returncode:
+        return None
+    skip = lambda rel: rel.split("/")[0] in rb.SKIP_TOP or (rel.split("/")[0].startswith(".") and "/" in rel)
+    rows = [l.split("\t", 1) for l in r.stdout.splitlines() if l.strip()]
+    keep = [rel for st_, rel in rows if st_ != "D" and not skip(rel)]; gone = [rel for st_, rel in rows if st_ == "D" and not skip(rel)]
+    bundle_of(sha, tree)  # makes the code state file of this commit (and its whole bundle, kept for a new pod)
+    pre, buf = str(tree).lstrip("/"), io.BytesIO()
+    with tarfile.open(fileobj=buf, mode="w:gz", compresslevel=3) as tf:
+        tf.add(POOL / "bundles" / f"{sha[:8]}.code-state.json", arcname=f"{pre}/code-state.shipped.json")
+        for rel in keep:
+            tf.add(tree / rel, arcname=f"{pre}/{rel}")
+    return buf.getvalue(), gone
+
+
 def add_tree(pod, commit):
     """A second commit's checkout on a pod, beside its first: its code, the first's packages, Python and SAM checkpoint."""
     sha, tree = tree_of(commit)
     if sha[:8] in pod["trees"]:
         return
-    with open(bundle_of(sha, tree), "rb") as f:
-        r = subprocess.run(["ssh", "-p", str(pod["port"]), *rb.SSH, f"root@{pod['ip']}", "tar -xzf - -C /"], stdin=f, capture_output=True, timeout=1800)
+    b, t = shlex.quote(next(iter(pod["trees"].values()))), shlex.quote(str(tree))
+    part = changed_since(next(iter(pod["trees"])), sha, tree)
+    if part is not None:
+        # only what differs from the pod's first checkout is sent (kilobytes, seconds): the pod copies that checkout
+        # beside itself and the changed files go over the copy. A whole checkout is 180 MB and took four to eight
+        # minutes a pod, one pod at a time, while the jobs for that commit waited.
+        data, gone = part
+        made = ssh(pod, f"set -e; rm -rf {t}; mkdir -p {t}; rsync -a --exclude /node_modules --exclude /.venv-seg --exclude /.venv-lines --exclude /work --exclude /code-state.shipped.json {b}/ {t}/; echo COPIED", timeout=900)
+        if b"COPIED" not in made.stdout:
+            raise RuntimeError("tree copy failed: " + (made.stdout + made.stderr).decode()[-200:])
+        r = subprocess.run(["ssh", "-p", str(pod["port"]), *rb.SSH, f"root@{pod['ip']}", "tar -xzf - -C /" + "".join(f" && rm -f {shlex.quote(str(tree / g))}" for g in gone)], input=data, capture_output=True, timeout=900)
+    else:
+        with open(bundle_of(sha, tree), "rb") as f:
+            r = subprocess.run(["ssh", "-p", str(pod["port"]), *rb.SSH, f"root@{pod['ip']}", "tar -xzf - -C /"], stdin=f, capture_output=True, timeout=1800)
     if r.returncode:
         raise RuntimeError("tree upload failed: " + r.stderr.decode()[-200:])
-    b, t = shlex.quote(next(iter(pod["trees"].values()))), shlex.quote(str(tree))
     setup = f"""set -e
 cd {t}
 find tools src -name '*.mjs' -o -name '*.js' -o -name '*.sh' | xargs grep -l 'backend=metal' 2>/dev/null | xargs -r sed -i 's/backend=metal/backend=vulkan/g'
@@ -203,6 +242,15 @@ mkdir -p work; touch work/runs.jsonl; ln -sfn {b}/work/models work/models
     with lock:
         pod["trees"][sha[:8]] = str(tree)
     log("tree", sha[:8], "on", pod["name"])
+
+
+def ship_trees(pod, commits):
+    try:
+        for c in commits:
+            try: add_tree(pod, c); save()
+            except Exception as e: log("tree FAILED", c[:8], "on", pod["name"], str(e)[:200])
+    finally:
+        shipping.discard(pod["name"])
 
 
 def measure(pod):
@@ -222,7 +270,8 @@ def add_pod(commit, n):
     try:
         sha, tree = tree_of(commit)
         cs = json.loads(bundle_of(sha, tree).with_name(f"{sha[:8]}.code-state.json").read_text())
-        rb.SHA, rb.DIRTY, rb.HARD_LIMIT, rb.T0, rb.LADDER = cs["commit"], 0, A.limit_min, time.time(), LADDER
+        life = A.limit_min if not A.end_min else max(20, min(A.limit_min, int(A.end_min - (time.time() - T_START) / 60)))
+        rb.SHA, rb.DIRTY, rb.HARD_LIMIT, rb.T0, rb.LADDER = cs["commit"], 0, life, time.time(), LADDER
         # memory for the widest pod first, then for two paintings, then what one needs: a big pod is not always in stock
         most = max(slots_of(g) for g, _ in LADDER)
         for k in sorted({most, min(most, 2), 1}, reverse=True):
@@ -233,7 +282,7 @@ def add_pod(commit, n):
             except RuntimeError as e:
                 if k == 1 or "no pod came up" not in str(e): raise
                 log("no pod with", Args.min_ram, "GB:", name, "asks for less")
-        pod = {"name": name, "id": box.id, "ip": box.ip, "port": box.port, "rate": box.rate, "created": time.time(), "limit": time.time() + A.limit_min * 60, "ready": False, "trees": {sha[:8]: str(tree)}, "gpu": getattr(box, "gpu", None), "slots": 1}
+        pod = {"name": name, "id": box.id, "ip": box.ip, "port": box.port, "rate": box.rate, "created": time.time(), "limit": time.time() + life * 60, "ready": False, "trees": {sha[:8]: str(tree)}, "gpu": getattr(box, "gpu", None), "slots": 1}
         measure(pod)
         # the pool sends inputs with rsync; the pod image has none
         r = ssh(pod, "command -v rsync >/dev/null || (apt-get install -y -qq rsync >/dev/null 2>&1 || (apt-get update -qq && apt-get install -y -qq rsync >/dev/null)); command -v rsync && echo RSYNC", timeout=600)
@@ -274,7 +323,7 @@ def dry_run():
     add, go, said = size(live, sum(c[1] for c in clients), [{**p, "claimed": claimed(p["name"])} for p in pods], 0, now)
     print("dry run:", said)
     for p in pods: print(f"  pod {p['name']} {p.get('gpu') or 'GPU type not recorded'}: {p['slots']} at once, {'a place claimed' if claimed(p['name']) else 'idle'}, {round((p['limit'] - now) / 60)} min left")
-    print(f"  would rent {add} pod(s) ({LADDER[0][0]} first: {slots_of(LADDER[0][0])} at once) for commits {sorted(c[:8] for c in wanted | {c[2] for c in clients}) or 'none'}")
+    print(f"  would rent {add} pod(s) ({LADDER[0][0]} first: {slots_of(LADDER[0][0])} at once) for commits {[c[:8] for c in in_order(wanted, clients)] or 'none'}")
     for name, why in go: print(f"  would delete {name}: {why}")
 
 
@@ -300,7 +349,7 @@ def main():
             if STOP.exists():
                 for p in list(st["pods"]): drop(p, "STOP-PODS")
                 save(); log("stopped by STOP-PODS"); break
-            clients = live_clients(); live, wanted = demand(now); commits = sorted(wanted | {c[2] for c in clients})
+            clients = live_clients(); live, wanted = demand(now); commits = in_order(wanted, clients)
             past = now - t0 > A.hours * 3600
             for p in list(st["pods"]):  # a pod past its limit has deleted itself
                 if now > p["limit"] + 60: drop(p, "past its limit")
@@ -314,11 +363,12 @@ def main():
             # the pods are published before any checkout is copied and again after each one: a copy takes minutes, and
             # a pod that is ready for one commit is not kept from its jobs while another commit reaches every pod
             save()
-            for p in [p for p in st["pods"] if p["ready"]]:
-                for c in commits:
-                    if c[:8] not in p["trees"]:
-                        try: add_tree(p, c); save()
-                        except Exception as e: log("tree FAILED", c[:8], "on", p["name"], str(e)[:200])
+            # each pod that can still take a job gets the commits it lacks in its own thread, the most waited-for first:
+            # the loop goes on renting and publishing meanwhile, and no commit waits behind another pod's copies
+            for p in [p for p in st["pods"] if p["ready"] and p["limit"] - now > 45 * 60 and p["name"] not in shipping]:
+                lacks = [c for c in commits if c[:8] not in p["trees"]]
+                if lacks:
+                    shipping.add(p["name"]); threading.Thread(target=ship_trees, args=(p, lacks), daemon=True).start()
             # more pods than the jobs and sessions need, or near its limit: an idle pod goes (never one painting)
             for name, why in go:
                 p = next((p for p in st["pods"] if p["name"] == name), None)
