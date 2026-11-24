@@ -14,6 +14,7 @@ import { refuseExtraGpuPaint, gpuPaintCount, cacheDirFor, switchesOf, segEnvFor,
 import { renderer } from './render.mjs';
 import { WorkersFailed } from './render-pool.mjs';
 import { FINAL_WAIT_HOURS, FINAL_TRIES, EXIT_KEPT, waitTicker, paintWithRetries, keptNote } from './final-wait.mjs';
+import { expandRunSets } from './run-sets.mjs';
 import { expandSubjects, pool, gpuPlace, throughput, jobsNow, DEFAULT_JOBS, PLAN_JOBS } from './queue.mjs';
 import { writeRunSheet, writeGridSheet, runPictures, formsImage, drawingSvg } from './sheet.mjs';
 import { toolsBase, resolveTools, writeTools, linesPictureDoc, allLinesDoc } from './session-tools.mjs';
@@ -118,7 +119,12 @@ try {
     if (!qwen.ready) throw new Error(`--studies author needs the local study route, and this machine lacks: ${qwen.missing.join('; ')}. Run with --studies locked.`);
     if (authors.some(a => !a.cli || ['script', 'edit', 'choice'].includes(a.cli))) throw new Error('--studies author: every author must be a model (auto and kept scripts make no studies)');
   }
-  const asked = expandSubjects(req.subjects, registry.subjects.map(s => s.id));
+  // a run set's name (bench/run-sets.json: core, extended) stands for its pictures that run at this level: the code
+  // planner alone is Auto, a model's session its --level; preparing reads the whole set
+  const sets = expandRunSets(req.subjects, req.prepare ? null : authors.every(a => !a.cli) ? 'Auto' : req.level);
+  for (const line of sets.said) console.log(line);
+  if (req.previous && sets.subjects.length !== 1) throw new Error('--previous names one model\'s previous try of one subject: a run set at L3 or L4 is run one picture at a time, each from its own previous run folder');
+  const asked = expandSubjects(sets.subjects, registry.subjects.map(s => s.id));
   specs = asked.flatMap(({ id, variant }) => {
     try {
       const v = variant ? variants[id]?.[variant] : null;

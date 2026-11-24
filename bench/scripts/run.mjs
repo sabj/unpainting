@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // Run one model through a round under protocol v2, gentle mode, and write its try folders.
 //   npm run bench:run -- --model opus --round V4|V5 [--tries 3] [--crops <crop,crop>] [--out bench/runs] [--strict-verdict] [--skills <dir>]
+//   (level 1, --round V3: --crops core|extended names a run set of bench/run-sets.json)
 //   npm run bench:run -- --dry-run [--round V4|V5]   (no model, no keys: a scripted stand-in exercises the whole path)
 // V4 and V5 write tries 1 to --tries (pipeline/round45.mjs). Rounds V1 to V3 are published history and can no longer be run.
 // A try folder (<out>/<round dir>/<model>/<try>/) gets run.json, <crop>.webp and <crop>-stages.webp. Raw outputs
@@ -15,6 +16,7 @@ import { KEYS } from './runners.mjs';
 import { preflight, scorePython } from './preflight.mjs';
 import { runDoctor } from '../../src/paint/doctor.mjs';
 import { profileForRound } from './profiles.mjs';
+import { loadRunSets, isRunSet, levelOneTargets } from '../../tools/paint/run-sets.mjs';
 
 const argv = process.argv.slice(2);
 const has = n => argv.includes('--' + n);
@@ -55,7 +57,13 @@ const model = DRY ? { key: dryKey, name: 'Scripted dry run', id: 'dry-run', effo
 
 // level 1 (the V3 round) also paints its own full-size targets (bench/v3/crops.json), which are not in the public suite
 const cropSpecs = Object.fromEntries([...loadCrops(), ...(round.id === 'V3' ? loadLevelOneCrops() : [])].map(c => [c.task, c]));
-const crops = (opt('crops') ? opt('crops').split(',') : round.targets ?? PUBLIC_CROPS).map(s => s.trim()).filter(Boolean);
+// --crops core|extended: a run set's name (bench/run-sets.json) stands for the level 1 targets of its pictures that
+// run at level 1; a picture with no level 1 target prepared stops the run, named
+const namedCrops = (opt('crops') ? opt('crops').split(',') : round.targets ?? PUBLIC_CROPS).map(s => s.trim()).filter(Boolean);
+const runSets = loadRunSets();
+if (namedCrops.some(c => isRunSet(c, runSets)) && round.id !== 'V3') fail(`--crops ${namedCrops.join(',')}: a run set names the 0.4 benchmark's pictures; of the rounds here only level 1 (--round V3) runs them`);
+let crops;
+try { crops = [...new Set(namedCrops.flatMap(c => (isRunSet(c, runSets) ? levelOneTargets(c, runSets) : [c])))]; } catch (e) { fail(e.message); }
 const PRIVATE = process.env.BENCH_PRIVATE_CROPS ? path.resolve(process.env.BENCH_PRIVATE_CROPS) : null;
 for (const c of crops) {
   if (!CROP_ORDER.includes(c) && !cropSpecs[c]?.base) fail(`unknown crop ${c}`);

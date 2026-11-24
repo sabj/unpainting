@@ -48,6 +48,24 @@ RESULTS: to be filled from the frozen run.
 
 The first run uses Gemini 4 Argon, Neon and Hydrogen and Claude Sonnet 5.5, all at medium effort, on subscriptions only. Not in it: a container for replication, and the OpenAI models (gpt-6-astra, gpt-6.1-sol, gpt-6.1-terra).
 
+## The pictures and how deep each is run
+
+[`run-sets.json`](run-sets.json) names the benchmark's pictures by their subject ids, with their groups, and what
+each runs.
+
+- **core**: five pictures, one of each group: Manet's Morisot with a Fan (figural; the approved crop), Prout's
+  Laundresses (architectural), Turner's Fort of L'Esseillon (landscape), Sargent's White Ships (loose), Mittens
+  close-up (generated). Each runs the whole ladder: levels 1 to 4, and Auto, which every score is measured against.
+- **extended**: all fifteen. The core five as above; the other ten run Auto and level 2 only.
+
+The runners read the file. A set's name stands for its pictures wherever a subject is named, and only the pictures
+that run at the level asked for are painted: `npm run paint -- extended paint` paints Auto for all fifteen,
+`npm run paint -- extended paint --author neon-m --level L2` runs level 2 on all fifteen, and at L3 or L4 the set is
+its core five (each run from its own previous folder, one picture at a time). Level 1:
+`node bench/scripts/run.mjs --round V3 --crops core`, which stops, naming them, while a core picture has no level 1
+target prepared. `node tools/paint/run-sets.mjs core` (or `extended`) lists every painting a set asks for and starts
+nothing.
+
 ## How to replicate 0.4
 
 Machines: sessions run on a Mac (Apple silicon). Painting runs on the GPU: on that Mac, on a Mac mini over ssh, or on rented GPU pods, through the render pool (`tools/paint/render-pool.mjs`). Scoring runs locally or hosted.
@@ -66,6 +84,7 @@ npm run paint -- SUBJECT paint --author neon-m --level L2 --out L2DIR
 npm run paint -- SUBJECT paint --author neon-m --level L3 --previous L2DIR --out L3DIR   # one retry from its L2 run folder
 npm run paint -- SUBJECT paint --author neon-m --level L4 --previous L3DIR --out L4DIR
 npm run paint -- SUBJECT paint --author neon-m --level L2 --dry-run   # what would run; paints nothing
+npm run paint -- core paint --author neon-m --level L2 --dry-run      # the same for a run set (core, extended)
 
 # score with the 0.4 panel, hosted (or locally: docs/scoring.md#judges)
 JUDGE_ROUTE=openrouter JUDGE_HOSTED_PANEL=open3 OPENROUTER_API_KEY=... npm run bench:score04 -- AUTODIR RUN_FOLDER... --out DIR   # Auto's painting of the subject sets the difficulty
