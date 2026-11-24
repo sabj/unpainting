@@ -9,7 +9,9 @@ export function dilate(m, w, h, r) {
   for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { let hit = 0; for (let dy = -r; dy <= r && !hit; dy++) { const yy = y + dy; if (yy < 0 || yy >= h) continue; if (a[yy * w + x] * a[yy * w + x] + dy * dy <= r2) hit = 1; } b[y * w + x] = hit; }
   return b;
 }
-const invert = m => Uint8Array.from(m, v => 1 - v);
+// a plain loop: Uint8Array.from with a mapping function walks the mask through an iterator and a call a cell, which
+// was 348 s of a full-size plan's 607 s on a pod (the same bytes come out: each is 1 - v stored into a Uint8Array)
+const invert = m => { const o = new Uint8Array(m.length); for (let i = 0; i < o.length; i++) o[i] = 1 - m[i]; return o; };
 const erode = (m, w, h, r) => invert(dilate(invert(m), w, h, r));
 /** A mask rounded as a brush of radius r would lay it: closed (gaps under 2r joined) then opened (parts under 2r dropped). */
 export function roundMask(m, w, h, r) { return dilate(erode(erode(dilate(m, w, h, r), w, h, r), w, h, r), w, h, r); }
