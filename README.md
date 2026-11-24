@@ -34,7 +34,7 @@ A painting takes a target image, a prepared drawing and one or more block-in stu
 
 While a painting runs, a guard blocks reads of the target's pixels. See [How it paints](docs/how-it-paints.md), [Plan format](docs/plan-format.md) and [Honesty](docs/honesty.md).
 
-<p align="center"><img src="docs/img/cheat-white-ships.webp" width="912" alt="Sargent's White Ships four times: the target; cheat #1, a hill-climber that keeps random dabs only when they match the photo better; cheat #2, the painter's own strokes replayed with their paint taken from the photo's pixels, with an inset heat map of where it read the photo; and the painter's run building up stroke by stroke."></p>
+<p align="center"><img src="docs/img/cheat-white-ships.webp" width="912" alt="Sargent's White Ships four times: the target; cheat #1, a hill-climber that keeps random dabs only when they match the photo better; cheat #2, the painter's own strokes replayed with their paint taken from the photo's pixels, with an inset heat map of where it read the photo; and the 0.4 painter building up stroke by stroke."></p>
 
 ## Try it
 
@@ -56,7 +56,7 @@ npm run example:animal      # Tiepolo, Punchinello Riding a Camel: drawing and s
 npm run example:portrait    # Sargent, A Tramp: study only
 ```
 
-<p align="center"><img src="docs/img/build-white-ships.webp" width="560" alt="Sargent's White Ships beside a benchmark painting by Sol, built from blank paper with the brush outline following each recorded stroke, then rewound"></p>
+<p align="center"><img src="docs/img/build-white-ships.webp" width="840" alt="Sargent's White Ships beside two paintings building from blank paper and rewinding: 0.3 and prior (middle) beside 0.4 onwards (right)"></p>
 
 [Running the painter](docs/running.md) covers your own images, sheet size, saved stages and animations. Optional:
 
