@@ -4,7 +4,7 @@ import { parseArgs } from './args.mjs';
 
 test('one subject and a mode, with the defaults', () => {
   const r = parseArgs(['kasha-watercolor', 'plan']);
-  assert.deepEqual(r, { subjects: [{ id: 'kasha-watercolor', variant: null }], mode: 'plan', prepare: false, preflight: false, look: false, until: null, region: null, authors: ['auto'], studies: 'locked', work: 'session', level: 'L2', tryNumber: 1, retries: 1, previous: null, looks: null, wallMinutes: null, graceMinutes: null, steps: null, reverts: null, from: null, lines: null, sets: [], jobs: null, out: null, dryRun: false, open: true });
+  assert.deepEqual(r, { subjects: [{ id: 'kasha-watercolor', variant: null }], mode: 'plan', prepare: false, preflight: false, look: false, until: null, region: null, authors: ['auto'], studies: 'locked', work: 'session', level: 'L2', tryNumber: 1, retries: 1, previous: null, looks: null, wallMinutes: null, graceMinutes: null, steps: null, reverts: null, from: null, lines: null, sets: [], jobs: null, out: null, dryRun: false, open: false });
 });
 
 test('several subjects, authors, settings and a variant', () => {
@@ -42,4 +42,11 @@ test('the budget of a try, the level and its retries are settings; prepare and l
   assert.throws(() => parseArgs(['mittens', 'plan', '--minutes', '85']), /--minutes is gone: a session's own minutes are measured, not capped.*--wallminutes/);
   assert.throws(() => parseArgs(['mittens', 'plan', '--critique', 'w.txt']), /--critique is gone: no critique, score or verdict is handed to a model at any level/);
   assert.throws(() => parseArgs(['mittens', 'plan', '--level', 'L5']), /--level is L1 \(fixed rounds only\), L2, L3 or L4/); assert.throws(() => parseArgs(['mittens', 'plan', '--looks', '0']), /--looks: the rendering budget of a try in units/);
+});
+
+test('no window is opened unless --open is given', () => {
+  assert.equal(parseArgs(['mittens-closeup', 'paint']).open, false, 'a run that says nothing opens nothing');
+  assert.equal(parseArgs(['mittens-closeup', 'paint', '--open']).open, true);
+  assert.equal(parseArgs(['mittens-closeup', 'paint', '--no-open']).open, false, 'the old word is still accepted');
+  assert.equal(parseArgs(['mittens-closeup', 'paint', '--open', '--no-open']).open, false);
 });
