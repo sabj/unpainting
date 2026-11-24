@@ -5,10 +5,12 @@ import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { segPythonFor } from '../paint/run.mjs';
 
 // tag-medium.py --mode contour, which keeps every stroke (rule A, the owner's pick on Rosewalk, 21 Nov): ink where the
 // contour rule inks or the source under the stroke is near-black; every other stroke is light pencil.
-const root = fileURLToPath(new URL('../../', import.meta.url)), python = path.join(root, '.venv-seg/bin/python');
+// (the segmentation python as the painter finds it: a git worktree without its own uses its main checkout's)
+const root = fileURLToPath(new URL('../../', import.meta.url)), python = segPythonFor(root);
 const run = (...args) => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'tag-medium-'));
   try { return JSON.parse(execFileSync(python, ['tools/seg/tag-medium-cases.py', dir, ...args], { cwd: root, encoding: 'utf8' }).trim().split('\n').pop()); }
