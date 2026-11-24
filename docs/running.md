@@ -264,6 +264,7 @@ Flags use `--name value`. The last repeated flag wins. The default recipe (`src/
 | `--runcache` | `0`, `1`: reuse matching preparation | `1` |
 | `--video` | `0`, `1` | `1` |
 | `--marks` | `0`, `1`: write the full stroke tape | `1` |
+| `--recording` | `full`: a frame after every stroke; `medium`: frames only at the film's frames; `light`: a film of at most 40 frames, enough for the ten progress stills | `medium` |
 | `--canarystop` | a pass number N: save `canary-pass-N.png` after pass N and stop | `0` |
 | `--notargetlooks` | `0`, `1`: no look at the target after planning | `0` |
 | `--valueplan` | JSON path; see [plan-format.md](plan-format.md#value-plan-file) | none |
