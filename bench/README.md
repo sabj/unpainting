@@ -33,6 +33,8 @@ Every level is one try that hands in the model's own script, with a budget of 3.
 
 Nothing of Auto is given at any level: no plan, planner, painting, film or stroke map. A hand-in of planner settings, or of the code's plan, is refused.
 
+Each step of the ladder changes several things at once, and level 1 paints in a different way from levels 2 to 4 (its own code driving the brush, against a painting script the painter lays). A gain between two levels is the effect of the whole step and cannot be assigned to one kind of help: [what changes from one level to the next](docs/levels.md#what-changes-from-one-level-to-the-next) lists all of it.
+
 Details: [levels](docs/levels.md), [rules](docs/rules.md) and [scoring](docs/scoring.md).
 
 - Drawing is the model's choice: pencil, pen or none; no drawing is a normal choice. The prepared drawing is offered, not required, and its lines may go down before the washes, with a stage of them, or after. Pen ink is waterproof or soluble. It gets warnings, not refusals, where a choice only risks the painting.
@@ -65,7 +67,7 @@ until that is explained). The museums' own size lines are in [PICTURES.md](PICTU
 
 RESULTS: to be filled from the frozen run.
 
-The first run uses Gemini 4 Argon, Neon and Hydrogen and Claude Sonnet 5.5, all at medium effort, on subscriptions only. Not in it: a container for replication, and the OpenAI models (gpt-6-astra, gpt-6.1-sol, gpt-6.1-terra).
+The models run are listed with the results. Not in 0.4's first run: a container for replication.
 
 ## Running a set
 
@@ -75,8 +77,9 @@ The runners read the file. A set's name stands for its pictures wherever a subje
 that run at the level asked for are painted: `npm run paint -- extended paint` paints Auto for all fifteen,
 `npm run paint -- extended paint --author neon-m --level L2` runs level 2 on all fifteen, and at L3 or L4 the set is
 its core five (each run from its own previous folder, one picture at a time). Level 1:
-`node bench/scripts/run.mjs --round V3 --crops core`, which stops, naming them, while a core picture has no level 1
-target prepared. `node tools/paint/run-sets.mjs core` (or `extended`) lists every painting a set asks for and starts
+`node bench/scripts/run.mjs --round V3 --model neon-m --crops core`. Each core picture has a level 1 target
+(`v3/crops.json`, made by `scripts/add-level-one-target.mjs`); the run stops before any session, naming them, while a
+target has no rendering unit, which it gets from its prepared Auto (today: Prout and White Ships). `node tools/paint/run-sets.mjs core` (or `extended`) lists every painting a set asks for and starts
 nothing.
 
 ## How to replicate 0.4
@@ -84,13 +87,12 @@ nothing.
 Machines: sessions run on a Mac (Apple silicon). Painting runs on the GPU: on that Mac, on a Mac mini over ssh, or on rented GPU pods, through the render pool (`tools/paint/render-pool.mjs`). Scoring runs locally or hosted.
 
 ```sh
-# level 1: one attempt with the freehand kit (the runner keeps its old round name, V3; model keys in models.json;
-# subjects in v3/crops.json; 360 sets the six-hour stop, which the brief then states)
-BENCH_V3_ATTEMPT_MIN=360 node bench/scripts/run.mjs --round V3 --model neonmed --crops SUBJECT --out DIR
+# level 1: one attempt with the freehand kit, closed like every session (the runner keeps its old round name, V3;
+# targets in v3/crops.json, or a run set's name; the clock is the six-hour safety stop)
+node bench/scripts/run.mjs --round V3 --model neon-m --crops TARGET --out DIR
 
-# (level 1 keys: argonmed, neonmed, sonnetmed; models.json has no Hydrogen key yet)
-
-# levels 2 to 4 (model keys in tools/paint/authors.json: argon-m, neon-m, hydrogen-m, sonnet-m)
+# levels 2 to 4 (the same model keys at every level: argon-m, neon-m, hydrogen-m, carbon-m, sonnet-m;
+# bench/models.json for level 1, tools/paint/authors.json for levels 2 to 4)
 npm run paint -- SUBJECT prepare                                   # once per subject: the inputs every level gets
 npm run paint -- SUBJECT paint --out AUTODIR                       # Auto, the reference (--author auto is the default)
 npm run paint -- SUBJECT paint --author neon-m --level L2 --out L2DIR

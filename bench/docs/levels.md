@@ -25,6 +25,19 @@ Notes:
 - Every picture is painted on the same area of paper, a quarter sheet (27.9 x 38.1 cm), in its own proportions, whatever the file's size. The original's real size is told to the model as a fact, not reproduced ([real sizes](../README.md#real-sizes-of-the-originals-told-to-the-model-as-a-fact)).
 - L0 (the kit with no tips) is defined, not run.
 
+## What changes from one level to the next
+
+Each step changes several things at once. Read a difference between two levels as the effect of the whole step, never of one kind of help: the benchmark cannot say which part of a step caused a gain or a loss.
+
+| Step | Everything that differs |
+|---|---|
+| L1 | Stands apart from L2 to L4 in kind, not only in help. The model writes code against the freehand kit and paints in its own process, stroke by stroke with direct brush control (path, pressure, speed, a flat's blade, load, water). It sees the picture with its own vision only: its scripts may not read any image, and get the picture as a 24-cell coarse map. It has the tips and the two technique guides, no prepared inputs. Each run of its script is a full-size painting; it may run 3 and look at each. Its last completed run is its painting. |
+| L1 to L2 | A different way of painting, and different help. The model now writes a painting script in millimetres (passages, washes, strokes) that the main painter lays; it no longer drives the brush sample by sample. It is given the prepared drawing, three colour studies and the named forms, and the subject as a picture in its folder, which its own code may measure. Its looks are half-size test paintings priced by size (3.0 units); the full-size final is painted afterwards and not charged. |
+| L2 to L3 | One more try, and its own result to study: its finished full-size L2 painting, film and stroke map, and its own written assessment. A fresh folder, session and budget. Nothing new about the picture. |
+| L3 to L4 | One more try again (the third at this picture), its L3 painting, film and stroke map to study, and new help: the studies' traced shapes as regions it may use, change or ignore. So L4 differs from L3 by both another retry and the shapes. |
+
+At every level: the same sheet, the same paints, the same closed workspace (no network but the model's own service, one fixed toolbox, nothing readable outside its folder), nothing of Auto, no score or critique shown.
+
 ## Budget
 
 A look has a fixed price by size, whatever is in it: a half-size look of the whole sheet 0.3, a full-size look 1.0, a look stopped at a stage or cut to a region its share of that (the share of the plan's washes or passages it paints), never under 0.2. At L2 to L4 a look is painted at half size (`./unpaint look`); at L1 each run of the script is a full-size painting (1.0). The budget for one try is 3.0 at every level. At L2 to L4 the full-size final is painted after the session and not charged; at L1 the painting is its last completed run. How a model paints (water, strokes, waits, dryings) is never charged: simulation work (cell-steps), sweeps, dryings, seconds, tokens (fresh, cached and output) and steps are recorded in `usage.json` beside the score. One runaway guard: a painting whose water steps pass ten times those of Auto's painting of the subject is stopped with a plain message, reported as a stop and not scored (a look it stops costs nothing). Steps (1,000) and a six-hour clock are runaway guards only.

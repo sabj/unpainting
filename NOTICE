@@ -190,8 +190,15 @@ credits: THIRD_PARTY_NOTICES.md.
    number) and its credit line; rights; link. The words are the museum's
    own record, read on 23 November 2026. Most of the full-size files are
    held outside this repository; the files that are in it are named in
-   sections 1, 2 and 4. Paintings of these pictures made by the painter
-   follow section 3 (museum works) or section 1 (Mittens and Kasha).
+   sections 1, 2 and 4, and here. Paintings of these pictures made by the
+   painter follow section 3 (museum works) or section 1 (Mittens and Kasha).
+
+   Level 1 targets in this repository, each the picture cited below scaled
+   down to the benchmark's sheet (credit and rights as cited there):
+     bench/v3/targets/manet-morisot-fan-crop-full.png (Manet; a detail)
+     bench/v3/targets/prout-laundresses-full.png (Prout)
+     bench/v3/targets/turner-esseillon-full.png (Turner)
+     bench/v3/targets/white-ships-1488-full.png (Sargent, White Ships)
 
    Rights. Art Institute of Chicago: the record marks the work public
    domain, and the museum releases such images under CC0

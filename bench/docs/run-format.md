@@ -47,9 +47,11 @@ The record keeps each model in its own role. `painter` is the model that painted
 | `evaluators.progressionJudges` | string[], required | judge ids that ran the progression check |
 | `try` | integer, required | try number, from 1 |
 | `settings.mode` | string, required | `gentle` or `hard` |
-| `settings.strokeBudget` | integer or null, required | 2500; null in V4 and V5, where the painter sets its own stroke count |
-| `settings.minutesPerCrop` | number | 15 |
-| `settings.sessionCapMin` | number | 85 |
+| `settings.strokeBudget` | integer or null, required | 2500 in V1 to V3; null in V4 and V5, where the painter sets its own stroke count, and in a level 1 record of 0.4 (one that names `settings.paintingsPerAttempt`): no limit on strokes |
+| `settings.paintingsPerAttempt` | integer | level 1 of 0.4: the paintings its script may run (3) |
+| `settings.minutesPerCrop` | number or null | 15; null at level 1 of 0.4 |
+| `settings.sessionCapMin` | number | 85; at level 1 of 0.4 the safety stop in force (360) |
+| `isolation` | object | level 1 of 0.4: `{closed, how, refusedRequests}`: the session ran under the closed profile, and how many requests to another host its gate refused; each painting's `network` has the hosts passed and refused |
 | `settings.lookBudget` | integer | looks per painting in hard mode, else null |
 | `settings.crops` | string[] | the targets the try was asked to paint |
 | `settings.learnsBetweenTries` | boolean | true in V3 and V5 |
@@ -82,7 +84,7 @@ Each `crops.<crop>` entry:
 
 | Field | Meaning |
 |---|---|
-| `strokes` | counted strokes, at most 2,500 |
+| `strokes` | counted strokes (at most 2,500 in V1 to V3; no limit at level 1 of 0.4) |
 | `minutes` | minutes from `kit.open` to `kit.finish` |
 | `smallShare`, `shortStrokes`, `dotStrokes` | stroke-size records from the toolkit |
 | `copyHF` | the copy-band correlation, a measure of matching fine detail (cheat-risk input) |
