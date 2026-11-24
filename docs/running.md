@@ -66,7 +66,7 @@ input is checked against its sha256 before anything starts. The code is in `tool
 npm run paint -- <subject[,subject...]> plan|paint|prepare|look|preflight [--author auto|<model key>[,...]]
                  [--studies locked|author] [--work session|reply] [--level L2|L3|L4] [--retries N] [--try N]
                  [--previous <dir>] [--looks U] [--steps N] [--wallminutes N] [--from <dir>]
-                 [--set key=value ...] [--jobs N] [--out <dir>] [--dry-run] [--no-open]
+                 [--set key=value ...] [--jobs N] [--out <dir>] [--dry-run] [--open]
 ```
 
 Every option and its default is in `tools/paint/args.mjs`; a wrong option prints that list.
@@ -119,7 +119,7 @@ the rest of the queue goes on and the command ends with exit 1. Writing a number
 of a queue that is already running.
 
 ```sh
-npm run paint -- all paint --jobs 6 --out work/paint/all-r1 --no-open
+npm run paint -- all paint --jobs 6 --out work/paint/all-r1
 
 # source | wash plan | painting, one row a subject, and the table of numbers
 node tools/paint/contact.mjs work/paint/all-r1 work/paint/all-r1/contact.jpg --table work/paint/all-r1/table.md
