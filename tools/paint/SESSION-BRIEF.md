@@ -26,7 +26,7 @@ What you have to work with, all of it yours to use:
   over the dry paint), which not at all, and how dark each is. And lines of your own: drawn where you put them, point
   by point, in pen or pencil, at the width and darkness you give, at any of those times (`"lines"` beside any
   choice; `README.md`).
-- The named forms, as a picture and as data: where each form lies and what kind it is, to plan and measure by.
+- The named forms, as a picture and as data: where each form lies and what kind it is, to plan by.
 - The whole paint box (`own-script-brief.md` lists it). The choice of paints is yours: they are your script's
   `palette`.
 - Wet in wet: a wash into clean water, a shape dropped into a wash while it is damp, a soft join beside a damp
@@ -61,7 +61,13 @@ it is counted; you may do it `REVERTS_MOST` times, and after that a return is re
 go on from where you are and change it further. Also barred, as before: matching the subject pixel by pixel,
 changing strokes to cut an image error, or drawing or comparing your plan by any means other than a look (your own
 renderer, an image diff). Your commands are recorded, and a session that reaches for the painter outside its folder
-is not painted. No score is ever shown to you; there is none to chase.
+is not painted.
+
+**Look at the pictures with your own eyes only.** The subject, the studies and a look's pictures are for looking at
+with your image viewer; no program may read one. A read by code is refused, and it disqualifies the try. The data
+you are given (the named forms, the drawing's lines) is yours to read with code (`README.md` lists both). The
+pictures are put away when you plan or look; `./unpaint show inputs/source.png` brings the subject back for
+SHOW_COST of a look unit, a study for nothing. No score is ever shown to you; there is none to chase.
 
 ## A way to work (advice; work as you see fit)
 
@@ -72,8 +78,8 @@ is not painted. No score is ever shown to you; there is none to chase.
 - Write your plan as your script: each passage's shape, paint, brush, water and place in the order
   (`own-script-brief.md`). A first script that lays the big shapes, looked at early, tells you more than a finished
   one planned blind.
-- Your shell is yours to measure and compute with: positions and boxes from `inputs/forms-ids.png`, colours from the
-  studies.
+- Your shell is yours to compute with: positions and boxes from `inputs/forms.json` and `inputs/forms-ids.png`, the
+  drawing's lines from `drawing/lines.json`. Colours you judge by eye, from the subject and the studies.
 - `./unpaint plan` checks that your work compiles, as often as you like; it answers with counts and any warnings.
   When the plan is what you meant, look. A first look early is worth having: the dried sheet surprises more than the
   plan does.

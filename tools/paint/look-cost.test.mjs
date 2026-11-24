@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { DEFAULT_LOOK_UNITS, LEAST_LOOK_COST, LOOK_PRICE, lookSizeOf, readLookAsk, regionBox, lookCost, costLine, scriptInRegion } from './look-cost.mjs';
+import { DEFAULT_LOOK_UNITS, LEAST_LOOK_COST, LOOK_PRICE, lookSizeOf, readLookAsk, regionBox, lookCost, costLine, scriptInRegion, SHOW_ORIGINAL_COST, showCost } from './look-cost.mjs';
 
 const rows = [...Array(3).fill({ stage: 1 }), ...Array(5).fill({ stage: 3 }), ...Array(2).fill({ stage: 4 })];
 test('a look has a fixed price: 0.3 for a half-size look of the whole sheet, 1.0 full size, its share when partial or regional, never under 0.2', () => {
@@ -37,4 +37,9 @@ test('the work a painting does is recorded, never charged: brush sweeps and dryi
   assert.deepEqual(paintedWork({ sweeps: 55, passes, passesDone: 2 }), { sweeps: 55, dryings: 1 }); assert.deepEqual(paintedWork({ sweeps: 97, passes }), { sweeps: 97, dryings: 3 });
   assert.throws(() => paintedWork({ sweeps: null, passes }), /did not report how many brush sweeps/);
   assert.equal(sweepsInLog('x\n952 brush sweeps, 144 frames, 1221 s\n'), 952); assert.equal(sweepsInLog('nothing'), null);
+});
+
+test('showing the original is priced lightly from the look budget: twenty glances are one unit; any other picture is free', () => {
+  assert.equal(SHOW_ORIGINAL_COST, 0.05); assert.equal(showCost(true), 0.05); assert.equal(showCost(false), 0);
+  assert.equal(Math.round(1 / SHOW_ORIGINAL_COST), 20); assert.ok(SHOW_ORIGINAL_COST < LEAST_LOOK_COST, 'a glance costs less than the least look');
 });

@@ -8,6 +8,22 @@ choice lays your present choice on a small sheet (the same millimetres, fewer ce
 brush, lets it dry, and you are shown what dried.
 
 
+## Pictures are to look at; data is for your code
+
+**No program may read a picture.** The pictures are the subject (`inputs/source.png`), the studies
+(`inputs/study-1.png` to `study-3.png`), any picture of an earlier painting you were handed, and a look's `beside.png`
+and `stages.png`. Open them with your own image viewer and look. A script or shell command that opens, copies or
+converts one is refused by the system, and reading a picture with code disqualifies the try: the session is recorded
+and nothing of it is painted. Do not name a picture in a script.
+
+The data is yours to read with any code: `inputs/forms.json` and `inputs/forms-ids.png`, `inputs/forms.png`,
+`inputs/drawing.png`, `drawing/lines.json` and `drawing/all-lines.png`, `resources/` when you were handed it, every
+look's `numbers.txt`, `plan.json`, `plan.png` and `sheet.png` (your own dried sheet alone), and every file you write.
+
+The subject, the studies and a handed painting lie in the folder when you start. They are put away each time you
+plan or look. `./unpaint show inputs/source.png` brings one back until your next plan or look: the subject costs
+SHOW_COST of a look unit each time (the same budget as your looks), the others nothing; every showing is counted.
+
 ## Files
 
 INPUT_LIST
@@ -47,10 +63,11 @@ plan's minutes and a look's painting are on it.
 |---|---|---|---|
 | `./unpaint status` | nothing | what is used of this try's budget (minutes on the clock, look units, returns to an earlier choice) and the plans made so far | none |
 | `./unpaint plan` | compiles your present `choice.json` and the script it names | whether it compiled, or why it was refused, and its counts (passages, washes, strokes, widest brush, washes by stage, and how far the hand jumps between consecutive strokes of one passage, median and worst, in mm), what each erase will take, and every WARNING on your choice (each is laid as you wrote it; heed or ignore it). Nothing else: no picture and no wash data | none |
-| `./unpaint look` | the same, then PAINTS your present choice for real, small, through drying, and shows you the dried sheet | `looks/N/beside.png` (your painting as it dried, the subject, the middle study, side by side), `looks/N/stages.png` (the subject, then your sheet at 10, 25, 50, 75 and 100% of the strokes: the order of the work), `looks/N/numbers.txt` (each named form measured on the DRIED sheet against the study and against your plan, marked when it is TOO DARK or TOO PALE, and every wash), `looks/N/plan.json` (every wash of your script as data), `looks/N/plan.png` (the plan as a diagram) | its cost in look units, of LOOKS_MOST for this try (the benchmark's budget) |
+| `./unpaint look` | the same, then PAINTS your present choice for real, small, through drying, and shows you the dried sheet | `looks/N/beside.png` (your painting as it dried, the subject, the middle study, side by side), `looks/N/stages.png` (the subject, then your sheet at 10, 25, 50, 75 and 100% of the strokes: the order of the work), `looks/N/numbers.txt` (each named form measured on the DRIED sheet against the study and against your plan, marked when it is TOO DARK or TOO PALE, and every wash), `looks/N/plan.json` (every wash of your script as data), `looks/N/plan.png` (the plan as a diagram), `looks/N/sheet.png` (your dried sheet alone: the one picture of a look your code may read) | its cost in look units, of LOOKS_MOST for this try (the benchmark's budget) |
 | `./unpaint look --until S` | the same, stopped after stage S of your plan (1 the first washes) and dried there; nothing after it is painted | the same files; `numbers.txt` begins with what is on the paper and what is still to come | that stage's share of the plan's washes, of the whole look's price |
 | `./unpaint look --region x0,y0,x1,y1` or `--region FORM NAME` | your own script only: paints the passages that touch that box (sheet millimetres) or that named form's box, and what they are laid into, by themselves on the sheet | the same files | the share of your script's passages that touch the region, of the whole look's price (with `--until` too: both shares multiplied). A wide box touches most passages and saves little: `./unpaint cost` says before you spend |
 | `./unpaint cost [--until S] [--region ...]` | prices that look of your present choice and paints nothing | the cost in units and what you have left | none |
+| `./unpaint show FILE` | brings a picture that was put away back into the folder, to look at (`inputs/source.png`, a study, a handed picture; several names may follow) | where the picture lies, and what it cost | `inputs/source.png`: SHOW_COST of a unit; any other: free |
 | `./unpaint wait` | waits for the answer of the command that said "still working" | that answer | none |
 
 A choice that is refused costs no look. A choice that is exactly one you planned before and then left is a
@@ -80,7 +97,7 @@ What a look's painting is, exactly:
 | The painter itself | your own script (`own-script-brief.md`) | every passage: its shape, paint and dilution, brush and width, paper wet, damp or dry, what it is laid into, how long the sheet dries first, stroke paths, pressure and hold, the order, the lights kept as paper. Write strokes in the order a hand would travel: finish one area before the next, neighbours after each other, long strokes before short; the replay is watched |
 | The preview | `./unpaint look` | the painter run for real, small: the dried sheet, the stages, each form measured on the dried sheet |
 | The compile check | `./unpaint plan` | whether your choice compiles, and its counts |
-| Your shell | any command in this folder | measure the input pictures, compute positions and colours, write and check your files, keep notes |
+| Your shell | any command in this folder | read the data (above), compute positions, measure your own dried sheet (`looks/N/sheet.png`), write and check your files, keep notes; never a picture |
 
 Given and fixed in this session: the three studies, the sheet size, the painter's guard and its seed. New studies
 cannot be asked for here.
@@ -154,7 +171,8 @@ What to know:
   has dried it takes far less (about a fifth under a pale wash, a twentieth under a medium one, less under a dark one). The eraser needs dry
   paper: leave its `wait` at `dry`. `./unpaint plan` says what each erase will take.
 
-Your shell is yours: read the files, measure the input pictures (sampling a colour or a position is fair), compute,
-keep notes, write and check your script with your own code. The folder is all there is to work from: the painter and
+Your shell is yours: read the data, compute, keep notes, write and check your script with your own code. The
+pictures are for your eyes only (see the top of this page): colour and place are judged by looking, and by the
+millimetre grid every picture carries. The folder is all there is to work from: the painter and
 other sessions are out of reach, and a session whose commands name them is not painted. A plan is painted, drawn or
 measured against the subject only by `./unpaint look`.

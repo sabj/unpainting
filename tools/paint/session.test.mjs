@@ -7,7 +7,7 @@ import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { levelOf, OWN_SCRIPT_ONLY } from './levels.mjs';
 import { shapesHanded, checkWithheld, WITHHELD } from './level4.mjs';
-import { DEFAULT_LOOKS, DEFAULT_WALL_MINUTES, DEFAULT_STEPS, forLevel, writeSession, sessionServer, ledgerLooks, safeRead, safeWrite, finalChoice, cleanEnv, seatbelt, sessionCall, readTranscript, transcriptFile, reachedOutside, ownFolderOf, ownPictures, runSession } from './session.mjs';
+import { DEFAULT_LOOKS, DEFAULT_WALL_MINUTES, DEFAULT_STEPS, forLevel, writeSession, sessionServer, ledgerLooks, ledgerShowings, safeRead, safeWrite, finalChoice, cleanEnv, seatbelt, sessionCall, readTranscript, transcriptFile, reachedOutside, ownFolderOf, ownPictures, runSession } from './session.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'paint-session-test-'));
@@ -504,7 +504,7 @@ test('at every level the folder holds the code planner\'s inputs and no code pla
         assert.doesNotMatch(text, /code planner|code's plan|auto\/|plan-to-edit|settings choice|"kind": "settings"|"kind": "plan"|perForm|edited plan|<!--/, `${level}: ${name} says nothing of the code's plan or planner`);
       }
       assert.match(prompt, /your own painting script/); assert.match(prompt, /has handed in nothing/); assert.match(prompt, /Looks: `2` units\. A look has a fixed price, whatever is in it: a\s+look of your whole plan on the whole sheet, painted at half size, costs 0\.3/); assert.match(prompt, /and at least 0\.2/); assert.match(prompt, /How you paint costs nothing: water, wetness, brushwork, the number of\s+strokes, waits and dryings are yours, and the final painting is not charged/); assert.doesNotMatch(prompt, /charged what it really took|brush sweeps and its dryings|painting work it really takes/, 'nothing says water or strokes cost budget');
-      assert.match(readme, /`inputs\/study-2.png`: block-in STUDY 2: the subject simplified to flat shapes \(1 the broad shapes, 2 the middle study, 3 details and accents\)\n/);
+      assert.match(readme, /`inputs\/study-2.png`: block-in STUDY 2: the subject simplified to flat shapes \(1 the broad shapes, 2 the middle study, 3 details and accents; to look at only\)\n/);
       assert.match(readme, /"kind": "erase"/, 'its erase passages are its own to write'); assert.match(readme, /"lines": "my-lines.json"/);
       if (level !== 'L2') assert.match(prompt, /`previous\/final-beside-subject.jpg`/);
       if (level === 'L4') {
@@ -615,4 +615,63 @@ test('a Muse session\'s transcript is its own session log: found by the session 
     assert.deepEqual([m.tokenSplit.reported, m.tokenSplit.freshIn, m.tokenSplit.cachedIn, m.tokenSplit.out, m.tokenSplit.thinking], [true, 900, 600, 50, 25]); assert.match(m.tokenSplit.from, /its own session log/);
     assert.deepEqual(readTranscript('muse', '{"some":"line of its output"}').steps, []);
   } finally { fs.rmSync(root, { recursive: true, force: true }); }
+});
+
+test('eyes only: the pictures lie in the folder at the start, are put away by a plan, and ./unpaint show brings one back, counted, the original at its price', async () => {
+  const { dir, ledger, eyesOnly } = folder({ looks: 0.5, level: 'L2' }), store = tmp();
+  try {
+    assert.deepEqual(eyesOnly, ['inputs/source.png', 'inputs/study-2.png'], 'the subject and the studies; the forms and the drawing are data');
+    for (const f of eyesOnly) { fs.mkdirSync(path.dirname(path.join(store, f)), { recursive: true }); fs.copyFileSync(path.join(dir, f), path.join(store, f)); }
+    put(dir, { kind: 'script', script: 'script.json' }); fs.writeFileSync(path.join(dir, 'script.json'), '{"passages": []}');
+    const server = sessionServer({ dir, codePlan: false, ledger, looks: 0.5, wallMinutes: 60, eyes: { files: eyesOnly, store }, look: async () => ({ ...(await looked()), sheet: PNG }), checkScript: s => s, compile: async () => compiled(1) });
+    server.begin();
+    assert.deepEqual(ledgerShowings(ledger).map(e => [e.shown, e.cost, e.atStart]), [['inputs/source.png', 0, true], ['inputs/study-2.png', 0, true]], 'the first showing of each is the start, free and recorded');
+    assert.match(await ask(dir, server, 'show inputs/source.png'), /^`inputs\/source\.png` is in your folder already: nothing was spent\./);
+    assert.match(await ask(dir, server, 'cost'), /would cost/); assert.ok(fs.existsSync(path.join(dir, 'inputs/source.png')), 'pricing a look puts nothing away');
+    assert.match(await ask(dir, server, 'plan'), /^It compiles/);
+    for (const f of eyesOnly) assert.equal(fs.existsSync(path.join(dir, f)), false, `${f} is put away by a plan`);
+    assert.ok(fs.existsSync(path.join(dir, 'inputs/forms.json')) && fs.existsSync(path.join(dir, 'inputs/forms-ids.png')) && fs.existsSync(path.join(dir, 'drawing/lines.json')), 'the data stays');
+    const shown = await ask(dir, server, 'show inputs/source.png');
+    assert.match(shown, /^SHOWN: `inputs\/source\.png` is in your folder until your next plan or look, cost 0\.05 of a unit\. Open it with your image viewer; a program may not read it\./); assert.match(shown, /0\.05 of 0\.5 rendering units spent on 0 looks and 1 showing of the subject/);
+    assert.deepEqual(fs.readFileSync(path.join(dir, 'inputs/source.png')), PNG); assert.equal(fs.statSync(path.join(dir, 'inputs/source.png')).mode & 0o222, 0);
+    assert.match(await ask(dir, server, 'show study-2'), /^SHOWN: `inputs\/study-2\.png` .*, free\./, 'a study by its short name, free');
+    assert.match(await ask(dir, server, 'show inputs/forms.json'), /^REFUSED, nothing was shown and nothing was spent: name the picture/);
+    assert.match(await ask(dir, server, 'show ../x'), /^REFUSED/);
+    // a look puts them away again, and delivers the session's own sheet alone beside the pictures
+    assert.match(await ask(dir, server, 'look'), /^LOOK 1 .*cost 0\.3 units.*0\.15 of 0\.5 left/s); assert.equal(fs.existsSync(path.join(dir, 'inputs/source.png')), false);
+    assert.deepEqual(fs.readFileSync(path.join(dir, 'looks/1/sheet.png')), PNG);
+    // the showings and the looks share one budget: with 0.15 left three showings are had, the fourth is refused and counted
+    for (let i = 0; i < 3; i++) { assert.match(await ask(dir, server, 'show source'), /^SHOWN/); assert.match(await ask(dir, server, 'plan'), /^It compiles/); }
+    assert.match(await ask(dir, server, 'show source'), /^NOT SHOWN, nothing was spent: showing `inputs\/source\.png` costs 0\.05 and you have 0 of 0\.5 units left\./); assert.equal(fs.existsSync(path.join(dir, 'inputs/source.png')), false);
+    assert.match(await ask(dir, server, 'show study-2'), /^SHOWN/, 'a free picture is still shown');
+    const rec = await server.stop();
+    assert.equal(rec.showings.filter(e => e.shown === 'inputs/source.png' && e.cost === 0.05).length, 4); assert.deepEqual(rec.lookUnits, { spent: 0.5, budget: 0.5 });
+    assert.ok(rec.showings.every(e => e.at && e.shown), 'each showing says which picture and when');
+    // the count outlives the server
+    const again = sessionServer({ dir, codePlan: false, ledger, looks: 0.5, wallMinutes: 60, eyes: { files: eyesOnly, store }, look: looked, checkScript: s => s, compile: async () => compiled(1) });
+    again.begin(); assert.equal(ledgerShowings(ledger).filter(e => e.atStart).length, 2, 'the start is recorded once');
+    assert.match(await ask(dir, again, 'status'), /0\.5 of 0\.5 rendering units spent on 1 look and 4 showings of the subject/); await again.stop();
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); fs.rmSync(store, { recursive: true, force: true }); }
+});
+
+test('eyes only: the session is told in plain words what is a picture and what is data, and nothing invites it to measure a picture with code', () => {
+  const { dir, prompt } = folder({ level: 'L2' });
+  try {
+    const readme = fs.readFileSync(path.join(dir, 'README.md'), 'utf8');
+    assert.match(readme, /\*\*No program may read a picture\.\*\*/); assert.match(readme, /reading a picture with code disqualifies the try/);
+    assert.match(readme, /`\.\/unpaint show inputs\/source\.png` brings one back until your next plan or look: the subject costs\n0\.05 of a look unit each time/);
+    assert.match(readme, /The data is yours to read with any code: `inputs\/forms\.json` and `inputs\/forms-ids\.png`/);
+    assert.match(prompt, /Look at the pictures with your own eyes only/); assert.match(prompt, /brings the subject back for\n0\.05 of a look unit/);
+    for (const text of [readme, prompt]) { assert.doesNotMatch(text, /measure the input pictures|sampling a colour|colours from the\s+studies|SHOW_COST/); }
+    assert.match(fs.readFileSync(path.join(dir, 'unpaint'), 'utf8'), /status\|plan\|look\|cost\|show\)/);
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('eyes only: every profile of this harness names the model command\'s own program as the one reader of the pictures; a command that is not installed is not started', { skip: process.platform !== 'darwin' && 'the profile is macOS seatbelt' }, () => {
+  const cwd = fs.mkdtempSync(path.join(fs.realpathSync(os.tmpdir()), 'unpaint-session-eyes-'));
+  try {
+    const call = sessionCall({ key: 'x', id: 'm', cli: 'no-such-model-command' }, { prompt: 'P', cwd, eyesOnly: null });
+    assert.fail(`started ${call.cmd}`);
+  } catch (e) { assert.match(e.message, /needs a shell/); } finally { fs.rmSync(cwd, { recursive: true, force: true }); }
+  assert.throws(() => sessionCall({ key: 'x', id: 'm', cli: 'no-such-model-command' }, { prompt: 'P', cwd: '/tmp/x', eyesOnly: ['inputs/source.png'] }), /eyes only: the `no-such-model-command` command is not on PATH/);
 });

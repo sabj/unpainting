@@ -36,7 +36,8 @@ import { editLine } from '../../src/paint/methods/plan-edit.mjs';
 import { tinyTouchWarning } from './plan-data.mjs';
 import { revertCounter, DEFAULT_REVERTS } from './reverts.mjs';
 import { readSeen, seenAsk } from './seen.mjs';
-import { DEFAULT_LOOK_UNITS, readLookAsk, regionBox, lookCost, costLine, scriptInRegion } from './look-cost.mjs';
+import { DEFAULT_LOOK_UNITS, SHOW_ORIGINAL_COST, showCost, readLookAsk, regionBox, lookCost, costLine, scriptInRegion } from './look-cost.mjs';
+import { eyesOnlyOf, isOriginal, eyesRule, viewersOf } from './eyes-only.mjs';
 
 /**
  * The benchmark's resource budget for one try (one model, one subject, one level), when the command line names none:
@@ -95,13 +96,13 @@ function safeJson(dir, rel) {
 
 /** The model's command: a request file in .requests/, then the wait for its answer. POSIX sh, nothing else needed. */
 export const UNPAINT_SH = `#!/bin/sh
-# ./unpaint status | plan | look [--until STAGE] [--region x0,y0,x1,y1 | --region FORM] | cost [the same] | wait
+# ./unpaint status | plan | look [--until STAGE] [--region x0,y0,x1,y1 | --region FORM] | cost [the same] | show PICTURE | wait
 # (README.md says what each returns)
 d="$(cd "$(dirname "$0")" && pwd)"; r="$d/.requests"
 case "\${1:-}" in
-  status|plan|look|cost) id="$(date +%s)-$$"; printf '%s\\n' "$*" > "$r/$id.tmp" && mv "$r/$id.tmp" "$r/$id.req" && printf '%s\\n' "$id" > "$r/last" ;;
+  status|plan|look|cost|show) id="$(date +%s)-$$"; printf '%s\\n' "$*" > "$r/$id.tmp" && mv "$r/$id.tmp" "$r/$id.req" && printf '%s\\n' "$id" > "$r/last" ;;
   wait) id="$(cat "$r/last" 2>/dev/null)"; [ -n "$id" ] || { echo "nothing to wait for"; exit 1; } ;;
-  *) echo "usage: ./unpaint status | plan | look [--until STAGE] [--region BOX or FORM] | cost [--until STAGE] [--region BOX or FORM] | wait"; exit 2 ;;
+  *) echo "usage: ./unpaint status | plan | look [--until STAGE] [--region BOX or FORM] | cost [--until STAGE] [--region BOX or FORM] | show PICTURE | wait"; exit 2 ;;
 esac
 i=0
 while [ ! -f "$r/$id.ans" ]; do
@@ -149,9 +150,9 @@ export function writeSession({ dir, packet, sheet, realSize = null, medium, code
   const mk = d => fs.mkdirSync(path.join(dir, d), { recursive: true });
   for (const d of [...(codePlan ? ['auto'] : []), 'plans', 'looks', '.requests']) mk(d);
   const put = (f, text) => fs.writeFileSync(path.join(dir, f), text);
-  const ink = /^ink/.test(medium), v = { TOOLS_NOTE: tools, STEPS_MOST: steps, 'REAL_SIZE_LINE\n': realSizeLine(realSize, sheet) ? `${realSizeLine(realSize, sheet)}\n` : '', SHEET_W: sheet.widthMm, SHEET_H: sheet.heightMm, WALL_MINUTES: wallMinutes, GRACE_MINUTES: graceMinutes, LOOKS_MOST: looks, REVERTS_MOST: reverts,
+  const ink = /^ink/.test(medium), v = { TOOLS_NOTE: tools, STEPS_MOST: steps, 'REAL_SIZE_LINE\n': realSizeLine(realSize, sheet) ? `${realSizeLine(realSize, sheet)}\n` : '', SHEET_W: sheet.widthMm, SHEET_H: sheet.heightMm, WALL_MINUTES: wallMinutes, GRACE_MINUTES: graceMinutes, LOOKS_MOST: looks, REVERTS_MOST: reverts, SHOW_COST: SHOW_ORIGINAL_COST,
     DRAWING_NOTE: ink ? 'As prepared, the drawing is waterproof ink laid before the washes; it carries the form and the washes go over it. It is offered, not required: laying no drawing (`"medium": "none"` in `choice.json`) is a normal choice, and then the brush makes the shapes on clean paper.' : 'As prepared, the drawing is light pencil laid before the washes; it only places the forms, and the paint carries form, value and edge. It is offered, not required: laying no drawing (`"medium": "none"` in `choice.json`) is a normal choice, and then the brush makes the shapes on clean paper.',
-    INPUT_LIST: packet.files.map(f => `- \`${f}\`: ${f.includes('source') ? 'the SUBJECT, the picture to paint' : f.includes('drawing') ? 'the opening DRAWING, already on the sheet before any wash' : f.includes('forms') ? 'the NAMED FORMS, each one flat colour' : `block-in STUDY ${/study-(\d)/.exec(f)?.[1]}: the subject simplified to flat shapes (1 the broad shapes, 2 the middle study, 3 details and accents)${codePlan ? '; the code planner reads its washes from these' : ''}`}`).join('\n') };
+    INPUT_LIST: packet.files.map(f => `- \`${f}\`: ${f.includes('source') ? 'the SUBJECT, the picture to paint (to look at only)' : f.includes('drawing') ? 'the opening DRAWING, already on the sheet before any wash' : f.includes('forms') ? 'the NAMED FORMS, each one flat colour' : `block-in STUDY ${/study-(\d)/.exec(f)?.[1]}: the subject simplified to flat shapes (1 the broad shapes, 2 the middle study, 3 details and accents; to look at only)${codePlan ? '; the code planner reads its washes from these' : ''}`}`).join('\n') };
   let prompt = fill(forLevel(fs.readFileSync(briefFile, 'utf8'), codePlan), v);
   // what the session is handed beside the subject's inputs (a later try: its own previous try; level 4: the automatic
   // painter's painting): each a folder of plain files and a paragraph of the task; never a number
@@ -182,13 +183,19 @@ export function writeSession({ dir, packet, sheet, realSize = null, medium, code
   for (const f of ['TASK.md', 'README.md', 'own-script-brief.md', ...AUTO_FILES.filter(f => !f.endsWith('.png')), 'inputs/forms.json', 'drawing/lines.json']) {
     if (fs.existsSync(path.join(dir, f)) && leak.some(w => fs.readFileSync(path.join(dir, f), 'utf8').includes(w))) throw new Error(`session: ${f} would carry a path or name of this machine; the session is not started`);
   }
-  return { prompt, pictures };
+  // the pictures that are for looking at, never for code (eyes-only.mjs): the subject, the studies, every handed picture
+  return { prompt, pictures, eyesOnly: eyesOnlyOf(packet.files, pictures) };
 }
 
 /** The looks already written in a run's ledger (one JSON line a look). The ledger lies outside the model's folder. */
 export function ledgerLooks(ledger) {
   if (!fs.existsSync(ledger)) return [];
   return fs.readFileSync(ledger, 'utf8').split('\n').filter(Boolean).map(l => JSON.parse(l)).filter(e => e.look);
+}
+/** The showings of a picture already written in a run's ledger: {shown: its file, cost, at, atStart}. */
+export function ledgerShowings(ledger) {
+  if (!fs.existsSync(ledger)) return [];
+  return fs.readFileSync(ledger, 'utf8').split('\n').filter(Boolean).map(l => JSON.parse(l)).filter(e => e.shown);
 }
 
 /** The words beside each command's token split: how it reports them, and what is not reported. */
@@ -226,15 +233,19 @@ function tokenSplit(cli, split) {
  * starts from. `pictures`: handed pictures that each need a line in seen.md before the first plan (seen.mjs).
  * `codePlan`: the level hands over the code's plan and planner (the preflight); without them a plan or a look of anything
  * but the model's own script is refused with OWN_SCRIPT_ONLY (choice.mjs readChoice), and nothing is spent.
+ * `eyes` {files: the eyes-only input pictures (eyes-only.mjs), store: a folder outside the model's folder that holds
+ * a copy of each at the same path}: the pictures lie in the folder when the session begins (the first showing, free
+ * and recorded); a plan or a look that gets as far as the planner puts them away; `./unpaint show FILE` brings one
+ * back, written into the ledger first, the original at its price from the same budget as the looks (look-cost.mjs).
  */
-export function sessionServer({ dir, codePlan = true, sheet = null, forms = [], looks: most = DEFAULT_LOOKS, wallMinutes = DEFAULT_WALL_MINUTES, graceMinutes = DEFAULT_GRACE_MINUTES, steps: stepsMost = DEFAULT_STEPS, stepsTaken = () => 0, lookSize = 'half', reverts: revertsMost = DEFAULT_REVERTS, startKey = null, pictures = [], compile, look: paintLook, keep = null, checkScript, checkPlan = null, checkTools = null, ledger, now = Date.now, everyMs = 400 }) {
+export function sessionServer({ dir, codePlan = true, sheet = null, forms = [], looks: most = DEFAULT_LOOKS, wallMinutes = DEFAULT_WALL_MINUTES, graceMinutes = DEFAULT_GRACE_MINUTES, steps: stepsMost = DEFAULT_STEPS, stepsTaken = () => 0, lookSize = 'half', reverts: revertsMost = DEFAULT_REVERTS, startKey = null, pictures = [], eyes = null, compile, look: paintLook, keep = null, checkScript, checkPlan = null, checkTools = null, ledger, now = Date.now, everyMs = 400 }) {
   if (!(most > 0) || !(wallMinutes > 0) || !(stepsMost > 0)) throw new Error('session: the budget is a number of look units and of steps, and the safety stop a number of minutes, each above 0');
   const plans = [], cache = new Map(), painted = new Map(), requests = [], good = new Set(), seen = new Map(), reverts = revertCounter(revertsMost, startKey);
   let t0 = now(), waitMs = 0, busy = false, timer = null, lastGood = null, n = 0, pending = null, lastEnd = t0, reached = null, warningsGiven = 0, described = null;
   const note = entry => { const fd = fs.openSync(ledger, 'a'); try { fs.writeSync(fd, JSON.stringify(entry) + '\n'); fs.fsyncSync(fd); } finally { fs.closeSync(fd); } };
   const used = () => ledgerLooks(ledger).length;
   // rendering spent, in look units: what each look cost when it was painted (a ledger line without a cost is a full look)
-  const spent = () => +ledgerLooks(ledger).reduce((a, l) => a + (l.cost ?? 1), 0).toFixed(2), unitsLeft = () => +Math.max(0, most - spent()).toFixed(2);
+  const spent = () => +(ledgerLooks(ledger).reduce((a, l) => a + (l.cost ?? 1), 0) + ledgerShowings(ledger).reduce((a, l) => a + (l.cost ?? 0), 0)).toFixed(2), unitsLeft = () => +Math.max(0, most - spent()).toFixed(2);
   // the model's own time: the clock less every stretch a request of its was waiting on this side (a stretch counted once)
   const ownSeconds = () => Math.round((now() - t0 - waitMs - (pending == null ? 0 : now() - pending)) / 1000);
   const wallSeconds = () => Math.round((now() - t0) / 1000), wallUp = () => wallSeconds() >= wallMinutes * 60;
@@ -243,8 +254,8 @@ export function sessionServer({ dir, codePlan = true, sheet = null, forms = [], 
   // the budget is reached once, by whichever comes first; it is recorded with when, and said in every answer after
   const reach = what => { if (!reached) { reached = { what, safetyStop: what === SAFETY, atWallMinutes: +(wallSeconds() / 60).toFixed(1), looks: used(), lookUnits: spent(), steps: steps() }; note({ budgetReached: reached }); } };
   const HAND_IN = 'Hand in what you have now: leave choice.json as your final choice (./unpaint plan still checks that it compiles), write your last message, and stop.';
-  const left = () => { const u = used(), r = reverts.record(); check();
-    return `Budget of this try (the benchmark's, the same for every model and machine): ${spent()} of ${most} rendering units spent on ${u} look${u === 1 ? '' : 's'}, ${steps()} of ${stepsMost} steps (your tool calls) taken, ${r.count} of ${r.allowed} returns to an earlier choice. Plans made: ${plans.length}. Time is not budgeted.${reached ? `\nTHE BENCHMARK'S RESOURCE BUDGET IS REACHED (${reached.what}). ${HAND_IN}${reached.safetyStop ? ` The session is ended ${graceMinutes} minutes after the safety stop.` : /steps/.test(reached.what) ? ` The session is ended after ${STEP_GRACE} more steps.` : ''}` : ''}`; };
+  const left = () => { const u = used(), r = reverts.record(), k = ledgerShowings(ledger).filter(e => e.cost > 0).length; check();
+    return `Budget of this try (the benchmark's, the same for every model and machine): ${spent()} of ${most} rendering units spent on ${u} look${u === 1 ? '' : 's'}${k ? ` and ${k} showing${k === 1 ? '' : 's'} of the subject` : ''}, ${steps()} of ${stepsMost} steps (your tool calls) taken, ${r.count} of ${r.allowed} returns to an earlier choice. Plans made: ${plans.length}. Time is not budgeted.${reached ? `\nTHE BENCHMARK'S RESOURCE BUDGET IS REACHED (${reached.what}). ${HAND_IN}${reached.safetyStop ? ` The session is ended ${graceMinutes} minutes after the safety stop.` : /steps/.test(reached.what) ? ` The session is ended after ${STEP_GRACE} more steps.` : ''}` : ''}`; };
   /** The handed pictures each described in seen.md, or the words that ask for it. */
   const seenFault = () => {
     if (!pictures.length || described?.ok) return null;
@@ -275,9 +286,31 @@ export function sessionServer({ dir, codePlan = true, sheet = null, forms = [], 
     return { choice, script, edit, text, tools, warnings, key: choiceKey(choice, text) };
   }
 
+  /** The eyes-only pictures now in the folder are put away: a plan or a look has been asked for. */
+  const putAway = () => { for (const f of eyes?.files ?? []) { try { fs.rmSync(inside(dir, f), { force: true }); } catch { /* not there */ } } };
+  const lies = f => { try { return fs.lstatSync(inside(dir, f)).isFile(); } catch { return false; } };
+  /** `./unpaint show FILE ...`: each named picture brought back into the folder, counted, the original at its price. */
+  function show(words) {
+    if (!eyes?.files.length) return 'REFUSED: this session has no pictures to show.';
+    const list = eyes.files.map(f => `\`${f}\``).join(', '), of = w => eyes.files.find(f => f === w || path.basename(f) === w || path.basename(f, path.extname(f)) === w);
+    if (!words.length || words.some(w => !of(w))) return `REFUSED, nothing was shown and nothing was spent: name the picture, as ./unpaint show FILE (one of ${list}).`;
+    const said = [];
+    for (const f of [...new Set(words.map(of))]) {
+      if (lies(f)) { said.push(`\`${f}\` is in your folder already: nothing was spent.`); continue; }
+      const cost = showCost(isOriginal(f));
+      if (cost > unitsLeft() + 1e-9) { note({ showRefused: f, cost, at: new Date(now()).toISOString() }); said.push(`NOT SHOWN, nothing was spent: showing \`${f}\` costs ${cost} and you have ${unitsLeft()} of ${most} units left.`); continue; }
+      // counted before it is delivered, as a look is
+      note({ shown: f, cost, at: new Date(now()).toISOString(), atSeconds: ownSeconds() });
+      safeWrite(dir, f, fs.readFileSync(path.join(eyes.store, f))); fs.chmodSync(path.join(dir, f), 0o444);
+      said.push(`SHOWN: \`${f}\` is in your folder until your next plan or look${cost ? `, cost ${cost} of a unit` : ', free'}. Open it with your image viewer; a program may not read it.`);
+    }
+    return `${said.join('\n')}\n${left()}`;
+  }
+
   async function answer(cmd, words = []) {
     if (cmd === 'status') return left();
     check();
+    if (cmd === 'show') return show(words);
     // what the look is asked of: the whole painting, or stopped after a stage, or a region (look-cost.mjs)
     const looking = cmd === 'look' || cmd === 'cost'; let ask = { until: null, region: null };
     if (looking) { try { ask = readLookAsk(words); } catch (e) { return `REFUSED, nothing was painted and nothing was spent: ${e.message}`; } }
@@ -288,6 +321,8 @@ export function sessionServer({ dir, codePlan = true, sheet = null, forms = [], 
     // a return to a choice the session had left is counted; past the allowed number it is refused (reverts.mjs)
     const back = reverts.see(p.key, ownSeconds());
     if (back.refused) return `REFUSED, nothing was planned${cmd === 'look' ? ' and no look was counted' : ''}: this choice is one you planned before and then left, and you have gone back to an earlier choice ${back.count} times, the most this benchmark allows (${revertsMost}). Going back again and again to keep only what a look liked is the one thing a session may not do. Go on from your present work: change it, do not undo it.\n${left()}`;
+    // the pictures are put away while the session plans and paints: ./unpaint show brings one back
+    if (cmd !== 'cost') putAway();
     const id = ++n, what = choiceKind(p.choice), atSeconds = ownSeconds(), t1 = now();
     let got = cache.get(p.key);
     if (!got) { try { got = await compile(p.choice, p.script, id, p.edit?.edit ?? null); } catch (e) { got = { ok: false, error: e.message }; } cache.set(p.key, got); }
@@ -349,9 +384,11 @@ export function sessionServer({ dir, codePlan = true, sheet = null, forms = [], 
     }
     safeWrite(dir, `${folder}/beside.png`, seenIt.picture); if (seenIt.stages) safeWrite(dir, `${folder}/stages.png`, seenIt.stages); safeWrite(dir, `${folder}/numbers.txt`, seenIt.numbersText);
     if (seenIt.planPicture) safeWrite(dir, `${folder}/plan.png`, seenIt.planPicture);
+    // its own dried sheet alone, nothing of the subject in it: the one picture of a look a program may read (eyes-only.mjs)
+    if (seenIt.sheet) safeWrite(dir, `${folder}/sheet.png`, seenIt.sheet);
     safeWrite(dir, `${folder}/plan.json`, JSON.stringify({ choice: { kind: p.choice.kind, settings: entry.settings, script: p.choice.script, plan: p.choice.plan ?? null }, summary: got.summary, washes: got.rows }, null, 1) + '\n');
     const m = seenIt.marked;
-    return `LOOK ${look} (${what}), cost ${charged} unit${charged === 1 ? '' : 's'}${charge ? ` (${chargedFrom})` : ' (looked at before: nothing was rendered)'}, ${unitsLeft()} of ${most} left${seenIt.stoppedText ? `. ${seenIt.stoppedText.split('\n')[0]}` : ''}${region ? `. Only the passages in the region were painted (${seenIt.painted?.regionPassages ?? '?'})` : ''}. PAINTED${seenIt.painted?.cells ? ` small (${seenIt.painted.cells} cells across${seenIt.painted.fullCells ? ` of the final ${seenIt.painted.fullCells}` : ''})` : ''} and dried: ${line}.${edited}\nOpen ${folder}/beside.png: your painting as it dried, the subject and the middle study, left to right, on the same grid.${seenIt.stages ? ` Open ${folder}/stages.png: the subject, then the sheet at 10, 25, 50, 75 and 100% of the strokes (the order of the work).` : ''} Read ${folder}/numbers.txt: each named form on the DRIED sheet against the study and against your plan${m ? `; ${m.forms} named forms are marked !! (too dark or too pale)${m.washes ? ` and ${m.washes} washes` : ''}` : ''}. ${folder}/plan.json holds every wash as data${seenIt.planPicture ? `, ${folder}/plan.png the plan as a diagram` : ''}.\nStep back from it as from the easel, and revise for what you see.\n${left()}`;
+    return `LOOK ${look} (${what}), cost ${charged} unit${charged === 1 ? '' : 's'}${charge ? ` (${chargedFrom})` : ' (looked at before: nothing was rendered)'}, ${unitsLeft()} of ${most} left${seenIt.stoppedText ? `. ${seenIt.stoppedText.split('\n')[0]}` : ''}${region ? `. Only the passages in the region were painted (${seenIt.painted?.regionPassages ?? '?'})` : ''}. PAINTED${seenIt.painted?.cells ? ` small (${seenIt.painted.cells} cells across${seenIt.painted.fullCells ? ` of the final ${seenIt.painted.fullCells}` : ''})` : ''} and dried: ${line}.${edited}\nOpen ${folder}/beside.png: your painting as it dried, the subject and the middle study, left to right, on the same grid.${seenIt.stages ? ` Open ${folder}/stages.png: the subject, then the sheet at 10, 25, 50, 75 and 100% of the strokes (the order of the work).` : ''} Read ${folder}/numbers.txt: each named form on the DRIED sheet against the study and against your plan${m ? `; ${m.forms} named forms are marked !! (too dark or too pale)${m.washes ? ` and ${m.washes} washes` : ''}` : ''}. ${folder}/plan.json holds every wash as data${seenIt.planPicture ? `, ${folder}/plan.png the plan as a diagram` : ''}${seenIt.sheet ? `, ${folder}/sheet.png your dried sheet alone (yours to measure with code; beside.png and stages.png are to look at only)` : ''}.\nStep back from it as from the easel, and revise for what you see.\n${left()}`;
   }
 
   async function tick() {
@@ -365,8 +402,8 @@ export function sessionServer({ dir, codePlan = true, sheet = null, forms = [], 
         const asked = Math.max(lastEnd, seen.get(id)); pending = asked;
         let cmd = 'unreadable', text;
         let words = [];
-        try { const line = safeRead(dir, `.requests/${f}`).trim(), [word, ...rest] = /^[A-Za-z0-9 ,.'_-]{1,300}$/.test(line) ? line.split(/\s+/) : ['']; cmd = ['status', 'plan', 'look', 'cost'].includes(word) ? word : 'unknown'; words = rest; } catch { /* a request that is a link, a folder or too large is not read */ }
-        try { text = cmd === 'unknown' || cmd === 'unreadable' ? 'REFUSED: a request is one of status, plan, look, cost, written by ./unpaint.' : await answer(cmd, words); } catch (e) { text = `the command failed on this side${cmd === 'look' ? '; if a look was counted it stays counted (./unpaint status says)' : ''}. ${left()}`; note({ fault: String(e.message).slice(0, 300), cmd }); }
+        try { const line = safeRead(dir, `.requests/${f}`).trim(), [word, ...rest] = /^[A-Za-z0-9 ,.'_/-]{1,300}$/.test(line) ? line.split(/\s+/) : ['']; cmd = ['status', 'plan', 'look', 'cost', 'show'].includes(word) ? word : 'unknown'; words = rest; } catch { /* a request that is a link, a folder or too large is not read */ }
+        try { text = cmd === 'unknown' || cmd === 'unreadable' ? 'REFUSED: a request is one of status, plan, look, cost, show, written by ./unpaint.' : await answer(cmd, words); } catch (e) { text = `the command failed on this side${cmd === 'look' ? '; if a look was counted it stays counted (./unpaint status says)' : ''}. ${left()}`; note({ fault: String(e.message).slice(0, 300), cmd }); }
         try { fs.rmSync(path.join(req, f), { recursive: true, force: true }); safeWrite(dir, `.requests/${id}.ans.tmp`, text + '\n'); fs.renameSync(path.join(req, `${id}.ans.tmp`), path.join(req, `${id}.ans`)); } catch (e) { note({ fault: `answer not delivered: ${String(e.message).slice(0, 200)}`, cmd }); }
         lastEnd = now(); waitMs += lastEnd - asked; pending = null;
         const entry = { cmd, seconds: Math.round((lastEnd - asked) / 1000), answer: text.split('\n')[0].slice(0, 200) }; requests.push(entry); note({ request: cmd, at: new Date(lastEnd).toISOString(), seconds: entry.seconds, answer: entry.answer });
@@ -377,7 +414,9 @@ export function sessionServer({ dir, codePlan = true, sheet = null, forms = [], 
   return {
     start() { timer = setInterval(() => { tick().catch(() => {}); }, everyMs); }, tick, ownSeconds, wallSeconds, present, looksTaken: used,
     /** The model's command starts now: the clock runs from here (not from when this side was made ready). */
-    begin() { t0 = now(); waitMs = 0; lastEnd = Math.max(lastEnd, t0); reached = null; },
+    begin() { t0 = now(); waitMs = 0; lastEnd = Math.max(lastEnd, t0); reached = null;
+      // the pictures lie in the folder as the session starts: the first showing of each, free and recorded once
+      if (eyes && !ledgerShowings(ledger).some(e => e.atStart)) for (const f of eyes.files.filter(lies)) note({ shown: f, cost: 0, atStart: true, at: new Date(t0).toISOString(), atSeconds: 0 }); },
     /** The safety stop and its minutes to hand in, or the steps and their grace, are used: the command is ended. */
     over: () => { check(); return wallSeconds() >= (wallMinutes + graceMinutes) * 60 || steps() >= stepsMost + STEP_GRACE; },
     /** Whether handing over this choice would be a return to an earlier choice past the allowed number. */
@@ -385,7 +424,7 @@ export function sessionServer({ dir, codePlan = true, sheet = null, forms = [], 
     async stop() { if (timer) clearInterval(timer); while (busy) await new Promise(r => setTimeout(r, 50));
       // the pictures as described when the session ended (a session that never planned is read here)
       if (pictures.length && !described?.ok) { let text = null; try { text = safeRead(dir, 'seen.md'); } catch { /* none */ } described = readSeen(text, pictures); }
-      return { looks: ledgerLooks(ledger), plans, requests, ownSeconds: ownSeconds(), wallSeconds: wallSeconds(), waitSeconds: Math.round(waitMs / 1000), lastGood, good, budgetReached: reached, lookUnits: { spent: spent(), budget: most }, steps: { taken: steps(), budget: stepsMost }, reverts: reverts.record(), warningsGiven, pictures: pictures.length ? { handed: pictures, said: described.said, missing: described.missing } : null }; },
+      return { looks: ledgerLooks(ledger), showings: ledgerShowings(ledger), plans, requests, ownSeconds: ownSeconds(), wallSeconds: wallSeconds(), waitSeconds: Math.round(waitMs / 1000), lastGood, good, budgetReached: reached, lookUnits: { spent: spent(), budget: most }, steps: { taken: steps(), budget: stepsMost }, reverts: reverts.record(), warningsGiven, pictures: pictures.length ? { handed: pictures, said: described.said, missing: described.missing } : null }; },
   };
 }
 
@@ -426,8 +465,9 @@ const q = s => `"${String(s).replace(/[\\"]/g, '\\$&')}"`;
  * the subject list, the caches, other sessions), may write only under `write`, and reaches the network only on
  * port 443 (its own service). Later rules win, so `cwd`, the session's own folder, is allowed again after the denials.
  * `local`: the command talks to its own helper over this machine's loopback, and runs its shell on a pseudo-terminal.
+ * `eyes` {pictures, viewers}: the pictures of the folder only a viewer may read (eyes-only.mjs eyesRule).
  */
-export function seatbelt({ deny, write, cwd, local = false, gated = false, readable = [], hidden = [], metadata = [] }) {
+export function seatbelt({ deny, write, cwd, local = false, gated = false, readable = [], hidden = [], metadata = [], eyes = null }) {
   // hidden: folders nothing may list or read (the home folder, other users, other volumes), save what is read again after
   // them: its own folder, `readable` (the toolbox, the model command's own program and settings) and `write`
   // gated: nothing goes out but to this machine's loopback, where the session's gate (session-net.mjs) passes the
@@ -443,6 +483,8 @@ export function seatbelt({ deny, write, cwd, local = false, gated = false, reada
     `(allow file-read* file-write* (subpath ${q(cwd)}))`, ...readable.map(d => `(allow file-read* (subpath ${q(d)}))`), ...metadata.map(d => `(allow file-read-metadata (literal ${q(d)}))`),
     '(deny network*)', ...(gated ? ['(allow network-outbound (remote ip "localhost:*"))'] : ['(allow network-outbound (remote tcp "*:443") (remote udp "*:53") (remote tcp "*:53") (literal "/private/var/run/mDNSResponder"))', '(allow network-inbound (local udp "*:*"))']), '(allow system-socket)',
     ...(local ? ['(allow network-bind (local ip "localhost:*"))', '(allow network-inbound (local ip "localhost:*"))', '(allow network-outbound (remote ip "localhost:*"))', '(allow pseudo-tty)', '(allow file-read* file-write* file-ioctl (literal "/dev/ptmx") (regex #"^/dev/ttys[0-9]+$"))'] : []),
+    // eyes: {pictures, viewers}: the session's pictures are read by the model command's own program only (eyes-only.mjs); last, so it wins
+    ...(eyes ? eyesRule({ cwd, pictures: eyes.pictures, viewers: eyes.viewers }) : []),
   ].join('\n');
 }
 
@@ -457,15 +499,19 @@ export function seatbelt({ deny, write, cwd, local = false, gated = false, reada
  * prompts off inside it; its transcript is the log it keeps (`log`, transcriptFile). With a `gate` (session-net.mjs)
  * each of the four is let out only through it and sees of the home folder only what it needs to sign in and run.
  */
-export function sessionCall(author, { prompt, cwd, deny = [], images = [], home = os.homedir(), tmp = os.tmpdir(), gate = null, toolbox = null }) {
+export function sessionCall(author, { prompt, cwd, deny = [], images = [], home = os.homedir(), tmp = os.tmpdir(), gate = null, toolbox = null, eyesOnly = null }) {
   const real = d => { try { return fs.realpathSync(d); } catch { return d; } }, all = [...new Set(deny.flatMap(d => [d, real(d)]))];
+  // eyesOnly: the folder's pictures that are for looking at (eyes-only.mjs): under a profile of this harness only the
+  // model command's own program reads them. A command that is not installed has no viewer to name: it is not started.
+  const eyes = eyesOnly ? { pictures: eyesOnly, viewers: viewersOf(author.cli) } : null;
+  const HELD = eyes ? '; its pictures (the subject, the studies, an earlier painting, a look\'s pictures) are read by the model command\'s own program only, to look at: every other program is refused them' : '';
   if (author.cli === 'claude' && gate) {
     // closed: the whole command under this harness's profile (its own sandbox off: two do not nest), out only through
     // the gate; of the home folder it reads only its program and the login keychain (its sign-in: the accepted
     // exposure, SIGN_IN_EXPOSURE); measured, it signs in and answers without ~/.claude or ~/.claude.json
     const bin = (() => { try { return real(execFileSync('/usr/bin/which', ['claude'], { encoding: 'utf8' }).trim()); } catch { return null; } })();
     const signIn = [path.join(home, 'Library', 'Keychains')];
-    const profile = seatbelt({ deny: all, write: [...new Set([real(tmp), '/private/tmp', '/private/var/folders'])], cwd: real(cwd), local: true, gated: true,
+    const profile = seatbelt({ deny: all, write: [...new Set([real(tmp), '/private/tmp', '/private/var/folders'])], cwd: real(cwd), local: true, gated: true, eyes,
       readable: [...new Set([...(toolbox?.readable ?? []), ...(bin ? [path.dirname(bin)] : []), ...signIn])], hidden: [...new Set([home, real(home), '/Users', '/Volumes'])], metadata: [path.join(home, '.local', 'bin'), path.join(home, '.local', 'bin', 'claude'), home] });
     const settings = { sandbox: { enabled: false }, permissions: { deny: all.map(d => `Read(/${d}/**)`) } };
     return { cmd: 'sandbox-exec', env: { CLAUDE_CODE_DISABLE_AUTO_MEMORY: '1', BASH_DEFAULT_TIMEOUT_MS: '120000', BASH_MAX_TIMEOUT_MS: '600000', DISABLE_TELEMETRY: '1', DISABLE_ERROR_REPORTING: '1', CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: '1', ...proxyEnv(gate.url), ...(toolbox?.env ?? {}) }, unset: [], profile, gated: true, signIn,
@@ -473,13 +519,13 @@ export function sessionCall(author, { prompt, cwd, deny = [], images = [], home 
       // 22 Nov preflight: a compound shell command "requires approval" and a Write to seen.md was refused as sensitive)
       args: ['-p', profile, 'claude', '-p', prompt, '--model', author.id, ...(author.effort ? ['--effort', author.effort] : []), '--allowedTools', 'Read Write Edit Glob Grep Bash', '--dangerously-skip-permissions', '--settings', JSON.stringify(settings), '--setting-sources', 'project', '--no-session-persistence', '--output-format', 'stream-json', '--verbose'],
       probe: file => ({ cmd: 'sandbox-exec', args: ['-p', profile, '/bin/cat', file] }),
-      closed: `the whole command runs under a seatbelt profile of this harness (its own sandbox off): nothing of the home folder can be listed or read but its program and the login keychain (${SIGN_IN_EXPOSURE}), it writes only in its folder and temporary folders, and reaches only this machine's loopback, where a gate passes its own service's hosts and refuses every other (its own permission prompts are off inside the profile)` };
+      closed: `the whole command runs under a seatbelt profile of this harness (its own sandbox off): nothing of the home folder can be listed or read but its program and the login keychain (${SIGN_IN_EXPOSURE}), it writes only in its folder and temporary folders, and reaches only this machine's loopback, where a gate passes its own service's hosts and refuses every other (its own permission prompts are off inside the profile)${HELD}`, eyesHeld: Boolean(eyes) };
   }
   if (author.cli === 'claude') {
     const settings = { sandbox: { enabled: true, autoAllowBashIfSandboxed: true, allowUnsandboxedCommands: false }, permissions: { deny: all.map(d => `Read(/${d}/**)`) } };
     return { cmd: 'claude', env: { CLAUDE_CODE_DISABLE_AUTO_MEMORY: '1', BASH_DEFAULT_TIMEOUT_MS: '120000', BASH_MAX_TIMEOUT_MS: '600000' }, unset: [],
       args: ['-p', prompt, '--model', author.id, ...(author.effort ? ['--effort', author.effort] : []), '--allowedTools', 'Read Write Edit Glob Grep Bash', '--settings', JSON.stringify(settings), '--setting-sources', 'project', '--no-session-persistence', '--output-format', 'stream-json', '--verbose'],
-      probe: null, closed: 'its shell runs in the command\'s own sandbox (writes only in its folder, network held to the command\'s allowed hosts) and neither its shell nor its file tools can read the repository, the subject list, the caches or other sessions' };
+      probe: null, eyesHeld: false, closed: 'its shell runs in the command\'s own sandbox (writes only in its folder, network held to the command\'s allowed hosts) and neither its shell nor its file tools can read the repository, the subject list, the caches or other sessions' };
   }
   if (author.cli === 'codex') {
     // with a gate (session-net.mjs): out only through it, the toolbox first on PATH, and of the home folder only its
@@ -487,12 +533,12 @@ export function sessionCall(author, { prompt, cwd, deny = [], images = [], home 
     // user's config.toml is not loaded (no MCP servers or plugins of the operator's), and its usage reports are off
     const codex = (() => { try { return real(execFileSync('/usr/bin/which', ['codex'], { encoding: 'utf8' }).trim()); } catch { return null; } })();
     const own = path.join(home, '.codex'), signIn = gate ? [own] : [];
-    const profile = seatbelt({ deny: all, write: [...new Set([own, real(tmp), '/private/tmp', '/private/var/folders'])], cwd: real(cwd), gated: Boolean(gate),
+    const profile = seatbelt({ deny: all, write: [...new Set([own, real(tmp), '/private/tmp', '/private/var/folders'])], cwd: real(cwd), gated: Boolean(gate), eyes,
       readable: gate ? [...new Set([...(toolbox?.readable ?? []), ...(codex ? [codex] : [])])] : [], hidden: gate ? [...new Set([home, real(home), '/Users', '/Volumes'])] : [], metadata: gate ? [...(codex ? [path.dirname(codex)] : []), home] : [] });
     return { cmd: 'sandbox-exec', env: { ...(gate ? proxyEnv(gate.url) : {}), ...(toolbox?.env ?? {}) }, unset: [], profile, gated: Boolean(gate), signIn,
       args: ['-p', profile, 'codex', 'exec', '--json', '-m', author.id, ...(author.effort ? ['-c', `model_reasoning_effort="${author.effort}"`] : []), ...(gate ? ['--ignore-user-config', '-c', 'analytics.enabled=false'] : []), '--dangerously-bypass-approvals-and-sandbox', '--skip-git-repo-check', '--ephemeral', '-C', cwd, ...images.flatMap(f => ['-i', f]), '--', prompt],
       probe: file => ({ cmd: 'sandbox-exec', args: ['-p', profile, '/bin/cat', file] }),
-      closed: `the whole command runs under a seatbelt profile of this harness: it cannot read the repository, the subject list, the caches or other sessions, writes only in its folder, its own settings folder and temporary folders, and ${gate ? `nothing else of the home folder can be listed or read (its settings folder holds its sign-in: ${SIGN_IN_EXPOSURE}); it reaches only this machine's loopback, where a gate passes its own service's hosts and refuses every other (no downloads, no installs)` : 'reaches the network on port 443 only'} (the command's own sandbox is off: two do not nest)` };
+      closed: `the whole command runs under a seatbelt profile of this harness: it cannot read the repository, the subject list, the caches or other sessions, writes only in its folder, its own settings folder and temporary folders, and ${gate ? `nothing else of the home folder can be listed or read (its settings folder holds its sign-in: ${SIGN_IN_EXPOSURE}); it reaches only this machine's loopback, where a gate passes its own service's hosts and refuses every other (no downloads, no installs)` : 'reaches the network on port 443 only'} (the command's own sandbox is off: two do not nest)${HELD}`, eyesHeld: Boolean(eyes) };
   }
   if (author.cli === 'muse') {
     // the whole command under this harness's profile, its own sandbox and approval prompts off inside it (two profiles
@@ -524,11 +570,11 @@ export function sessionCall(author, { prompt, cwd, deny = [], images = [], home 
     // its sign-in (accepted exposure, SIGN_IN_EXPOSURE): its handle in Application Support and the login keychain; its own folder seen, not listed
     const signIn = gate ? [path.join(home, 'Library', 'Application Support', 'antigravity'), path.join(home, 'Library', 'Keychains')] : [];
     const readable = [...(toolbox?.readable ?? []), ...(gate && agy ? [agy] : []), ...signIn];
-    const profile = seatbelt({ deny: all, write: [...new Set([path.join(home, '.gemini'), real(tmp), '/private/tmp', '/private/var/folders'])], cwd: real(cwd), local: true, gated: Boolean(gate), readable: [...new Set(readable)], hidden: gate ? [...new Set([home, real(home), '/Users', '/Volumes'])] : [], metadata: gate && agy ? [path.dirname(agy), home] : [] });
+    const profile = seatbelt({ deny: all, write: [...new Set([path.join(home, '.gemini'), real(tmp), '/private/tmp', '/private/var/folders'])], cwd: real(cwd), local: true, gated: Boolean(gate), eyes, readable: [...new Set(readable)], hidden: gate ? [...new Set([home, real(home), '/Users', '/Volumes'])] : [], metadata: gate && agy ? [path.dirname(agy), home] : [] });
     return { cmd: 'sandbox-exec', env: { DO_NOT_TRACK: '1', ...(gate ? proxyEnv(gate.url) : {}), ...(toolbox?.env ?? {}) }, unset: [], profile, serial: true, gated: Boolean(gate), signIn,
       args: ['-p', profile, 'agy', '-p', prompt, '--model', author.id, '--dangerously-skip-permissions', '--output-format', 'stream-json'],
       probe: file => ({ cmd: 'sandbox-exec', args: ['-p', profile, '/bin/cat', file] }),
-      closed: `the whole command runs under a seatbelt profile of this harness: neither its shell nor its file tools can read the repository, the subject list, the caches or other sessions, it writes only in its folder, its own settings folder and temporary folders, and ${gate ? 'reaches only this machine\'s loopback, where a gate passes its own service\'s hosts and refuses every other (no downloads, no installs)' : 'reaches the network on port 443 and this machine\'s loopback only'} (its own permission prompts are off inside the profile)` };
+      closed: `the whole command runs under a seatbelt profile of this harness: neither its shell nor its file tools can read the repository, the subject list, the caches or other sessions, it writes only in its folder, its own settings folder and temporary folders, and ${gate ? 'reaches only this machine\'s loopback, where a gate passes its own service\'s hosts and refuses every other (no downloads, no installs)' : 'reaches the network on port 443 and this machine\'s loopback only'} (its own permission prompts are off inside the profile)${HELD}`, eyesHeld: Boolean(eyes) };
   }
   throw new Error(`author ${author.key}: a working session needs a shell, and "${author.cli}" is called without one here (claude, codex, agy and muse can)`);
 }
@@ -576,7 +622,7 @@ export function transcriptFile(call, outFile, keep = null) {
 /** The exposure the owner accepted for runs on his own machine (22 Nov): the model command signs in from the login keychain, and its shell runs under the same profile. */
 export const SIGN_IN_EXPOSURE = 'a session\'s shell can read the model tool\'s own secret and list keychain entry names; accepted by the owner for runs on this machine';
 
-const kindOfCommand = c => { const m = /(?:^|[\s;&|/])unpaint\s+(status|plan|look|cost|wait)\b/.exec(c); return m ? `unpaint ${m[1]}` : 'shell'; };
+const kindOfCommand = c => { const m = /(?:^|[\s;&|/])unpaint\s+(status|plan|look|cost|show|wait)\b/.exec(c); return m ? `unpaint ${m[1]}` : 'shell'; };
 
 /**
  * A session's transcript read: {text (its last message), tokens, tokensIn, tokensOut (null where the command does not
@@ -594,7 +640,9 @@ export function readTranscript(cli, out) {
   // each tool step for tool-use.mjs: its kind, the command or the place, and once it has ended its exit and the start of its output
   const kindOf = name => (/^(read_file|view_file|list_dir|find_by_name|grep_search|Read|Glob|Grep)$/.test(name) ? 'read' : /^(write_to_file|write_file|replace_file_content|multi_replace_file_content|sed_file|Write|Edit)$/.test(name) ? 'write' : name);
   const stepOf = (id, kind, t) => { const st = { kind, text: String(t), exit: null, failed: false, output: null }; toolSteps.push(st); if (id != null) byId.set(id, st); return st; };
-  const ended = (st, { exit = null, failed = false, output = null }) => { if (!st) return; const ex = exit ?? (/exited with code (\d+)/.exec(output ?? '')?.[1] != null ? Number(/exited with code (\d+)/.exec(output)[1]) : null); Object.assign(st, { exit: ex, failed: failed || (ex != null && ex !== 0), output: output == null ? null : String(output).slice(0, 2000) }); };
+  const ended = (st, { exit = null, failed = false, output = null }) => { if (!st) return; const ex = exit ?? (/exited with code (\d+)/.exec(output ?? '')?.[1] != null ? Number(/exited with code (\d+)/.exec(output)[1]) : null); Object.assign(st, { exit: ex, failed: failed || (ex != null && ex !== 0), output: output == null ? null : String(output).slice(0, 2000) });
+    // what the system refused, wherever in the output it was said (eyes-only.mjs reads these for a refused picture read)
+    const denied = output == null ? [] : String(output).split('\n').filter(l => /operation not permitted|permission denied|EPERM|EACCES/i.test(l)).slice(0, 8).map(l => l.slice(0, 300)); if (denied.length) st.denied = denied; };
   const steps = new Set(), said = new Map();
   for (const l of out.split('\n')) {
     let d; try { d = JSON.parse(l); } catch { continue; }
