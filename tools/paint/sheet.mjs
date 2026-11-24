@@ -182,6 +182,13 @@ export async function runPictures(run, { panelWidth = 900 } = {}) {
   return pics;
 }
 
+/**
+ * Whether a run ends with its labelled sheet.jpg (the owner, 23 Nov: it was made for every look and final). One is
+ * kept for a full-size final and for every Auto run (its plan previews too); a look, and a model's plan alone, get
+ * none: their pictures are in the run's folder.
+ */
+export const keepsRunSheet = ({ look = false, mode, author }) => !look && (mode === 'paint' || author === 'auto');
+
 /** One run's sheet: its row and, when painted, the stage strip under it. */
 export async function writeRunSheet(run, file, { height = 440 } = {}) {
   const pics = await runPictures(run), rows = [{ height, panels: runPanels(run, pics) }];

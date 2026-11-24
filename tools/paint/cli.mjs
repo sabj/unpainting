@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Paint one picture, or several, by name: npm run paint -- <subject[,subject...]> plan|paint [options] (args.mjs).
 // For each subject and author it reads the subject's record, checks every pinned input, prints what will run, runs
-// the painter once, and writes run.json and one labelled sheet.jpg. Several runs also make one grid sheet.
+// the painter once, and writes run.json and, for a full-size final or an Auto run, one labelled sheet.jpg. Several runs also make one grid sheet.
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -16,7 +16,7 @@ import { WorkersFailed } from './render-pool.mjs';
 import { FINAL_WAIT_HOURS, FINAL_TRIES, EXIT_KEPT, waitTicker, paintWithRetries, keptNote } from './final-wait.mjs';
 import { expandRunSets, standardSheetOnly } from './run-sets.mjs';
 import { expandSubjects, pool, gpuPlace, throughput, jobsNow, DEFAULT_JOBS, PLAN_JOBS } from './queue.mjs';
-import { writeRunSheet, writeGridSheet, runPictures, formsImage, drawingSvg } from './sheet.mjs';
+import { writeRunSheet, writeGridSheet, keepsRunSheet, runPictures, formsImage, drawingSvg } from './sheet.mjs';
 import { toolsBase, resolveTools, writeTools, linesPictureDoc, allLinesDoc } from './session-tools.mjs';
 import sharp from 'sharp';
 import { authorOf, authorLabel, briefName, readScript, checkAuthored, preparePacket, formBoxes, gridImage, askAuthor, retryPrompt } from './author.mjs';
@@ -746,7 +746,8 @@ async function oneRun(r) {
   } catch (e) { record.failure = e.message; }
   record.results ??= collectResults(record.plate, req.mode);
   if (record.failure) say(r, `FAILED: ${record.failure}`);
-  try { record.sheetImage = (await writeRunSheet(record, path.join(record.out, 'sheet.jpg'))).file; } catch (e) { say(r, `no sheet: ${e.message}`); }
+  // one labelled sheet for a full-size final and for an Auto run; none for a look or a model's plan alone (sheet.mjs)
+  if (keepsRunSheet({ look: Boolean(req.look), mode: req.mode, author: record.author.key })) { try { record.sheetImage = (await writeRunSheet(record, path.join(record.out, 'sheet.jpg'))).file; } catch (e) { say(r, `no sheet: ${e.message}`); } }
   // what the session cost, measured: its looks, plans, minutes, tokens and cost, the machine's minutes for its looks and
   // for the full-size final (which is painted after the session, outside its clock), and what was taken prepared
   // the seed the final was painted with (a locked setting: the same for every run of the subject), into the terms
@@ -760,7 +761,7 @@ async function oneRun(r) {
   }
   fs.writeFileSync(path.join(record.out, 'run.json'), JSON.stringify(record, null, 1) + '\n');
   const p = record.results.plan;
-  say(r, `${record.results.state}${p ? `: ${p.shapes ?? '-'} shapes, ${p.washes} washes, ${p.strokes ?? '-'} strokes, widest wash brush ${p.widestBrushMm} mm` : ''}${record.results.cheatRisk?.level ? `; cheat-risk ${record.results.cheatRisk.level}` : ''}; painter ${record.seconds ?? 0} s; sheet ${record.sheetImage}`);
+  say(r, `${record.results.state}${p ? `: ${p.shapes ?? '-'} shapes, ${p.washes} washes, ${p.strokes ?? '-'} strokes, widest wash brush ${p.widestBrushMm} mm` : ''}${record.results.cheatRisk?.level ? `; cheat-risk ${record.results.cheatRisk.level}` : ''}; painter ${record.seconds ?? 0} s${record.sheetImage ? `; sheet ${record.sheetImage}` : ''}`);
 }
 /**
  * A subject's prepared inputs made once for this code and these settings (prepared.mjs): the code planner's plan on
@@ -875,5 +876,5 @@ if (many) {
   console.log(`\ngrid: ${grid.file}`); show = grid.file;
 }
 // Preview is opened without this session's variables, so nothing started from it inherits them
-if (req.open && process.platform === 'darwin') { try { execFileSync('env', ['-i', `HOME=${process.env.HOME}`, `USER=${process.env.USER}`, 'PATH=/usr/bin:/bin', 'open', '-a', 'Preview', show]); } catch (e) { console.error(`paint: could not open the sheet (${e.message})`); } }
+if (req.open && show && process.platform === 'darwin') { try { execFileSync('env', ['-i', `HOME=${process.env.HOME}`, `USER=${process.env.USER}`, 'PATH=/usr/bin:/bin', 'open', '-a', 'Preview', show]); } catch (e) { console.error(`paint: could not open the sheet (${e.message})`); } }
 process.exit(keptOnly ? EXIT_KEPT : failed ? 1 : 0);

@@ -74,8 +74,9 @@ Every option and its default is in `tools/paint/args.mjs`; a wrong option prints
 `plan` makes the wash plan only, on the CPU, in minutes. `paint` makes the whole painting on the GPU; one painting
 asked for by itself refuses to start when `--jobs` GPU paintings (default 2) are already running. Before a run the command prints the subject, source, sheet, drawing,
 studies, named forms, author, mode, every setting that differs from its default, the commit and the exact
-`paint-plate` command. Every run ends with one labelled picture, `<out>/sheet.jpg` (source, opening drawing, studies,
-named forms, wash plan, painting, and the stage strip when painted), and `<out>/run.json`. The painter's own files are
+`paint-plate` command. Every run ends with `<out>/run.json`. A full-size painting and every Auto run also end with one labelled picture,
+`<out>/sheet.jpg` (source, opening drawing, studies, named forms, wash plan, painting, and the stage strip when
+painted); a look, and a model's plan alone, write none. The painter's own files are
 in `<out>/plate/`. Several subjects or authors also make one grid, subjects down and authors across.
 
 ```sh
