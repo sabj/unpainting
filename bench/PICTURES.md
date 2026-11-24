@@ -38,9 +38,9 @@ is what the model is told.
 
 | Set | Picture | Source photograph | Modified with an image generator | Size | Rights | File |
 |---|---|---|---|---|---|---|
-| **Core** | Mittens (`mittens-closeup`) | Photograph by Sam Jackson | Image generator not recorded | Nominal 23 x 30.5 cm | © Sam Jackson, noncommercial ([NOTICE](../NOTICE) section 1) | `v3/targets/mittens-closeup-full.png` |
-| Extended | Kasha portrait (`kasha-portrait`) | Photograph by Sam Jackson | Image generator not recorded | Nominal 23 x 30.5 cm | © Sam Jackson, noncommercial ([NOTICE](../NOTICE) section 1) | Not in the repository |
-| Extended | Yale Rosewalk (`h36`) | Carol M. Highsmith, Yale University, New Haven, Connecticut, September 2011. George F. Landegger Collection of Connecticut Photographs in Carol M. Highsmith's America, Library of Congress, Prints and Photographs Division, [LC-DIG-highsm-19255](https://www.loc.gov/item/2012630670/). "No known restrictions on publication." | 10 October 2026; the record names the tool `image_gen.imagegen` and no model ([record](../demos/lab/examples/h36-a/h36-a.json)) | Nominal 28 x 38 cm | Source photograph: no known restrictions ([NOTICE](../NOTICE) section 4) | `v3/targets/h36-full.png` |
+| **Core** | Mittens (`mittens-closeup`) | Photograph by Sam Jackson | Modified with an image generator (Nano Banana, Google, or the image generator in Codex, OpenAI; which one was not recorded for this picture) | Nominal 23 x 30.5 cm | © Sam Jackson, noncommercial use ([NOTICE](../NOTICE) section 1) | `v3/targets/mittens-closeup-full.png` |
+| Extended | Kasha portrait (`kasha-portrait`) | Photograph by Sam Jackson | Modified with an image generator (Nano Banana, Google, or the image generator in Codex, OpenAI; which one was not recorded for this picture) | Nominal 23 x 30.5 cm | © Sam Jackson, noncommercial use ([NOTICE](../NOTICE) section 1) | Not in the repository |
+| Extended | Yale Rosewalk (`h36`) | Carol M. Highsmith, Yale University, New Haven, Connecticut, September 2011. George F. Landegger Collection of Connecticut Photographs in Carol M. Highsmith's America, Library of Congress, Prints and Photographs Division, [LC-DIG-highsm-19255](https://www.loc.gov/item/2012630670/). "No known restrictions on publication." Confirmed by the owner | 10 October 2026, with the image generator in Codex (OpenAI); the record names the tool `image_gen.imagegen` ([record](../demos/lab/examples/h36-a/h36-a.json)) | Nominal 28 x 38 cm | Source photograph: no known restrictions ([NOTICE](../NOTICE) section 4) | `v3/targets/h36-full.png` |
 
 ## Optional set
 
@@ -69,14 +69,14 @@ Made with an image generator:
 
 | Picture | Source photograph | Modified with an image generator | Rights |
 |---|---|---|---|
-| Yale, Sterling Library | Not recorded | Image generator not recorded | Not citable until its source is found |
-| Kasha portrait wash | Photograph by Sam Jackson | Image generator not recorded | © Sam Jackson, noncommercial |
-| The first Mittens, cat and portrait (0.2.1 benchmark) | Photograph by Sam Jackson | Image generator not recorded | © Sam Jackson, noncommercial ([NOTICE](../NOTICE) section 1) |
-| Yale Trumbull (0.2.1 benchmark) | Not Sam Jackson's: [posted](https://www.instagram.com/p/CESNBxYg0g8/) by the Trumbull College Instagram account (@trumbullcollegeyale), 24 August 2020, credited there to Google; photographer unknown | 5 October 2026; image generator not recorded | The source photograph was not licensed properly, so the picture is kept out of the 0.4 benchmark ([NOTICE](../NOTICE) section 1a) |
+| Yale, Sterling Library | Carol M. Highsmith, Yale University, New Haven, Connecticut, September 2011. George F. Landegger Collection of Connecticut Photographs in Carol M. Highsmith's America, Library of Congress, Prints and Photographs Division, [LC-DIG-highsm-19252](https://www.loc.gov/item/2012630667/). "No known restrictions on publication." Found by matching our picture to the catalogue | Modified with an image generator (Nano Banana, Google, or the image generator in Codex, OpenAI; which one was not recorded for this picture) | Source photograph: no known restrictions |
+| Kasha portrait wash | Photograph by Sam Jackson | Modified with an image generator (Nano Banana, Google, or the image generator in Codex, OpenAI; which one was not recorded for this picture) | © Sam Jackson, noncommercial use |
+| The first Mittens, cat and portrait (0.2.1 benchmark) | Photograph by Sam Jackson | Modified with an image generator (Nano Banana, Google, or the image generator in Codex, OpenAI; which one was not recorded for this picture) | © Sam Jackson, noncommercial use ([NOTICE](../NOTICE) section 1) |
+| Yale Trumbull (0.2.1 benchmark) | Not Sam Jackson's: [posted](https://www.instagram.com/p/CESNBxYg0g8/) by the Trumbull College Instagram account (@trumbullcollegeyale), 24 August 2020, credited there to Google; photographer unknown | 5 October 2026. Modified with an image generator (Nano Banana, Google, or the image generator in Codex, OpenAI; which one was not recorded for this picture) | The source photograph was not licensed properly, so the picture is kept out of the 0.4 benchmark ([NOTICE](../NOTICE) section 1a) |
 
 ## Private set
 
-Beach and Overlook: photographs by Sam Jackson, modified with an image generator (image generator not recorded).
+Beach and Overlook: photographs by Sam Jackson, modified with an image generator (Nano Banana, Google, or the image generator in Codex, OpenAI; which one was not recorded for this picture).
 Not distributed.
 
 ## Earlier benchmarks

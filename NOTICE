@@ -34,9 +34,9 @@ credits: THIRD_PARTY_NOTICES.md.
      washes, strokes, paints and brushes.
    bench/v3/targets/mittens-closeup.png
    bench/v3/targets/mittens-closeup-full.png
-     Mittens close-up: a watercolour sketch made with an image generator
-     from Sam Jackson's own photograph. A picture of the 0.4 benchmark
-     (section 5).
+     Mittens close-up: Sam Jackson's own photograph, modified with an
+     image generator (section 5 says which). A picture of the 0.4
+     benchmark. (c) Sam Jackson, noncommercial use.
 
 
 1a. Trumbull College photograph: third party, credited
@@ -307,19 +307,21 @@ credits: THIRD_PARTY_NOTICES.md.
      Landegger Collection of Connecticut Photographs in Carol M.
      Highsmith's America, Library of Congress, Prints and Photographs
      Division, LC-DIG-highsm-19255. Rights, the record's words: "No known
-     restrictions on publication." Modified with an image generator on 10
-     October 2026: the generation record names the tool
-     image_gen.imagegen and no model
-     (demos/lab/examples/h36-a/h36-a.json; section 4).
+     restrictions on publication." Modified on 10 October 2026 with the
+     image generator in Codex (OpenAI): the generation record names the
+     tool image_gen.imagegen (demos/lab/examples/h36-a/h36-a.json;
+     section 4). The source photograph was confirmed by the owner.
      https://www.loc.gov/item/2012630670/
 
      Mittens (mittens-closeup). Source: photograph by Sam Jackson.
-     Modified with an image generator; image generator not recorded.
-     Section 1's terms.
+     Modified with an image generator (Nano Banana, Google, or the image
+     generator in Codex, OpenAI; which one was not recorded for this
+     picture). Section 1's terms.
 
      Kasha portrait (kasha-portrait). Source: photograph by Sam Jackson.
-     Modified with an image generator; image generator not recorded.
-     Section 1's terms. Not in this repository.
+     Modified with an image generator (Nano Banana, Google, or the image
+     generator in Codex, OpenAI; which one was not recorded for this
+     picture). Section 1's terms. Not in this repository.
 
 
 6. Other pictures: the optional and private sets
@@ -432,30 +434,42 @@ credits: THIRD_PARTY_NOTICES.md.
 
    Optional, made with an image generator:
 
-     Yale, Sterling Library. Made with an image generator. Source
-     photograph not recorded; image generator not recorded. Not citable
-     until its source is found.
+     Yale, Sterling Library. Source photograph: Carol M. Highsmith, Yale
+     University, New Haven, Connecticut, September 2011. George F.
+     Landegger Collection of Connecticut Photographs in Carol M.
+     Highsmith's America, Library of Congress, Prints and Photographs
+     Division, LC-DIG-highsm-19252. Rights, the record's words: "No known
+     restrictions on publication." Modified with an image generator (Nano
+     Banana, Google, or the image generator in Codex, OpenAI; which one
+     was not recorded for this picture). The item was found by matching
+     our picture to the catalogue (the same view, with the same
+     passers-by); a second frame of the view is LC-DIG-highsm-19253.
+     https://www.loc.gov/item/2012630667/
 
      Kasha portrait wash. Source: photograph by Sam Jackson. Modified
-     with an image generator; image generator not recorded.
+     with an image generator (Nano Banana, Google, or the image generator
+     in Codex, OpenAI; which one was not recorded for this picture).
 
      The first Mittens, cat and portrait (0.2.1 benchmark). Source:
-     photograph by Sam Jackson. Modified with an image generator; image
-     generator not recorded. Section 1.
+     photograph by Sam Jackson. Modified with an image generator (Nano
+     Banana, Google, or the image generator in Codex, OpenAI; which one
+     was not recorded for this picture). Section 1.
 
      Yale Trumbull (0.2.1 benchmark). Source photograph: not Sam
      Jackson's; posted by the Trumbull College Instagram account
      (@trumbullcollegeyale) on 24 August 2020, credited there to Google,
-     photographer unknown (section 1a). Modified with an image generator
-     on 5 October 2026; image generator not recorded. The source
-     photograph was not licensed properly, so the picture is kept out of
-     the 0.4 benchmark.
+     photographer unknown (section 1a). Modified on 5 October 2026 with
+     an image generator (Nano Banana, Google, or the image generator in
+     Codex, OpenAI; which one was not recorded for this picture). The
+     source photograph was not licensed properly, so the picture is kept
+     out of the 0.4 benchmark.
      https://www.instagram.com/p/CESNBxYg0g8/
 
    Private:
 
      Beach and Overlook. Source: photographs by Sam Jackson. Modified
-     with an image generator; image generator not recorded. Not
+     with an image generator (Nano Banana, Google, or the image generator
+     in Codex, OpenAI; which one was not recorded for this picture). Not
      distributed.
 
    Hills and France are in no 0.4 set. Their targets, paintings and scores
