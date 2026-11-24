@@ -1,3 +1,4 @@
+import { slideRate, reposeStep } from './grain-field.mjs';
 import { certifyDryFixed, validDryFixedCertificate, invalidatePaperCertificate, recordWetCell, recordWetCells, recordWetStep, syncWetReachVersion } from './paper-certificate.mjs';
 import { censusDry } from './census.mjs';
 import { SIZING } from './sizing.mjs';
@@ -941,7 +942,8 @@ function stepBox(sheet, o, box, reduce = false) {
   // over is the paper plus the pigment already on it), so a hollow fills until it is no steeper than they rest on. A
   // next-state buffer keeps it unbiased. Flocculating pigment (floc) settles as clumps too big for the hollows between
   // fibres: the clumps bridge them and collect in the broader hollows of the paper's tooth, a softer, larger mottle.
-  const slide = o.slide ?? 0, fill = o.slideFillNow ?? o.slideFill ?? 1, repose = o.repose ?? 0, slideCap = o.slideCap ?? 0, { height: fibreH, tooth } = paper;
+  const slide = slideRate(o.slide ?? 0, paper.mmPerCell), fill = o.slideFillNow ?? o.slideFill ?? 1, repose = reposeStep(o.repose ?? 0, paper.mmPerCell), slideCap = o.slideCap ?? 0, { grainH: fibreH, tooth } = paper;
+  if (!fibreH) throw new Error('sheet: the paper has no grainH (make it with makePaper or scanPaper)');
   if (slide > 0) {
     const { dSlide: dD, ex, fl, dep, moved: mv } = sc;
     for (let k = 0; k < K; k++) { fl[k] = pigments[k].floc ?? 0; mv[k] = 0; }

@@ -43,9 +43,10 @@ test('cold press: structure from 0.1 mm up, about even per octave from 0.2 to 1 
   assert.ok(Math.max(...mid) / Math.min(...mid) < 1.6, `octave bands 0.2 to 1 mm: ${mid.map(v => v.toFixed(2)).join(' ')} um`);
   assert.ok(b[2] < 0.8 * b[0.5], `2 mm band ${b[2]} against 0.5 mm ${b[0.5]} um: no millimetre basins to pool in`);
   assert.ok(b[0.1] > 0.3 * b[0.5], `0.1 mm band ${b[0.1]} um: the sheet still has structure there`);
-  // hollows (makePaper): a cell's depth below the tooth level, in the relief's RMS, about 0.4 on average and none on
-  // the crests, a little shallower on a coarser grid of the same paper
+  // hollows (makePaper): a cell's depth below the tooth level of the relief low-passed at 0.2 mm (grain-field.mjs), in
+  // that field's RMS about its millimetre mean: about 0.6 on average and none on the crests, the same on a coarser grid
+  // of the same paper (at rc4, read cell by cell, 0.40 at 0.05 mm fell to 0.28 at 0.25 mm)
   const hol = mm => { const n = Math.round(25 / mm), p = makePaper(n, n, { seed: 5, mmPerCell: mm, coldPress: { mmPerCell: mm } }); let pos = 0, m = 0; for (const v of p.hollow) { m += v; if (v > 0) pos++; } return { m: m / p.n, pos: pos / p.n }; };
   const h05 = hol(0.05), h25 = hol(0.25);
-  assert.ok(h05.m > 0.3 && h05.m < 0.55 && h05.pos < 0.65 && h25.m < h05.m && h25.m > 0.6 * h05.m, JSON.stringify({ h05, h25 }));
+  assert.ok(h05.m > 0.45 && h05.m < 0.8 && h05.pos < 0.65 && Math.abs(h25.m / h05.m - 1) < 0.1, JSON.stringify({ h05, h25 }));
 });

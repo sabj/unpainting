@@ -1,3 +1,4 @@
+import { slideRate, reposeStep } from './grain-field.mjs';
 import { flowTime, poreTime } from './flow-time.mjs';
 // Threads for the sheet's step (sheet.mjs): a persistent worker pool on SharedArrayBuffers runs each large box in row
 // bands through the phases in sheet-kernel.mjs, bit-identical to the serial step. Whole-sheet jobs use the same pool
@@ -114,7 +115,8 @@ const PAPERS = new WeakMap(), PERMS = new WeakMap();
 function paperShared(paper) {
   if (PAPERS.has(paper)) return PAPERS.get(paper);
   const h = paper.valley || paper.height;
-  const out = { capacity: sharedCopy(paper.capacity), fdx: sharedCopy(paper.fdx), fdy: sharedCopy(paper.fdy), grain: sharedCopy(paper.grain), height: sharedCopy(h), fibreH: sharedCopy(paper.height), tooth: paper.tooth ? sharedCopy(paper.tooth) : null, hollow: sharedCopy(paper.hollow) };
+  if (!paper.grainH) throw new Error('sheet threads: the paper has no grainH (make it with makePaper or scanPaper)');
+  const out = { capacity: sharedCopy(paper.capacity), fdx: sharedCopy(paper.fdx), fdy: sharedCopy(paper.fdy), grain: sharedCopy(paper.grain), height: sharedCopy(h), fibreH: sharedCopy(paper.grainH), tooth: paper.tooth ? sharedCopy(paper.tooth) : null, hollow: sharedCopy(paper.hollow) };
   PAPERS.set(paper, out); return out;
 }
 const set = (C, key, value) => { C[key] = value; post({ t: 'set', id: C.id, key, value }); };
@@ -292,7 +294,7 @@ function params(C, sheet, o) {
     ff: o.fibreFlow ?? 0.6, flowDepth: o.flowDepth ?? 0.12, flow: o.flow, slope: o.slope, mar: o.marangoni ?? 0,
     diffuse: Math.min(0.25, Math.max(0, o.diffuse * fraction)), cd: o.carryDepth ?? 0.08, filmDiff: Math.max(0, (o.filmDiffuse ?? 0) * fraction), filmDepth: o.filmDepth ?? 0.03, gran: o.gran ?? 1, liftDepth: o.liftDepth ?? 0.15,
     scour: o.scour ?? 0, holdCap: o.hold ?? Infinity, holdDepth: o.holdDepth ?? o.film, coSettle: o.coSettle ?? 0, settle: o.settle, lift: o.lift, looseLift: o.looseLift, rewetLift: o.rewetLift,
-    granFill: o.granFill ?? 0, slide: o.slide ?? 0, fill: o.slideFillNow ?? o.slideFill ?? 1, repose: o.repose ?? 0,
+    granFill: o.granFill ?? 0, slide: slideRate(o.slide ?? 0, sheet.paper.mmPerCell), fill: o.slideFillNow ?? o.slideFill ?? 1, repose: reposeStep(o.repose ?? 0, sheet.paper.mmPerCell),
     capStep: poreTime(sheet, o).fraction, sizing: o.sizing ?? SIZING, filter: o.wickFilter ?? 0.2,
     capEps: o.capEps, capDelta: o.capDelta, wetEps: o.wetEps, paperDry: o.paperDry, capSigma: o.capSigma, spill: o.spill,
     spillHeight: o.spillHeight, dampEase: o.dampEase, pinning: o.pinning ?? 0, pinFibre: o.pinFibre ?? 0,

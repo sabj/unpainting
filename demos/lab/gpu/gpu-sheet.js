@@ -2,6 +2,7 @@
 // the GPU. Adapted from src/media/gpu/stepfull.mjs: the WGSL is a module, the
 // device comes from navigator.gpu, and nothing blocks (every read is a promise). sheet.js stays the reference and the
 // CPU fallback.
+import { slideRate, reposeStep } from '../media/grain-field.js';
 import { permeability } from '../media/sheet.js';
 import { settleSpeed, settleDiffusion } from '../media/settling.js';
 import { WGSL } from './gpu-wgsl.js';
@@ -116,10 +117,13 @@ export class GpuSheet {
     const { px, py } = permeability(paper), P4 = new Float32Array(n * 4), P2 = new Float32Array(n * 4), P3 = new Float32Array(n * 4), hv = paper.valley || paper.height;
     for (let i = 0; i < n; i++) {
       P4.set([paper.capacity[i], paper.grain[i], paper.fdx[i], paper.fdy[i]], i * 4); P2.set([px[i], py[i], 0, 0], i * 4);
-      P3.set([paper.tooth[i], HASH(i), hv[i], paper.height[i]], i * 4);
+      P3.set([paper.tooth[i], HASH(i), hv[i], paper.grainH[i]], i * 4);
     }
     put(B.PAPER, P4); put(B.PAPER2, P2); put(B.PAPER3, P3);
-    // settling's hollows are worked out from the tooth and height with these (paper.js toothHollow)
+    // settling's hollows are worked out from the tooth and the grain field with these (paper.js toothHollow; the
+    // painter's src/media/grain-field.mjs), and the slide's rate and resting step follow the paper's cell (slideRate, reposeStep)
+    if (!paper.grainH) throw new Error('GPU sheet: the paper has no grainH (make it with makePaper)');
+    this.paperMm = paper.mmPerCell ?? 0;
     if (!(paper.hollowUnit > 0)) throw new Error('GPU sheet: the paper has no hollowUnit (make it with makePaper)');
     this.paperHollow = { toothLo: paper.toothLo, toothSpan: paper.toothSpan, hollowUnit: paper.hollowUnit, physical: !!paper.zUm };
     this.cap = this.ntiles; this.hold = 0; this.epoch = 0; this.knownDry = false; this.hasTop = false;
@@ -225,7 +229,7 @@ export class GpuSheet {
     Object.entries({
       dt, evap: o.evap, edgeEvap: o.edgeEvap, edgeWidth: o.edgeWidth, capE: o.edgeWidth + 1, absorb: o.absorb, film: o.film, flow: o.flow * fraction, ff: o.fibreFlow ?? 0.6,
       flowDepth: o.flowDepth ?? 0.12, diffuse: Math.min(0.25, Math.max(0, o.diffuse * fraction)), cd: o.carryDepth ?? 0.08, settle: o.settle, liftDepth: o.liftDepth ?? 0.15,
-      rewetLift: o.rewetLift, granFill: o.granFill ?? 0, holdCap: Number.isFinite(o.hold ?? Infinity) ? o.hold : 0, slide: o.slide ?? 0, slideFill: o.slideFill ?? 1,
+      rewetLift: o.rewetLift, granFill: o.granFill ?? 0, holdCap: Number.isFinite(o.hold ?? Infinity) ? o.hold : 0, slide: slideRate(o.slide ?? 0, this.paperMm ?? 0), slideFill: o.slideFill ?? 1,
       capStep: this.poreTime.fraction, capEps: o.capEps, capDelta: o.capDelta, sizing: o.sizing ?? 0.85, wickFilter: o.wickFilter ?? 0.2,
       wetEps: o.wetEps, paperDry: o.paperDry, capSigma: o.capSigma, spill: o.spill, spillHeight: o.spillHeight, dampEase: o.dampEase, pinning: o.pinning ?? 0, pinFibre: o.pinFibre ?? 0,
       enclose: o.encloseEase ?? 0, slideCap: o.slideCap ?? 0, holeFill: o.holeFill ?? 0, padB: 0,
@@ -238,7 +242,7 @@ export class GpuSheet {
     const base = UF.length, gran = o.gran ?? 1, scour = o.scour ?? 0;
     this.pigments.forEach((p, k) => {
       const gg = p.gamma * gran, mob = p.wick ?? Math.max(0.05, Math.min(0.9, 1 - p.gamma));
-      F32.set([gg, (p.rho / p.omega) * o.lift * o.looseLift, scour / p.omega, gg > 0 ? (o.repose ?? 0) / gg : 0], base + k * 4);
+      F32.set([gg, (p.rho / p.omega) * o.lift * o.looseLift, scour / p.omega, gg > 0 ? reposeStep(o.repose ?? 0, this.paperMm ?? 0) / gg : 0], base + k * 4);
       // pb.x, pc.x: the Stokes speed and the Brownian diffusion of the paint's particles, times settle (settling.js)
       F32.set([settleSpeed(p) * (o.settle ?? 1), p.omega, p.floc ?? 0, mob], base + 64 + k * 4);
       F32.set([settleDiffusion(p) * (o.settle ?? 1), 0, 0, 0], base + 144 + k * 4);
