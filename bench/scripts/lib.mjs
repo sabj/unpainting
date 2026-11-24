@@ -196,12 +196,14 @@ export function validateRun(run) {
   need(run.settings && ['gentle', 'hard'].includes(run.settings.mode), 'settings.mode must be gentle or hard');
   // V4 and V5 paint with the painter, which sets its own stroke count: no budget
   const pipeline = PIPELINE_ROUNDS.has(roundById(run.round)?.id);
-  need(run.settings && run.settings.strokeBudget === (pipeline ? null : BUDGET.strokes), `settings.strokeBudget must be ${pipeline ? 'null in V4 and V5' : BUDGET.strokes}`);
+  // level 1 of 0.4 (a V3 record with settings.paintingsPerAttempt) has no stroke limit either: its budget is paintings run. The published V1 to V3 records keep their 2,500
+  const free = pipeline || (run.round === 'V3' && run.settings?.paintingsPerAttempt != null && run.settings?.strokeBudget === null);
+  need(run.settings && run.settings.strokeBudget === (free ? null : BUDGET.strokes), `settings.strokeBudget must be ${pipeline ? 'null in V4 and V5' : `${BUDGET.strokes} (null in a level 1 record of 0.4, which names settings.paintingsPerAttempt)`}`);
   need(run.guard && Number.isInteger(run.guard.blockedImageReads), 'guard.blockedImageReads must be an integer');
   need(run.crops && typeof run.crops === 'object', 'crops must be an object (empty when nothing was painted)');
   for (const [k, c] of Object.entries(run.crops || {})) {
     need(CROP_ORDER.includes(k) || (run.round === 'V3' && levelOneTasks().has(k)), `crop ${k} is not a benchmark crop`);   // level 1's own targets are run records of the V3 round only
-    const cap = pipeline ? Infinity : BUDGET.strokes;
+    const cap = free ? Infinity : BUDGET.strokes;
     need(c.strokes == null || (Number.isInteger(c.strokes) && c.strokes >= 0 && c.strokes <= cap), `crops.${k}.strokes must be 0..${cap}`);
     if (pipeline) need(c.pipeline && typeof c.pipeline.outcome === 'string', `crops.${k}.pipeline is required in V4 and V5`);
     const s = c.score?.composite;

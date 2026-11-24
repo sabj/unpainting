@@ -85,8 +85,9 @@ export function splitAtTurns(P) {
  *  agree (cos) and a gap that lies along both (aim): the painter's hand gates (drawing-hand.mjs, 0.8 and 0.7). A piece
  *  meeting another at a corner, or lying beside it, is not joined. The closest join is made first (ties in scan order:
  *  piece, other piece, end, other end), the joined piece goes to the end of the list, and the search starts again.
- *  Ends are binned by the gap, so each search looks only at ends near each other. */
-export function joinPieces(pieces, { gap, cos = 0.8, aim = 0.7 } = {}) {
+ *  Ends are binned by the gap, so each search looks only at ends near each other; `work.candidates`, when a `work`
+ *  object is given, counts the pairs of ends looked at. */
+export function joinPieces(pieces, { gap, cos = 0.8, aim = 0.7, work = null } = {}) {
   let items = pieces.filter(P => P.length >= 2).map(P => P.slice());
   const end = (P, atStart) => { const p = atStart ? P[0] : P.at(-1), q = atStart ? P[1] : P.at(-2); return { p, t: unit(p[0] - q[0], p[1] - q[1]) }; };
   const cell = Math.max(gap, 1e-9);
@@ -100,6 +101,7 @@ export function joinPieces(pieces, { gap, cos = 0.8, aim = 0.7 } = {}) {
       const A = ends[a][sa ? 1 : 0], cx = Math.floor(A.p[0] / cell), cy = Math.floor(A.p[1] / cell);
       for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) for (const [b, sb] of bins.get(`${cx + dx},${cy + dy}`) ?? []) {
         if (a === b) continue;
+        if (work) work.candidates++;
         const B = ends[b][sb ? 1 : 0], ex = B.p[0] - A.p[0], ey = B.p[1] - A.p[1], d = Math.hypot(ex, ey);
         if (d > gap) continue;
         if (-(A.t[0] * B.t[0] + A.t[1] * B.t[1]) < cos) continue;

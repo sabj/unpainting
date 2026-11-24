@@ -4,8 +4,18 @@
 // its pictures wherever a subject is named (`npm run paint -- core paint --author neon-m --level L3`), and only the
 // pictures that run at the level asked for are painted. Nothing here starts a painting or a session.
 //   node tools/paint/run-sets.mjs [core|extended]     every painting the set asks for, as a list; starts nothing
+//   node tools/paint/run-sets.mjs check [core|extended]   is every picture of the set registered under the one-area
+//     sheet rule and prepared (every input there, pinned and matching)? One line a picture; exit 1 when any is not.
+//     It also says, first, whether each model of the roster (bench/run-sets.json "roster") has its entry for levels 2
+//     to 4 (tools/paint/authors.json) and for level 1 (bench/models.json), the same in both, called by a command the
+//     session's gate knows. Run it at the release tag before a benchmark run. Reads the subject list; starts and
+//     writes nothing.
+// A benchmark picture is painted only from a registration made under the sheet rule (sheet-rule.mjs): the file names
+// only such registrations, and a run of one that is not is refused (standardSheetOnly).
 import fs from 'node:fs';
 import { pathToFileURL } from 'node:url';
+import { SHEET_RULE, QUARTER_SHEET_MM } from './sheet-rule.mjs';
+import { PROVIDER_HOSTS } from './session-net.mjs';
 
 const FILE = new URL('../../bench/run-sets.json', import.meta.url);
 const LEVELS = ['Auto', 'L1', 'L2', 'L3', 'L4'];
@@ -29,7 +39,11 @@ export function loadRunSets(doc = JSON.parse(fs.readFileSync(FILE, 'utf8'))) {
     sets[name] = { name, what: s.what ?? '', pictures: pictures.map(p => ({ ...p, levels: depth(p.core ? own.core : own.others) })) };
   }
   if (!Object.keys(sets).length) bad('no "sets"');
-  return { sets, names: Object.keys(sets) };
+  // the roster: the keys of the benchmark's models (a file without one names pictures only, and rosterEntries says so)
+  const roster = doc.roster == null ? null : doc.roster.models;
+  if (doc.roster != null && (!Array.isArray(roster) || !roster.length || roster.some(k => typeof k !== 'string' || !k))) bad('"roster" needs "models", the keys of the benchmark\'s models');
+  if (roster && new Set(roster).size !== roster.length) bad('a model is in the roster twice');
+  return { sets, names: Object.keys(sets), roster };
 }
 
 /** Whether a word names a run set. */
@@ -71,7 +85,88 @@ export function levelOneTargets(setName, runSets = loadRunSets()) {
   return at.map(p => p.levelOne);
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
+const readList = (rel, key) => JSON.parse(fs.readFileSync(new URL(rel, import.meta.url), 'utf8'))[key];
+/**
+ * Whether each model of the roster can be run at every level: [{key, name, cli, id, effort, ok, faults: [plain]}]. A
+ * model is ready when its key has an entry in tools/paint/authors.json (`authors`: levels 2 to 4) and in
+ * bench/models.json (`models`: level 1), the two with the same id, effort and name and the same command, and that
+ * command is one the session's gate knows (session-net.mjs PROVIDER_HOSTS): any other is refused at level 1 and would
+ * run ungated at levels 2 to 4. Starts nothing: whether the provider serves the id is not asked here.
+ */
+export function rosterEntries(runSets = loadRunSets(), authors = readList('./authors.json', 'authors'), models = readList('../../bench/models.json', 'models')) {
+  if (!runSets.roster) throw new Error('bench/run-sets.json: no "roster" (the keys of the benchmark\'s models)');
+  return runSets.roster.map(key => {
+    const a = authors.find(x => x.key === key), m = models.find(x => x.key === key), faults = [];
+    if (!a) faults.push('no entry in tools/paint/authors.json (levels 2 to 4)');
+    if (!m) faults.push('no entry in bench/models.json (level 1)');
+    if (a && m) for (const [what, x, y] of [['id', a.id, m.id], ['effort', a.effort, m.effort], ['name', a.name, m.name], ['command', a.cli, m.runner]]) if (x !== y) faults.push(`its ${what} differs: ${x} in tools/paint/authors.json, ${y} in bench/models.json`);
+    for (const cli of new Set([a?.cli, m?.runner].filter(Boolean))) if (!PROVIDER_HOSTS[cli]) faults.push(`its command ${cli} has no gate (tools/paint/session-net.mjs PROVIDER_HOSTS)`);
+    for (const [where, e] of [['tools/paint/authors.json', a], ['bench/models.json', m]]) if (e && (!e.id || !e.effort || e.effort === 'n/a')) faults.push(`its entry in ${where} names no id or no effort`);
+    return { key, name: a?.name ?? m?.name ?? null, cli: a?.cli ?? m?.runner ?? null, id: a?.id ?? m?.id ?? null, effort: a?.effort ?? m?.effort ?? null, ok: !faults.length, faults };
+  });
+}
+
+/** Whether a subject id is one of the benchmark's pictures (any set). */
+export const isBenchmarkPicture = (id, runSets = loadRunSets()) => Object.values(runSets.sets).some(s => s.pictures.some(p => p.id === id));
+
+/**
+ * The benchmark's pictures are all painted on one area of paper. A resolved subject (subjects.mjs) that is one of
+ * them and whose registration is not under the rule is refused here, before anything runs. Any other subject (an
+ * earlier registration named by its own id, for an earlier result) passes: its run says which sheet it has.
+ */
+export function standardSheetOnly(spec, runSets = loadRunSets()) {
+  if (!isBenchmarkPicture(spec.id, runSets) || spec.sheet?.rule === SHEET_RULE) return spec;
+  throw new Error(`subject ${spec.id} is a benchmark picture, and its registration is not under the one-area sheet rule (every benchmark picture is painted on the area of a quarter sheet, ${QUARTER_SHEET_MM.map(v => v / 10).join(' x ')} cm; this one is registered at ${spec.sheet?.cells} cells, ${spec.sheet?.widthMm} mm across). It is not run. Register it under the rule (node tools/paint/reregister.mjs) and name that registration in bench/run-sets.json`);
+}
+
+/**
+ * Whether each picture of a set can be run: [{id, title, levels, ok, faults: [plain], notes: [plain]}]. A picture is
+ * ready when its id is in the registry, registered under the sheet rule, its study seed final, every input (source,
+ * drawing files, studies, labels, named forms) pinned by a sha256 and matching on disk, and, where it runs at level 1,
+ * its level 1 target named. `resolve(id)` -> a resolved subject, `check(spec)` -> the spec with its files read
+ * (subjects.mjs resolveSubject and checkInputs); `record(id)` -> the registry's own record or null.
+ */
+export function readiness(setName, { record, resolve, check }, runSets = loadRunSets()) {
+  return picturesAt(setName, null, runSets).map(p => {
+    const faults = [], notes = [], row = { id: p.id, title: p.title, levels: p.levels, faults, notes };
+    const rec = record(p.id);
+    if (!rec) {
+      // the earlier registration it would be made from, and how far that one is
+      const base = p.id.endsWith('-qs') ? record(p.id.slice(0, -3)) : null;
+      faults.push(base ? `not registered under the sheet rule yet: make it from ${base.id} (node tools/paint/reregister.mjs ${base.id} --registry <the subject list>); ${base.id} is at ${base.sheet?.cellsAcross?.full} cells, its study seed ${base.studySeed?.final === true ? `final (${base.studySeed.chosen})` : 'not final'}` : 'not registered: no such subject in the subject list');
+    }
+    else {
+      if (rec.sheet?.rule !== SHEET_RULE) faults.push(`not under the one-area sheet rule (registered at ${rec.sheet?.cellsAcross?.full} cells, ${rec.sheet?.widthMm} mm across)`);
+      if (rec.studySeed?.final !== true) faults.push(`its study seed is not final (${rec.studySeed?.status ?? 'none chosen'})`);
+      let spec = null;
+      try { spec = resolve(p.id); } catch (e) { faults.push(e.message.split('\n')[0]); }
+      if (spec) {
+        const open = [['source', spec.source], ...spec.drawing.files.map(f => ['drawing file', f]), ...spec.studies.map((s, i) => [`study ${i + 1}`, s]), ...(spec.labels ? [['labels', spec.labels]] : [])].filter(([, f]) => !f.sha256);
+        if (open.length) faults.push(`not pinned by a checksum: ${open.map(([what, f]) => `${what} ${f.path}`).join(', ')}`);
+        try { check(spec); if (!spec.masks?.receipt) faults.push(`no named forms (${spec.masks?.none ?? 'no receipt'})`); } catch (e) { faults.push(...e.message.split('\n').slice(1).map(l => l.trim())); }
+        const px = spec.source.px?.[0];
+        if (px > 0 && spec.sheet.cells > px) notes.push(`painted enlarged ${(spec.sheet.cells / px).toFixed(2)} times (the file is ${px} px across, the sheet ${spec.sheet.cells} cells)`);
+      }
+    }
+    if (p.levels.includes('L1') && !p.levelOne) faults.push('no level 1 target (bench/run-sets.json "levelOne")');
+    return { ...row, ok: !faults.length };
+  });
+}
+
+if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href && process.argv[2] === 'check') {
+  const { loadRegistry, resolveSubject, checkInputs } = await import('./subjects.mjs');
+  const name = process.argv[3] ?? 'extended';
+  // the roster first: it needs no subject list
+  const roster = rosterEntries(), unready = roster.filter(r => !r.ok).length;
+  for (const r of roster) console.log(`${r.ok ? 'ready    ' : 'NOT READY'} model ${r.key}${r.ok ? ` (${r.name}; ${r.cli}, ${r.id}, effort ${r.effort})` : `: ${r.faults.join('; ')}`}`);
+  console.log(`\nRoster: ${roster.length - unready} of ${roster.length} models have their entry for level 1 and for levels 2 to 4${unready ? `; ${unready} do not` : ''}.\n`);
+  let rows;
+  try { const reg = loadRegistry(); rows = readiness(name, { record: id => reg.subjects.find(s => s.id === id) ?? null, resolve: id => resolveSubject(reg, id), check: checkInputs }); } catch (e) { console.error(`run-sets check: ${e.message}`); process.exit(unready ? 1 : 2); }
+  for (const r of rows) console.log(`${r.ok ? 'ready    ' : 'NOT READY'} ${r.id}${r.ok ? '' : `: ${r.faults.join('; ')}`}${r.notes.length ? ` [${r.notes.join('; ')}]` : ''}`);
+  const bad = rows.filter(r => !r.ok).length;
+  console.log(`\nRun set ${name}: ${rows.length - bad} of ${rows.length} pictures are under the sheet rule and prepared${bad ? `; ${bad} are not, and a benchmark run of them is refused` : ''}.`);
+  process.exit(bad || unready ? 1 : 0);
+} else if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
   const runSets = loadRunSets(), name = process.argv[2] ?? 'extended', pictures = picturesAt(name, null, runSets);
   console.log(`Run set ${name}: ${runSets.sets[name].what}. Nothing is started by this list.\n`);
   console.log('| Picture | Subject id | Group | Runs at | Level 1 target |\n|---|---|---|---|---|');

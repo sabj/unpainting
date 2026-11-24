@@ -1,5 +1,5 @@
 {
-  "note": "Models that can write the wash plan for `npm run paint -- ... --author <key>`. cli is how the model is called (claude, codex or agy): as a working session with a shell in its own folder (tools/paint/session.mjs), or read-only for one reply (--work reply); effort is the reasoning setting sent. A key that is not here is looked up in bench/models.json. The -m keys are the six models of the 0.4 run at medium effort (BENCHMARK-DEFINITION, 22 Nov); a model that has not yet run through the session harness is checked first with `npm run paint -- <subject> preflight --author <keys>`.",
+  "note": "Models that can write the wash plan for `npm run paint -- ... --author <key>`. cli is how the model is called (claude, codex, agy or muse): as a working session with a shell in its own folder (tools/paint/session.mjs), or read-only for one reply (--work reply); effort is the reasoning setting sent. A key that is not here is looked up in bench/models.json. The -m keys are models at medium effort; the ten of the 0.4 roster are named in bench/run-sets.json \"roster\" (the owner, 23 Nov: Muse's top model and the Gemini, Codex and Anthropic families without Hydrogen, Luna and Haiku), and `node tools/paint/run-sets.mjs check` says whether each has its entry here and in bench/models.json; a model that has not yet run through the session harness is checked first with `npm run paint -- <subject> preflight --author <keys>`.",
   "authors": [
     { "key": "opus", "name": "Opus 5.5", "id": "claude-opus-5-5", "effort": "high", "cli": "claude" },
     { "key": "fable", "name": "Fable 5.2", "id": "claude-fable-5-2", "effort": "high", "cli": "claude" },
@@ -10,9 +10,13 @@
     { "key": "argon-m", "name": "Gemini 4 Argon (medium)", "id": "gemini-4-argon-medium", "effort": "medium", "cli": "agy" },
     { "key": "neon-m", "name": "Gemini 4 Neon (medium)", "id": "gemini-4-neon-medium", "effort": "medium", "cli": "agy" },
     { "key": "hydrogen-m", "name": "Gemini 4 Hydrogen (medium)", "id": "gemini-4-hydrogen-medium", "effort": "medium", "cli": "agy" },
+    { "key": "carbon-m", "name": "Gemini 4 Carbon (medium)", "id": "gemini-4-carbon-medium", "effort": "medium", "cli": "agy" },
     { "key": "astra-m", "name": "Codex Astra (medium)", "id": "gpt-6-astra", "effort": "medium", "cli": "codex" },
     { "key": "sol-m", "name": "Codex Sol (medium)", "id": "gpt-6.1-sol", "effort": "medium", "cli": "codex" },
     { "key": "sonnet-m", "name": "Claude Sonnet 5.5 (medium)", "id": "claude-sonnet-5-5", "effort": "medium", "cli": "claude" },
-    { "key": "terra-m", "name": "Codex Terra (medium)", "id": "gpt-6.1-terra", "effort": "medium", "cli": "codex" }
+    { "key": "terra-m", "name": "Codex Terra (medium)", "id": "gpt-6.1-terra", "effort": "medium", "cli": "codex" },
+    { "key": "fable-m", "name": "Claude Fable 5.2 (medium)", "id": "claude-fable-5-2", "effort": "medium", "cli": "claude" },
+    { "key": "opus-m", "name": "Claude Opus 5.5 (medium)", "id": "claude-opus-5-5", "effort": "medium", "cli": "claude" },
+    { "key": "wonderfull-m", "name": "Muse Wonder Full (medium)", "id": "muse-wonder-full-1.0", "effort": "medium", "cli": "muse" }
   ]
 }

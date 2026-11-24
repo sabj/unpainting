@@ -58,7 +58,7 @@ npm run paint -- <subject[,subject...]> plan|paint|prepare|look|preflight [--aut
 ```
 
 - `plan`: builds the wash plan on the CPU.
-- `paint`: renders the full painting on the GPU (`backend: "gpu", fallback: false` required). Writes `<out>/sheet.jpg`, `<out>/run.json` and `<out>/plate/`.
+- `paint`: renders the full painting on the GPU (`backend: "gpu", fallback: false` required). Writes `<out>/run.json`, `<out>/plate/` and, for a full-size painting, `<out>/sheet.jpg`.
 - `prepare`: builds the subject's prepared inputs once (Auto plan, traced study shapes, unit look) before model sessions run.
 - `look`: renders one half-size look of a kept choice (`--author choice:<folder>`), optionally with `--until N` or `--region`.
 - `preflight`: runs a two-minute check that each `--author` model can open an image, run `./unpaint plan` and write a file in the sandbox.
@@ -66,6 +66,8 @@ npm run paint -- <subject[,subject...]> plan|paint|prepare|look|preflight [--aut
 - `--jobs N`: concurrent GPU paintings (default 2; up to 6 on an idle machine). `all` expands to every registered subject; write a new number to `<out>/jobs` to resize a running queue. Summarize a batch with `node tools/paint/contact.mjs` or `node tools/paint/author-sheet.mjs`.
 
 Subjects registered under the 0.4 one-area rule paint on a quarter sheet (27.9 × 38.1 cm at 0.26 mm a cell) in the picture's proportions (`node tools/paint/sheet-rule.mjs` lists sizes).
+
+The painter's files are in `<out>/plate/`. Every run writes `<out>/run.json`. `<out>/sheet.jpg` (source, opening drawing, studies, named forms, wash plan, painting, stage strip) is written for a full-size painting and every Auto run only; a look, and a model's plan alone, write none. Several subjects or authors also make one grid, subjects down and authors across.
 
 ### Model authors
 

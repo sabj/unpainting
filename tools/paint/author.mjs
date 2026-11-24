@@ -25,9 +25,9 @@ const NOT_WASH = new Set(['pen', 'dry']), NOT_OFFERED = new Set(['lampblack']);
  * (it is made on the CPU); the painting would then stop on the GPU, so the check refuses it before anything is made. */
 const SCRIPT_PAINTS_MOST = 14;
 /** The runner names of bench/models.json and the command each is called with here. */
-const CLI_OF_RUNNER = { claude: 'claude', codex: 'codex', agy: 'agy' };
+const CLI_OF_RUNNER = { claude: 'claude', codex: 'codex', agy: 'agy', muse: 'muse' };
 /** What each command needs before it can be called, by name only. */
-const NEEDS = { claude: 'the `claude` command, logged in (or ANTHROPIC_API_KEY)', codex: 'the `codex` command, logged in (or OPENAI_API_KEY)', agy: 'the `agy` command, logged in' };
+const NEEDS = { claude: 'the `claude` command, logged in (or ANTHROPIC_API_KEY)', codex: 'the `codex` command, logged in (or OPENAI_API_KEY)', agy: 'the `agy` command, logged in', muse: 'the `muse` command, logged in' };
 
 /** The author an --author word names: auto, a kept script, a kept edit of the code planner's plan, or a model (authors.json, else bench/models.json). */
 export function authorOf(word, authors, benchModels = []) {
@@ -38,7 +38,7 @@ export function authorOf(word, authors, benchModels = []) {
   const own = authors.find(x => x.key === word); if (own) return { ...own };
   const m = benchModels.find(x => x.key === word);
   if (m && CLI_OF_RUNNER[m.runner]) return { key: m.key, name: m.name, id: m.id, effort: m.effort === 'n/a' ? null : m.effort, cli: CLI_OF_RUNNER[m.runner] };
-  if (m) throw new Error(`--author ${word}: its runner "${m.runner}" cannot be called as an author here (claude, codex and agy can)`);
+  if (m) throw new Error(`--author ${word}: its runner "${m.runner}" cannot be called as an author here (claude, codex, agy and muse can)`);
   throw new Error(`--author ${word}: auto, script:FILE.json, edit:FILE.json, or one of ${[...authors.map(x => x.key), ...benchModels.filter(x => CLI_OF_RUNNER[x.runner] && !authors.some(a => a.key === x.key)).map(x => x.key)].join(', ')}`);
 }
 export const needsOf = cli => NEEDS[cli] ?? 'an unknown command';
@@ -206,7 +206,7 @@ export function authorCall(author, { prompt, images, cwd }) {
       args: ['--settings', JSON.stringify({ permissions: { allow } }), '-p', `Open each named picture directly, use no shell, and answer in one reply.\n\n${prompt}`, '--model', author.id, '--mode', 'plan', '--sandbox'],
       parse: out => ({ text: out, tokens: null, costUSD: null }) };
   }
-  throw new Error(`author ${author.key}: no way to call "${author.cli}"`);
+  throw new Error(`author ${author.key}: "${author.cli}" is called as a working session only here (--work session), not for one reply`);
 }
 
 function launch(call, { cwd, outFile, errFile, minutes }) {

@@ -56,7 +56,7 @@ test('a gated session\'s profile lets out only to loopback; its command gets the
   assert.deepEqual(proxyEnv('u').all_proxy, 'u');
   // nothing of the home folder, other users or other volumes can be listed or read in a gated session, save its own program, settings and toolbox
   const hid = seatbelt({ deny: [], write: ['/home/x/.gemini'], cwd: '/c', gated: true, readable: ['/home/x/venv'], hidden: ['/home/x', '/Users', '/Volumes'] });
-  assert.match(hid, /\(deny file-read\* \(subpath "\/home\/x"\) \(subpath "\/Users"\) \(subpath "\/Volumes"\)\)\n\(allow file-read\* \(subpath "\/home\/x\/\.gemini"\)\)\n\(allow file-read\* file-write\* \(subpath "\/c"\)\)\n\(allow file-read\* \(subpath "\/home\/x\/venv"\)\)/);
+  assert.match(hid, /\(deny file-read\* \(subpath "\/home\/x"\) \(subpath "\/Users"\) \(subpath "\/Volumes"\)\)\n\(allow file-read\* \(subpath "\/home\/x\/\.gemini"\)\)\n\(deny file-read\* file-write\*  \(regex #"\/unpaint-session-"\) \(regex #"\/unpaint-bench-"\)\)\n\(allow file-read\* file-write\* \(subpath "\/c"\)\)\n\(allow file-read\* \(subpath "\/home\/x\/venv"\)\)/);
   const g = sessionCall({ key: 'argon-m', cli: 'agy', id: 'm' }, { prompt: 'P', cwd: '/c', deny: [], gate: { url: 'u' }, toolbox, home: '/home/x' });
   assert.match(g.profile, /\(deny file-read\* \(subpath "\/home\/x"\)/);
 });
@@ -72,6 +72,50 @@ test('a gated Claude session: the whole command under the profile with its own s
   assert.ok(allowed('api.anthropic.com', PROVIDER_HOSTS.claude)); assert.ok(!allowed('mcp-proxy.anthropic.com', PROVIDER_HOSTS.claude));
 });
 
+test('a gated Codex session: the whole command under the profile, out only through the gate, of the home folder only its own folder, the user\'s settings not loaded', () => {
+  const toolbox = { dir: '/tb', python: '/venv/bin/python', readable: ['/tb', '/venv'], env: { PATH: '/tb/bin:/bin' } };
+  const c = sessionCall({ key: 'sol-m', cli: 'codex', id: 'gpt-6.1-sol', effort: 'medium' }, { prompt: 'P', cwd: '/c', deny: ['/repo'], images: ['/c/inputs/source.png'], gate: { url: 'http://127.0.0.1:9' }, toolbox, home: '/home/x' });
+  assert.equal(c.cmd, 'sandbox-exec'); assert.deepEqual(c.args.slice(2, 7), ['codex', 'exec', '--json', '-m', 'gpt-6.1-sol']); assert.deepEqual(c.args.slice(-2), ['--', 'P']);
+  assert.ok(c.args.includes('model_reasoning_effort="medium"') && c.args.includes('--ignore-user-config') && c.args.includes('analytics.enabled=false') && c.args.includes('--dangerously-bypass-approvals-and-sandbox') && c.args.includes('--ephemeral'));
+  assert.equal(c.env.HTTPS_PROXY, 'http://127.0.0.1:9'); assert.equal(c.env.PATH, '/tb/bin:/bin'); assert.equal(c.gated, true); assert.deepEqual(c.signIn, ['/home/x/.codex']);
+  assert.doesNotMatch(c.profile, /\*:443|\*:53/); assert.match(c.profile, /\(allow network-outbound \(remote ip "localhost:\*"\)\)/);
+  assert.match(c.profile, /\(deny file-read\* \(subpath "\/home\/x"\)/); assert.match(c.profile, /\(allow file-read\* \(subpath "\/home\/x\/\.codex"\)/); assert.doesNotMatch(c.profile, /Keychains/);
+  assert.match(c.closed, /a gate passes its own service's hosts/);
+  // without a gate (the check of an author before a run) it is the earlier open form, and says so
+  const open = sessionCall({ key: 'sol-m', cli: 'codex', id: 'gpt-6.1-sol', effort: 'medium' }, { prompt: 'P', cwd: '/c', deny: ['/repo'], home: '/home/x' });
+  assert.match(open.profile, /remote tcp "\*:443"/); assert.ok(!open.args.includes('--ignore-user-config')); assert.match(open.closed, /reaches the network on port 443 only/);
+});
+
+test('a gated Muse session: the whole command under the profile with its own sandbox off, a session id of the harness\'s, its log named, the update off', () => {
+  const toolbox = { dir: '/tb', python: '/venv/bin/python', readable: ['/tb', '/venv'], env: { PATH: '/tb/bin:/bin' } };
+  const c = sessionCall({ key: 'wonderfull-m', cli: 'muse', id: 'muse-wonder-full-1.0', effort: 'medium' }, { prompt: 'P', cwd: '/c', deny: ['/repo'], gate: { url: 'http://127.0.0.1:9' }, toolbox, home: '/home/x' });
+  assert.equal(c.cmd, 'sandbox-exec'); assert.deepEqual(c.args.slice(2, 8), ['muse', 'exec', '--json', '--model', 'muse-wonder-full-1.0', '--effort']); assert.equal(c.args[8], 'medium'); assert.equal(c.args.at(-1), 'P');
+  for (const f of ['--disable-sandbox', '--disable-approval', '--disable-web-tools', '--disable-reminders', '--no-foreign-personal-context']) assert.ok(c.args.includes(f), f);
+  assert.equal(c.args[c.args.indexOf('--contributor-mode') + 1], 'off'); assert.equal(c.args[c.args.indexOf('--workspace') + 1], '/c');
+  assert.ok(!c.args.includes('--max-model-steps') && !c.args.includes('--max-tool-output-bytes'), 'no step or output limit of the tool\'s is set: the harness counts the steps');
+  const id = c.args[c.args.indexOf('--session-id') + 1]; assert.match(id, /^[0-9a-f-]{36}$/); assert.deepEqual(c.log, { root: '/home/x/.local/share/muse/sessions', id });
+  assert.equal(c.env.MUSE_NO_AUTO_UPDATE, '1'); assert.equal(c.env.HTTPS_PROXY, 'http://127.0.0.1:9'); assert.equal(c.env.PATH, '/tb/bin:/bin'); assert.equal(c.gated, true);
+  assert.deepEqual(c.signIn, ['/home/x/.config/muse', '/home/x/Library/Keychains']);
+  assert.doesNotMatch(c.profile, /\*:443|\*:53/); assert.match(c.profile, /\(deny file-read\* \(subpath "\/home\/x"\)/);
+  assert.match(c.profile, /\(allow file-write\* \(subpath "\/home\/x\/\.config\/muse"\) \(subpath "\/home\/x\/\.local\/share\/muse"\)/); assert.match(c.profile, /\(allow file-read\* \(subpath "\/home\/x\/Library\/Keychains"\)\)/);
+  assert.doesNotMatch(c.profile, /\.claude|\.codex|\.gemini/); assert.match(c.closed, /its own sandbox and permission prompts off inside it.*a gate passes its own service's hosts/);
+  assert.deepEqual(c.probe('/repo/x').args.slice(-2), ['/bin/cat', '/repo/x']);
+});
+
+test('each of the four commands has a gate, and each gate passes its own provider\'s hosts and no other\'s', () => {
+  const own = { agy: ['daily-cloudcode-pa.googleapis.com', 'lh3.googleusercontent.com'], claude: ['api.anthropic.com'], codex: ['chatgpt.com', 'auth.openai.com', 'api.openai.com'], muse: ['api.meta.ai', 'auth.meta.com'] };
+  assert.deepEqual(Object.keys(PROVIDER_HOSTS).sort(), ['agy', 'claude', 'codex', 'muse']);
+  for (const [cli, hosts] of Object.entries(own)) {
+    for (const h of hosts) assert.ok(allowed(h, PROVIDER_HOSTS[cli]), `${cli} reaches ${h}`);
+    for (const [other, theirs] of Object.entries(own)) if (other !== cli) for (const h of theirs) assert.ok(!allowed(h, PROVIDER_HOSTS[cli]), `${cli} does not reach ${other}'s ${h}`);
+    for (const h of ['pypi.org', 'registry.npmjs.org', 'github.com', 'example.com', `${hosts[0]}.evil.example`, ...(cli === 'agy' ? [] : [`evil-${hosts[0]}`, `x.${hosts[0]}`])]) assert.ok(!allowed(h, PROVIDER_HOSTS[cli]), `${cli} does not reach ${h}`);
+  }
+  // (agy's gate passes any host under googleapis.com and googleusercontent.com, as it did before)
+  // codex and muse are held to the named hosts, not to a whole domain; muse's update download host is not passed
+  for (const h of ['openai.com', 'cdn.openai.com', 'x.chatgpt.com', 'platform.openai.com']) assert.ok(!allowed(h, PROVIDER_HOSTS.codex), h);
+  for (const h of ['meta.ai', 'meta.com', 'www.meta.ai', 'lookaside.facebook.com', 'facebook.com']) assert.ok(!allowed(h, PROVIDER_HOSTS.muse), h);
+});
+
 test('the command line itself parses (a name clash there passes every unit test and stops every run)', () => {
   const here = path.dirname(new URL(import.meta.url).pathname);
   for (const f of ['cli.mjs', 'session.mjs', 'session-net.mjs', 'tool-use.mjs', 'look-cost.mjs']) execFileSync(process.execPath, ['--check', path.join(here, f)]);
@@ -81,7 +125,13 @@ test('the command line starts: a dry run of a model session and of a plan resolv
   const here = path.dirname(new URL(import.meta.url).pathname), root = path.resolve(here, '..', '..');
   const run = args => { try { return { code: 0, out: execFileSync(process.execPath, [path.join(here, 'cli.mjs'), ...args], { cwd: root, encoding: 'utf8', stdio: 'pipe', timeout: 120000 }) }; } catch (e) { return { code: e.status, out: `${e.stdout}${e.stderr}` }; } };
   const plan = run(['mittens-closeup', 'plan', '--dry-run']);
-  if (plan.code !== 0 && /not registered|no such subject|registry/i.test(plan.out)) { t.skip('the subject list is not on this machine'); return; }
+  if (plan.code !== 0 && /no subject list at|not registered|no such subject|registry/i.test(plan.out)) { t.skip('the subject list is not on this machine'); return; }
+  // A list copied to a machine without the pictures: the record is found but none of its files are. Skipped only when
+  // the source itself is absent and every complaint is a missing file; one file gone beside a present source fails.
+  const faults = plan.out.split('\n').filter(l => /^ {2,}\S/.test(l) && !/^\s+at /.test(l)).map(l => l.trim());
+  if (plan.code !== 0 && /inputs do not match the record/.test(plan.out) && faults.length && faults.every(l => l.startsWith('missing ')) && faults.some(l => l.startsWith('missing source: '))) {
+    t.skip(`the subject's files are not on this machine (${faults.length} missing, the source among them)`); return;
+  }
   assert.equal(plan.code, 0, plan.out.slice(-600)); assert.match(plan.out, /dry run: nothing was started/);
   const session = run(['mittens-closeup', 'paint', '--author', 'argon-m', '--level', 'L2', '--dry-run']);
   assert.equal(session.code, 0, session.out.slice(-600)); assert.match(session.out, /dry run: nothing was started/);

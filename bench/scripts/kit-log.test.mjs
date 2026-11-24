@@ -106,3 +106,25 @@ test('the kit takes its targets from the coarse maps installed next to it', () =
     assert.deepEqual(tasks, ['harbour', 'mittens']);
   } finally { fs.rmSync(ws, { recursive: true, force: true }); }
 });
+
+test('paintings opened at the same moment share the render slots: a slot freed while another process looks at it stops nobody', async () => {
+  // more processes than slots, each ending as soon as its sheet is open: slots are freed while the others are looking
+  const { spawn } = await import('node:child_process');
+  const ws = fs.mkdtempSync(path.join(os.tmpdir(), 'kitslots-'));
+  try {
+    fs.symlinkSync(path.join(REPO, 'src'), path.join(ws, 'src')); fs.symlinkSync(path.join(REPO, 'tools'), path.join(ws, 'tools'));
+    fs.symlinkSync(path.join(REPO, 'node_modules'), path.join(ws, 'node_modules'));
+    fs.copyFileSync(path.join(REPO, 'package.json'), path.join(ws, 'package.json'));
+    const ends = [];
+    for (let k = 0; k < 9; k++) {
+      // a kit folder each (its own out/), all under one parent, so all nine share one set of slots
+      const wb = path.join(ws, `b${k}`); fs.mkdirSync(path.join(wb, 'tasks'), { recursive: true });
+      for (const f of ['kit.mjs', 'guard.mjs']) fs.copyFileSync(path.join(V2, 'kit', f), path.join(wb, f));
+      fs.copyFileSync(path.join(V2, 'targets', 'sargent-coarse.json'), path.join(wb, 'tasks', 'sargent-coarse.json'));
+      fs.writeFileSync(path.join(wb, 'open.mjs'), "import * as kit from './kit.mjs';\nawait kit.open('sargent', { gpu: false });\nprocess.exit(0);\n");
+      ends.push(new Promise(resolve => { let err = ''; const c = spawn('node', ['open.mjs'], { cwd: wb, env: { ...process.env, BENCH_SEED: '7', BENCH_NO_FILM: '1' }, stdio: ['ignore', 'ignore', 'pipe'] }); c.stderr.on('data', d => { err += d; }); c.on('close', code => resolve({ code, err })); }));
+    }
+    const got = await Promise.all(ends);
+    assert.deepEqual(got.filter(g => g.code !== 0).map(g => g.err.split('\n').find(l => /Error/.test(l)) ?? g.err.slice(-200)), [], 'every painting opened');
+  } finally { fs.rmSync(ws, { recursive: true, force: true }); }
+});

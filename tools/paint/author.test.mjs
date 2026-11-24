@@ -34,6 +34,9 @@ test('an author is auto, a kept script, or a model of authors.json or the benchm
   assert.equal(authorLabel({ cli: 'script', ...keptScriptAuthor('/r/cat--astra/step-back/script-revised.json', runOf) }), 'Codex Astra, its own script, revised after one step back, brief v2, written earlier');
   assert.equal(authorLabel({ cli: 'script', ...keptScriptAuthor('/r/x/author/script.json', f => { if (/run\.json$/.test(f)) throw new Error('none'); return { author: 'Opus' }; }) }), 'Opus, its own script, written earlier');
   assert.throws(() => authorOf('minimax', AUTHORS, BENCH), /cannot be called as an author/);
+  // a Muse model is an author as a working session; for one reply it is not called
+  const wonder = authorOf('wonderfull-m', AUTHORS, BENCH); assert.equal(wonder.cli, 'muse'); assert.equal(wonder.effort, 'medium');
+  assert.throws(() => authorCall(wonder, { prompt: 'P', images: [], cwd: '/c' }), /is called as a working session only here/);
   assert.throws(() => authorOf('gpt9', AUTHORS, BENCH), /auto, script:FILE.json, edit:FILE.json, or one of opus.*sonnet/);
 });
 

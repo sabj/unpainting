@@ -23,6 +23,7 @@
 // What this cannot stop: a model drawing its own script's polygons with its own code. Its commands are kept.
 import { travelLine } from './hand-travel.mjs';
 import { realSizeLine } from './real-size.mjs';
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import { proxyEnv, TOOLS_OPEN } from './session-net.mjs';
 import os from 'node:os';
@@ -195,6 +196,7 @@ const SPLIT_FROM = {
   agy: 'agy reports input (fresh), cache_read (cached) and output per response; thinking tokens it reports apart, and its total is input + output',
   claude: 'claude reports input, cache_creation (counted as fresh input, and also shown as cacheWriteIn), cache_read (cached) and output',
   codex: 'codex reports input (cached included; fresh = input - cached) and output per turn',
+  muse: 'muse keeps input (cached included; fresh = input - cached), output and reasoning tokens per request in its own session log, subagents included; reasoning is shown apart',
 };
 /** The split of a transcript's tokens, or a plain record that its command did not report one. */
 function tokenSplit(cli, split) {
@@ -430,10 +432,14 @@ export function seatbelt({ deny, write, cwd, local = false, gated = false, reada
   // them: its own folder, `readable` (the toolbox, the model command's own program and settings) and `write`
   // gated: nothing goes out but to this machine's loopback, where the session's gate (session-net.mjs) passes the
   // model's own service only; readable: folders read again after the denials (the toolbox's Python)
+  // other sessions' folders, by name: a working session's (unpaint-session-) and a level 1 attempt's (unpaint-bench-)
+  const closedOff = `(deny file-read* file-write* ${deny.map(d => `(subpath ${q(d)})`).join(' ')} (regex #"/unpaint-session-") (regex #"/unpaint-bench-"))`;
   return ['(version 1)', '(allow default)',
     '(deny file-write*)', `(allow file-write* ${write.map(d => `(subpath ${q(d)})`).join(' ')} (literal "/dev/null") (literal "/dev/dtracehelper") (regex #"^/dev/tty"))`,
-    `(deny file-read* file-write* ${deny.map(d => `(subpath ${q(d)})`).join(' ')} (regex #"/unpaint-session-"))`,
-    ...(hidden.length ? [`(deny file-read* ${hidden.map(d => `(subpath ${q(d)})`).join(' ')})`, `(allow file-read* ${write.map(d => `(subpath ${q(d)})`).join(' ')})`] : []),
+    closedOff,
+    // (the temporary folders are read again after the hidden ones, and other sessions live in them: the denials are said
+    // again after that, or a later rule would open what an earlier one closed)
+    ...(hidden.length ? [`(deny file-read* ${hidden.map(d => `(subpath ${q(d)})`).join(' ')})`, `(allow file-read* ${write.map(d => `(subpath ${q(d)})`).join(' ')})`, closedOff] : []),
     `(allow file-read* file-write* (subpath ${q(cwd)}))`, ...readable.map(d => `(allow file-read* (subpath ${q(d)}))`), ...metadata.map(d => `(allow file-read-metadata (literal ${q(d)}))`),
     '(deny network*)', ...(gated ? ['(allow network-outbound (remote ip "localhost:*"))'] : ['(allow network-outbound (remote tcp "*:443") (remote udp "*:53") (remote tcp "*:53") (literal "/private/var/run/mDNSResponder"))', '(allow network-inbound (local udp "*:*"))']), '(allow system-socket)',
     ...(local ? ['(allow network-bind (local ip "localhost:*"))', '(allow network-inbound (local ip "localhost:*"))', '(allow network-outbound (remote ip "localhost:*"))', '(allow pseudo-tty)', '(allow file-read* file-write* file-ioctl (literal "/dev/ptmx") (regex #"^/dev/ttys[0-9]+$"))'] : []),
@@ -447,7 +453,9 @@ export function seatbelt({ deny, write, cwd, local = false, gated = false, reada
  * claude: its own sandbox for the shell and Read rules for its file tools. codex: its own sandbox cannot deny a read
  * and seatbelt profiles do not nest, so the whole command runs under this module's profile with its own switched off.
  * agy: the same profile (its own permission prompts off inside it), with loopback and a pseudo-terminal allowed: it
- * talks to a helper of its own on localhost and runs its shell on a pty.
+ * talks to a helper of its own on localhost and runs its shell on a pty. muse: the same profile, its own sandbox and
+ * prompts off inside it; its transcript is the log it keeps (`log`, transcriptFile). With a `gate` (session-net.mjs)
+ * each of the four is let out only through it and sees of the home folder only what it needs to sign in and run.
  */
 export function sessionCall(author, { prompt, cwd, deny = [], images = [], home = os.homedir(), tmp = os.tmpdir(), gate = null, toolbox = null }) {
   const real = d => { try { return fs.realpathSync(d); } catch { return d; } }, all = [...new Set(deny.flatMap(d => [d, real(d)]))];
@@ -474,11 +482,39 @@ export function sessionCall(author, { prompt, cwd, deny = [], images = [], home 
       probe: null, closed: 'its shell runs in the command\'s own sandbox (writes only in its folder, network held to the command\'s allowed hosts) and neither its shell nor its file tools can read the repository, the subject list, the caches or other sessions' };
   }
   if (author.cli === 'codex') {
-    const profile = seatbelt({ deny: all, write: [...new Set([path.join(home, '.codex'), real(tmp), '/private/tmp', '/private/var/folders'])], cwd: real(cwd) });
-    return { cmd: 'sandbox-exec', env: {}, unset: [], profile,
-      args: ['-p', profile, 'codex', 'exec', '--json', '-m', author.id, ...(author.effort ? ['-c', `model_reasoning_effort="${author.effort}"`] : []), '--dangerously-bypass-approvals-and-sandbox', '--skip-git-repo-check', '--ephemeral', '-C', cwd, ...images.flatMap(f => ['-i', f]), '--', prompt],
+    // with a gate (session-net.mjs): out only through it, the toolbox first on PATH, and of the home folder only its
+    // own folder (~/.codex: its sign-in file auth.json, the accepted exposure, and what it keeps as it runs); the
+    // user's config.toml is not loaded (no MCP servers or plugins of the operator's), and its usage reports are off
+    const codex = (() => { try { return real(execFileSync('/usr/bin/which', ['codex'], { encoding: 'utf8' }).trim()); } catch { return null; } })();
+    const own = path.join(home, '.codex'), signIn = gate ? [own] : [];
+    const profile = seatbelt({ deny: all, write: [...new Set([own, real(tmp), '/private/tmp', '/private/var/folders'])], cwd: real(cwd), gated: Boolean(gate),
+      readable: gate ? [...new Set([...(toolbox?.readable ?? []), ...(codex ? [codex] : [])])] : [], hidden: gate ? [...new Set([home, real(home), '/Users', '/Volumes'])] : [], metadata: gate ? [...(codex ? [path.dirname(codex)] : []), home] : [] });
+    return { cmd: 'sandbox-exec', env: { ...(gate ? proxyEnv(gate.url) : {}), ...(toolbox?.env ?? {}) }, unset: [], profile, gated: Boolean(gate), signIn,
+      args: ['-p', profile, 'codex', 'exec', '--json', '-m', author.id, ...(author.effort ? ['-c', `model_reasoning_effort="${author.effort}"`] : []), ...(gate ? ['--ignore-user-config', '-c', 'analytics.enabled=false'] : []), '--dangerously-bypass-approvals-and-sandbox', '--skip-git-repo-check', '--ephemeral', '-C', cwd, ...images.flatMap(f => ['-i', f]), '--', prompt],
       probe: file => ({ cmd: 'sandbox-exec', args: ['-p', profile, '/bin/cat', file] }),
-      closed: 'the whole command runs under a seatbelt profile of this harness: it cannot read the repository, the subject list, the caches or other sessions, writes only in its folder and temporary folders, and reaches the network on port 443 only (the command\'s own sandbox is off: two do not nest)' };
+      closed: `the whole command runs under a seatbelt profile of this harness: it cannot read the repository, the subject list, the caches or other sessions, writes only in its folder, its own settings folder and temporary folders, and ${gate ? `nothing else of the home folder can be listed or read (its settings folder holds its sign-in: ${SIGN_IN_EXPOSURE}); it reaches only this machine's loopback, where a gate passes its own service's hosts and refuses every other (no downloads, no installs)` : 'reaches the network on port 443 only'} (the command's own sandbox is off: two do not nest)` };
+  }
+  if (author.cli === 'muse') {
+    // the whole command under this harness's profile, its own sandbox and approval prompts off inside it (two profiles
+    // do not nest; headless, a prompt is a refusal). Of the home folder it reads its program (a launcher and the program
+    // beside it, named muse*, with the launcher's notes .muse-*), its settings folder (~/.config/muse: its sign-in file)
+    // and the login keychain (where the sign-in file says its secret is kept), and writes its settings folder and its
+    // data folder (~/.local/share/muse: its session log, which is this session's transcript; earlier Muse sessions'
+    // logs lie there too and can be read by the session's shell). The launcher's update is off: nothing is downloaded.
+    // Flags as bench/scripts/runners.mjs sends them at level 1 (contributor mode off: no training on the session; no
+    // personal rules, web tools or reminders), with --disable-sandbox added. No switch for its usage reports is in its
+    // help: a report to any host but its own service is refused at the gate.
+    // Loopback and a pseudo-terminal are allowed as for agy (it keeps a session server and runs a managed shell): the
+    // best reading of its help and data folder, not yet measured in a session.
+    const own = museFiles(home), id = crypto.randomUUID(), signIn = gate ? own.signIn : [];
+    const profile = seatbelt({ deny: all, write: [...new Set([...own.write, real(tmp), '/private/tmp', '/private/var/folders'])], cwd: real(cwd), local: true, gated: Boolean(gate),
+      readable: gate ? [...new Set([...(toolbox?.readable ?? []), ...own.readable])] : [], hidden: gate ? [...new Set([home, real(home), '/Users', '/Volumes'])] : [], metadata: gate ? own.metadata : [] });
+    return { cmd: 'sandbox-exec', env: { ...own.env, ...(gate ? proxyEnv(gate.url) : {}), ...(toolbox?.env ?? {}) }, unset: [], profile, gated: Boolean(gate), signIn,
+      // its transcript is not its output: it is the log it keeps under its data folder, in a folder named for the session
+      log: { root: own.sessions, id },
+      args: ['-p', profile, 'muse', 'exec', '--json', '--model', author.id, ...(author.effort ? ['--effort', author.effort] : []), '--contributor-mode', 'off', '--no-foreign-personal-context', '--disable-web-tools', '--disable-reminders', '--disable-approval', '--disable-sandbox', '--workspace', cwd, '--session-id', id, prompt],
+      probe: file => ({ cmd: 'sandbox-exec', args: ['-p', profile, '/bin/cat', file] }),
+      closed: `the whole command runs under a seatbelt profile of this harness (its own sandbox and permission prompts off inside it): neither its shell nor its file tools can read the repository, the subject list, the caches or other sessions, it writes only in its folder, its own settings and data folders and temporary folders, and ${gate ? `of the home folder reads only those, its program and the login keychain (${SIGN_IN_EXPOSURE}); it reaches only this machine's loopback, where a gate passes its own service's hosts and refuses every other (no downloads, no installs)` : 'reaches the network on port 443 and this machine\'s loopback only'}` };
   }
   if (author.cli === 'agy') {
     // with a gate (session-net.mjs) its network is the gate's: the model's service only; with a toolbox, its Python is on PATH and installs are answered by shims
@@ -494,7 +530,47 @@ export function sessionCall(author, { prompt, cwd, deny = [], images = [], home 
       probe: file => ({ cmd: 'sandbox-exec', args: ['-p', profile, '/bin/cat', file] }),
       closed: `the whole command runs under a seatbelt profile of this harness: neither its shell nor its file tools can read the repository, the subject list, the caches or other sessions, it writes only in its folder, its own settings folder and temporary folders, and ${gate ? 'reaches only this machine\'s loopback, where a gate passes its own service\'s hosts and refuses every other (no downloads, no installs)' : 'reaches the network on port 443 and this machine\'s loopback only'} (its own permission prompts are off inside the profile)` };
   }
-  throw new Error(`author ${author.key}: a working session needs a shell, and "${author.cli}" is called without one here (claude, codex and agy can)`);
+  throw new Error(`author ${author.key}: a working session needs a shell, and "${author.cli}" is called without one here (claude, codex, agy and muse can)`);
+}
+
+/**
+ * What the muse command reads and writes of the home folder `home` to sign in and run: {readable (its program: the
+ * launcher and the program beside it, named muse*, with the launcher's notes .muse-*; its settings folder; the login
+ * keychain), write (its settings and data folders), metadata (the folders above them, seen to exist, never listed),
+ * signIn (where its sign-in lies), sessions (where it keeps each session's log), env (the launcher's update off)}.
+ */
+export function museFiles(home) {
+  const muse = (() => { try { return execFileSync('/usr/bin/which', ['muse'], { encoding: 'utf8' }).trim(); } catch { return null; } })(), at = muse ? path.dirname(muse) : null;
+  const program = at ? fs.readdirSync(at).filter(f => /^\.?muse/.test(f)).map(f => path.join(at, f)) : [];
+  const settings = path.join(home, '.config', 'muse'), data = path.join(home, '.local', 'share', 'muse'), signIn = [settings, path.join(home, 'Library', 'Keychains')];
+  return { readable: [...new Set([...program, ...signIn])], write: [settings, data], signIn, sessions: path.join(data, 'sessions'), env: { MUSE_NO_AUTO_UPDATE: '1' },
+    metadata: [...new Set([...(at ? [at, path.dirname(at)] : []), path.join(home, '.config'), path.join(home, '.local'), path.join(home, '.local', 'share'), home])] };
+}
+
+/** The folder Muse keeps a session's log in (its data folder: sessions/<year>/<month>/<day>/<session id>), or null while there is none. */
+function museLog(root, id) {
+  const find = (d, depth) => {
+    let list; try { list = fs.readdirSync(d, { withFileTypes: true }); } catch { return null; }
+    for (const e of list) {
+      if (!e.isDirectory() || e.name.startsWith('.')) continue;
+      if (e.name === id) return path.join(d, e.name, 'session.jsonl');
+      if (depth < 3) { const hit = find(path.join(d, e.name), depth + 1); if (hit) return hit; }
+    }
+    return null;
+  };
+  return find(root, 0);
+}
+/**
+ * The file a session's transcript is read from (readTranscript): the command's own output `outFile`, or, for a
+ * command that keeps its transcript in a log of its own (`call.log`, sessionCall: muse), that log; while the log is
+ * not there yet, the output. `keep`: a file the log is copied to, so the run's folder holds what was read.
+ */
+export function transcriptFile(call, outFile, keep = null) {
+  if (!call?.log) return outFile;
+  call.log.file ??= museLog(call.log.root, call.log.id);
+  if (!call.log.file || !fs.existsSync(call.log.file)) return outFile;
+  if (keep) { fs.copyFileSync(call.log.file, keep); return keep; }
+  return call.log.file;
 }
 
 /** The exposure the owner accepted for runs on his own machine (22 Nov): the model command signs in from the login keychain, and its shell runs under the same profile. */
@@ -506,7 +582,9 @@ const kindOfCommand = c => { const m = /(?:^|[\s;&|/])unpaint\s+(status|plan|loo
  * A session's transcript read: {text (its last message), tokens, tokensIn, tokensOut (null where the command does not
  * report them apart), costUSD (the command's own report, or null), calls: {kind: count}, commands: [shell
  * commands in order]}. claude: stream-json lines; codex: --json lines; agy: stream-json lines (a step_update for each
- * step as it starts and ends, the tool's parameters in it, and one result).
+ * step as it starts and ends, the tool's parameters in it, and one result); muse: the lines of its own session log
+ * (transcriptFile), read from logs of this machine (Muse Code 1.4.25): the tool calls of each model step with their
+ * arguments, each call's result, each message, and a usage record for each request to its service.
  */
 export function readTranscript(cli, out) {
   const calls = {}, commands = [], toolSteps = [], byId = new Map(); let text = '', tokens = null, costUSD = null, tokensIn = null, tokensOut = null, split = null;
@@ -532,6 +610,21 @@ export function readTranscript(cli, out) {
       if (d.event === 'step_update' && s?.step_type === 'tool' && s.state && s.state !== 'ACTIVE') ended(byId.get(s.step_index), { failed: s.state !== 'DONE', output: s.tool_info?.output ?? s.error ?? null });
       if (d.event === 'step_update' && s?.step_type === 'agent_response') { if (s.text_delta) said.set(s.step_index, (said.get(s.step_index) ?? '') + s.text_delta); if (s.usage?.total_tokens) { tokens = (tokens ?? 0) + s.usage.total_tokens; add('freshIn', s.usage.input_tokens); add('cachedIn', s.usage.cache_read_tokens); add('out', s.usage.output_tokens); add('thinking', s.usage.thinking_tokens); } }
       if (d.event === 'result' && d.result?.response) text = String(d.result.response);
+      continue;
+    }
+    if (cli === 'muse') {
+      const e = d.payload?.event ?? {};
+      if (e.kind === 'assistant_tool_calls_committed') for (const c of e.tool_calls ?? []) {
+        let par = {}; try { par = JSON.parse(c.args ?? '{}') ?? {}; } catch { /* arguments that are not JSON: the step is counted without them */ }
+        if (c.name === 'bash') { const line = String(par.command ?? ''); commands.push(line); count(kindOfCommand(line)); stepOf(c.call_id, 'shell', line); }
+        else { count(kindOf(c.name) === 'read' ? 'read file' : kindOf(c.name) === 'write' ? 'write file' : c.name); const f = par.path ?? par.file_path; if (f) commands.push(`${c.name} ${f}`); stepOf(c.call_id, kindOf(c.name), f ?? ''); }
+      }
+      // a shell result is JSON text with its exit code in it
+      if (e.kind === 'tool_result_batch_committed') for (const r of e.results ?? []) { const ex = /"exit_code":\s*(-?\d+)/.exec(r.text ?? '')?.[1]; ended(byId.get(r.tool_call_id), { exit: ex == null ? null : Number(ex), output: r.text ?? null }); }
+      if (e.kind === 'assistant_message_committed' && e.text?.trim()) text = e.text;
+      // one record for each request to its service (the main model's and a subagent's alike); a tool's own record is not tokens
+      const u = e.kind === 'goal_usage_attribution' && e.record?.usage_family === 'provider' ? e.record.quantity : null;
+      if (u) { add('freshIn', (u.input_tokens || 0) - (u.cached_tokens || 0)); add('cachedIn', u.cached_tokens || 0); add('out', u.output_tokens || 0); add('thinking', u.reasoning_tokens || 0); tokensIn = (tokensIn ?? 0) + (u.input_tokens || 0); tokensOut = (tokensOut ?? 0) + (u.output_tokens || 0); tokens = tokensIn + tokensOut; }
       continue;
     }
     if (cli === 'claude') {

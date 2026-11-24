@@ -7,7 +7,7 @@ import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { levelOf, OWN_SCRIPT_ONLY } from './levels.mjs';
 import { shapesHanded, checkWithheld, WITHHELD } from './level4.mjs';
-import { DEFAULT_LOOKS, DEFAULT_WALL_MINUTES, DEFAULT_STEPS, forLevel, writeSession, sessionServer, ledgerLooks, safeRead, safeWrite, finalChoice, cleanEnv, seatbelt, sessionCall, readTranscript, reachedOutside, ownFolderOf, ownPictures, runSession } from './session.mjs';
+import { DEFAULT_LOOKS, DEFAULT_WALL_MINUTES, DEFAULT_STEPS, forLevel, writeSession, sessionServer, ledgerLooks, safeRead, safeWrite, finalChoice, cleanEnv, seatbelt, sessionCall, readTranscript, transcriptFile, reachedOutside, ownFolderOf, ownPictures, runSession } from './session.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'paint-session-test-'));
@@ -279,7 +279,7 @@ test('a session is started with a shell held to its folder; a model without a sh
   // codex cannot deny a read itself, and seatbelt profiles do not nest: the whole command runs under this harness's profile
   const astra = sessionCall({ key: 'astra', id: 'gpt-6.2-astra', effort: 'high', cli: 'codex' }, { prompt: 'P', cwd: '/tmp/s', deny: ['/repo'], images: ['/tmp/s/inputs/source.png'], home: '/home/x', tmp: '/tmp' });
   assert.equal(astra.cmd, 'sandbox-exec'); assert.deepEqual(astra.args.slice(0, 1), ['-p']); assert.equal(astra.args[2], 'codex'); assert.ok(astra.args.includes('--dangerously-bypass-approvals-and-sandbox'), 'its own sandbox is off only inside ours');
-  assert.match(astra.profile, /\(deny file-read\* file-write\* \(subpath "\/repo"\) \(regex #"\/unpaint-session-"\)\)/); assert.match(astra.profile, /\(deny file-write\*\)/); assert.match(astra.profile, /\(deny network\*\)/);
+  assert.match(astra.profile, /\(deny file-read\* file-write\* \(subpath "\/repo"\) \(regex #"\/unpaint-session-"\) \(regex #"\/unpaint-bench-"\)\)/); assert.match(astra.profile, /\(deny file-write\*\)/); assert.match(astra.profile, /\(deny network\*\)/);
   assert.ok(astra.profile.indexOf('(allow file-read* file-write* (subpath "/tmp/s"))') > astra.profile.indexOf('unpaint-session-'), 'its own folder is allowed again after the denials');
   assert.deepEqual(astra.probe('/repo/x').args.slice(-2), ['/bin/cat', '/repo/x']);
   // agy: the same profile, with loopback and a pseudo-terminal (its helper and its shell), its own prompts off inside it
@@ -287,9 +287,33 @@ test('a session is started with a shell held to its folder; a model without a sh
   assert.equal(argon.cmd, 'sandbox-exec'); assert.equal(argon.args[2], 'agy'); assert.deepEqual(argon.args.slice(3, 7), ['-p', 'P', '--model', 'gemini-4-argon-high']); assert.ok(argon.args.includes('--dangerously-skip-permissions') && argon.args.includes('stream-json'));
   assert.match(argon.profile, /\(deny file-read\* file-write\* \(subpath "\/repo"\)/); assert.match(argon.profile, /\(subpath "\/home\/x\/\.gemini"\)/); assert.match(argon.profile, /\(allow network-bind \(local ip "localhost:\*"\)\)/); assert.match(argon.profile, /\(allow pseudo-tty\)/);
   assert.doesNotMatch(astra.profile, /localhost|pseudo-tty/, 'codex gets neither'); assert.equal(argon.serial, true); assert.deepEqual(argon.probe('/repo/x').args.slice(-2), ['/bin/cat', '/repo/x']);
+  // muse: the same profile with its own sandbox off, also without a gate (the check of an author before a run)
+  const wonder = sessionCall({ key: 'wonderfull-m', id: 'muse-wonder-full-1.0', effort: 'medium', cli: 'muse' }, { prompt: 'P', cwd: '/tmp/s', deny: ['/repo'], home: '/home/x', tmp: '/tmp' });
+  assert.equal(wonder.cmd, 'sandbox-exec'); assert.deepEqual(wonder.args.slice(2, 4), ['muse', 'exec']); assert.ok(wonder.args.includes('--disable-sandbox')); assert.match(wonder.profile, /\(deny file-read\* file-write\* \(subpath "\/repo"\)/); assert.match(wonder.profile, /remote tcp "\*:443"/);
   assert.throws(() => sessionCall({ key: 'other', cli: 'ollama' }, { prompt: 'P', cwd: '/x' }), /needs a shell/);
   assert.match(seatbelt({ deny: ['/a "b'], write: ['/w'], cwd: '/c' }), /\(subpath "\/a \\"b"\)/);
   assert.deepEqual(cleanEnv({ HOME: '/h', PATH: '/bin', CLAUDECODE: '1', CLAUDE_CODE_ENTRYPOINT: 'cli', X_GRADE: '1', OPENAI_API_KEY: 'k', LC_ALL: 'C' }), { HOME: '/h', PATH: '/bin', OPENAI_API_KEY: 'k', LC_ALL: 'C' });
+});
+
+test('under the closed profile a session reads its own folder, never another session\'s nor the repository', { skip: process.platform !== 'darwin' && 'the profile is macOS seatbelt' }, () => {
+  // real processes under the real profile (no model): the temporary folders are writable and read again after the
+  // home folder is hidden, and other sessions live in them
+  const tmp = fs.realpathSync(os.tmpdir()), mine = fs.mkdtempSync(path.join(tmp, 'unpaint-session-mine-')), theirs = fs.mkdtempSync(path.join(tmp, 'unpaint-session-theirs-')), attempt = fs.mkdtempSync(path.join(tmp, 'unpaint-bench-'));
+  try {
+    for (const d of [mine, theirs, attempt]) fs.writeFileSync(path.join(d, 'f.txt'), 'x');
+    const repo = path.resolve('package.json');
+    for (const hidden of [[os.homedir(), '/Users', '/Volumes'], []]) {
+      const profile = seatbelt({ deny: [path.dirname(repo)], write: [tmp, '/private/tmp', '/private/var/folders'], cwd: mine, local: true, gated: hidden.length > 0, hidden });
+      const can = (cmd, ...a) => { try { execFileSync('sandbox-exec', ['-p', profile, cmd, ...a], { stdio: 'pipe' }); return true; } catch { return false; } };
+      const how = hidden.length ? 'the home folder hidden' : 'the home folder not hidden';
+      assert.equal(can('/bin/cat', path.join(mine, 'f.txt')), true, `its own file is read (${how})`);
+      assert.equal(can('/usr/bin/touch', path.join(mine, 'new.txt')), true, `its own folder is written (${how})`);
+      assert.equal(can('/bin/cat', path.join(theirs, 'f.txt')), false, `another session's file is not read (${how})`);
+      assert.equal(can('/usr/bin/touch', path.join(theirs, 'new.txt')), false, `another session's folder is not written (${how})`);
+      assert.equal(can('/bin/cat', path.join(attempt, 'f.txt')), false, `a level 1 attempt's file is not read (${how})`);
+      assert.equal(can('/bin/cat', repo), false, `a file of the repository is not read (${how})`);
+    }
+  } finally { for (const d of [mine, theirs, attempt]) fs.rmSync(d, { recursive: true, force: true }); }
 });
 
 test('a transcript gives the tool calls by kind, the commands, the last message and the cost', () => {
@@ -563,4 +587,32 @@ test('levels 2 to 4 are told the original\'s real size in one line beside their 
   }
   const none = folder({ level: 'L2' });
   try { assert.doesNotMatch(none.prompt, /original is|REAL_SIZE/); assert.match(none.prompt, /the painter follows\.\n\n\*\*The goal/); } finally { fs.rmSync(none.dir, { recursive: true, force: true }); }
+});
+
+test('a Muse session\'s transcript is its own session log: found by the session id, and read for steps, commands, exits, the last message and the tokens', () => {
+  const root = tmp(), id = '0f0e0d0c-0b0a-4908-8706-050403020100', dir = path.join(root, '2026', '11', '23', id), out = path.join(root, 'S.out.txt'), keep = path.join(root, 'S.log.jsonl');
+  try {
+    fs.writeFileSync(out, '{"some":"line of its output"}\n');
+    const call = { log: { root, id } };
+    assert.equal(transcriptFile({}, out), out, 'a command without a log of its own is read from its output'); assert.equal(transcriptFile(call, out), out, 'no log yet: the output');
+    const ev = event => JSON.stringify({ schema_version: 1, payload: { kind: 'run', event } });
+    const usage = (family, q) => ev({ kind: 'goal_usage_attribution', record: { usage_family: family, quantity: q } });
+    fs.mkdirSync(path.join(root, '.msp-view-v1', id), { recursive: true }); fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, 'session.jsonl'), [
+      ev({ kind: 'assistant_tool_calls_committed', tool_calls: [{ id: 'i1', call_id: 'c1', name: 'read_file', args: '{"path":"inputs/source.png"}' }, { id: 'i2', call_id: 'c2', name: 'bash', args: '{"command":"./unpaint plan","description":"plan"}' }] }),
+      ev({ kind: 'tool_result_batch_committed', results: [{ tool_call_index: 0, tool_call_id: 'c1', text: 'a picture' }, { tool_call_index: 1, tool_call_id: 'c2', text: '{\n  "exit_code": 0,\n  "output": "It compiles"\n}' }] }),
+      usage('provider', { input_tokens: 1000, cached_tokens: 600, output_tokens: 40, reasoning_tokens: 25 }), usage('tool', { input_tokens: 9999 }),
+      ev({ kind: 'assistant_tool_calls_committed', tool_calls: [{ id: 'i3', call_id: 'c3', name: 'bash', args: '{"command":"ls /nowhere"}' }, { id: 'i4', call_id: 'c4', name: 'bash', args: 'not json' }] }),
+      ev({ kind: 'tool_result_batch_committed', results: [{ tool_call_id: 'c3', text: '{"exit_code": 2, "output": "No such file"}' }] }),
+      ev({ kind: 'assistant_message_committed', text: 'I wrote my script.' }), usage('provider', { input_tokens: 500, cached_tokens: 0, output_tokens: 10, reasoning_tokens: 0 }), '{"a partial last li',
+    ].join('\n'));
+    const file = transcriptFile(call, out); assert.equal(file, path.join(dir, 'session.jsonl'));
+    assert.equal(transcriptFile({ log: { root, id } }, out, keep), keep, 'at the end the log is copied into the run\'s folder and read there'); assert.equal(fs.readFileSync(keep, 'utf8'), fs.readFileSync(file, 'utf8'));
+    const m = readTranscript('muse', fs.readFileSync(file, 'utf8'));
+    assert.deepEqual(m.calls, { 'read file': 1, 'unpaint plan': 1, shell: 2 }); assert.deepEqual(m.commands, ['read_file inputs/source.png', './unpaint plan', 'ls /nowhere', '']);
+    assert.deepEqual(m.steps.map(x => [x.kind, x.exit, x.failed]), [['read', null, false], ['shell', 0, false], ['shell', 2, true], ['shell', null, false]]); assert.equal(m.steps.length, 4, 'each tool call is one step of the budget');
+    assert.equal(m.text, 'I wrote my script.'); assert.equal(m.tokensIn, 1500); assert.equal(m.tokensOut, 50); assert.equal(m.tokens, 1550); assert.equal(m.costUSD, null);
+    assert.deepEqual([m.tokenSplit.reported, m.tokenSplit.freshIn, m.tokenSplit.cachedIn, m.tokenSplit.out, m.tokenSplit.thinking], [true, 900, 600, 50, 25]); assert.match(m.tokenSplit.from, /its own session log/);
+    assert.deepEqual(readTranscript('muse', '{"some":"line of its output"}').steps, []);
+  } finally { fs.rmSync(root, { recursive: true, force: true }); }
 });

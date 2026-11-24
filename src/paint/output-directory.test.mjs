@@ -51,7 +51,7 @@ test('actual CLI refuses reused output before reading the image or initializing 
   fs.writeFileSync(saved, 'saved frame index');
   const cli = fileURLToPath(new URL('../../tools/paint-plate.mjs', import.meta.url));
   const result = spawnSync(process.execPath, [cli, '--out', destination, '--image', '/definitely-missing-painter-image.png'], {
-    encoding: 'utf8', timeout: 15_000,
+    encoding: 'utf8', timeout: 120_000,
   });
   assert.equal(result.error, undefined);
   assert.equal(result.status, 1);

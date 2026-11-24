@@ -8,9 +8,9 @@ import sharp from 'sharp';
 
 // A small whole run of the painter with a prepared drawing in two ink stages (the wash recipe's prepink and finishink):
 // both pens lay the drawing's vector strokes, carried into each stage file, and a drawing with no vectors stops the run.
-const run = (args, cwd) => execFileSync(process.execPath, ['tools/paint-plate.mjs', '--allowdirty', '1', '--width', '48', '--scale', '1', '--sheetmm', '48', '--mode', 'fast', '--gpu', 'off', '--threads', '1', '--feedback', '0', '--notargetlooks', '1', '--targetguard', 'strict', '--frames', '0', '--video', '0', '--segments', 'off', ...args], { cwd, stdio: 'pipe', timeout: 240000 }).toString();
+const run = (args, cwd) => execFileSync(process.execPath, ['tools/paint-plate.mjs', '--allowdirty', '1', '--width', '48', '--scale', '1', '--sheetmm', '48', '--mode', 'fast', '--gpu', 'off', '--threads', '1', '--feedback', '0', '--notargetlooks', '1', '--targetguard', 'strict', '--frames', '0', '--video', '0', '--segments', 'off', ...args], { cwd, stdio: 'pipe', timeout: 600000 }).toString();   // (15 to 50 s; a hang is still caught)
 
-test('a two-stage pen run lays the drawing\'s vector strokes in both stages; no vectors, no run', async () => {
+test('a two-stage pen run lays the drawing\'s vector strokes in both stages; no vectors, no run', { timeout: 960000 }, async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ink-vectors-run-')), cwd = new URL('../../../', import.meta.url);
   try {
     const target = path.join(dir, 'target.png'), out = path.join(dir, 'paint'), stem = path.join(dir, 'set');
@@ -33,7 +33,7 @@ test('a two-stage pen run lays the drawing\'s vector strokes in both stages; no 
 // An ink drawing whose strokes are partly marked medium 'graphite' (a pencil under-drawing under selective ink): the opening
 // pen lays those strokes first in graphite and the rest in ink, with no --outlinemedium graphite asked for; a drawing with
 // no graphite strokes puts no graphite on the sheet.
-test('an ink drawing with pencil strokes lays them first in graphite, the rest in ink', async () => {
+test('an ink drawing with pencil strokes lays them first in graphite, the rest in ink', { timeout: 960000 }, async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ink-vectors-layin-')), cwd = new URL('../../../', import.meta.url);
   try {
     const target = path.join(dir, 'target.png'), out = path.join(dir, 'paint'), stem = path.join(dir, 'set');

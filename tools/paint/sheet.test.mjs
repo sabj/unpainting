@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import sharp from 'sharp';
-import { fit, drawingSvg, formColour, layout, riskLine, sessionLine, runPanels, runHeader, composeSheet, writeRunSheet, writeGridSheet } from './sheet.mjs';
+import { fit, drawingSvg, formColour, layout, riskLine, sessionLine, runPanels, runHeader, composeSheet, writeRunSheet, writeGridSheet, keepsRunSheet } from './sheet.mjs';
 
 test('text is cut to its panel', () => {
   assert.equal(fit('short', 400, 16), 'short');
@@ -96,4 +96,16 @@ test('a working session is said in one plain line: what it handed over, looks, m
   assert.match(sessionLine({ session: { ...base, submitted: { kind: 'plan', settings: {}, edit: { auto: 120, untouched: 90, untouchedShare: 0.75, changed: 12, moved: 2, merged: 3, mergedFrom: 14, dropped: 2, added: 4 } } } }), /^edited the code planner's plan: 90 of its 120 washes untouched \(75%\), 12 changed, 2 moved, 14 merged into 3, 2 left out, 4 of its own added · /);
   assert.match(sessionLine({ passages: 21, session: { ...base, wallMinutes: 61.2, ended: 'reached the benchmark\'s resource budget', budgetReached: { what: '60 minutes of wall time' }, submitted: { kind: 'script', settings: {} } } }), /^wrote its own script \(21 passages\) · 2 looks · 61 min on the clock, 31 min its own · REACHED THE BUDGET \(60 minutes of wall time\) · 57 tool calls$/);
   assert.equal(sessionLine({}), 'working session: not run');
+});
+
+test('a run keeps its sheet when it is a full-size final or an Auto run; a look and a model\'s plan alone write none', () => {
+  assert.equal(keepsRunSheet({ mode: 'paint', author: 'argon-m' }), true, 'a model\'s full-size final');
+  assert.equal(keepsRunSheet({ mode: 'paint', author: 'auto' }), true); assert.equal(keepsRunSheet({ mode: 'plan', author: 'auto' }), true, 'Auto\'s plan preview');
+  assert.equal(keepsRunSheet({ look: true, mode: 'paint', author: 'argon-m' }), false, 'a look of a kept choice');
+  assert.equal(keepsRunSheet({ look: true, mode: 'paint', author: 'auto' }), false, 'a look, whoever asked');
+  assert.equal(keepsRunSheet({ mode: 'plan', author: 'argon-m' }), false, 'a model\'s plan alone');
+  // the command asks before it writes, and says nothing of a sheet it did not make
+  const cli = fs.readFileSync(new URL('./cli.mjs', import.meta.url), 'utf8');
+  assert.match(cli, /if \(keepsRunSheet\(\{ look: Boolean\(req\.look\), mode: req\.mode, author: record\.author\.key \}\)\) \{ try \{ record\.sheetImage = \(await writeRunSheet\(/);
+  assert.equal(cli.match(/writeRunSheet\(/g).length, 1, 'one place writes a run\'s sheet');
 });
