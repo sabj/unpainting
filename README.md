@@ -135,7 +135,7 @@ How it is run and scored:
 - Drawing is the model's choice: pencil, pen or none. The prepared drawing is offered, not required.
 - Every picture is painted on one standard sheet; the original's real size is told to the model as a fact.
 - A look's price is fixed by size: a half-size whole look 0.3, full size 1.0, a partial look its share, never under 0.2. The final is not charged. How a model paints is free and measured beside the score. Steps and a six-hour clock are runaway guards only.
-- Judges read how human the making looks from the film (an opening of the bare paper, then twelve scored snapshots, then the finished sheet), and how good and how like the original the painting is. The original is scored for quality as well, and a painting's quality is its share of the original's.
+- Judges read how human the making looks from the film (an opening of the bare paper, the drawing before the first wash scored beside, then ten scored frames from the first wash to the finished sheet), and how good and how like the original the painting is. The original is scored for quality as well, and a painting's quality is its share of the original's.
 - Judges: an open-weight panel (GLM-5.3-Flash, Qwen3.8-27B, Gemma-4-31B), hosted with zero data retention or run locally ([scoring](bench/docs/scoring.md#judges)).
 - The first run: Gemini 4 Argon, Neon and Hydrogen and Claude Sonnet 5.5, all at medium effort, on subscriptions. Not in it: a container for replication and the OpenAI models.
 - How to replicate: [bench/README](bench/README.md#how-to-replicate-04).

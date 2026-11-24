@@ -1,12 +1,18 @@
 #!/usr/bin/env python3
 """0.4's scoring: every painting and its original, read by one judge panel, into results.json and SCORES.md.
 
-  npm run bench:score04 -- RUN_FOLDER... | MANIFEST.json --out DIR
+  npm run bench:score04 -- RUN_FOLDER... | MANIFEST.json --out DIR [--snapshots wash10|film13]
 
 For each painting (s04_runs.py says what a run folder must hold):
-  1 HUMAN-NESS, the main reading: twelve film snapshots and the finished sheet under the human-ness rubric
-    (bench/docs/human-ness-rubric.md; its sha256 is written into the results), the mean of the twelve as % of 5,
-    the thirds, the tally of tells, and the whole-sequence yes or no. No film: refused before any judge is called.
+  1 HUMAN-NESS, the main reading, from the film under the human-ness rubric (bench/docs/human-ness-rubric.md; its
+    sha256 is written into the results). --snapshots names what the judges are shown (s04_readings.SCHEMES):
+    wash10, the default: the opening paper (not scored), the drawing frame (the last before the first wash; scored
+    and reported, not in the mean; absent when nothing was drawn first), and ten frames from the first wash to the
+    finished sheet, whose mean is human-ness; film13: the scheme before it (twelve through the whole film, then the
+    finished sheet), so an old film can be scored the old way. THE TWO ARE NOT COMPARABLE: results.json and SCORES.md
+    name the scheme. The same pictures go to every judge route, local or hosted. Also the thirds, the tally of tells
+    and the whole-sequence yes or no. No film, or a film that does not say where its first wash is: refused before
+    any judge is called.
   2 QUALITY AND LIKENESS: the painting alone and its ORIGINAL alone, 0 to 10; the painting's share of the original's.
   3 COMBINED: two parts human-ness to one part quality (s04_table.WEIGHTS, written into the results).
   4 beside, never blended: the painter's cheat-risk record and progression, classic.py against the original, and the
@@ -25,10 +31,14 @@ sys.path.insert(0, HERE)
 REPO = os.path.dirname(os.path.dirname(HERE))
 RUBRIC = os.path.join(REPO, "bench", "docs", "human-ness-rubric.md")
 SERIES = "0.4 scores are a new series: not comparable with the V1 to V5 rounds (J1, J2) or with a different judge label."
+SCHEME_NOTE = {
+    "wash10": "Human-ness here is the mean of ten frames from the first wash to the finished sheet (scheme wash10, from 0.4 rc7). It is NOT comparable with human-ness scored under the earlier scheme (film13: twelve frames through the whole film, the finished sheet not counted).",
+    "film13": "Human-ness here is scored the earlier way (scheme film13: twelve frames through the whole film, the finished sheet shown and not counted). It is NOT comparable with scores under wash10, the scheme from 0.4 rc7.",
+}
 
 import s04_judge, s04_readings as R, s04_runs, s04_table as T  # noqa: E402
 
-SEQ_CTX, SEQ_TOKENS = 16384, 3000   # fourteen pictures (opening, twelve, finished) need a longer window than the scorer's 8,192
+SEQ_CTX, SEQ_TOKENS = 16384, 3000   # up to fourteen pictures (film13: opening, twelve, finished; wash10: opening, drawing, ten) need a longer window than the scorer's 8,192
 ONE_CTX, ONE_TOKENS = 8192, 1024
 SNAP_PX, ONE_PX = 640, 768
 
@@ -68,8 +78,9 @@ class Job:
 def jobs_for(paintings, originals, rubric, data_uri):
     out = []
     for e in paintings:
-        snaps = e["snapshots"]
-        head = R.SEQ.format(rubric=rubric, n=len(snaps), style=e["style"])
+        # the scored pictures in the order shown: the drawing frame first when the scheme has one, then the snapshots
+        snaps = ([e["drawing"]] if e.get("drawing") else []) + e["snapshots"]
+        head = R.sequence_prompt(e.get("scheme", "film13"), rubric, e["style"], len(snaps), bool(e.get("drawing")))
         texts = [head + "\nOpening: the untouched paper (not scored)"] + [f"Snapshot {k + 1}: {p}% complete" for k, (_, p) in enumerate(snaps)]
         out.append(Job(e["id"], "sequence", [(e["opening"], SNAP_PX)] + [(f, SNAP_PX) for f, _ in snaps], texts, SEQ_CTX, SEQ_TOKENS, lambda raw, n=len(snaps): R.parse_sequence(raw, n), data_uri))
         out.append(Job(e["id"], "single", [(e["painting"], ONE_PX)], [R.SINGLE.format(style=e["style"])], ONE_CTX, ONE_TOKENS, R.parse_single, data_uri))
@@ -112,6 +123,7 @@ def main(argv=None, judge=s04_judge, env=None, say=print):
     ap = argparse.ArgumentParser(prog="bench:score04", description="0.4's scoring: human-ness, quality and likeness, combined; anti-cheat, algorithmic, Auto adjustment and usage beside.")
     ap.add_argument("inputs", nargs="+", help="run folders, or a manifest .json listing them")
     ap.add_argument("--out", required=True, help="folder for results.json, SCORES.md and the kept readings")
+    ap.add_argument("--snapshots", default=R.DEFAULT_SCHEME, choices=sorted(R.SCHEMES), help="what the judges are shown: wash10 (default: opening, drawing frame, ten frames from the first wash to the finished sheet) or film13 (the earlier scheme: opening, twelve through the film, the finished sheet). Scores under one are not comparable with the other")
     a = ap.parse_args(argv)
     try:
         cfg = judge.settings(env)
@@ -120,7 +132,8 @@ def main(argv=None, judge=s04_judge, env=None, say=print):
         bad = []
         for e in paintings:
             try:
-                e["snapshots"], e["opening"] = R.snapshots(e["painting"]), R.opening(e["painting"])
+                shown = R.frames_for(e["painting"], a.snapshots)
+                e.update(scheme=a.snapshots, snapshots=shown["snapshots"], opening=shown["opening"], drawing=shown["drawing"], firstWash=shown["firstWash"])
             except R.Refusal as x:
                 bad.append(f"{e['id']}: {x}")
         if bad:
@@ -144,18 +157,19 @@ def main(argv=None, judge=s04_judge, env=None, say=print):
     got = read_all(jobs_for(paintings, originals, rubric, data_uri), cfg, judge, a.out, say)
     faults, rows = [], []
     for e in paintings:
-        h = R.human(got[(e["id"], "sequence")], cfg["panel"])
+        h = R.human(got[(e["id"], "sequence")], cfg["panel"], a.snapshots, bool(e["drawing"]))
         q = R.quality(got[(e["id"], "single")], cfg["panel"])
         faults += [f"{e['id']}, human-ness: {x}" for x in h["faults"]] + [f"{e['id']}, quality: {x}" for x in q["faults"]]
         rows.append({**{k: e[k] for k in ("id", "label", "subject", "auto", "author", "commit", "folder", "painting", "target", "style", "classic", "usage")},
-                     "opening": e["opening"], "snapshots": [{"file": f, "pct": p} for f, p in e["snapshots"]], "human": h, "quality": q, "cheat": cheat_summary(e["cheat"])})
+                     "opening": e["opening"], "drawingFrame": {"file": e["drawing"][0], "pct": e["drawing"][1]} if e["drawing"] else None, "firstWash": e["firstWash"],
+                     "snapshots": [{"file": f, "pct": p} for f, p in e["snapshots"]], "human": h, "quality": q, "cheat": cheat_summary(e["cheat"])})
     for sid, o in originals.items():
         o["quality"] = R.quality(got[("original--" + sid, "single")], cfg["panel"])
         faults += [f"original of {sid}, quality: {x}" for x in o["quality"]["faults"]]
     T.derive(rows, originals)
-    res = {"schema": "unpaint-bench/score04@1", "written": time.strftime("%Y-%m-%d %H:%M"), "series": SERIES, "judge": jrec,
-           "rubric": {"path": os.path.relpath(RUBRIC, REPO), "sha256": rubric_sha}, "prompts": R.prompt_hashes(rubric),
-           "weights": dict(T.WEIGHTS), "readings": R.READINGS, "snapshots": R.SNAPSHOTS, "faults": faults, "originals": originals, "paintings": rows}
+    res = {"schema": "unpaint-bench/score04@1", "written": time.strftime("%Y-%m-%d %H:%M"), "series": SERIES + " " + SCHEME_NOTE[a.snapshots], "judge": jrec,
+           "rubric": {"path": os.path.relpath(RUBRIC, REPO), "sha256": rubric_sha}, "prompts": R.prompt_hashes(rubric, a.snapshots),
+           "weights": dict(T.WEIGHTS), "readings": R.READINGS, "snapshots": R.SCHEMES[a.snapshots]["count"], "snapshotScheme": {**R.SCHEMES[a.snapshots], "note": SCHEME_NOTE[a.snapshots]}, "faults": faults, "originals": originals, "paintings": rows}
     write(os.path.join(a.out, "results.json"), json.dumps(res, indent=1))
     write(os.path.join(a.out, "SCORES.md"), T.markdown(res))
     say("written", os.path.join(a.out, "results.json"), "and SCORES.md" + (f"; {len(faults)} faults: " + "; ".join(faults) if faults else ""), flush=True)

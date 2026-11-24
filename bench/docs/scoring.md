@@ -33,11 +33,14 @@ RESULTS: to be filled from the frozen run.
 ## Human-ness
 
 - First the opening: the untouched paper the painter chose, the film's first frame, in its own colour (a toned sheet shows toned). The prompt says it is context only and not scored. Auto's films and models' films (the painter's and the level 1 kit's) all start with that frame; a film that does not is refused.
-- Then twelve snapshots evenly through the painting's film, then the finished sheet, shown in order, each labelled only with its percentage complete. It does not know the method.
+- Then the drawing frame: the last frame before the first wash. It is scored and reported beside the result, and it is not part of the human-ness figure. When nothing was drawn before the first wash there is no drawing frame.
+- Then ten frames evenly spaced from the first wash to the finished sheet: the first is the first wash, the tenth is the finished sheet. All are shown in order, each labelled only with its percentage complete. The judge does not know the method.
+- Where the first wash is comes from the film's own record (`frames.json`: each frame's stage in the painter's film, the count of brush strokes in the level 1 kit's film). It is never guessed: a film that does not say is refused.
 - It first says whether this is the order and the kind of mark a person would use (yes or no). Then it scores each snapshot 1 to 5 by the [rubric](human-ness-rubric.md): 5 is unmistakably a person's painting in progress, 1 is a finished image uncovered by a filter or wipe. Tells are named by letter (a to j).
-- The figure is the mean of the twelve film snapshots, as a percentage of 5 (mean ÷ 5). The finished sheet is shown last but not counted: it is at its ceiling. Also shown: the means of the first, middle and last four, the tally of tells (each judge's first reading, every snapshot shown), and how many readings said yes.
+- The figure is the mean of the ten, as a percentage of 5 (mean ÷ 5). Also shown: the drawing frame's score, the means of frames 1 to 3, 4 to 7 and 8 to 10, the tally of tells (each judge's first reading, every snapshot shown), and how many readings said yes.
 - The rubric file is `bench/docs/human-ness-rubric.md`. Its sha256 is written into the results; editing it starts a new series.
 - A painting with no film is refused, not scored from its finished sheet.
+- This scheme is named `wash10` and is the default from 0.4 rc7. The scheme before it is kept under the name `film13` (`npm run bench:score04 -- ... --snapshots film13`): the opening, twelve snapshots evenly through the whole film, then the finished sheet, with the mean of the twelve as the figure. Use it to score an old film the old way. **Scores under `wash10` are not comparable with scores under `film13`**: the frames differ, and the finished sheet now counts. Every results file and scores table names its scheme. The same pictures go to every judge route, local or hosted.
 
 ## Quality and likeness
 

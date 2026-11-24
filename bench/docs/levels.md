@@ -41,7 +41,7 @@ A look has a fixed price by size, whatever is in it: a half-size look of the who
 
 See [scoring](scoring.md). In short:
 
-- Human-ness, from the film, by a written rubric: the judges see the opening (the untouched paper the painter chose; context, not scored), twelve snapshots evenly through the film, then the finished sheet. The figure is the mean of the twelve, as a percentage of 5 (mean ÷ 5).
+- Human-ness, from the film, by a written rubric: the judges see the opening (the untouched paper the painter chose; context, not scored), the drawing frame (the last frame before the first wash; scored and reported, not in the figure; absent when nothing was drawn first), then ten frames evenly spaced from the first wash to the finished sheet, the tenth being the finished sheet. The figure is the mean of the ten, as a percentage of 5 (mean ÷ 5). Scores from before rc7 used twelve snapshots through the whole film and are not comparable ([scoring](scoring.md#human-ness)).
 - Quality and likeness is a second reading.
 - A combined number is shown too: two parts human-ness to one part quality, a setting. Both parts stay visible.
 - The original is scored for quality too, and a painting's quality is its share of the original's score. Auto is scored too, so each subject has a difficulty index.

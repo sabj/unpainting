@@ -234,7 +234,7 @@ function counted(kind) {
   st[kind === 'brush' ? 'strokes' : kind]++;
   const n = used();
   if (n % SNAP_EVERY === 0) snap(n);
-  if (n > 1 && (n - 1) % FILM_EVERY === 0) film('painting', n - 1);   // the sheet as it stands before this stroke is laid: after strokes 2, 4, ...
+  if (n > 1 && (n - 1) % FILM_EVERY === 0) film('painting', n - 1, st.strokes - (kind === 'brush' ? 1 : 0));   // the sheet as it stands before this stroke is laid: after strokes 2, 4, ...
 }
 // A stroke's own options: the kit moves the water (src/media/water-clock.mjs), so `between` and the step cadence are not the script's.
 function own(options, what) {
@@ -355,23 +355,25 @@ export function look() {
 }
 const png = (rgb, file) => sharp(Buffer.from(rgb.buffer, rgb.byteOffset, rgb.byteLength), { raw: { width: st.W, height: st.H, channels: 3 } }).png().toFile(file);
 // The film (see the header). A frame is the sheet as look() gives it, written lossless in the background; nothing is painted.
+// Each frame records the strokes on the sheet it shows and how many of them are brush strokes (`brush`): the judges' ten
+// snapshots start at the first wash, which the scorer reads from this record (bench/scorer/s04_readings.py first_wash).
 const FILM_EVERY = 2, FILM_MOST = 400, FILM = !process.env.BENCH_NO_FILM;
-function film(stage, after = used()) {
+function film(stage, after = used(), brush = st?.strokes ?? 0) {
   if (!FILM || !st) return;
   const last = st.film.at(-1);
   if (last && last.after === after && last.stage === stage) return;
   const img = look(), k = st.film.length, src = `t${String(k).padStart(5, '0')}.webp`;
-  st.film.push({ src, stage, after });
+  st.film.push({ src, stage, after, brush });
   st.pending = st.pending.then(() => sharp(Buffer.from(img.buffer, img.byteOffset, img.byteLength), { raw: { width: st.W, height: st.H, channels: 3 } }).webp({ lossless: true, effort: 2 }).toFile(path.join(st.out, 'film', src)));
 }
 /** At the end: the last frame is the finished sheet; at most FILM_MOST frames are kept, evenly through, every 'dried' frame among them while they fit. */
 async function closeFilm(final) {
   if (!FILM) return null;
   const dir = path.join(st.out, 'film'), n = used(), all = st.film;
-  await sharp(final).webp({ lossless: true, effort: 2 }).toFile(path.join(dir, 't-final.webp')); all.push({ src: 't-final.webp', stage: 'finished', after: n });
+  await sharp(final).webp({ lossless: true, effort: 2 }).toFile(path.join(dir, 't-final.webp')); all.push({ src: 't-final.webp', stage: 'finished', after: n, brush: st.strokes });
   let keep = all.map((_, i) => i);
   if (all.length > FILM_MOST) { const even = new Set(Array.from({ length: FILM_MOST }, (_, j) => Math.round(j * (all.length - 1) / (FILM_MOST - 1)))); keep = keep.filter(i => even.has(i)); }
-  const frames = keep.map((i, j) => { const f = all[i], src = `f${String(j).padStart(4, '0')}.webp`; fs.renameSync(path.join(dir, f.src), path.join(dir, src)); return { src, stage: f.stage, strokes: f.after, of: n, position: keep.length > 1 ? j / (keep.length - 1) : 1 }; });
+  const frames = keep.map((i, j) => { const f = all[i], src = `f${String(j).padStart(4, '0')}.webp`; fs.renameSync(path.join(dir, f.src), path.join(dir, src)); return { src, stage: f.stage, strokes: f.after, brush: f.brush, of: n, position: keep.length > 1 ? j / (keep.length - 1) : 1 }; });
   for (const f of fs.readdirSync(dir)) if (/^t.*\.webp$/.test(f)) fs.rmSync(path.join(dir, f));
   const doc = { painter: 'bench kit ' + PROTOCOL, task: st.task, width: st.W, height: st.H, presentation: { framePolicy: `every ${FILM_EVERY} strokes and each drying, at most ${FILM_MOST} kept evenly`, frameFormat: 'webp (lossless)', saved: all.length, kept: frames.length }, frames };
   fs.writeFileSync(path.join(dir, 'frames.json'), JSON.stringify(doc));

@@ -26,7 +26,8 @@ want is the last one completed (it ended with `kit.finish`), stop.
   `src/plan.js`, `src/painter.js` and similar).
 - Paint like a person: light before dark, broad before detail, washes and strokes rather than pixel fills. Stage frames
   are saved automatically at 10%, 25%, 50%, 75% and 100% of your strokes, and the kit films the painting: judges
-  score twelve snapshots from the film for whether the making looks like a person's.
+  score ten snapshots from the film, from your first wash to the finished sheet, for whether the making looks like
+  a person's. Any drawing you lay before the first wash is scored beside them as one more snapshot.
 - Paintings: each run of your script that lays a mark is one painting of the whole sheet, whatever is in it, and
   counts against your budget of 3 paintings; the run past it is refused before it lays anything.
   `kit.work()` says which painting this is and how many are left. Nothing else is budgeted: strokes, water, waits and

@@ -86,6 +86,8 @@ kit.dryAll(sheet, O); await kit.finish('pencil');`, true);
   assert.equal(strokes[0].pencil.grade, '2B'); assert.equal(strokes[2].eraser.width, 10); assert.ok(strokes[2].lifted.graphiteShare > 0.5);
   assert.deepEqual([run.stats.pencilStrokes, run.stats.eraserStrokes, run.stats.brushStrokes, run.stats.strokes], [2, 1, 1, 4]);
   assert.deepEqual(JSON.parse(run.film).frames.map(f => [f.stage, f.strokes]), [['paper', 0], ['painting', 2], ['painting', 4], ['dried', 4], ['finished', 4]]);
+  // each frame counts the brush strokes on the sheet it shows: two pencil lines are drawing, the first wash is the frame after
+  assert.deepEqual(JSON.parse(run.film).frames.map(f => f.brush), [0, 0, 1, 1, 1]);
 });
 
 test('the kit takes its targets from the coarse maps installed next to it', () => {

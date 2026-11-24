@@ -26,7 +26,10 @@ def picture(path, seed, size=(60, 80)):
     Image.fromarray(rng.integers(0, 255, (size[1], size[0], 3), dtype=np.uint8)).save(path)
 
 
-def make_run(root, name, author, registry, source, frames=20, film=True, usage=None, cheat=None):
+def make_run(root, name, author, registry, source, frames=20, film=True, usage=None, cheat=None, drawn=3, stages=True):
+    # the film's record, as the painter writes it: the paper, `drawn` frames of drawing, then washes, then the finished sheet
+    # (stages=False: an old film that names only its paper)
+    stage = lambda i: "paper" if i == 0 else None if not stages else "drawing" if i <= drawn else "finished" if i == frames - 1 else "paint"
     f = Path(root) / name
     (f / "plate").mkdir(parents=True)
     picture(f / "plate" / "painting.png", 7 * len(name))
@@ -34,7 +37,7 @@ def make_run(root, name, author, registry, source, frames=20, film=True, usage=N
         fr = []
         for i in range(frames):
             picture(f / "plate" / f"f{i:04d}.webp", i + 100 * len(name), (30, 40))
-            fr.append({"src": f"f{i:04d}.webp", "position": i / (frames - 1), **({"stage": "paper"} if i == 0 else {})})
+            fr.append({"src": f"f{i:04d}.webp", "position": i / (frames - 1), **({"stage": stage(i)} if stage(i) else {})})
         (f / "plate" / "frames.json").write_text(json.dumps({"frames": fr}))
     run = {"subject": {"id": "subj", "sourceAbs": str(source), "registry": str(registry)}, "author": {"key": author, "name": author},
            "code": {"commit": "abcdef1234"}, "failure": None}
@@ -111,13 +114,67 @@ class Readings(unittest.TestCase):
             self.assertEqual([os.path.basename(x) for x, _ in s[:3]], ["f0002.webp", "f0004.webp", "f0006.webp"])
             self.assertEqual(s[-1], (str(f / "plate" / "painting.png"), 100))
             self.assertEqual(s[5][1], round(100 * 12 / 26))
+            old = R.frames_for(str(f / "plate" / "painting.png"), "film13")
+            self.assertEqual((old["snapshots"], old["drawing"], old["firstWash"], old["opening"]), (s, None, None, str(f / "plate" / "f0000.webp")))
+
+    def test_ten_from_the_first_wash_to_the_finished_sheet_with_the_drawing_frame_before(self):
+        with tempfile.TemporaryDirectory() as d:
+            src, reg = fixtures(d)
+            f = make_run(d, "r", "auto", reg, src, frames=41, drawn=4)
+            g = R.frames_for(str(f / "plate" / "painting.png"))
+            self.assertEqual(g["scheme"], "wash10")
+            self.assertEqual(g["opening"], str(f / "plate" / "f0000.webp"))
+            self.assertEqual(g["firstWash"], {"frame": 5, "pct": round(100 * 5 / 40)})
+            self.assertEqual(g["drawing"], (str(f / "plate" / "f0004.webp"), 10), "the last frame before the first wash")
+            self.assertEqual(len(g["snapshots"]), 10)
+            self.assertEqual([os.path.basename(x) for x, _ in g["snapshots"][:9]], [f"f{5 + round(i * 35 / 9):04d}.webp" for i in range(9)])
+            self.assertEqual(os.path.basename(g["snapshots"][0][0]), "f0005.webp", "the first of the ten is the first wash")
+            self.assertEqual(g["snapshots"][-1], (str(f / "plate" / "painting.png"), 100), "the tenth is the finished sheet")
+            with self.assertRaisesRegex(R.Refusal, "--snapshots: one of"):
+                R.frames_for(str(f / "plate" / "painting.png"), "eleven")
+
+    def test_nothing_drawn_before_the_first_wash_no_drawing_frame(self):
+        with tempfile.TemporaryDirectory() as d:
+            src, reg = fixtures(d)
+            f = make_run(d, "r", "auto", reg, src, frames=30, drawn=0)
+            g = R.frames_for(str(f / "plate" / "painting.png"))
+            self.assertIsNone(g["drawing"]); self.assertEqual(g["firstWash"]["frame"], 1); self.assertEqual(len(g["snapshots"]), 10)
+            # masking fluid alone is not a drawing
+            doc = json.loads((f / "plate" / "frames.json").read_text())
+            self.assertEqual(R.first_wash([{"stage": "paper"}, {"stage": "frisket"}, {"stage": "paint"}]), (2, False))
+            self.assertEqual(R.first_wash([{"stage": "paper"}, {"stage": "frisket"}, {"stage": "drawing"}, {"stage": "paint"}, {"stage": "drawing"}]), (3, True))
+            self.assertEqual(len(doc["frames"]), 30)
+
+    def test_the_first_wash_is_read_from_the_film_never_guessed(self):
+        with tempfile.TemporaryDirectory() as d:
+            src, reg = fixtures(d)
+            old = make_run(d, "old", "auto", reg, src, frames=27, stages=False)
+            with self.assertRaisesRegex(R.Refusal, "records no wash.*never guessed.*--snapshots film13"):
+                R.frames_for(str(old / "plate" / "painting.png"))
+            self.assertEqual(len(R.frames_for(str(old / "plate" / "painting.png"), "film13")["snapshots"]), 13, "an old film is still scored the old way")
+            short = make_run(d, "short", "auto", reg, src, frames=14, drawn=6)
+            with self.assertRaisesRegex(R.Refusal, "has 7 frames from its first wash .frame 7. to the finished sheet; the ten snapshots need at least 10"):
+                R.frames_for(str(short / "plate" / "painting.png"))
+        # the kit's film: each frame counts the brush strokes on the sheet; pen or pencil before the first is drawing
+        kit = [{"stage": "paper", "strokes": 0, "brush": 0}, {"stage": "painting", "strokes": 2, "brush": 0}, {"stage": "painting", "strokes": 4, "brush": 1}, {"stage": "dried", "strokes": 4, "brush": 1}]
+        self.assertEqual(R.first_wash(kit), (2, True))
+        self.assertEqual(R.first_wash([kit[0], {"stage": "painting", "strokes": 2, "brush": 2}]), (1, False))
+        with self.assertRaisesRegex(R.Refusal, "kit film that does not record its brush strokes.*film13"):
+            R.first_wash([{"stage": "paper"}, {"stage": "painting", "strokes": 2}, {"stage": "finished"}])
+        with self.assertRaisesRegex(R.Refusal, "starts with a wash"):
+            R.first_wash([{"stage": "paint"}, {"stage": "paint"}])
 
     def test_the_opening_is_the_untouched_paper_shown_and_not_scored(self):
         with tempfile.TemporaryDirectory() as d:
             src, reg = fixtures(d)
             f = make_run(d, "r", "auto", reg, src, frames=27)
             self.assertEqual(R.opening(str(f / "plate" / "painting.png")), str(f / "plate" / "f0000.webp"))
-            self.assertIn("It is context only: do not score it.", R.SEQ)
+            self.assertIn("It is context only: do not score it.", R.SEQ); self.assertIn("It is context only: do not score it.", R.SEQ_WASH)
+            with_drawing = R.sequence_prompt("wash10", "RUBRIC", "watercolour", 11, True)
+            self.assertIn("Then come 11 snapshots", with_drawing); self.assertIn("first the drawing as it stood just before the first wash, then 10 snapshots evenly spaced from the first wash to the finished sheet", with_drawing)
+            self.assertNotIn("the drawing as it stood", R.sequence_prompt("wash10", "RUBRIC", "watercolour", 10, False))
+            self.assertEqual(R.sequence_prompt("film13", "RUBRIC", "watercolour", 13, False), R.SEQ.format(rubric="RUBRIC", n=13, style="watercolour"), "the earlier scheme's prompt is unchanged")
+            self.assertNotEqual(R.prompt_hashes("RUBRIC")["sequence"], R.prompt_hashes("RUBRIC", "film13")["sequence"], "a kept reading of one scheme is never reused for the other")
 
     def test_a_film_that_does_not_start_with_the_paper_is_refused(self):
         with tempfile.TemporaryDirectory() as d:
@@ -173,6 +230,22 @@ class Readings(unittest.TestCase):
         self.assertEqual(h["tells"], {"c": 39}); self.assertEqual(h["tellsOf"], 39)
         self.assertEqual((h["yes"], h["of"], h["sequenceHuman"]), (3, 9, False))
         self.assertEqual(h["faults"], [])
+        self.assertEqual((h["scheme"], h["drawing"]), ("film13", None))
+
+    def test_human_ness_is_the_mean_of_the_ten_from_the_first_wash_and_the_drawing_frame_stands_beside(self):
+        ten = [1, 1, 1, 3, 3, 3, 3, 5, 5, 5]
+        by = {m: [seq_reading([2] + ten)] * 3 for m in PANEL}
+        h = R.human(by, PANEL, "wash10", True)
+        self.assertAlmostEqual(h["meanOf5"], 3.0); self.assertAlmostEqual(h["percent"], 60.0)
+        self.assertEqual(h["drawing"], 2.0, "scored and reported")
+        self.assertEqual(h["thirds"], [1.0, 3.0, 5.0], "frames 1-3, 4-7, 8-10")
+        self.assertEqual(len(h["perSnapshot"]), 11); self.assertEqual(h["judges"], {m: 3.0 for m in PANEL})
+        low = R.human({m: [seq_reading([1] + ten)] * 3 for m in PANEL}, PANEL, "wash10", True)
+        self.assertEqual(low["meanOf5"], h["meanOf5"], "the drawing frame's score never moves human-ness")
+        none = R.human({m: [seq_reading(ten)] * 3 for m in PANEL}, PANEL, "wash10", False)
+        self.assertAlmostEqual(none["meanOf5"], 3.0); self.assertIsNone(none["drawing"])
+        last = R.human({m: [seq_reading(ten[:9] + [1])] * 3 for m in PANEL}, PANEL, "wash10", False)
+        self.assertAlmostEqual(last["meanOf5"], 2.6, msg="the finished sheet is the tenth and counts")
 
     def test_a_judge_short_of_three_readings_empties_the_figure(self):
         by = {m: [seq_reading([4] * 13)] * 3 for m in PANEL}
@@ -351,12 +424,12 @@ class EndToEnd(unittest.TestCase):
         firsts, post = [], j.post
         def seen(cfg, model, content, max_tokens, num_ctx):
             imgs = [c["image_url"]["url"] for c in content if c["type"] == "image_url"]
-            if len(imgs) > 1: firsts.append(paper.get(imgs[0]) if len(imgs) == 14 else f"{len(imgs)} pictures")
+            if len(imgs) > 1: firsts.append(paper.get(imgs[0]) if len(imgs) == 12 else f"{len(imgs)} pictures")
             return post(cfg, model, content, max_tokens, num_ctx)
         j.post = seen
         rc = self.S.main([str(a), str(m), "--out", os.path.join(self.tmp.name, "out")], judge=j, say=lambda *x, **k: None)
         self.assertEqual(rc, 0)
-        self.assertTrue(firsts and all(firsts), f"every sequence a hosted judge saw was the paper, then twelve and the finished sheet: {firsts}")
+        self.assertTrue(firsts and all(firsts), f"every sequence a hosted judge saw was the paper, then the drawing frame and the ten from the first wash: {firsts}")
         self.assertEqual(set(firsts), {"auto-run", "model-run"})
 
     def test_two_paintings_and_their_original(self):
@@ -384,16 +457,38 @@ class EndToEnd(unittest.TestCase):
         self.assertEqual(res["judge"]["label"], "J3-local-3x")
         self.assertEqual(res["rubric"]["path"], "bench/docs/human-ness-rubric.md")
         self.assertIn("new series", res["series"])
-        # 3 judges x (2 sequences + 3 single pictures) x 3 readings; sequences carry 13 pictures in the wider window
+        # 3 judges x (2 sequences + 3 single pictures) x 3 readings; a sequence is the opening, the drawing frame and the ten, in the wider window
         self.assertEqual(len(j.calls), 45)
-        self.assertEqual({(n, c) for _, n, c in j.calls}, {(14, 16384), (1, 8192)})
+        self.assertEqual({(n, c) for _, n, c in j.calls}, {(12, 16384), (1, 8192)})
+        self.assertEqual((res["snapshots"], res["snapshotScheme"]["name"]), (10, "wash10"))
+        self.assertIn("NOT comparable", res["series"]); self.assertIn("NOT comparable", res["snapshotScheme"]["note"])
+        p = by["model-run"]
+        self.assertEqual((os.path.basename(p["drawingFrame"]["file"]), p["firstWash"]["frame"], len(p["snapshots"])), ("f0003.webp", 4, 10))
+        self.assertEqual(os.path.basename(p["snapshots"][0]["file"]), "f0004.webp"); self.assertEqual(p["snapshots"][-1], {"file": p["painting"], "pct": 100})
+        self.assertAlmostEqual(p["human"]["drawing"], 4.0); self.assertEqual(len(p["human"]["perSnapshot"]), 11)
         self.assertEqual(j.events, [(e, m_) for m_ in PANEL for e in ("load", "unload")])
         md = Path(out, "SCORES.md").read_text()
         self.assertIn("- None: every reading has all its judges.", md)
+        self.assertIn("HUMAN-NESS (mean of 10 frames from the first wash to the finished sheet, % of 5)", md)
+        self.assertIn("the drawing frame, before the first wash (of 5; not in the mean)", md); self.assertIn("NOT comparable with scores under the earlier scheme (film13)", md)
+        # the earlier scheme by its name: the opening, twelve and the finished sheet, kept apart from the new readings
+        j13 = self.stub(); j13.marks = j.marks
+        out13 = os.path.join(self.tmp.name, "out13")
+        self.assertEqual(self.S.main([str(a), str(m), "--out", out13, "--snapshots", "film13"], judge=j13, say=lambda *x, **k: None), 0)
+        self.assertEqual({(n, c) for _, n, c in j13.calls}, {(14, 16384), (1, 8192)})
+        res13 = json.loads(Path(out13, "results.json").read_text())
+        self.assertEqual((res13["snapshots"], res13["snapshotScheme"]["name"], res13["paintings"][0]["drawingFrame"]), (12, "film13", None))
+        self.assertNotEqual(res13["prompts"]["sequence"], res["prompts"]["sequence"])
+        md13 = Path(out13, "SCORES.md").read_text()
+        self.assertIn("HUMAN-NESS (mean of 12 film snapshots, % of 5)", md13); self.assertIn("scheme film13, the earlier one", md13); self.assertNotIn("drawing frame", md13)
         # a second run reuses every kept reading
         j2 = self.stub(); j2.marks = j.marks
         self.assertEqual(self.S.main([str(a), str(m), "--out", out], judge=j2, say=lambda *x, **k: None), 0)
         self.assertEqual(j2.calls, [])
+        # the same folder, the other scheme: nothing kept is reused
+        j3 = self.stub(); j3.marks = j.marks
+        self.assertEqual(self.S.main([str(a), str(m), "--out", out, "--snapshots", "film13"], judge=j3, say=lambda *x, **k: None), 0)
+        self.assertEqual(len([1 for _, n, _c in j3.calls if n == 14]), 18, "every sequence is read again under the other scheme")
 
     def test_a_broken_judge_is_named_and_the_exit_is_not_clean(self):
         a, m = self.runs()
