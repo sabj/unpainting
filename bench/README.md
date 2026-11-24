@@ -2,6 +2,24 @@
 
 AI models paint a subject with the simulator's brush and pen, and judges score how human the making looks and how good the painting is. The code planner alone, "Auto", is the reference. 0.4 is a new series: its scores are not comparable with the rounds V1 to V5.
 
+## The pictures
+
+Fifteen pictures: four groups of three museum works, and a bonus group of three pictures made with an image generator.
+
+| Group | Pictures (core in bold) |
+|---|---|
+| Figural | **Manet, Morisot with a Fan** · Tiepolo, Bacchus and Ariadne · Homer, The Water Fan |
+| Architectural | **Prout, Laundresses before the Wasserturm** · Guardi, A Colonnade · Bonington, French Town |
+| Landscape | **Turner, The Fort of L'Esseillon** · Sargent, In Austrian Tyrol · Ender, Mountain Valley |
+| Abstract or loose | **Sargent, White Ships** · Morisot, Avenue du Bois · Cezanne, Bathers Under a Bridge |
+| Bonus (generated) | **Mittens** · Kasha portrait · Yale Rosewalk |
+
+- Core: five pictures, one from each group. They run levels 1 to 4.
+- Extended: all fifteen. The other ten run Auto and level 2.
+
+[PICTURES.md](PICTURES.md) has each picture's museum, medium, real size, rights and credit line, and the optional and
+private pictures that are not scored.
+
 ## The ladder, in 0.4
 
 Every level is one try that hands in the model's own script, with a budget of 3.0 look units.
@@ -20,7 +38,7 @@ Details: [levels](docs/levels.md), [rules](docs/rules.md) and [scoring](docs/sco
 - Drawing is the model's choice: pencil, pen or none; no drawing is a normal choice. The prepared drawing is offered, not required, and its lines may go down before the washes, with a stage of them, or after. Pen ink is waterproof or soluble. It gets warnings, not refusals, where a choice only risks the painting.
 - Retries are self-study. The model sees its own painting, replay and stroke map and writes its own assessment. It never gets a score or a critique.
 - Budget for one try: 3.0 look units. A look's price is fixed by size: a half-size whole look 0.3, full size 1.0, a partial look its share, never under 0.2 (at L2 to L4 looks are half size; at L1 each run is a full-size painting, 1.0). At L2 to L4 the full-size final is painted after the session and not charged; at L1 the painting is its last completed run. How a model paints (water, strokes, waits, dryings) is free and measured beside the score: simulation work, sweeps, dryings, seconds, tokens (fresh, cached, output), steps. One runaway guard: water steps over ten times Auto's for the subject stop the painting (reported as a stop, not scored). Steps and the six-hour clock are runaway guards only.
-- Scores: human-ness from the film (the judges see the opening, the untouched paper the painter chose, as context; then twelve snapshots evenly through the film, scored; then the finished sheet), plus quality and likeness, plus a combined number. The original is scored for quality too, and a painting's quality is its share of the original's. Auto sets the difficulty.
+- Scores: the judges score human-ness first, from the film (the judges see the opening, the untouched paper the painter chose, as context; then twelve snapshots evenly through the film, scored; then the finished sheet), plus quality and likeness, plus a combined number. The original is scored for quality too, and a painting's quality is its share of the original's. Auto sets the difficulty.
 - Every picture is painted on one standard sheet. The original's real size is recorded and told to the model as a fact;
   it is not reproduced. Each picture is the whole sheet, never a crop, with one exception chosen by the owner (Manet's
   Morisot with a Fan, its head, shoulders and hand).
@@ -28,10 +46,11 @@ Details: [levels](docs/levels.md), [rules](docs/rules.md) and [scoring](docs/sco
 
 ## Real sizes of the originals (told to the model as a fact)
 
-Tiepolo 31.2 x 24.3 cm · Guardi 45.4 x 30.1 · Homer, The Water Fan 37.4 x 53.4 · Homer, Adirondacks Guide 32.9 x 54.5 ·
-Homer, Two Ladies 17.6 x 20.2 · Manet, Morisot with a Fan 20.9 x 16.8 (whole sheet) · Sargent, In Austrian Tyrol
-29.9 x 45.2 · Turner 19.7 x 28 · Ender 21 x 28.5 · Morisot, Avenue du Bois 20 x 28 · Cezanne 21 x 27.2 · Sargent,
-White Ships: to look up. Nominal, generated: Mittens and Kasha portrait 23 x 30.5 · Yale Rosewalk 28 x 38.
+Tiepolo 31.2 x 24.3 cm · Homer, The Water Fan 37.4 x 53.4 · Manet, Morisot with a Fan 20.9 x 16.8 (whole sheet) ·
+Guardi 45.4 x 30.1 · Prout 30.2 x 21.6 · Bonington 18.1 x 14.3 · Sargent, In Austrian Tyrol 29.9 x 45.2 ·
+Turner 19.7 x 28 · Ender 21 x 28.5 · Sargent, White Ships 35.2 x 49.2 (from Wikimedia Commons) · Morisot, Avenue du Bois 20 x 28 ·
+Cezanne 21 x 27.2. Nominal, generated: Mittens and Kasha portrait 23 x 30.5 · Yale Rosewalk 28 x 38.
+The museums' own size lines are in [PICTURES.md](PICTURES.md).
 
 RESULTS: to be filled from the frozen run.
 
@@ -82,7 +101,10 @@ The benchmark has five rounds, V1 to V5, each with different tools or feedback. 
 
 V1 to V5 are published. V3 ran the Claude, Codex, Gemini 4 Argon and Muse models. V4 and V5 ran the Claude, Codex and Gemini 4 Argon models. Not every model ran every round. The [leaderboard](results/leaderboard.md) lists the tries each model ran. In V4 and V5 the first try is shared: V5 try 1 has no feedback yet, so it is also V4 try 1.
 
-## Subjects
+## Subjects of rounds V1 to V5
+
+These five small targets belong to the earlier rounds, not to the 0.4 set. Their files, paintings and scores are kept.
+Ships is Sargent's White Ships, which 0.4 paints at a larger size; the 0.4 Mittens is a different picture.
 
 | Subject | Style | Target in the repo |
 |---|---|---|

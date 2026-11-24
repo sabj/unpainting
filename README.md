@@ -122,6 +122,8 @@ Everything runs on a basic machine. A GPU, including a local one through WebGPU,
 
 **0.4 is a new series.** Its scores are not comparable with the rounds before it.
 
+The pictures: fifteen, in four groups of three museum works (figural, architectural, landscape, abstract or loose) and a bonus group of three generated pictures. Five are the core, one from each group, and run levels 1 to 4; the other ten run Auto and level 2. [The pictures and their credits](bench/PICTURES.md).
+
 The ladder. Every level is one try that hands in the model's own script, with a budget of 3.0 look units:
 
 - L1: the freehand kit and its tips (technique guides and worked examples). Paper colour is its choice. One attempt; budget 3 runs of its script.
