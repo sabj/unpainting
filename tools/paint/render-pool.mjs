@@ -98,11 +98,15 @@ export function claims(dir, isAlive = alive) {
   return out;
 }
 
-/** How many live waiting jobs came before `id` (FIFO): a job takes a free place only when there are more free places than that. */
-export function waitRank(dir, id, isAlive = alive) {
+/**
+ * How many live waiting jobs came before `id` (FIFO): a job takes a free place only when there are more free places than
+ * that. `couldTake(w)`: whether an earlier waiter could take one of the places free now; one that could not (a pod-only
+ * job while only the mini is free, a job whose commit no free pod holds) does not hold back a later job that can.
+ */
+export function waitRank(dir, id, isAlive = alive, couldTake = () => true) {
   const d = path.join(dir, 'waiting'); const mine = readJson(path.join(d, `${id}.json`)); if (!mine) return 0;
   const pods = k => POD_KINDS.has(k);   // a look and a painting wait for different places
-  return (fs.existsSync(d) ? fs.readdirSync(d) : []).map(n => readJson(path.join(d, n))).filter(w => w && w.id !== id && pods(w.kind) === pods(mine.kind) && isAlive(w.pid) && (w.since < mine.since || (w.since === mine.since && w.id < id))).length;
+  return (fs.existsSync(d) ? fs.readdirSync(d) : []).map(n => readJson(path.join(d, n))).filter(w => w && w.id !== id && pods(w.kind) === pods(mine.kind) && isAlive(w.pid) && (w.since < mine.since || (w.since === mine.since && w.id < id)) && couldTake(w)).length;
 }
 
 /** Say that this process paints through the pool and runs `sessions` sessions; the pods follow the live total. Cleared at exit. */
@@ -376,7 +380,8 @@ async function takePlace({ dir, env, id, commit, avoid, gpuCount, kind, remoteFo
       }
       // a look takes a pod's place only past the ones the waiting paintings will take
       if (!POD_KINDS.has(kind)) { let keep = podPlacesKept(dir); for (let i = 0; i < open.length && keep > 0; i++) if (open[i].worker.kind === 'pod') { open.splice(i--, 1); keep--; } }
-      const rank = waitRank(dir, id);
+      // an earlier waiter counts only when one of the places open to this job is a place it could take too
+      const openSlots = new Set(open.map(p => p.slot)), rank = waitRank(dir, id, alive, w => places({ pods, mini, local: most, commit: w.commit ?? commit, kind: w.kind, only: w.only ?? null }).some(p => openSlots.has(p.slot)));
       if (open.length > rank) for (const p of open) if (claim(dir, p.slot, { job: id, kind, worker: p.worker.name })) return p;
       tick(why);
       await sleep(pollMs + Math.random() * 1000);

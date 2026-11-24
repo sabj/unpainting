@@ -93,6 +93,11 @@ test('places: one painting a worker, a claim held while its process lives, waiti
   assert.deepEqual(['a', 'b', 'c'].map(id => waitRank(dir, id)), [0, 1, 2]);
   fs.writeFileSync(path.join(dir, 'waiting', 'f.json'), JSON.stringify({ id: 'f', pid: process.pid, since: 9, kind: 'painting' }));
   assert.equal(waitRank(dir, 'f'), 0, 'a painting does not wait behind looks: they wait for other places');
+  // a waiter that cannot take any place free now does not hold back a later one that can (a pod-only job while the mini alone is free)
+  assert.equal(waitRank(dir, 'c', undefined, w => w.id !== 'a'), 1, 'a, which could take no free place, is skipped'); assert.equal(waitRank(dir, 'c', undefined, () => false), 0);
+  const mini = { host: 'mini', slots: 2 }, free = new Set(places({ mini, local: 0, commit: 'abc', kind: 'look', only: ['mini'] }).map(p => p.slot));
+  const could = w => places({ mini, local: 0, pods: [], commit: w.commit, kind: w.kind, only: w.only ?? null }).some(p => free.has(p.slot));
+  assert.equal(could({ kind: 'speed check', commit: 'abc', only: ['pod'] }), false, 'a pod-only waiter cannot take the mini'); assert.equal(could({ kind: 'look', commit: 'abc' }), true);
 });
 
 test('benchmark jobs go first: an operator\'s job takes a place only while none waits, and one at a time', () => {
