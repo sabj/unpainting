@@ -100,7 +100,7 @@ def tally(t):
 def markdown(r):
     """SCORES.md from a results document (score04.py's results.json)."""
     j, w = r["judge"], r["weights"]
-    wash = (r.get("snapshotScheme") or {}).get("name") == "wash10"   # a results document from before the schemes is film13
+    wash = (r.get("snapshotScheme") or {}).get("name") == "progress10"   # a results document from before the schemes is film13
     L = ["# 0.4 scores", "",
          f"Written {r['written']} by `npm run bench:score04`" + (f", repeat {r['repeat']} of the same paintings (a further scoring, no reading shared with another repeat)" if (r.get("repeat") or 1) > 1 else "") + f". **{r['series']}**", "",
          f"Judge label **{j['label']}**, panel **{j.get('panelName') or 'not named'}**, route `{j['route']}` ({j['endpoint']}), reasoning {j.get('reasoning') or 'not recorded'}; judges " + ", ".join(f"`{m}`" + (f" (served as `{(j.get('sentAs') or {}).get(m)}`)" if (j.get('sentAs') or {}).get(m, m) != m else "") for m in j["panel"]) +
@@ -112,19 +112,19 @@ def markdown(r):
         rows = [p for p in r["paintings"] if p["subject"] == sid]
         o = (r["originals"].get(sid) or {}).get("quality") or {}
         L += [f"## {sid}", "", f"The original scores {_f(o.get('score'))} of 10 read alone; each painting's quality share is its score over that.", "",
-              f"| Picture | HUMAN-NESS (mean of {r['snapshots']} {'frames from the first wash to the finished sheet' if wash else 'film snapshots'}, % of 5) | QUALITY AND LIKENESS (share of the original) | COMBINED ({w['humanness']} parts human-ness to {w['quality']} part quality) | adjusted for Auto: human-ness | quality | combined |",
+              f"| Picture | HUMAN-NESS (mean of {r['snapshots']} {'stills in progress, from the first wash to just before the finish' if wash else 'film snapshots'}, % of 5) | QUALITY AND LIKENESS (share of the original) | COMBINED ({w['humanness']} parts human-ness to {w['quality']} part quality) | adjusted for Auto: human-ness | quality | combined |",
               "|---|---|---|---|---|---|---|"]
         for p in rows:
             a = p["adjusted"]
             adj = ["Auto itself"] * 3 if p["auto"] else [a["note"]] * 3 if a.get("note") else [_sg(a["humanness"]), _sg(a["quality"]), _sg(a["combined"])]
             L.append(f"| {p['label']} | {_f(p['human']['percent'], 0, '%')} | {_f(p['share'], 0, '%')} ({_f(p['quality']['score'])} of 10) | **{_f(p['combined'], 0, '%')}** | " + " | ".join(adj) + " |")
-        L += ["", "### Human-ness in detail", "", f"| Picture | {'the drawing frame, before the first wash (of 5; not in the mean) | ' if wash else ''}first third | middle | last third (of 5) | tells (each judge's first reading, every snapshot shown) | a person would paint it in this order | one judge's sentence |", "|---|---|---|---|---|---|---|" + ("---|" if wash else "")]
+        L += ["", "### Human-ness in detail", "", f"| Picture | {'the drawing frame, before the first wash (of 5; not in the mean) | ' if wash else ''}first third | middle | last third (of 5) | the finished sheet (of 5; not in the mean) | tells (each judge's first reading, every snapshot shown) | a person would paint it in this order | one judge's sentence |", "|---|---|---|---|---|---|---|---|" + ("---|" if wash else "")]
         for p in rows:
             h = p["human"]
             th = h["thirds"] or [None] * 3
             yes = "none read" if not h["of"] else f"{'yes' if h['yes'] * 2 > h['of'] else 'no'} ({h['yes']} of {h['of']} readings)"
             told = f"{tally(h['tells'])} (of {h['tellsOf']})" if h.get("tellsOf") else "none"
-            L.append(f"| {p['label']} | {((_f(h['drawing'], 1) if h.get('drawing') is not None else 'nothing drawn first' if not p.get('drawingFrame') else _f(None, 1)) + ' | ') if wash else ''}{_f(th[0], 1)} | {_f(th[1], 1)} | {_f(th[2], 1)} | {told} | {yes} | {(h['why'] or '').replace('|', '/')} |")
+            L.append(f"| {p['label']} | {((_f(h['drawing'], 1) if h.get('drawing') is not None else 'nothing drawn first' if not p.get('drawingFrame') else _f(None, 1)) + ' | ') if wash else ''}{_f(th[0], 1)} | {_f(th[1], 1)} | {_f(th[2], 1)} | {_f(h.get('finished'), 1)} | {told} | {yes} | {(h['why'] or '').replace('|', '/')} |")
         L += ["", "### Beside the score, never blended in", "", "| Picture | anti-cheat: cheat-risk | progression | algorithmic mean (value / edges / marks) | adjusted for Auto | usage |", "|---|---|---|---|---|---|"]
         for p in rows:
             c = p.get("classic") or {}
@@ -133,9 +133,9 @@ def markdown(r):
             L.append(f"| {p['label']} | {cheat_text(p.get('cheat'))} | {progression_text(p.get('cheat'))} | {_f(c.get('mean'))} ({_f(mt.get('value'))} / {_f(mt.get('edge'))} / {_f(mt.get('marks'))}) | {adj} | {usage_text(p.get('usage'))} |")
         L.append("")
     L += ["## What each column is", "",
-          ("- HUMAN-NESS (scheme wash10): the judges see the opening (the untouched paper, not scored), the drawing frame (the last frame before the first wash; scored and shown in the detail table, not in the mean; absent when nothing was drawn first), then ten frames evenly spaced from the first wash to the finished sheet, the tenth being the finished sheet, each with only its percent complete, scored 1 to 5 under the rubric. The figure is the mean of the ten as a percentage of 5. The first wash is read from the film's own record. Thirds: the mean of frames 1-3, 4-7, 8-10. NOT comparable with scores under the earlier scheme (film13). Tells: "
+          ("- HUMAN-NESS (scheme progress10): the judges see the opening (the untouched paper, not scored), the drawing frame (the last frame before the first wash; scored and shown in the detail table, not in the mean; absent when nothing was drawn first), then ten stills of the painting in progress from the first wash to just before the finish, then the finished sheet (scored and shown in the detail table, not in the mean), each scored 1 to 5 under the rubric. The figure is the mean of the ten as a percentage of 5. The judges are never shown the original here, on purpose. The ten are placed by progress, not by frame number: a frame's progress is the share of the finished picture that is on the sheet, measured from the frames themselves, and the ten are at equal steps of it from the first wash (each still is labelled with it); how densely the film was recorded, and strokes that leave no mark, do not move them. The first wash is read from the film's own record. Thirds: the mean of stills 1-3, 4-7, 8-10. NOT comparable with scores under film13 or the withdrawn wash10. Tells: "
            if wash else
-           f"- HUMAN-NESS (scheme film13, the earlier one): {r['snapshots']} snapshots evenly through the painting's film and then the finished sheet, shown in order with only their percent complete, scored 1 to 5 under the rubric; the figure is the mean of the {r['snapshots']} film snapshots as a percentage of 5 (the finished sheet is shown but not counted). Thirds: the mean of snapshots 1-4, 5-8, 9-12. NOT comparable with scores under wash10. Tells: ")
+           f"- HUMAN-NESS (scheme film13, the first one): {r['snapshots']} snapshots evenly through the painting's film and then the finished sheet, shown in order with only their percent complete, scored 1 to 5 under the rubric; the figure is the mean of the {r['snapshots']} film snapshots as a percentage of 5 (the finished sheet is shown but not counted). Thirds: the mean of snapshots 1-4, 5-8, 9-12. NOT comparable with scores under progress10. Tells: ")
           + "; ".join(f"({k}) {v}" for k, v in TELL.items()) + ".",
           "- QUALITY AND LIKENESS: the picture alone, scored as a watercolour 0 to 10, not told whether it is an original or a painting; the share is the painting's score over its original's, read the same way. May pass 100%.",
           f"- COMBINED: ({w['humanness']} x human-ness + {w['quality']} x quality share) / {w['humanness'] + w['quality']}; the weights are written into results.json.",
