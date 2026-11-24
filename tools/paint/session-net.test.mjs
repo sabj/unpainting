@@ -56,7 +56,7 @@ test('a gated session\'s profile lets out only to loopback; its command gets the
   assert.deepEqual(proxyEnv('u').all_proxy, 'u');
   // nothing of the home folder, other users or other volumes can be listed or read in a gated session, save its own program, settings and toolbox
   const hid = seatbelt({ deny: [], write: ['/home/x/.gemini'], cwd: '/c', gated: true, readable: ['/home/x/venv'], hidden: ['/home/x', '/Users', '/Volumes'] });
-  assert.match(hid, /\(deny file-read\* \(subpath "\/home\/x"\) \(subpath "\/Users"\) \(subpath "\/Volumes"\)\)\n\(allow file-read\* \(subpath "\/home\/x\/\.gemini"\)\)\n\(allow file-read\* file-write\* \(subpath "\/c"\)\)\n\(allow file-read\* \(subpath "\/home\/x\/venv"\)\)/);
+  assert.match(hid, /\(deny file-read\* \(subpath "\/home\/x"\) \(subpath "\/Users"\) \(subpath "\/Volumes"\)\)\n\(allow file-read\* \(subpath "\/home\/x\/\.gemini"\)\)\n\(deny file-read\* file-write\*  \(regex #"\/unpaint-session-"\) \(regex #"\/unpaint-bench-"\)\)\n\(allow file-read\* file-write\* \(subpath "\/c"\)\)\n\(allow file-read\* \(subpath "\/home\/x\/venv"\)\)/);
   const g = sessionCall({ key: 'argon-m', cli: 'agy', id: 'm' }, { prompt: 'P', cwd: '/c', deny: [], gate: { url: 'u' }, toolbox, home: '/home/x' });
   assert.match(g.profile, /\(deny file-read\* \(subpath "\/home\/x"\)/);
 });

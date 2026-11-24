@@ -279,7 +279,7 @@ test('a session is started with a shell held to its folder; a model without a sh
   // codex cannot deny a read itself, and seatbelt profiles do not nest: the whole command runs under this harness's profile
   const astra = sessionCall({ key: 'astra', id: 'gpt-6.2-astra', effort: 'high', cli: 'codex' }, { prompt: 'P', cwd: '/tmp/s', deny: ['/repo'], images: ['/tmp/s/inputs/source.png'], home: '/home/x', tmp: '/tmp' });
   assert.equal(astra.cmd, 'sandbox-exec'); assert.deepEqual(astra.args.slice(0, 1), ['-p']); assert.equal(astra.args[2], 'codex'); assert.ok(astra.args.includes('--dangerously-bypass-approvals-and-sandbox'), 'its own sandbox is off only inside ours');
-  assert.match(astra.profile, /\(deny file-read\* file-write\* \(subpath "\/repo"\) \(regex #"\/unpaint-session-"\)\)/); assert.match(astra.profile, /\(deny file-write\*\)/); assert.match(astra.profile, /\(deny network\*\)/);
+  assert.match(astra.profile, /\(deny file-read\* file-write\* \(subpath "\/repo"\) \(regex #"\/unpaint-session-"\) \(regex #"\/unpaint-bench-"\)\)/); assert.match(astra.profile, /\(deny file-write\*\)/); assert.match(astra.profile, /\(deny network\*\)/);
   assert.ok(astra.profile.indexOf('(allow file-read* file-write* (subpath "/tmp/s"))') > astra.profile.indexOf('unpaint-session-'), 'its own folder is allowed again after the denials');
   assert.deepEqual(astra.probe('/repo/x').args.slice(-2), ['/bin/cat', '/repo/x']);
   // agy: the same profile, with loopback and a pseudo-terminal (its helper and its shell), its own prompts off inside it
@@ -290,6 +290,27 @@ test('a session is started with a shell held to its folder; a model without a sh
   assert.throws(() => sessionCall({ key: 'other', cli: 'ollama' }, { prompt: 'P', cwd: '/x' }), /needs a shell/);
   assert.match(seatbelt({ deny: ['/a "b'], write: ['/w'], cwd: '/c' }), /\(subpath "\/a \\"b"\)/);
   assert.deepEqual(cleanEnv({ HOME: '/h', PATH: '/bin', CLAUDECODE: '1', CLAUDE_CODE_ENTRYPOINT: 'cli', X_GRADE: '1', OPENAI_API_KEY: 'k', LC_ALL: 'C' }), { HOME: '/h', PATH: '/bin', OPENAI_API_KEY: 'k', LC_ALL: 'C' });
+});
+
+test('under the closed profile a session reads its own folder, never another session\'s nor the repository', { skip: process.platform !== 'darwin' && 'the profile is macOS seatbelt' }, () => {
+  // real processes under the real profile (no model): the temporary folders are writable and read again after the
+  // home folder is hidden, and other sessions live in them
+  const tmp = fs.realpathSync(os.tmpdir()), mine = fs.mkdtempSync(path.join(tmp, 'unpaint-session-mine-')), theirs = fs.mkdtempSync(path.join(tmp, 'unpaint-session-theirs-')), attempt = fs.mkdtempSync(path.join(tmp, 'unpaint-bench-'));
+  try {
+    for (const d of [mine, theirs, attempt]) fs.writeFileSync(path.join(d, 'f.txt'), 'x');
+    const repo = path.resolve('package.json');
+    for (const hidden of [[os.homedir(), '/Users', '/Volumes'], []]) {
+      const profile = seatbelt({ deny: [path.dirname(repo)], write: [tmp, '/private/tmp', '/private/var/folders'], cwd: mine, local: true, gated: hidden.length > 0, hidden });
+      const can = (cmd, ...a) => { try { execFileSync('sandbox-exec', ['-p', profile, cmd, ...a], { stdio: 'pipe' }); return true; } catch { return false; } };
+      const how = hidden.length ? 'the home folder hidden' : 'the home folder not hidden';
+      assert.equal(can('/bin/cat', path.join(mine, 'f.txt')), true, `its own file is read (${how})`);
+      assert.equal(can('/usr/bin/touch', path.join(mine, 'new.txt')), true, `its own folder is written (${how})`);
+      assert.equal(can('/bin/cat', path.join(theirs, 'f.txt')), false, `another session's file is not read (${how})`);
+      assert.equal(can('/usr/bin/touch', path.join(theirs, 'new.txt')), false, `another session's folder is not written (${how})`);
+      assert.equal(can('/bin/cat', path.join(attempt, 'f.txt')), false, `a level 1 attempt's file is not read (${how})`);
+      assert.equal(can('/bin/cat', repo), false, `a file of the repository is not read (${how})`);
+    }
+  } finally { for (const d of [mine, theirs, attempt]) fs.rmSync(d, { recursive: true, force: true }); }
 });
 
 test('a transcript gives the tool calls by kind, the commands, the last message and the cost', () => {
