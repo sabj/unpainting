@@ -138,6 +138,33 @@ Not measured on rc7: a full-size painting without film, a level 1 session, a lev
 on the one-area sheet. The pod's plan phase runs on the pod's CPU, which is why a pod can take longer than the mini
 for one painting; pods are used to paint many at once.
 
+## What runs where
+
+| Part | Needs | Local or cloud |
+|---|---|---|
+| The painter | a GPU that WebGPU can use | local |
+| Planning, fitting the drawing, segmentation | CPU | local |
+| Studies for a new picture | the image model: about 100 GB of memory as run here on Apple silicon, or a rented GPU for about an hour | local on a large machine, or cloud |
+| Studies for the shipped pictures | nothing: they come already made | local |
+| Judges | the local panel (large memory), or the same open models hosted (an API key) | either |
+| The models under test | their makers' command-line tools | their makers' clouds |
+
+Running the benchmark on the shipped pictures needs only the painter and the planner, plus a route to the judges and
+to the models under test.
+
+Measured: one full-size Auto painting of Mittens (1,086 x 1,448 cells, no film) on a Mac mini (M4, 16 GB), nothing
+else painting there, at rc7 45115256, with `/usr/bin/time -l`. The painter's process peaked at 11.0 GB resident
+(10,981,392,384 bytes) and finished in 11.3 min. macOS reported a peak memory footprint of 43.0 GB for the same
+process; that figure counts compressed pages at their full size and memory shared with the GPU, so it is larger than
+the machine's memory.
+
+The smallest machine that has done each thing here: painting and planning, the 16 GB Mac mini; everything including
+new studies and the local judges, a 128 GB Mac.
+
+Not measured: GPU memory apart from the process; a painting with film; any other picture or sheet size; a machine
+with less than 16 GB; the memory of the image model and of the local judge panel (the 100 GB is the preparation
+notes' figure).
+
 ## Benchmark
 
 [unpaint-bench](bench/README.md) tests how well AI models paint, and how much of that is the model and how much is the code that helps it. The reference is "Auto", the code planner alone.
