@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { renderSetting, outOf, paintHere, renderer } from './render.mjs';
 import { namedPaths, jobInputs, workerArgs, homePaths, workerEnv } from './render-ship.mjs';
-import { claim, claims, release, markStarted, waitRank, places, costOf, paintOnPool, WorkerFailure, WorkersFailed, registerClient, podsDaemon, daemonProcessAlive, DAEMON_GONE_GRACE_S } from './render-pool.mjs';
+import { claim, claims, release, markStarted, waitRank, places, podPlacesKept, costOf, paintOnPool, WorkerFailure, WorkersFailed, registerClient, podsDaemon, daemonProcessAlive, DAEMON_GONE_GRACE_S } from './render-pool.mjs';
 import { paintJob } from './render-worker.mjs';
 import { shellWords, keptCommand } from './render-replay.mjs';
 
@@ -91,13 +91,23 @@ test('benchmark jobs go first: an operator\'s job takes a place only while none 
   assert.equal(claim(d2, 'mini-0', { job: 'op', kind: 'operator look' }), false, 'a session\'s look waits for the mini too');
 });
 
-test('the places a job may take: a look this Mac then the mini; a full-size painting a ready pod with the commit and time left', () => {
+test('the places a job may take: a look this Mac, the mini, then a pod that is up; a full-size painting a ready pod with the commit and time left', () => {
   const now = 1e12, pods = [{ name: 'p1', ready: true, trees: { abcdef12: '/t' }, limit: now / 1000 + 3600, ip: '1.2.3.4', port: 22, rate: 0.89 }, { name: 'p2', ready: true, trees: { abcdef12: '/t' }, limit: now / 1000 + 600 }, { name: 'p3', ready: false, trees: { abcdef12: '/t' } }, { name: 'p4', ready: true, trees: { other000: '/t' }, limit: now / 1000 + 9999 }];
-  assert.deepEqual(places({ pods, mini: { host: 'mini', slots: 2 }, local: 1, commit: 'abcdef1234', now }).map(p => p.slot), ['local-0', 'mini-0', 'mini-1']);
+  assert.deepEqual(places({ pods, mini: { host: 'mini', slots: 2 }, local: 1, commit: 'abcdef1234', now }).map(p => p.slot), ['local-0', 'mini-0', 'mini-1', 'pod-p1']);
   const got = places({ pods, mini: { host: 'mini', slots: 2 }, local: 1, commit: 'abcdef1234', kind: 'painting', now });
   assert.deepEqual(got.map(p => p.slot), ['pod-p1']); assert.equal(got[0].worker.tree, '/t');
   assert.deepEqual(places({ pods, mini: { host: 'mini' }, local: 2, commit: 'abcdef1234', now, only: ['mini'] }).map(p => p.slot), ['mini-0', 'mini-1']);
   assert.equal(costOf({ kind: 'pod', rate: 0.89 }, 3600), 0.89); assert.equal(costOf({ kind: 'mini' }, 3600), 0);
+  // a pod paints as many at once as its GPU type was measured to: the places fill pod by pod, level by level
+  const wide = [{ ...pods[0], slots: 3 }, { ...pods[0], name: 'q', slots: 2 }];
+  assert.deepEqual(places({ pods: wide, commit: 'abcdef1234', kind: 'painting', now }).map(p => p.slot), ['pod-p1', 'pod-q', 'pod-p1-1', 'pod-q-1', 'pod-p1-2']);
+  assert.equal(costOf({ kind: 'pod', rate: 0.9, slots: 3 }, 3600), 0.3, 'a place costs its share of the pod');
+  // a look leaves a pod place for each painting waiting
+  const dir = tmp(); fs.mkdirSync(path.join(dir, 'waiting'));
+  fs.writeFileSync(path.join(dir, 'waiting', 'f.json'), JSON.stringify({ id: 'f', pid: process.pid, since: 1, kind: 'painting' }));
+  fs.writeFileSync(path.join(dir, 'waiting', 'l.json'), JSON.stringify({ id: 'l', pid: process.pid, since: 1, kind: 'look' }));
+  fs.writeFileSync(path.join(dir, 'waiting', 'g.json'), JSON.stringify({ id: 'g', pid: 999999, since: 1, kind: 'painting' }));
+  assert.equal(podPlacesKept(dir, pid => pid === process.pid), 1);
 });
 
 test('a full-size painting with no pods daemon running fails at once, saying how to start it', async () => {
