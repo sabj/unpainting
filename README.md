@@ -142,15 +142,11 @@ How it is run and scored:
 - The first run: Gemini 4 Argon, Neon and Hydrogen and Claude Sonnet 5.5, all at medium effort, on subscriptions. Not in it: a container for replication and the OpenAI models.
 - How to replicate: [bench/README](bench/README.md#how-to-replicate-04).
 
-<p align="center"><a href="docs/auto-vs-model.md"><img src="docs/img/auto-vs-model-banner.webp" width="720" alt="Mittens: the picture, Auto's painting, and a model's painting at level 2"></a></p>
+<p align="center"><a href="docs/auto-vs-model.md"><img src="docs/img/auto-vs-model-auto-cut.webp" width="720" alt="Mittens: a study, the outline of every wash Auto cuts from it, and a close up of the head"></a></p>
 
-<p align="center">Mittens: the picture, Auto, a model at L2.</p>
+<p align="center">How Auto starts: a study cut into washes.</p>
 
-<p align="center"><a href="docs/auto-vs-model.md#the-forehead-stripes"><img src="docs/img/auto-vs-model-place-stripes.webp" width="720" alt="The forehead stripes: the model's long wet strokes against Auto's jigsaw shapes of short dry strokes"></a></p>
-
-<p align="center">Forehead stripes: the model on top, Auto below.</p>
-
-- [Auto against a model](docs/auto-vs-model.md): one cat, step by step, and what a model may change at each level.
+- [How Auto paints, and how a model's script differs](docs/auto-vs-model.md): Auto's method on one cat, step by step.
 - [Painting script](docs/painting-script.md): how a model writes its passages.
 - [Levels](bench/docs/levels.md): what each level is given.
 - [Rules](bench/docs/rules.md): the workspace and the budgets.
