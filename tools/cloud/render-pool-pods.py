@@ -206,8 +206,9 @@ mkdir -p work; touch work/runs.jsonl; ln -sfn {b}/work/models work/models
 
 
 def measure(pod):
-    """What the pod really has (its container's memory and cores, its GPU), and so how many it paints at once."""
-    r = ssh(pod, "echo MEM=$(cat /sys/fs/cgroup/memory.max 2>/dev/null || cat /sys/fs/cgroup/memory/memory.limit_in_bytes); echo CPU=$(awk '$1 != \"max\" { printf \"%d\", $1 / $2 }' /sys/fs/cgroup/cpu.max 2>/dev/null | grep . || nproc); echo GPU=$(nvidia-smi --query-gpu=name --format=csv,noheader | head -1)", timeout=60)
+    """What the pod really has (its container's memory and its own core allowance, not the host's core count: a
+    16-core pod on a 128-core host reported 128; its GPU), and so how many it paints at once."""
+    r = ssh(pod, "echo MEM=$(cat /sys/fs/cgroup/memory.max 2>/dev/null || cat /sys/fs/cgroup/memory/memory.limit_in_bytes); echo CPU=$( (awk '$1 != \"max\" { printf \"%d\", $1 / $2 }' /sys/fs/cgroup/cpu.max 2>/dev/null | grep .) || (q=$(cat /sys/fs/cgroup/cpu/cpu.cfs_quota_us 2>/dev/null); p=$(cat /sys/fs/cgroup/cpu/cpu.cfs_period_us 2>/dev/null); [ \"${q:-0}\" -gt 0 ] && echo $((q / p))) || nproc); echo GPU=$(nvidia-smi --query-gpu=name --format=csv,noheader | head -1)", timeout=60)
     said = dict(l.split("=", 1) for l in r.stdout.decode().splitlines() if "=" in l)
     gpu = said.get("GPU", "").strip()
     ram = int(said["MEM"]) / 1e9 if said.get("MEM", "").isdigit() and int(said["MEM"]) < 1e13 else None
