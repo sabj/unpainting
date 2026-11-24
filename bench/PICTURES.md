@@ -4,72 +4,80 @@ The 0.4 benchmark paints fifteen pictures: four groups of three museum works, an
 made with an image generator. Five are the core, one from each group; all fifteen are the extended set.
 [README](README.md#the-pictures) says what each set runs.
 
-Each museum row is copied from the museum's own record, read on 23 November 2026. The medium, size and credit line
-are the museum's words. The same credits, with the files in the repository, are in [NOTICE](../NOTICE) section 5.
+Museum records were read on 23 November 2026. The medium, size and credit line are the museum's words. The same
+credits, with the files in the repository, are in [NOTICE](../NOTICE) sections 5 and 6.
 
-| Group | Set | Picture | Museum and accession | Medium (museum's line) | Real size | Rights | Credit line | Link |
+## Museum works
+
+| Group | Set | Artist, title, date | Museum (accession) | Medium (museum's line) | Real size | Rights | Credit line | Link |
 |---|---|---|---|---|---|---|---|---|
-| Figural | Extended | Giovanni Battista Tiepolo, Bacchus and Ariadne, ca. 1740 | The Metropolitan Museum of Art, 1975.1.443 | Pen and brown ink, brown wash, over black chalk. | 12 5/16 x 9 9/16 in. (31.2 x 24.3 cm) | Public domain (Open Access, CC0) | Robert Lehman Collection, 1975 | [Met 459236](https://www.metmuseum.org/art/collection/search/459236) · [Commons, CC0](https://commons.wikimedia.org/wiki/File:Bacchus_and_Ariadne_MET_DP358995.jpg) |
-| Figural | Extended | Winslow Homer, The Water Fan, 1898/99 | Art Institute of Chicago, 1972.190 | Watercolor, with blotting and touches of scraping, over graphite, on thick, rough twill-textured, ivory wove paper | 37.4 × 53.4 cm (14 3/4 × 21 1/16 in.) | Public domain (CC0) | Gift of Dorothy A., John A., Jr., and Christopher Holabird in memory of William and Mary Holabird | [AIC 38666](https://www.artic.edu/artworks/38666) |
-| Figural | **Core** | Édouard Manet, Portrait of Berthe Morisot with a Fan, 1874 (a detail: head, shoulders and hand) | Art Institute of Chicago, 1963.812 | Watercolor over traces of graphite on cream wove paper | 20.9 × 16.8 cm (8 1/4 × 6 5/8 in.), the whole sheet | Public domain (CC0) | Helen Regenstein Collection | [AIC 18667](https://www.artic.edu/artworks/18667) |
-| Architectural | Extended | Francesco Guardi, A Colonnade, Partly Ruined, with Figures, ca. 1780–90 | The Metropolitan Museum of Art, 1975.1.337 | Pen and brown ink, brown and gray wash | 17 7/8 x 11 7/8 in. (45.4 x 30.1 cm) | Public domain (Open Access, CC0) | Robert Lehman Collection, 1975 | [Met 459623](https://www.metmuseum.org/art/collection/search/459623) · [Commons, CC0](https://commons.wikimedia.org/wiki/File:A_Colonnade,_Partly_Ruined,_with_Figures_MET_DT3176.jpg) |
-| Architectural | **Core** | Samuel Prout, Laundresses before the Wasserturm, Nuremberg (no date in the open data) | National Gallery of Art, Washington, 1988.20.35 | watercolor on wove paper; laid down | overall: 30.2 x 21.6 cm (11 7/8 x 8 1/2 in.) | Image flagged open access in the Gallery's open data; the page's own wording to be checked by hand | Gift of John Nichols Estabrook and Dorothy Coogan Estabrook | [NGA 70364](https://www.nga.gov/artworks/70364) |
-| Architectural | Extended | Richard Parkes Bonington, French Town, Buildings and River, 1821/8 | Art Institute of Chicago, 1939.430 | Watercolor on paper | 18.1 × 14.3 cm (7 1/8 × 5 5/8 in.) | Public domain (CC0) | Olivia Shaler Swan Memorial Collection | [AIC 30925](https://www.artic.edu/artworks/30925) |
-| Landscape | Extended | John Singer Sargent, In Austrian Tyrol, 1911 | The Cleveland Museum of Art, 1921.1734 | watercolor with traces of graphite | Sheet: 29.9 x 45.2 cm (11 3/4 x 17 13/16 in.) | CC0 | Hinman B. Hurlbut Collection | [Cleveland 1921.1734](https://clevelandart.org/art/1921.1734) |
-| Landscape | **Core** | Joseph Mallord William Turner, The Fort of L'Esseillon, Val de la Maurienne, France, 1835–36 | The Metropolitan Museum of Art, 1972.118.293 | Watercolor | sheet: 7 3/4 x 11 in. (19.7 x 28 cm) | Public domain (Open Access, CC0) | Bequest of Walter C. Baker, 1971 | [Met 343384](https://www.metmuseum.org/art/collection/search/343384) · [Commons, CC0](https://commons.wikimedia.org/wiki/File:Fort_of_L%27Essillon,_Val_de_la_Maurienne,_France_MET_DP805109.jpg) |
-| Landscape | Extended | Thomas Ender, Mountain Valley, early 19th–mid 19th century | The Metropolitan Museum of Art, 2007.116 | Watercolor over graphite | 8 1/4 x 11 1/4 in. (21 x 28.5 cm) | Public domain (Open Access, CC0) | Harry G. Sperling Fund, 2007 | [Met 372683](https://www.metmuseum.org/art/collection/search/372683) · [Commons, CC0](https://commons.wikimedia.org/wiki/File:Mountain_Valley_MET_DP803728.jpg) |
-| Abstract or loose | **Core** | John Singer Sargent, White Ships, 1908 | Brooklyn Museum, 09.846 | Translucent and touches of opaque watercolor and wax resist with graphite underdrawing | 35.2 x 49.2 cm (from Commons) | Commons: PD-Art (PD-old-70), "no known copyright restrictions"; the museum's own statement to be checked by hand | Commons gives a purchase by Special Subscription; the museum's credit line to be checked by hand | [Brooklyn 20397](https://www.brooklynmuseum.org/objects/20397) · [Commons, public domain](https://commons.wikimedia.org/wiki/File:Brooklyn_Museum_-_White_Ships_-_John_Singer_Sargent.jpg) |
-| Abstract or loose | Extended | Berthe Morisot, A Woman Seated at a Bench on the Avenue du Bois, 1885 | The Metropolitan Museum of Art, 48.10.8 | Watercolor over traces of graphite | sheet: 7 7/8 x 11 in. (20 x 28 cm) | Public domain (Open Access, CC0) | Harris Brisbane Dick Fund, 1948 | [Met 337864](https://www.metmuseum.org/art/collection/search/337864) · [Commons, CC0](https://commons.wikimedia.org/wiki/File:A_Woman_Seated_at_a_Bench_on_the_Avenue_du_Bois_MET_DP807732.jpg) |
-| Abstract or loose | Extended | Paul Cézanne, Bathers Under a Bridge (recto); Study after Houdon's Ecorché (verso), 1900–06 (recto). The recto is painted. | The Metropolitan Museum of Art, 55.21.2 | Watercolor over graphite (recto); graphite (verso) | Sheet: 8 1/4 x 10 11/16 in. (21 x 27.2cm) | Public domain (Open Access, CC0) | Maria DeWitt Jesup Fund, 1951; acquired from The Museum of Modern Art, Lillie P. Bliss Collection | [Met 334173](https://www.metmuseum.org/art/collection/search/334173) · [Commons, CC0 and PD-Art](https://commons.wikimedia.org/wiki/File:Bathers_by_a_Bridge_(recto);_Study_after_Houdon%27s_Ecorch%C3%A9_(verso)_MET_DP805572.jpg) |
-| Bonus (generated) | **Core** | Mittens (`mittens-closeup`) | None: made with an image generator from Sam Jackson's own photograph | Soft washes over pencil | Nominal 23 x 30.5 cm | © Sam Jackson, noncommercial ([NOTICE](../NOTICE) section 1) | Photo by Sam Jackson | `v3/targets/mittens-closeup-full.png` |
-| Bonus (generated) | Extended | Kasha portrait (`kasha-portrait`) | None: made with an image generator from Sam Jackson's own photograph | Black pen and watercolour | Nominal 23 x 30.5 cm | © Sam Jackson, noncommercial ([NOTICE](../NOTICE) section 1) | Photo by Sam Jackson | Not in the repository |
-| Bonus (generated) | Extended | Yale Rosewalk (`h36`) | None: made with an image generator from a public-domain photograph | Ink line and watercolour | Nominal 28 x 38 cm | Source photograph public domain ([NOTICE](../NOTICE) section 4) | Photograph by Carol M. Highsmith, Library of Congress | `v3/targets/h36-full.png` |
+| Figural | Extended | Giovanni Battista Tiepolo, Bacchus and Ariadne, ca. 1740 | The Metropolitan Museum of Art (1975.1.443) | Pen and brown ink, brown wash, over black chalk. | 31.2 x 24.3 cm | Public domain (Open Access, CC0) | Robert Lehman Collection, 1975 | [Met 459236](https://www.metmuseum.org/art/collection/search/459236) · [our file, Commons, CC0](https://commons.wikimedia.org/wiki/File:Bacchus_and_Ariadne_MET_DP358995.jpg) |
+| Figural | Extended | Winslow Homer, The Water Fan, 1898/99 | Art Institute of Chicago (1972.190) | Watercolor, with blotting and touches of scraping, over graphite, on thick, rough twill-textured, ivory wove paper | 37.4 × 53.4 cm | Public domain (CC0) | Gift of Dorothy A., John A., Jr., and Christopher Holabird in memory of William and Mary Holabird | [AIC 38666](https://www.artic.edu/artworks/38666) |
+| Figural | **Core** | Édouard Manet, Portrait of Berthe Morisot with a Fan, 1874 (painted as a detail: head, shoulders and hand) | Art Institute of Chicago (1963.812) | Watercolor over traces of graphite on cream wove paper | 20.9 × 16.8 cm, the whole sheet | Public domain (CC0) | Helen Regenstein Collection | [AIC 18667](https://www.artic.edu/artworks/18667) |
+| Architectural | Extended | Francesco Guardi, A Colonnade, Partly Ruined, with Figures, ca. 1780–90 | The Metropolitan Museum of Art (1975.1.337) | Pen and brown ink, brown and gray wash | 45.4 x 30.1 cm | Public domain (Open Access, CC0) | Robert Lehman Collection, 1975 | [Met 459623](https://www.metmuseum.org/art/collection/search/459623) · [our file, Commons, CC0](https://commons.wikimedia.org/wiki/File:A_Colonnade,_Partly_Ruined,_with_Figures_MET_DT3176.jpg) |
+| Architectural | **Core** | Samuel Prout (British, 1783–1852), Laundresses before the Wasserturm, Nuremberg, no date given by the museum | National Gallery of Art, Washington (1988.20.35) | watercolor on wove paper; laid down | overall: 30.2 x 21.6 cm | "This object's media is free and in the public domain." | Gift of John Nichols Estabrook and Dorothy Coogan Estabrook | [NGA 70364](https://www.nga.gov/artworks/70364-laundresses-wasserturm-nuremberg) |
+| Architectural | Extended | Richard Parkes Bonington, French Town, Buildings and River, 1821/8 | Art Institute of Chicago (1939.430) | Watercolor on paper | 18.1 × 14.3 cm | Public domain (CC0) | Olivia Shaler Swan Memorial Collection | [AIC 30925](https://www.artic.edu/artworks/30925) |
+| Landscape | Extended | John Singer Sargent, In Austrian Tyrol, 1911 | The Cleveland Museum of Art (1921.1734) | watercolor with traces of graphite | Sheet: 29.9 x 45.2 cm | CC0 | Hinman B. Hurlbut Collection | [Cleveland 1921.1734](https://clevelandart.org/art/1921.1734) |
+| Landscape | **Core** | Joseph Mallord William Turner, The Fort of L'Esseillon, Val de la Maurienne, France, 1835–36 | The Metropolitan Museum of Art (1972.118.293) | Watercolor | sheet: 19.7 x 28 cm | Public domain (Open Access, CC0) | Bequest of Walter C. Baker, 1971 | [Met 343384](https://www.metmuseum.org/art/collection/search/343384) · [our file, Commons, CC0](https://commons.wikimedia.org/wiki/File:Fort_of_L%27Essillon,_Val_de_la_Maurienne,_France_MET_DP805109.jpg) |
+| Landscape | Extended | Thomas Ender, Mountain Valley, early 19th–mid 19th century | The Metropolitan Museum of Art (2007.116) | Watercolor over graphite | 21 x 28.5 cm | Public domain (Open Access, CC0) | Harry G. Sperling Fund, 2007 | [Met 372683](https://www.metmuseum.org/art/collection/search/372683) · [our file, Commons, CC0](https://commons.wikimedia.org/wiki/File:Mountain_Valley_MET_DP803728.jpg) |
+| Abstract or loose | **Core** | John Singer Sargent, White Ships, 1908 | Brooklyn Museum (09.846) | Translucent and touches of opaque watercolor and wax resist with graphite underdrawing | 13 7/8 x 19 3/8 in. (35.2 x 49.2 cm) | Work public domain (artist died 1925). Photograph: Brooklyn Museum; its page gave no rights line when read; the Commons file carries the museum's "no known copyright restrictions" tag | Purchased by Special Subscription | [Brooklyn 20397](https://www.brooklynmuseum.org/objects/20397) · [Commons, PD-Art](https://commons.wikimedia.org/wiki/File:Brooklyn_Museum_-_White_Ships_-_John_Singer_Sargent.jpg) |
+| Abstract or loose | Extended | Berthe Morisot, A Woman Seated at a Bench on the Avenue du Bois, 1885 | The Metropolitan Museum of Art (48.10.8) | Watercolor over traces of graphite | sheet: 20 x 28 cm | Public domain (Open Access, CC0) | Harris Brisbane Dick Fund, 1948 | [Met 337864](https://www.metmuseum.org/art/collection/search/337864) · [our file, Commons, CC0](https://commons.wikimedia.org/wiki/File:A_Woman_Seated_at_a_Bench_on_the_Avenue_du_Bois_MET_DP807732.jpg) |
+| Abstract or loose | Extended | Paul Cézanne, Bathers Under a Bridge (recto); Study after Houdon's Ecorché (verso), 1900–06 (recto); the recto is painted | The Metropolitan Museum of Art (55.21.2) | Watercolor over graphite (recto); graphite (verso) | Sheet: 21 x 27.2 cm | Public domain (Open Access, CC0) | Maria DeWitt Jesup Fund, 1951; acquired from The Museum of Modern Art, Lillie P. Bliss Collection | [Met 334173](https://www.metmuseum.org/art/collection/search/334173) · [our file, Commons, CC0 and PD-Art](https://commons.wikimedia.org/wiki/File:Bathers_by_a_Bridge_(recto);_Study_after_Houdon%27s_Ecorch%C3%A9_(verso)_MET_DP805572.jpg) |
 
-Notes:
-
-- Art Institute of Chicago: the record marks each work public domain, and the museum releases images of such works
-  under [CC0](https://www.artic.edu/open-access/open-access-images).
-- The Met: the record marks each work public domain; [Open Access](https://www.metmuseum.org/hubs/open-access) images
-  are CC0. Our files are the Met's own files as donated to Wikimedia Commons, where each is tagged CC0.
-- National Gallery of Art: its page refused scripted requests, so the Prout row is from the Gallery's
-  [open data](https://github.com/NationalGalleryOfArt/opendata). The page's date and rights wording are to be checked
-  by hand.
-- Brooklyn Museum: its page refused scripted requests, so the White Ships row's size, rights and credit are from the
-  Commons page, and the medium line is the one the project copied from the museum's page on 23 November 2026. The
-  page's caption, credit line and rights statement are to be checked by hand.
+- Art Institute of Chicago: the record marks the work public domain, and the museum releases such images under
+  [CC0](https://www.artic.edu/open-access/open-access-images).
+- The Met: the record marks the work public domain; [Open Access](https://www.metmuseum.org/hubs/open-access) images
+  are CC0. Our files are the Met's own files as donated to Wikimedia Commons.
+- The National Gallery's and the Brooklyn Museum's pages refuse scripts; both were read by hand on 23 November 2026.
 - Manet's Morisot with a Fan is painted as a detail. Every other picture is the whole sheet.
-- A generated picture has no real size; its nominal size is what the model is told.
+
+## Bonus group: made with an image generator
+
+Each started from a photograph and was modified with an image generator. There is no museum original; the nominal size
+is what the model is told.
+
+| Set | Picture | Source photograph | Modified with an image generator | Size | Rights | File |
+|---|---|---|---|---|---|---|
+| **Core** | Mittens (`mittens-closeup`) | Photograph by Sam Jackson | Image generator not recorded | Nominal 23 x 30.5 cm | © Sam Jackson, noncommercial ([NOTICE](../NOTICE) section 1) | `v3/targets/mittens-closeup-full.png` |
+| Extended | Kasha portrait (`kasha-portrait`) | Photograph by Sam Jackson | Image generator not recorded | Nominal 23 x 30.5 cm | © Sam Jackson, noncommercial ([NOTICE](../NOTICE) section 1) | Not in the repository |
+| Extended | Yale Rosewalk (`h36`) | Carol M. Highsmith, Yale University, New Haven, Connecticut, September 2011. George F. Landegger Collection of Connecticut Photographs in Carol M. Highsmith's America, Library of Congress, Prints and Photographs Division, [LC-DIG-highsm-19255](https://www.loc.gov/item/2012630670/). "No known restrictions on publication." | 10 October 2026; the record names the tool `image_gen.imagegen` and no model ([record](../demos/lab/examples/h36-a/h36-a.json)) | Nominal 28 x 38 cm | Source photograph: no known restrictions ([NOTICE](../NOTICE) section 4) | `v3/targets/h36-full.png` |
 
 ## Optional set
 
-Not scored. Sources as recorded in the project's inventory; these records were not re-read for this release.
+Not scored.
 
-| Picture | Source |
-|---|---|
-| Winslow Homer, Adirondacks Guide, 1892 | Art Institute of Chicago, [16772](https://www.artic.edu/artworks/16772), CC0 |
-| Winslow Homer, A Fisherman's Daughter, 1873 | The Cleveland Museum of Art, [1943.660](https://clevelandart.org/art/1943.660), CC0 |
-| Winslow Homer, Two Ladies, 1880 | The Met, [11144](https://www.metmuseum.org/art/collection/search/11144) |
-| Winslow Homer, Leaping Trout | The Cleveland Museum of Art, [1973.142](https://clevelandart.org/art/1973.142) |
-| Samuel Prout, French Street Scene with a Medieval Turret | National Gallery of Art, [70363](https://www.nga.gov/artworks/70363) |
-| W. J. Bennett, View of South Street, from Maiden Lane, New York City, c. 1827 | The Met, [10141](https://www.metmuseum.org/art/collection/search/10141) |
-| Frank Randal, Il Resegone, 1885 | The Met, [459658](https://www.metmuseum.org/art/collection/search/459658) |
-| John Varley, On the Thames at Hammersmith, c. 1836 | The Met, [426773](https://www.metmuseum.org/art/collection/search/426773) |
-| John Singer Sargent, Chalets, Breithorn, Murren, 1870 | The Met, [12299](https://www.metmuseum.org/art/collection/search/12299) |
-| John Singer Sargent, View from Mount Pilatus, 1870 | The Met, [12042](https://www.metmuseum.org/art/collection/search/12042) |
-| William Marlow, The door of a grotto, c. 1765-66 | The Met, [641334](https://www.metmuseum.org/art/collection/search/641334) |
-| A. W. Hunt, Snowdon, c. 1857 | The Met, [728488](https://www.metmuseum.org/art/collection/search/728488) |
-| John Constable, Cloud study | The Met, [727706](https://www.metmuseum.org/art/collection/search/727706) |
-| Paul Cézanne, Bathers | The Met, [364093](https://www.metmuseum.org/art/collection/search/364093) |
-| Rembrandt, Woman Reading | The Met, [347891](https://www.metmuseum.org/art/collection/search/347891), public domain |
-| Jean Honoré Fragonard, Rinaldo in the Enchanted Forest, ca. 1763 (chalk under the wash) | The Met, [386293](https://www.metmuseum.org/art/collection/search/386293), public domain |
-| Yale, Sterling Library | Made with an image generator |
-| Kasha portrait wash | Made with an image generator from Sam Jackson's photograph |
-| Trumbull (from the 0.2.1 benchmark) | Third-party photograph, [NOTICE](../NOTICE) section 1a |
-| The first Mittens, cat and portrait (from the 0.2.1 benchmark) | Photo by Sam Jackson, [NOTICE](../NOTICE) section 1 |
+| Artist, title, date | Medium (museum's line) | Museum (accession), credit line | Rights | Link |
+|---|---|---|---|---|
+| Winslow Homer, Adirondacks Guide, 1892 | Transparent watercolor with touches of opaque watercolor, rewetting, blotting and scraping, over traces of graphite, on thick, moderately textured, ivory wove paper (top edge trimmed) | Art Institute of Chicago (1933.1234), Mr. and Mrs. Martin A. Ryerson Collection | Public domain (CC0) | [AIC 16772](https://www.artic.edu/artworks/16772) |
+| Winslow Homer, A Fisherman's Daughter, 1873 | Watercolor and gouache over graphite | The Cleveland Museum of Art (1943.660), Purchase from the J. H. Wade Fund | CC0 | [Cleveland 1943.660](https://clevelandart.org/art/1943.660) |
+| Winslow Homer, Leaping Trout, 1889 | Watercolor over graphite | The Cleveland Museum of Art (1973.142), Anonymous Gift | CC0 | [Cleveland 1973.142](https://clevelandart.org/art/1973.142) |
+| Winslow Homer, Two Ladies, 1880 | Watercolor and graphite on off-white wove paper | The Metropolitan Museum of Art (18.123.3), Gift of Estate of Florence Baird Meyer, in her memory, 1918 | Public domain (Open Access, CC0) | [Met 11144](https://www.metmuseum.org/art/collection/search/11144) |
+| Samuel Prout, French Street Scene with a Medieval Turret, no date given | watercolor on wove paper; laid down | National Gallery of Art, Washington (1988.20.34), Gift of John Nichols Estabrook and Dorothy Coogan Estabrook | Image flagged open access in the Gallery's open data; page not read | [NGA 70363](https://www.nga.gov/artworks/70363) |
+| William James Bennett, View of South Street, from Maiden Lane, New York City, ca. 1827 | Watercolor on off-white wove paper | The Metropolitan Museum of Art (54.90.130), The Edward W. C. Arnold Collection of New York Prints, Maps, and Pictures, Bequest of Edward W. C. Arnold, 1954 | Public domain (Open Access, CC0) | [Met 10141](https://www.metmuseum.org/art/collection/search/10141) |
+| Frank Randal, Mountainous Landscape in Italy: "Il Resegone", 1885 | Watercolor over pencil | The Metropolitan Museum of Art (1975.1.895), Robert Lehman Collection, 1975 | Public domain (Open Access, CC0) | [Met 459658](https://www.metmuseum.org/art/collection/search/459658) |
+| John Varley, On the Thames at Hammersmith, ca. 1836 | Watercolor and graphite | The Metropolitan Museum of Art (2013.541), Purchase, Brooke Russell Astor Bequest, 2013 | Public domain (Open Access, CC0) | [Met 426773](https://www.metmuseum.org/art/collection/search/426773) |
+| John Singer Sargent, Chalets, Breithorn, Mürren, 1870 | Watercolor and graphite on off-white wove paper | The Metropolitan Museum of Art (50.130.82b recto), Gift of Mrs. Francis Ormond, 1950 | Public domain (Open Access, CC0) | [Met 12299](https://www.metmuseum.org/art/collection/search/12299) |
+| John Singer Sargent, View from Mount Pilatus, 1870 | Watercolor on white wove paper | The Metropolitan Museum of Art (50.130.82e), Gift of Mrs. Francis Ormond, 1950 | Public domain (Open Access, CC0) | [Met 12042](https://www.metmuseum.org/art/collection/search/12042) |
+| William Marlow, The door of a grotto, ca. 1765–66 | Watercolor and graphite | The Metropolitan Museum of Art (2014.147), Purchase, Jeffrey L. Berenson and Raymond Lifchez Living Trust Gifts, 2014 | Public domain (Open Access, CC0) | [Met 641334](https://www.metmuseum.org/art/collection/search/641334) |
+| Alfred William Hunt, Snowdon, after an April Hailstorm [or Snowdon through Clearing Clouds], ca. 1857 | Watercolor | The Metropolitan Museum of Art (2016.597), Harry G. Sperling Fund, 2016 | Public domain (Open Access, CC0) | [Met 728488](https://www.metmuseum.org/art/collection/search/728488) |
+| John Constable, Cloud study, 1830–35 | Watercolor over graphite | The Metropolitan Museum of Art (2016.589), Purchase, 2015 Benefit Fund, The Elisha Whittelsey Collection, The Elisha Whittelsey Fund, and Connie Simmons and James D. Krugman Gift, 2016 | Public domain (Open Access, CC0) | [Met 727706](https://www.metmuseum.org/art/collection/search/727706) |
+| Paul Cézanne, Bathers (recto); Landscape (verso), ca. 1888 (recto) | Watercolor and graphite on wove paper | The Metropolitan Museum of Art (2003.20.3), The Walter H. and Leonore Annenberg Collection, Bequest of Walter H. Annenberg, 2002 | Public domain (Open Access, CC0) | [Met 364093](https://www.metmuseum.org/art/collection/search/364093) |
+| Rembrandt (Rembrandt van Rijn), Woman Reading, 1606–69 | Pen and brown ink, brush and brown wash; framing lines in pen and brown ink | The Metropolitan Museum of Art (26.208), Rogers Fund, 1926 | Public domain (Open Access, CC0) | [Met 347891](https://www.metmuseum.org/art/collection/search/347891) |
+| Jean Honoré Fragonard, Rinaldo in the Enchanted Forest, ca. 1763 | Brush and brown wash over very light black chalk underdrawing | The Metropolitan Museum of Art (2009.236) | Public domain (Open Access, CC0) | [Met 386293](https://www.metmuseum.org/art/collection/search/386293) |
+
+Made with an image generator:
+
+| Picture | Source photograph | Modified with an image generator | Rights |
+|---|---|---|---|
+| Yale, Sterling Library | Not recorded | Image generator not recorded | Not citable until its source is found |
+| Kasha portrait wash | Photograph by Sam Jackson | Image generator not recorded | © Sam Jackson, noncommercial |
+| The first Mittens, cat and portrait (0.2.1 benchmark) | Photograph by Sam Jackson | Image generator not recorded | © Sam Jackson, noncommercial ([NOTICE](../NOTICE) section 1) |
+| Yale Trumbull (0.2.1 benchmark) | Not Sam Jackson's: [posted](https://www.instagram.com/p/CESNBxYg0g8/) by the Trumbull College Instagram account (@trumbullcollegeyale), 24 August 2020, credited there to Google; photographer unknown | 5 October 2026; image generator not recorded | The source photograph was not licensed properly, so the picture is kept out of the 0.4 benchmark ([NOTICE](../NOTICE) section 1a) |
 
 ## Private set
 
-Beach and Overlook: the owner's own pictures, made with an image generator from his photographs. Not distributed.
+Beach and Overlook: photographs by Sam Jackson, modified with an image generator (image generator not recorded).
+Not distributed.
 
 ## Earlier benchmarks
 

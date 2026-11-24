@@ -48,7 +48,7 @@ Details: [levels](docs/levels.md), [rules](docs/rules.md) and [scoring](docs/sco
 
 Tiepolo 31.2 x 24.3 cm · Homer, The Water Fan 37.4 x 53.4 · Manet, Morisot with a Fan 20.9 x 16.8 (whole sheet) ·
 Guardi 45.4 x 30.1 · Prout 30.2 x 21.6 · Bonington 18.1 x 14.3 · Sargent, In Austrian Tyrol 29.9 x 45.2 ·
-Turner 19.7 x 28 · Ender 21 x 28.5 · Sargent, White Ships 35.2 x 49.2 (from Wikimedia Commons) · Morisot, Avenue du Bois 20 x 28 ·
+Turner 19.7 x 28 · Ender 21 x 28.5 · Sargent, White Ships 35.2 x 49.2 · Morisot, Avenue du Bois 20 x 28 ·
 Cezanne 21 x 27.2. Nominal, generated: Mittens and Kasha portrait 23 x 30.5 · Yale Rosewalk 28 x 38.
 The museums' own size lines are in [PICTURES.md](PICTURES.md).
 
