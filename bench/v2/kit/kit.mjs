@@ -23,7 +23,7 @@
 // - No image files may be read (the targets are in your prompt; your own frames are readable under bench/out/).
 // - Paint only from the box: conc must come from kit.mix() over BRUSH_PAINTS (brush) or INK (pen); total at most 8 (brush and pen alike;
 //   the painter's section brush lays a thinner film than the old row brush: a one-layer dark needs a total of about 6).
-// - Budget 2,500 counted strokes (brush, pen, pencil and eraser) per painting.
+// - No limit on strokes: how a painting is painted is free (the owner, 23 Nov 2026). Strokes are counted and recorded.
 // Recorded and reported, not rejected: the share of small strokes (brush radius under 1.5 mm = 5.8 cells), short
 // strokes (shorter than 3x the brush width) and dots (shorter than the brush width).
 // Stroke log: every counted stroke is also written, in order, to out/<task>/strokes.jsonl.gz (see bench/docs/run-format.md).
@@ -77,7 +77,7 @@ import { applyNativeFastGpuEnv } from '../tools/painter/native-gpu-env.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 export const PROTOCOL = 'v2';
-export const BUDGET = 2500, MM = 0.259, BRUSH_MOST = 8;
+export const MM = 0.259, BRUSH_MOST = 8;
 // the targets of this run: the harness installs one coarse map per target in tasks/ next to the kit
 export const TASKS = fs.existsSync(path.join(HERE, 'tasks'))
   ? fs.readdirSync(path.join(HERE, 'tasks')).filter(f => f.endsWith('-coarse.json')).map(f => f.slice(0, -'-coarse.json'.length)).sort() : [];
@@ -200,7 +200,7 @@ export async function open(task, { seed = +(process.env.BENCH_SEED || 1), gpu = 
   logLine({ ev: 'open', protocol: PROTOCOL, task, seed, W, H, mmPerCell: MM, paper: { toothScale: 0.2, coldPress: true, rgb: paperRGB }, backend: st.backend, t0: st.t0 });
   process.on('exit', flushLog); // a script that dies before finish() keeps the strokes it laid
   film('paper', 0);   // the film's first frame: the untouched sheet in its own colour (the judges' first snapshot)
-  console.error(`kit v2: ${task} ${W}x${H}, ${st.backend}, budget ${BUDGET} strokes; this is painting ${runsSoFar(task) + 1} of the ${RUNS} you may run in this attempt (charged when it lays its first mark)`);
+  console.error(`kit v2: ${task} ${W}x${H}, ${st.backend}, no limit on strokes; this is painting ${runsSoFar(task) + 1} of the ${RUNS} you may run in this attempt (charged when it lays its first mark)`);
   return { sheet, O, W, H };
 }
 
@@ -229,7 +229,6 @@ const used = () => st.strokes + st.pen + st.pencil + st.erase;   // every counte
 const lenOf = pts => { let L = 0; for (let i = 1; i < pts.length; i++) L += Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y); return L; };
 function counted(kind) {
   if (!st) reject('call kit.open() first');
-  if (used() >= BUDGET) reject(`stroke budget of ${BUDGET} used up`);
   charge();
   st[kind === 'brush' ? 'strokes' : kind]++;
   const n = used();
@@ -402,7 +401,7 @@ export async function finish(note = '') {
   logLine({ ev: 'finish', strokes: n, t: Date.now() - st.t0, note });
   flushLog();
   fs.rmSync(path.join(st.out, 'snaps'), { recursive: true, force: true });
-  const stats = { protocol: PROTOCOL, task: st.task, film: filmed, brushStrokes: st.strokes, penStrokes: st.pen, pencilStrokes: st.pencil, eraserStrokes: st.erase, smallStrokes: st.small, shortStrokes: st.short, dotStrokes: st.dots, smallShare: st.strokes ? +(st.small / st.strokes).toFixed(3) : 0, strokes: n, budget: BUDGET, stageStrokes: stages, seconds: Math.round((Date.now() - st.t0) / 1000), backend: st.backend, note, seed: st.seed, sheet: { W: st.W, H: st.H, mmPerCell: MM }, strokeLog: st.log ? 'strokes.jsonl.gz' : null, work: work() };
+  const stats = { protocol: PROTOCOL, task: st.task, film: filmed, brushStrokes: st.strokes, penStrokes: st.pen, pencilStrokes: st.pencil, eraserStrokes: st.erase, smallStrokes: st.small, shortStrokes: st.short, dotStrokes: st.dots, smallShare: st.strokes ? +(st.small / st.strokes).toFixed(3) : 0, strokes: n, budget: null, stageStrokes: stages, seconds: Math.round((Date.now() - st.t0) / 1000), backend: st.backend, note, seed: st.seed, sheet: { W: st.W, H: st.H, mmPerCell: MM }, strokeLog: st.log ? 'strokes.jsonl.gz' : null, work: work() };
   fs.writeFileSync(path.join(st.out, 'stats.json'), JSON.stringify(stats, null, 2));
   fs.appendFileSync(path.join(HERE, 'out', 'kitlog.jsonl'), JSON.stringify({ ev: 'finish', task: st.task, t: Date.now(), strokes: n }) + '\n');
   if (st.sheet._gpu) st.sheet._gpu.close();

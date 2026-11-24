@@ -7,18 +7,20 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import sharp from 'sharp';
-import { BENCH, RUN_SCHEMA, VERSION_STAMP, V2, BUDGET, readJson, writeJson, validateRun, posix, loadCrops, loadLevelOneCrops, auditScripts } from './lib.mjs';
+import { BENCH, RUN_SCHEMA, VERSION_STAMP, V2, readJson, writeJson, validateRun, posix, loadCrops, loadLevelOneCrops, auditScripts } from './lib.mjs';
 import { turnCommand, usage } from './runners.mjs';
 import { thumb, stageStrip } from './images.mjs';
 import { makeWorktree, keepScripts, runTurn, minutes } from './pipeline/harness.mjs';
 import { closeTurn, closable, probe } from './pipeline/closed.mjs';
 
 const V3 = path.join(BENCH, 'v3');
-// Each attempt is stopped after 32 minutes of wall time (the brief says 30): the old round's limit, set for its small
-// sheets. BENCH_V3_ATTEMPT_MIN states another ("time scaled to the sheet": a drying takes longer on a full-size sheet);
-// up to 360, the owner's 6-hour safety stop ("measure, do not limit"); the brief and the prompts then say that limit less two minutes, and the run record keeps it (settings.sessionCapMin).
-const ATTEMPT_MIN = Math.max(10, Math.min(360, Number(process.env.BENCH_V3_ATTEMPT_MIN) || 32)), SAID_MIN = ATTEMPT_MIN - 2;
-const sayLimit = t => (SAID_MIN === 30 ? t : t.replaceAll('About 30 minutes', `About ${SAID_MIN} minutes`).replaceAll('about 30 minutes', `about ${SAID_MIN} minutes`).replaceAll('after 30 minutes', `after ${SAID_MIN} minutes`).replaceAll('stopped at 30', `stopped at ${SAID_MIN}`));
+// The clock is a safety stop only, as at levels 2 to 4 (tools/paint/session.mjs DEFAULT_WALL_MINUTES): 360 minutes, the
+// owner's 6-hour stop ("measure, do not limit"). BENCH_V3_ATTEMPT_MIN states a shorter one (10 to 360) for a trial;
+// the brief says the limit in force and the run record keeps it (settings.sessionCapMin). Nothing is told two minutes
+// short any more: the stop is far, not a deadline to work towards.
+export const attemptMinutes = (env = process.env) => Math.max(10, Math.min(360, Number(env.BENCH_V3_ATTEMPT_MIN) || 360));
+const ATTEMPT_MIN = attemptMinutes(), SAID_MIN = ATTEMPT_MIN;
+const sayLimit = t => t.replaceAll('{LIMIT_MIN}', String(SAID_MIN));
 
 const fill = (t, vals) => Object.entries(vals).reduce((s, [k, v]) => s.replaceAll(`{${k}}`, String(v)), t);
 
@@ -128,7 +130,7 @@ async function session({ model, crop, spec, tries, rawTry, dry }) {
       const env = { BENCH_SEED: '1', BENCH_VIOLATIONS: violationsNow, PYTHONPATH: path.join(tmp, 'pyguard'), BENCH_PYGUARD: path.join(tmp, 'pyguard'), TMPDIR: scratch };
       const c = dry ? { cmd: process.execPath, args: ['bench/dry-v3.mjs', crop, String(n)] }
         : turnCommand(model, { ws, raw, text: prompt, images: pictures, sessionId, resume: false, turn: n,
-          briefFile: path.join(ws, 'bench', 'BRIEF.md'), crops: [crop], logFile: events, minutes: ATTEMPT_MIN - 2 });
+          briefFile: path.join(ws, 'bench', 'BRIEF.md'), crops: [crop], logFile: events, minutes: ATTEMPT_MIN });
       // closed as a level 2 to 4 session is: a seatbelt profile, a network gate, the fixed toolbox, a clean environment;
       // the profile is tried before the model is started
       closed = await closeTurn(c, { runner: model.runner, tmp, extraEnv: env });
@@ -162,9 +164,19 @@ async function session({ model, crop, spec, tries, rawTry, dry }) {
   return res;
 }
 
+/**
+ * Level 1 has no stroke limit, so its one guard must be there: a target without its rendering unit (bench/v3/crops.json
+ * `unit`: the water steps of the automatic painting of the subject) has no runaway stop, and is refused by name.
+ */
+export function guarded(crops, specs) {
+  const none = crops.filter(c => !(specs.find(s => s.task === c)?.unit?.waterSteps > 0));
+  if (none.length) throw new Error(`level 1 target${none.length > 1 ? 's' : ''} ${none.join(', ')}: no rendering unit (bench/v3/crops.json "unit", the water steps of the automatic painting of the subject), so a runaway painting would never be stopped; level 1 has no other limit on how it paints. Not started`);
+}
+
 /** Run V3 for one model and write try folders 1..tries. */
 export async function runV3({ round, model, tries, crops, dry, outRoot, force }) {
   closable(model.runner);   // a runner the gate does not know is refused here, before any worktree or session
+  if (!dry) guarded(crops, allCrops());
   const specs = Object.fromEntries(allCrops().map(c => [c.task, c]));
   for (let n = 1; n <= tries; n++) {
     const f = path.join(outRoot, round.dir, model.key, String(n), 'run.json');
@@ -206,7 +218,7 @@ export async function runV3({ round, model, tries, crops, dry, outRoot, force })
       schema: RUN_SCHEMA, benchmark: 'unpaint-bench', protocol: 'v2', round: round.id, ...VERSION_STAMP,
       painter: { key: model.key, name: model.name, id: model.id, effort: model.effort, runner: model.runner },
       planner: null, evaluators: { scoreJudges: [], progressionJudges: [] }, try: n,
-      settings: { mode: 'gentle', strokeBudget: BUDGET.strokes, minutesPerCrop: SAID_MIN, sessionCapMin: ATTEMPT_MIN, lookBudget: null, paintingsPerAttempt: 3, crops, learnsBetweenTries: tries > 1, attemptsPerSession: tries },
+      settings: { mode: 'gentle', strokeBudget: null, minutesPerCrop: null, sessionCapMin: ATTEMPT_MIN, lookBudget: null, paintingsPerAttempt: 3, crops, learnsBetweenTries: tries > 1, attemptsPerSession: tries },
       session: { minutes: +min.toFixed(1), tokens: tokens || null, costUSD: null, exitCode: null, killedAtCap: killed },
       guard: { blockedImageReads: violations, kitRejections: 0, auditHits: hits },
       isolation: { closed: true, how: 'seatbelt profile, network gate and fixed toolbox, as a level 2 to 4 session (bench/scripts/pipeline/closed.mjs)', refusedRequests: results.reduce((k, r) => k + (r.attempts.find(x => x.n === n)?.network?.refused.length ?? 0), 0) },
