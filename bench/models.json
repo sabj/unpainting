@@ -1,5 +1,5 @@
 {
- "note": "Models the harness knows how to run. runner: claude (Claude Code CLI), codex (Codex CLI), muse (Muse Code CLI), agy (Antigravity CLI) or together (bench/v2/runners/oss_loop.py on Together). effort is the reasoning setting sent, or n/a.",
+ "note": "Models the harness knows how to run. runner: claude (Claude Code CLI), codex (Codex CLI), muse (Muse Code CLI), agy (Antigravity CLI) or together (bench/v2/runners/oss_loop.py on Together). effort is the reasoning setting sent, or n/a. The -m keys are the 0.4 benchmark's models at medium effort under the same key, id and effort as tools/paint/authors.json, so a model's level 1 results (run here) and its level 2 to 4 results carry one key; argonmed, neonmed and sonnetmed are the same models under the keys the earlier rounds' records use.",
  "models": [
   { "key": "fable", "name": "Fable 5.1", "id": "claude-fable-5-1", "effort": "xhigh", "runner": "claude" },
   { "key": "fable52", "name": "Fable 5.2", "id": "claude-fable-5-2", "effort": "xhigh", "runner": "claude" },
@@ -20,6 +20,11 @@
   { "key": "argonmed", "name": "Gemini 4 Argon (Medium)", "id": "gemini-4-argon-medium", "effort": "medium", "runner": "agy" },
   { "key": "neonmed", "name": "Gemini 4 Neon (Medium)", "id": "gemini-4-neon-medium", "effort": "medium", "runner": "agy" },
   { "key": "sonnetmed", "name": "Sonnet 5.5 (Medium)", "id": "claude-sonnet-5-5", "effort": "medium", "runner": "claude" },
+  { "key": "argon-m", "name": "Gemini 4 Argon (medium)", "id": "gemini-4-argon-medium", "effort": "medium", "runner": "agy" },
+  { "key": "neon-m", "name": "Gemini 4 Neon (medium)", "id": "gemini-4-neon-medium", "effort": "medium", "runner": "agy" },
+  { "key": "hydrogen-m", "name": "Gemini 4 Hydrogen (medium)", "id": "gemini-4-hydrogen-medium", "effort": "medium", "runner": "agy" },
+  { "key": "carbon-m", "name": "Gemini 4 Carbon (medium)", "id": "gemini-4-carbon-medium", "effort": "medium", "runner": "agy" },
+  { "key": "sonnet-m", "name": "Claude Sonnet 5.5 (medium)", "id": "claude-sonnet-5-5", "effort": "medium", "runner": "claude" },
   { "key": "gflash", "name": "Gemini 3.8 Flash", "id": "gemini-3.8-flash-high", "effort": "high", "runner": "agy" }
  ]
 }

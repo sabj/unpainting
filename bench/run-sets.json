@@ -1,5 +1,5 @@
 {
- "_about": "The benchmark's pictures and how deep each is run (owner, 23 Nov: \"core is 1 photo per group\"; \"extended is all 15\"). Read by the runners: `npm run paint -- core|extended ...` (Auto and levels 2 to 4) and `node bench/scripts/run.mjs --round V3 --crops core|extended` (level 1), through tools/paint/run-sets.mjs; `node tools/paint/run-sets.mjs core` lists every painting a set asks for and starts nothing. id: the subject's id in the registry (SUBJECTS.json). group: the kind of picture; the core has one of each. levelOne: the picture's level 1 target in bench/v3/crops.json, or null while none is prepared on the standard sheet.",
+ "_about": "The benchmark's pictures and how deep each is run (owner, 23 Nov: \"core is 1 photo per group\"; \"extended is all 15\"). Read by the runners: `npm run paint -- core|extended ...` (Auto and levels 2 to 4) and `node bench/scripts/run.mjs --round V3 --crops core|extended` (level 1), through tools/paint/run-sets.mjs; `node tools/paint/run-sets.mjs core` lists every painting a set asks for and starts nothing. id: the subject's id in the registry (SUBJECTS.json). group: the kind of picture; the core has one of each. levelOne: the picture's level 1 target in bench/v3/crops.json (made by bench/scripts/add-level-one-target.mjs on the standard sheet), or null while none is made; a target without its rendering unit is refused by the level 1 runner.",
  "depths": {
   "full": { "levels": ["Auto", "L1", "L2", "L3", "L4"], "what": "the whole ladder: levels 1 to 4, and Auto, which every score is measured against" },
   "auto-l2": { "levels": ["Auto", "L2"], "what": "Auto and level 2 only" }
@@ -9,16 +9,16 @@
   "extended": { "what": "all fifteen: the core five on the whole ladder, the other ten at Auto and level 2", "pictures": "all", "depth": { "core": "full", "others": "auto-l2" } }
  },
  "pictures": [
-  { "id": "manet-morisot-fan-crop", "title": "Manet, Morisot with a Fan (the approved crop)", "group": "figural", "core": true, "levelOne": null },
+  { "id": "manet-morisot-fan-crop", "title": "Manet, Morisot with a Fan (the approved crop)", "group": "figural", "core": true, "levelOne": "manet-morisot-fan-crop-full" },
   { "id": "tiepolo-bacchus", "title": "Tiepolo, Bacchus and Ariadne", "group": "figural", "core": false, "levelOne": null },
   { "id": "homer-water-fan", "title": "Homer, The Water Fan", "group": "figural", "core": false, "levelOne": null },
-  { "id": "prout-laundresses", "title": "Prout, Laundresses before the Wasserturm, Nuremberg", "group": "architectural", "core": true, "levelOne": null },
+  { "id": "prout-laundresses", "title": "Prout, Laundresses before the Wasserturm, Nuremberg", "group": "architectural", "core": true, "levelOne": "prout-laundresses-full" },
   { "id": "guardi", "title": "Guardi, a colonnade", "group": "architectural", "core": false, "levelOne": null },
   { "id": "bonington-french-town", "title": "Bonington, French Town, Buildings and River", "group": "architectural", "core": false, "levelOne": null },
-  { "id": "turner-esseillon", "title": "Turner, The Fort of L'Esseillon", "group": "landscape", "core": true, "levelOne": null },
+  { "id": "turner-esseillon", "title": "Turner, The Fort of L'Esseillon", "group": "landscape", "core": true, "levelOne": "turner-esseillon-full" },
   { "id": "sargent-tyrol", "title": "Sargent, In Austrian Tyrol", "group": "landscape", "core": false, "levelOne": null },
   { "id": "ender-mountain-valley", "title": "Ender, Mountain Valley", "group": "landscape", "core": false, "levelOne": null },
-  { "id": "white-ships-1488", "title": "Sargent, White Ships", "group": "loose", "core": true, "levelOne": null },
+  { "id": "white-ships-1488", "title": "Sargent, White Ships", "group": "loose", "core": true, "levelOne": "white-ships-1488-full" },
   { "id": "morisot-avenue-du-bois", "title": "Morisot, A Woman Seated at a Bench on the Avenue du Bois", "group": "loose", "core": false, "levelOne": null },
   { "id": "cezanne-bathers-bridge", "title": "Cezanne, Bathers Under a Bridge", "group": "loose", "core": false, "levelOne": null },
   { "id": "mittens-closeup", "title": "Mittens, close-up", "group": "bonus (generated)", "core": true, "levelOne": "mittens-closeup-full" },

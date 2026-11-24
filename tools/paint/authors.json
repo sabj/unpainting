@@ -10,6 +10,7 @@
     { "key": "argon-m", "name": "Gemini 4 Argon (medium)", "id": "gemini-4-argon-medium", "effort": "medium", "cli": "agy" },
     { "key": "neon-m", "name": "Gemini 4 Neon (medium)", "id": "gemini-4-neon-medium", "effort": "medium", "cli": "agy" },
     { "key": "hydrogen-m", "name": "Gemini 4 Hydrogen (medium)", "id": "gemini-4-hydrogen-medium", "effort": "medium", "cli": "agy" },
+    { "key": "carbon-m", "name": "Gemini 4 Carbon (medium)", "id": "gemini-4-carbon-medium", "effort": "medium", "cli": "agy" },
     { "key": "astra-m", "name": "Codex Astra (medium)", "id": "gpt-6-astra", "effort": "medium", "cli": "codex" },
     { "key": "sol-m", "name": "Codex Sol (medium)", "id": "gpt-6.1-sol", "effort": "medium", "cli": "codex" },
     { "key": "sonnet-m", "name": "Claude Sonnet 5.5 (medium)", "id": "claude-sonnet-5-5", "effort": "medium", "cli": "claude" },

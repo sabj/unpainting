@@ -39,11 +39,15 @@ test('a set\'s name stands for its pictures at the level asked for, where it was
 });
 
 test('level 1 of a set is never run on part of it in silence', () => {
-  assert.throws(() => levelOneTargets('core'), /no level 1 target is prepared for manet-morisot-fan-crop, prout-laundresses, turner-esseillon, white-ships-1488/);
+  const none = { depths: { full: { levels: ['Auto', 'L1'] } }, sets: { s: { pictures: 'all', depth: 'full' } }, pictures: [{ id: 'a', title: 'A', group: 'g', core: true, levelOne: 'a-full' }, { id: 'b', title: 'B', group: 'g', core: true, levelOne: null }, { id: 'c', title: 'C', group: 'g', core: true }] };
+  assert.throws(() => levelOneTargets('s', loadRunSets(none)), /run set s, level 1: no level 1 target is prepared for b, c/);
+  // the core five each have one (made by bench/scripts/add-level-one-target.mjs; the runner then refuses a target without its rendering unit)
+  assert.deepEqual(levelOneTargets('core'), ['manet-morisot-fan-crop-full', 'prout-laundresses-full', 'turner-esseillon-full', 'white-ships-1488-full', 'mittens-closeup-full']);
   const doc = { depths: { full: { levels: ['Auto', 'L1'] } }, sets: { s: { pictures: 'all', depth: 'full' } }, pictures: [{ id: 'a', title: 'A', group: 'g', core: true, levelOne: 'a-full' }, { id: 'b', title: 'B', group: 'g', core: false, levelOne: 'b-full' }] };
   assert.deepEqual(levelOneTargets('s', loadRunSets(doc)), ['a-full', 'b-full']);
-  const r = spawnSync(process.execPath, ['bench/scripts/run.mjs', '--round', 'V3', '--dry-run', '--crops', 'core'], { cwd: ROOT, encoding: 'utf8' });
-  assert.equal(r.status, 2); assert.match(r.stderr, /run set core, level 1: no level 1 target is prepared for/);
+  // a run set at a round that is not level 1 is refused before anything starts
+  const r = spawnSync(process.execPath, ['bench/scripts/run.mjs', '--round', 'V4', '--dry-run', '--crops', 'core'], { cwd: ROOT, encoding: 'utf8' });
+  assert.equal(r.status, 2);
 });
 
 test('a fault in the file stops whatever reads it', () => {
