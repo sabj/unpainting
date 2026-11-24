@@ -44,8 +44,8 @@ INPUT_LIST
 - `self-review.md`: yours to write before you stop if you wish (`TASK.md`, "Before you stop"): the five worst
   differences between your last look's dried sheet and the subject, and whether a major fault remains. It is kept
   with the session; nothing depends on it.
-- `seen.md`: only when you were handed pictures of your previous painting (`previous/`): one line on each, written
-  before your first plan (`TASK.md` says which).
+- `seen.md`: only when you were handed pictures beside the inputs (Auto's painting in `auto-result/`, or your previous
+  painting in `previous/`): one line on each, written before your first plan (`TASK.md` says which).
 
 ## Tools
 

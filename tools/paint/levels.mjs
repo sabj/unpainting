@@ -1,31 +1,33 @@
 // The levels of a model session, as named settings of one session (never a fork of the code). The ladder is the
-// owner's (22 Nov, with the level 2 change of that day): L0 nothing (defined, not run) and L1 the freehand kit with
-// its tips are not this session. Here:
-//   L2  the SAME inputs the code planner gets (the prepared drawing, the three colour studies, the named forms) and
-//       NOT the code's plan: the model plans the painting itself, as its own script. One go.
-//   L3  L2 again after studying its own L2 painting: a session that starts from the model's own L2 result, handed that
-//       try's dried full-size painting beside the subject, its replay sheet, its arrows sheet and what it handed over.
-//       No critique and never a score: the model judges its own sheet and writes what it will change. Still no code
-//       plan: its own script is the only choice it may hand in.
-//   L4  the chance to improve on L3 with one more help (owner, 23 Nov): a session that starts from the model's L3
-//       result, handed that the same way (its painting, film and stroke map), and also the studies' traced shapes as
-//       regions it may use, change, redraw or ignore (level4.mjs). Nothing of Auto: not its plan, planner, settings,
-//       painting, film or stroke map. So no level's prepare paints Auto at full size.
-// At every level the model hands in its own script: planner settings alone, or the code's plan (edited or not), are
-// refused (OWN_SCRIPT_ONLY). Looks are priced by size and share (look-cost.mjs), whatever is in them.
-// How many retries a level has is a setting (--retries, default 1: one L3 session, one L4 session), not a constant.
+// owner's of 24 Nov (work/lead-04/work/BENCHMARK-DEFINITION.md, "levels, revised" and the anti-cheat correction):
+// every level is ONE fresh, independent session; no level is handed another level's output, so every level and
+// picture can run at once. At every level: the same look budget, the anti-cheat guard (code may not read the
+// original's pixels), no judge feedback, and the model hands in its own script. Each level adds one thing:
+//   L1  the picture, the script format and the painting tips; nothing prepared. Fixed rounds.
+//   L2  + the prepared studies: the drawing, the named forms, the studies' traced shapes (offered as regions, maybe
+//       wrong). Nothing of Auto. Fixed rounds.
+//   L3  + Auto's plan (its washes in numbers, to read) and Auto's finished painting (to improve on). Fixed rounds.
+//   L4  L3's inputs in an open session with tools (sandbox, painter commands, its own files). --work session.
+// Kept only to replay the runs of 23-24 Nov made under the earlier ladder, never part of the benchmark:
+//   L4-retry  the old level 4: the traced shapes and the model's own earlier painting and script (--previous;
+//             "L4 after L2" or "after L3"); nothing of Auto.
+// Planner settings alone, or the code's plan as a choice, are refused at every level (OWN_SCRIPT_ONLY): Auto's plan
+// at L3 and L4 is something to read, never a choice to hand in. Looks are priced by size and share (look-cost.mjs).
 // Pure: nothing is read or written here.
 
-/** Retries at a level when the command line names no number. */
+/** Retries at a level when the command line names no number (the old retry level only). */
 export const DEFAULT_RETRIES = 1;
 
 export const LEVELS = Object.freeze({
-  // level 1 here is its fixed-rounds form (rounds.mjs): the subject, the toolkit and the tips, and nothing prepared
-  L1: { previousTry: false, codePlan: false, autoPainting: false, shapesData: false, noInputs: true, what: 'the subject, the toolkit and the tips; no prepared drawing, study or named form (fixed rounds only: its kit-and-shell form is bench/scripts/run.mjs --round V3)' },
-  L2: { previousTry: false, codePlan: false, autoPainting: false, shapesData: false, what: 'one go from the same inputs the code planner gets (drawing, studies, named forms), planned by the model itself; no code plan' },
-  L3: { previousTry: true, codePlan: false, autoPainting: false, shapesData: false, what: 'L2 again from the model\'s own L2 result: its painting, replay sheet, arrows sheet and what it handed over; it judges its own sheet; no code plan' },
-  L4: { previousTry: true, codePlan: false, autoPainting: false, shapesData: true, what: 'a retry from the model\'s L3 result with one more help: the studies\' traced shapes as regions it may use or ignore; nothing of Auto (plan, planner, painting, film or stroke map)' },
+  L1: { work: 'rounds', previousTry: false, codePlan: false, autoPlan: false, autoPainting: false, shapesData: false, noInputs: true, what: 'the picture, the script format and the painting tips; nothing prepared (fixed rounds)' },
+  L2: { work: 'rounds', previousTry: false, codePlan: false, autoPlan: false, autoPainting: false, shapesData: true, what: 'L1 and the prepared studies: the drawing, the named forms and the studies\' traced shapes; nothing of Auto (fixed rounds)' },
+  L3: { work: 'rounds', previousTry: false, codePlan: false, autoPlan: true, autoPainting: true, shapesData: true, what: 'L2 and Auto\'s plan and finished painting, to improve on (fixed rounds)' },
+  L4: { work: 'session', previousTry: false, codePlan: false, autoPlan: true, autoPainting: true, shapesData: true, what: 'L3\'s inputs in an open session with tools (sandbox, painter commands, its own files), the anti-cheat guard on' },
+  'L4-retry': { work: null, replayOnly: true, previousTry: true, codePlan: false, autoPlan: false, autoPainting: false, shapesData: true, what: 'the old level 4 of 23-24 Nov, for replaying those runs only: the traced shapes and its own earlier result (--previous); nothing of Auto' },
 });
+
+/** The benchmark's levels (the replay-only level is not one). */
+export const BENCHMARK_LEVELS = Object.freeze(Object.keys(LEVELS).filter(k => !LEVELS[k].replayOnly));
 
 /** What a session is told when it reaches for the code's plan, planner or settings (choice.mjs, session.mjs): at every level. */
 export const OWN_SCRIPT_ONLY = 'the code\'s plan, its planner and its settings are handed over at no level: every level hands in its own script';
@@ -38,16 +40,17 @@ export function levelOf(name) {
 }
 
 /**
- * What a session of this level and try is handed, checked against what the command line gave: {previous, plan (the
- * code's plan and planner: auto/ and the settings and plan-edit choices), auto (the code's finished painting), shapes}
- * (each true or false). `tryNumber`: which retry of the level this is (1 the first), of `retries`. Throws,
- * plainly, when the level's terms and the command line disagree: nothing is left out or added in silence.
+ * What a session of this level is handed, checked against what the command line gave: {previous (its own earlier
+ * result: the replay-only level alone), plan (the code's plan as a choice: never), autoPlan (Auto's plan to read),
+ * auto (Auto's finished painting), shapes (the traced shapes)}, and noInputs at L1. `work`: rounds or session, when
+ * the level names its own. Throws, plainly, when the level's terms and the command line disagree.
  */
-export function handedAt(level, { tryNumber = 1, retries = DEFAULT_RETRIES, previous = null }) {
+export function handedAt(level, { tryNumber = 1, retries = DEFAULT_RETRIES, previous = null, work = null }) {
   if (!(Number.isInteger(tryNumber) && tryNumber >= 1)) throw new Error('--try: a whole number, 1 or more');
   if (!(Number.isInteger(retries) && retries >= 1)) throw new Error('--retries: a whole number, 1 or more');
-  if (!level.previousTry && (previous || tryNumber > 1)) throw new Error(`--level ${level.name} is one go from the prepared inputs: --previous and --try belong to L3 and L4`);
+  if (work && level.work && work !== level.work) throw new Error(`--level ${level.name} is ${level.work === 'rounds' ? 'fixed rounds (--work rounds)' : 'an open session with tools (--work session)'}, not --work ${work}`);
+  if (!level.previousTry && (previous || tryNumber > 1)) throw new Error(`--level ${level.name} is one fresh session, handed no other level's result: --previous and --try belong to the replay level L4-retry only`);
   if (level.previousTry && tryNumber > retries) throw new Error(`--level ${level.name}, try ${tryNumber}: this benchmark gives ${retries} ${retries === 1 ? 'retry' : 'retries'} at a level (--retries sets it)`);
-  if (level.previousTry && !previous) throw new Error(`--level ${level.name} is a retry: it starts from the model's own ${level.name === 'L4' && tryNumber === 1 ? 'L3' : level.name === 'L3' && tryNumber === 1 ? 'L2' : 'previous'} result. Name that run's folder with --previous`);
-  return { previous: Boolean(previous), plan: level.codePlan, auto: level.autoPainting, shapes: level.shapesData, ...(level.noInputs ? { noInputs: true } : {}) };
+  if (level.previousTry && !previous) throw new Error(`--level ${level.name} replays an old retry: it starts from the model's own earlier result. Name that run's folder with --previous`);
+  return { previous: Boolean(previous), plan: level.codePlan, autoPlan: level.autoPlan, auto: level.autoPainting, shapes: level.shapesData, ...(level.noInputs ? { noInputs: true } : {}) };
 }

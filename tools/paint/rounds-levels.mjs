@@ -1,11 +1,11 @@
-// What the later levels add to round 0 of fixed rounds (rounds-run.mjs). Each level is a fresh conversation:
-//   L3  everything L2 gets, and the model's own L2 result: its finished painting to look at, and its script as text,
-//       to reuse or ignore. Its own work, never its reasoning or its looks. No critique and no score.
-//       (L4 may also be run straight from an L2 result, with no L3 between: the run's record then says "L4 after L2",
-//       and the brief names the level the previous painting is from. A named choice of the run, never a silent one.)
-//   L4  the same from L3, and the studies' traced shapes: a picture of them numbered and a list (number, colour, area,
-//       box, named forms). A passage names a shape by number and the harness lays its outline, so the geometry never
-//       has to be sent as text (shapes.json is about a megabyte). Offered, never required, and possibly wrong.
+// What levels 2 to 4 add to round 0 of fixed rounds (rounds-run.mjs), each level a fresh conversation handed no
+// other level's result (levels.mjs):
+//   L2  the studies' traced shapes: a picture of them numbered and a list (number, colour, area, box, named forms). A
+//       passage names a shape by number and the harness lays its outline, so the geometry never has to be sent as
+//       text (shapes.json is about a megabyte). Offered, never required, and possibly wrong.
+//   L3  the same, and Auto's plan (its washes in numbers) and Auto's finished painting, as it dried at full size.
+// Kept to replay the old runs only (L4-retry): the model's own earlier result, its finished painting to look at and
+// its script as text (previousHanded).
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
@@ -52,11 +52,11 @@ export async function shapesHandedRounds(data, sheet, { width = 1400, numberFrom
   const labels = shapes.filter(s => (s.areaMm2 ?? 0) >= numberFromMm2 && s.boxMm).map(s => { const x = (s.boxMm[0] + s.boxMm[2]) / 2 * k, y = (s.boxMm[1] + s.boxMm[3]) / 2 * k; return `<text x="${x.toFixed(0)}" y="${y.toFixed(0)}" font-family="Helvetica" font-size="13" font-weight="bold" text-anchor="middle" fill="#000" stroke="#fff" stroke-width="2.5" paint-order="stroke">${s.n}</text>`; }).join('');
   const picture = await sharp(Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}"><rect width="100%" height="100%" fill="#fff"/>${polys}${labels}</svg>`)).png().toBuffer();
   const list = data.shapes.map(s => `${s.n} | rgb ${(s.colour ?? []).join('/')} | ${s.areaMm2} mm2${s.paper ? ' | read as paper' : ''}${s.inside != null ? ` | inside ${s.inside}` : ''} | box ${s.boxMm ? `x ${Math.round(s.boxMm[0])}-${Math.round(s.boxMm[2])}, y ${Math.round(s.boxMm[1])}-${Math.round(s.boxMm[3])}` : '?'}${s.forms?.length ? ` | in ${s.forms.map(f => f.name ?? f).slice(0, 3).join(', ')}` : ''}`);
-  const text = `## The studies' traced shapes, offered as regions (this level only)
+  const text = `## The studies' traced shapes, offered as regions
 
 \`traced-shapes.jpg\` shows the block-in study's flat shapes traced into outlines, each in its colour, the larger ones
 numbered. They are offered, not required, and they may be wrong: a traced edge can cut across a form or miss one. Use
-them, change them, or ignore them and write your own regions. At this level a passage of your script MAY name shapes
+them, change them, or ignore them and write your own regions. A passage of your script MAY name shapes
 by number in place of writing a polygon: \`"shapes": [12, 13]\` (its region is those shapes), \`"reserve": [40]\`
 (paper it is laid round), and in a stroke \`"along": 12\` (the stroke runs down that shape's long axis). The paint,
 the brush, the order and the handling are yours as always. The shapes (number | colour | area | box in mm | the named forms it lies in):
@@ -98,4 +98,21 @@ export function levelOneTemplate(template) {
   t = cut(t, '## FORMS', '## The project\'s skills');
   for (const [from, to] of L1_LINES) { if (!t.includes(from)) throw new Error(`the level 1 brief is made from the author's brief, which no longer has the line "${from}"`); t = t.replace(from, to); }
   return t.replace(/\bin the studies\b/g, 'in the subject').replace(/at the studies' value/g, 'at the subject\'s value').replace(/- \[ \] Read the studies, coarse to fine:/, '- [ ] Read the subject:').replace(/of each named form/g, 'of each form you name');
+}
+
+/**
+ * Auto's plan and finished painting for round 0 of level 3: the text that goes with the picture `auto-painting.jpg`.
+ * `washes`: Auto's plan in numbers (plan-data.mjs washesText). Facts only: what each is, and that the hand-in is the
+ * model's own script.
+ */
+export function autoHandedRounds(washes) {
+  if (!washes) throw new Error('level 3 hands over Auto\'s plan, and there is none for this run');
+  return `## Auto's plan and Auto's finished painting
+
+Auto is this project's automatic painter. \`auto-painting.jpg\` is Auto's finished painting of this subject, as
+it dried at full size, on the millimetre grid. Auto's plan follows: its washes in painting order, in numbers. Both are
+given to read, as a result to improve on. What you hand in is your own script, as at every level: Auto's plan is not a
+script and cannot be handed in.
+
+${washes}`;
 }

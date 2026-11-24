@@ -1,8 +1,8 @@
 // The automatic plan of a subject is a PREPARED INPUT, made once at a commit before any session and found by a
-// session in seconds: no session makes it on its own clock. For level 4 the automatic painter's full-size painting
+// session in seconds: no session makes it on its own clock. For levels 3 and 4 the automatic painter's full-size painting
 // and its three sheets (work-sheets.mjs) are prepared the same way. A session whose prepared input is missing does
 // not start, and says the command that makes it:
-//   npm run paint -- <subject> prepare [--level L4] [--set ...]
+//   npm run paint -- <subject> prepare [--level L3] [--set ...]
 // Where: $UNPAINT_PREPARED, else the folder `prepared` beside SUBJECTS.json, then
 //   <subject>[-variant]/<commit, 8>[-dirty-<diff, 8>][-set-<settings, 8>]/
 //     prepared.json     what was made, when, with which code and settings
@@ -11,8 +11,8 @@
 //                       filtered into washes (the painter writes them beside its plan: study-shapes-out.mjs). The
 //                       planner holds them only in memory, so level 4's data is made here, once, and found
 //     washes.json       the plan's washes as shapes, a second set (study-shapes.mjs): what the later studies add is here
-//     painting/         level 4: the full-size painting as a run (run.json, plate/)
-//     sheets/           level 4: the painting beside the subject, the replay sheet, the arrows sheet
+//     painting/         levels 3 and 4: the full-size painting as a run (run.json, plate/)
+//     sheets/           levels 3 and 4: the painting beside the subject, the replay sheet, the arrows sheet
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -36,7 +36,7 @@ export function preparedKey({ id, variant = null, commit, dirty = false, diffSha
 
 /** The command that prepares a subject, as a person types it. */
 export function prepareCommand({ subject, level = 'L2', sets = [] }) {
-  return `npm run paint -- ${subject} prepare${level === 'L4' ? ' --level L4' : ''}${sets.map(([k, v]) => ` --set ${k}=${v}`).join('')}`;
+  return `npm run paint -- ${subject} prepare${level === 'L3' || level === 'L4' ? ` --level ${level}` : ''}${sets.map(([k, v]) => ` --set ${k}=${v}`).join('')}`;
 }
 
 /**
@@ -51,10 +51,10 @@ export function readPrepared(folder, { painting = false, command }) {
   const plan = path.join(folder, 'plan');
   for (const f of ['value-plan.json', 'plan-to-edit.json']) if (!fs.existsSync(path.join(plan, f))) throw miss(`the automatic plan of this subject (its ${f})`);
   const shapes = path.join(folder, SHAPES_FILE), washes = path.join(folder, WASHES_FILE);
-  if (painting) for (const [f, what] of [[shapes, 'the block-in study\'s flat shapes as data'], [washes, 'the plan\'s washes as data']]) if (!fs.existsSync(f)) throw miss(`${what} (level 4 hands them to the session)`);
+  if (painting) for (const [f, what] of [[shapes, 'the block-in study\'s flat shapes as data'], [washes, 'the plan\'s washes as data']]) if (!fs.existsSync(f)) throw miss(`${what} (levels 3 and 4 hand them over)`);
   if (!painting) return { plan, record, painting: null, shapes: fs.existsSync(shapes) ? shapes : null, washes: fs.existsSync(washes) ? washes : null };
   const run = path.join(folder, 'painting'), sheets = Object.values(SHEET_FILES).map(name => ({ from: path.join(folder, 'sheets', name), name }));
-  if (!record.painting || !fs.existsSync(path.join(run, 'run.json'))) throw miss('the automatic painter\'s full-size painting of this subject (level 4 hands it to the session)');
+  if (!record.painting || !fs.existsSync(path.join(run, 'run.json'))) throw miss('the automatic painter\'s full-size painting of this subject (levels 3 and 4 hand it over)');
   for (const s of sheets) if (!fs.existsSync(s.from)) throw miss(`the automatic painting's ${s.name}`);
   return { plan, record, painting: { run, sheets }, shapes, washes };
 }
@@ -65,5 +65,5 @@ export function writePrepared(folder, record) {
   fs.writeFileSync(path.join(folder, 'prepared.json'), JSON.stringify({ schema: 'unpaint-paint/prepared@1', ...record }, null, 1) + '\n');
 }
 
-/** The settings a prepare adds so level 4's automatic painting keeps its frames for the replay sheet (work-sheets.mjs needs two or more); none below level 4. Video and frames are outside the prepared key. */
+/** The settings a prepare adds so the automatic painting of levels 3 and 4 keeps its frames for its sheets (work-sheets.mjs needs two or more); none below level 3. Video and frames are outside the prepared key. */
 export const preparedFilm = level => (level?.autoPainting ? [['video', '1'], ['frames', '48']] : []);

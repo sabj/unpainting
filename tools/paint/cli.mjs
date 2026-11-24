@@ -32,7 +32,7 @@ import { DEFAULT_REVERTS } from './reverts.mjs';
 import { roundsRun } from './rounds-run.mjs';
 import { ROUNDS_CLIS, ROUNDS_AT_ONCE } from './rounds-call.mjs';
 import { levelOf, handedAt, OWN_SCRIPT_ONLY } from './levels.mjs';
-import { shapesHanded, checkWithheld } from './level4.mjs';
+import { shapesHanded, checkWithheld, autoHanded, AUTO_GIVEN_FOLDER } from './level4.mjs';
 import { usageOf, usageLine } from './usage.mjs';
 import { shapesData, namesShapes, resolveNumbered } from './study-shapes.mjs';
 import { stoppedText } from './stage-look.mjs';
@@ -109,13 +109,14 @@ try {
   if (process.env.UNPAINT_SESSION_PREVIOUS || process.env.UNPAINT_SESSION_TRY) throw new Error('UNPAINT_SESSION_PREVIOUS and UNPAINT_SESSION_TRY are gone: name the previous try on the command line (--level L3|L4 --previous <its run folder>)');
   // a model works as a session (the default) or answers in one reply; its column is named for what it does
   authors = req.authors.map(a => authorOf(a, ownAuthors, models)).map(a => (a.cli && !['script', 'edit', 'choice'].includes(a.cli) ? { ...a, work: req.work, brief: req.work === 'reply' ? briefName(BRIEF_FILE) : null } : a));
-  if (req.work === 'session') for (const a of authors) if (a.work) sessionCall(a, { prompt: '', cwd: '' });
+  // the stand-in (cli dry) calls no model: in an open session it is handed the folder and hands in nothing
+  if (req.work === 'session') for (const a of authors) if (a.work && a.cli !== 'dry') sessionCall(a, { prompt: '', cwd: '' });
   // fixed rounds (rounds.mjs): no shell, no tools; every author's command must be one rounds can call
   if (req.work === 'rounds') { for (const a of authors) if (a.work && !ROUNDS_CLIS[a.cli]) throw new Error(`--work rounds: ${a.key} is called with "${a.cli}", which rounds cannot call (${Object.keys(ROUNDS_CLIS).join(', ')} can)`); }
   if (req.from && !fs.existsSync(req.from)) throw new Error(`--from ${req.from}: no such folder`);
   // what a session of this level and try is handed; the level's terms and the command line must agree
   if (!req.prepare && !req.from && (req.work === 'session' || req.work === 'rounds') && authors.some(a => a.work === req.work)) {
-    terms = handedAt(level, { tryNumber: req.tryNumber, retries: req.retries, previous: req.previous });
+    terms = handedAt(level, { tryNumber: req.tryNumber, retries: req.retries, previous: req.previous, work: req.work });
     if (req.previous && !fs.existsSync(req.previous)) throw new Error(`--previous ${req.previous}: no such folder`);
     if (req.previous && (authors.length !== 1 || req.subjects.length !== 1)) throw new Error('--previous names one model\'s previous try of one subject: give one subject and one author');
   } else if (req.previous || req.tryNumber > 1) throw new Error('--previous and --try belong to a model\'s working session (not to --from, a kept script, or the code planner)');
@@ -402,13 +403,14 @@ async function paintLookOnce(r, choice, script, plate, at, edit, compiled, ask =
  * What this session is handed beside the subject's inputs, by its level (levels.mjs), each a folder of its own with
  * a paragraph of the task (session.mjs writeSession). A retry (L3, L4): the result it starts from (--previous: the
  * dried full-size painting beside the subject, the replay sheet, the arrows sheet, and what was handed over, to start
- * from). Level 4 also: the studies' traced shapes offered as regions (level4.mjs); nothing of Auto. Never a score, a verdict or anyone's critique: the model judges its own sheet.
+ * from; the replay level L4-retry only). Level 4: the studies' traced shapes offered as regions, Auto's plan in numbers and its finished painting (level4.mjs). Never a score, a verdict or anyone's critique.
  * `made`: a folder outside the model's folder where the files are made. Returns the list.
  */
-async function handedTo(r, prepared, made) {
+async function handedTo(r, prepared, made, auto) {
   const { spec, authorFull: author } = r, handed = [];
-  // level 4 (level4.mjs): the studies' traced shapes offered as regions; nothing of Auto
+  // level 4 (level4.mjs): the studies' traced shapes offered as regions, and Auto's plan to read and its finished painting
   if (terms.shapes) handed.push(shapesHanded(prepared.shapes));
+  if (terms.autoPlan || terms.auto) handed.push(await autoHanded({ auto, prepared, made: path.join(made, AUTO_GIVEN_FOLDER), widthMm: spec.sheet.widthMm }));
   if (terms.previous) {
     const from = path.resolve(req.previous); let earlier; try { earlier = JSON.parse(fs.readFileSync(path.join(from, 'run.json'), 'utf8')); } catch { throw new Error(`--previous ${from}: no finished run there (run.json)`); }
     const sub = earlier.author?.session?.submitted;
@@ -512,14 +514,14 @@ async function sessionRun(r) {
     const hashOf = f => (f && fs.existsSync(f) ? crypto.createHash('sha256').update(fs.readFileSync(f)).digest('hex') : null);
     record.author.terms = { budget, unit: prepared.record.unit, seed: null, commit: code.commit, dirty: Boolean(code.dirty), level: level.name, tryNumber: req.tryNumber, model: author.id, cli: author.cli, codePlan: terms.plan,
       prepared: { folder: preparedFolder, plan: hashOf(path.join(prepared.plan, 'value-plan.json')), planToEdit: hashOf(path.join(prepared.plan, 'plan-to-edit.json')), shapes: hashOf(prepared.shapes), washes: hashOf(prepared.washes), painting: prepared.painting ? Object.fromEntries(prepared.painting.sheets.map(f => [f.name, hashOf(f.from)])) : null } };
-    say(r, `the code planner's plan was taken prepared (${preparedFolder})${prepared.painting ? ', and its full-size painting with it' : ''}: nothing of it is made on the session's clock${terms.plan ? '' : `; it is not handed to the session (${OWN_SCRIPT_ONLY})`}`);
+    say(r, `the code planner's plan was taken prepared (${preparedFolder})${prepared.painting ? ', and its full-size painting with it' : ''}: nothing of it is made on the session's clock${terms.plan ? '' : terms.autoPlan ? `; it is handed to read (its washes in numbers), never as a choice (${OWN_SCRIPT_ONLY})` : `; it is not handed to the session (${OWN_SCRIPT_ONLY})`}`);
     // the model's folder: a temporary one outside the repository; it is kept in the run folder when the session ends
     const cwd = r.sessionDir, real = fs.realpathSync(cwd), listing = toEdit(auto.plate), base = await baseOf(r);
     // a choice's tools are checked against the drawing and the forms of this run; nothing is written for a check
     const checkTools = t => { try { const g = resolveTools(t, base); return { record: g.record, said: g.said, warnings: g.warnings }; } catch (e) { throw new Error(tidy(e.message)); } };
     try {
       for (const f of packet.files) { fs.mkdirSync(path.dirname(path.join(cwd, f)), { recursive: true }); fs.copyFileSync(path.join(dir, f), path.join(cwd, f)); }
-      const handed = await handedTo(r, prepared, path.join(dir, 'handed'));
+      const handed = await handedTo(r, prepared, path.join(dir, 'handed'), auto);
       if (terms.previous) record.author.previousTry = { tryNumber: req.tryNumber, retries: req.retries, from: path.resolve(req.previous) };
       routes = await closedRoutes(author);
       // the code's plan and its settings are handed at no level (levels.mjs): the folder holds no auto/
@@ -536,6 +538,14 @@ async function sessionRun(r) {
       record.author.handed = handed.map(h => ({ folder: h.folder, files: h.files.map(f => ({ name: f.name, sha256: sha(path.join(cwd, h.folder, f.name)), picture: Boolean(f.picture), namedInTheFirstMessage: prompt.includes(`\`${h.folder}/${f.name}\``) })) }));
       if (terms.previous) { const painting = ['painting.png', 'painting.jpg'].map(f => path.join(path.resolve(req.previous), 'plate', f)).find(f => fs.existsSync(f)); record.author.previousTry.paintingSha256 = sha(painting); record.author.previousTry.painting = painting; }
       fs.writeFileSync(path.join(dir, 'session-prompt.txt'), prompt);
+      // the stand-in calls no model: the folder as a model would be handed it is kept, and nothing is handed in
+      if (author.cli === 'dry') {
+        fs.cpSync(cwd, path.join(dir, 'folder'), { recursive: true, verbatimSymlinks: true });
+        session = { ended: 'stand-in: no model called', standIn: true, level: level.name, budget, looksMost, eyesOnly: { pictures: eyesOnly, words: EYES_ONLY_WORDS }, submitted: null };
+        fin = { failure: `the stand-in calls no model in an open session: the folder it would be handed is kept in ${path.join(dir, 'folder')}, and nothing is painted` };
+        say(r, `stand-in: the open session's folder is written and kept (${handed.map(h => h.folder).join(', ') || 'nothing beside the inputs'}); no model is called`);
+        throw Object.assign(new Error('stand-in'), { standIn: true });
+      }
       // the command, once it is made below: its steps are counted from where it keeps its transcript
       const started = { call: null };
       const server = sessionServer({ dir: cwd, sheet: { widthMm: spec.sheet.widthMm, heightMm: spec.sheet.heightMm }, forms: record.masks.mask ? await formBoxes(record.masks.mask, record.masks.forms, W) : [], looks: looksMost, wallMinutes: wallMost, graceMinutes: graceMost, steps: stepsMost, stepsTaken: stepCounter(author.cli, () => transcriptFile(started.call, path.join(dir, 'S.out.txt'))), lookSize: lookSizeOf(lookCells(spec.sheet.cells), spec.sheet.cells), reverts: revertsMost, codePlan: terms.plan, startKey: terms.plan ? choiceKey(readChoice({ kind: 'settings', settings: {} }), '') : null, pictures: handedPictures, eyes: { files: eyesOnly, store: eyesStore }, checkScript: check, checkPlan: terms.plan ? obj => checkEdit(obj, listing) : null, checkTools, ledger: path.join(dir, 'looks.jsonl'), keep: path.join(dir, 'looks'), compile: (choice, script, n, edit) => compileChoice(r, choice, script, path.join(dir, 'plans', String(n)), edit),
@@ -606,7 +616,7 @@ async function sessionRun(r) {
       // a try that read a picture with code is disqualified: recorded, kept, and nothing of it is painted
       if (guarded.cheat.disqualified) { say(r, `DISQUALIFIED: ${guarded.cheat.reason}`); if (!fin.failure) fin = { failure: `disqualified: ${guarded.cheat.reason} (${EYES_ONLY_WORDS}); nothing of this session is painted`, submitted: fin.submitted }; }
       say(r, `session ${session.ended === 'done' ? 'ended' : `ended (${session.ended})`}: ${session.wallMinutes} min on the clock (${session.ownMinutes} its own), ${kept.looks.length} looks for ${kept.lookUnits.spent} of ${looksMost} rendering units, ${kept.steps.taken} of ${stepsMost} steps, ${kept.plans.length} plans, ${session.toolCallsTotal} tool calls, ${kept.reverts.count} returns to an earlier choice, ${kept.warningsGiven} warnings given; handed over: ${fin.submitted ? `${fin.submitted.what}${fin.submitted.note ? ` (${fin.submitted.note})` : ''}` : 'nothing'}${outside.length ? `; ${outside.length} COMMANDS NAME PLACES OUTSIDE ITS FOLDER (S.commands.txt)` : ''}${pictures.length ? `; it made ${pictures.length} pictures of its own` : ''}`);
-    } finally { if (routes) await routes.done(); fs.rmSync(cwd, { recursive: true, force: true }); }
+    } catch (e) { if (!e.standIn) throw e; } finally { if (routes) await routes.done(); fs.rmSync(cwd, { recursive: true, force: true }); }
   }
   record.author.session = session; record.author.label = authorLabel(record.author);
   if (fin.failure) throw new Error(fin.failure);
@@ -681,11 +691,11 @@ async function lookOfChoice(r, fin) {
 const roundsSlots = Object.fromEntries(Object.entries(ROUNDS_AT_ONCE).map(([cli, n]) => [cli, pool(n)]));
 const roundsLent = {
   root: ROOT, briefFile: BRIEF_FILE, looksMost, get level() { return level.name; }, get terms() { return terms; }, get previous() { return req.previous ? path.resolve(req.previous) : null; }, say,
-  // level 4's traced shapes: a prepared input, from the prepared folder of this code, else the newest of the subject that holds them (said)
+  // the traced shapes (levels 2 and 3): a prepared input, from the prepared folder of this code, else the newest of the subject that holds them (said)
   shapesFile(r) {
     const mine = preparedAt(r.spec), root = path.dirname(mine), all = [mine, ...(fs.existsSync(root) ? fs.readdirSync(root).map(d => path.join(root, d)).filter(d => d !== mine).sort((a, b) => (fs.existsSync(path.join(b, 'prepared.json')) ? fs.statSync(path.join(b, 'prepared.json')).mtimeMs : 0) - (fs.existsSync(path.join(a, 'prepared.json')) ? fs.statSync(path.join(a, 'prepared.json')).mtimeMs : 0)) : [])];
     const folder = all.find(d => fs.existsSync(path.join(d, SHAPES_FILE)));
-    if (!folder) throw new Error(`the studies' traced shapes of ${r.spec.id} are not prepared; level 4 hands them over. Make them once with:\n  ${prepareCommand({ subject: r.spec.id, level: 'L4', sets: req.sets })}`);
+    if (!folder) throw new Error(`the studies' traced shapes of ${r.spec.id} are not prepared; levels 2 to 4 hand them over. Make them once with:\n  ${prepareCommand({ subject: r.spec.id, level: 'L2', sets: req.sets })}`);
     if (folder !== mine) say(r, `the traced shapes are taken from an earlier prepared folder of this subject (${path.basename(folder)}): none is prepared for this code`);
     return path.join(folder, SHAPES_FILE);
   },
@@ -705,6 +715,16 @@ const roundsLent = {
   compile: (r, choice, script, plate) => compileChoice(r, choice, script, plate),
   look: (r, choice, script, plate, at, compiled, ask) => paintLook(r, choice, script, plate, at, null, compiled, { ...ask, noFilm: true, sheetOnly: true }),
   paintChoice: (r, fin) => paintChoice(r, fin),
+  // level 3: Auto's plan in numbers and its finished painting, prepared for this code (prepare --level L3); never made here
+  async autoOf(r) {
+    const { auto, prepared, folder } = await preparedPlan(r);
+    const painting = ['painting.png', 'painting.jpg'].map(f => path.join(prepared.painting.run, 'plate', f)).find(f => fs.existsSync(f));
+    if (!painting) throw new Error(`Auto's finished painting of ${r.spec.id} is not in ${prepared.painting.run}; make it once with:\n  ${prepareLine(r.spec)}`);
+    const sha = f => crypto.createHash('sha256').update(fs.readFileSync(f)).digest('hex');
+    r.record.author.prepared = { ...(r.record.author.prepared ?? {}), plan: true, painting: true, from: folder, note: 'level 3 is handed Auto\'s plan in numbers and its finished painting from this folder' };
+    say(r, `Auto's plan and finished painting are handed from the prepared folder of this code (${folder})`);
+    return { painting, washes: washesText(auto), from: folder, paintingSha256: sha(painting), planSha256: sha(path.join(prepared.plan, 'value-plan.json')) };
+  },
   slot: cli => roundsSlots[cli],
 };
 

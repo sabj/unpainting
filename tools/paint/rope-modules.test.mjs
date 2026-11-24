@@ -6,7 +6,7 @@ import path from 'node:path';
 import sharp from 'sharp';
 import { revertCounter, DEFAULT_REVERTS } from './reverts.mjs';
 import { readSeen, seenAsk, logReads, LEAST_SAID } from './seen.mjs';
-import { LEVELS, levelOf, handedAt, DEFAULT_RETRIES } from './levels.mjs';
+import { LEVELS, BENCHMARK_LEVELS, levelOf, handedAt, DEFAULT_RETRIES } from './levels.mjs';
 import { usageOf, usageLine } from './usage.mjs';
 import { handedOverRecord, checkHandedOver, checkChoice, filesOf } from './parity.mjs';
 import { preparedRoot, preparedKey, prepareCommand, readPrepared, writePrepared, preparedFilm } from './prepared.mjs';
@@ -36,16 +36,21 @@ test('handed pictures: a line each in seen.md; what a command\'s log can show of
   assert.deepEqual(logReads('codex', ['sips -g pixelWidth previous/final-beside-subject.jpg'], files), { [files[0]]: null, [files[1]]: null }, 'codex\'s log cannot show a picture being read: null, never a guess');
 });
 
-test('a level is a named setting: L2 one go without the code\'s plan, L3 a retry from the L2 result, L4 a retry from the L3 result with the traced shapes, nothing of Auto; no critique at any level', () => {
-  assert.deepEqual(Object.keys(LEVELS), ['L1', 'L2', 'L3', 'L4']); assert.throws(() => levelOf('L9'), /one of L1, L2, L3, L4/); assert.equal(DEFAULT_RETRIES, 1);
-  assert.deepEqual(handedAt(levelOf('L2'), {}), { previous: false, plan: false, auto: false, shapes: false }, 'L2 gets the code planner\'s inputs, not its plan');
-  assert.deepEqual(handedAt(levelOf('L3'), { previous: 'l2-run' }), { previous: true, plan: false, auto: false, shapes: false }, 'L3 gets its own previous painting and nothing of the code\'s');
-  assert.deepEqual(handedAt(levelOf('L4'), { previous: 'l3-run' }), { previous: true, plan: false, auto: false, shapes: true }, 'L4 gets the traced shapes, nothing of Auto');
-  assert.ok(Object.values(LEVELS).every(l => l.codePlan === false), 'no level hands over the code\'s plan');
-  assert.deepEqual(handedAt(levelOf('L3'), { tryNumber: 3, retries: 3, previous: 'run' }), { previous: true, plan: false, auto: false, shapes: false }, 'the number of retries is a setting');
-  assert.throws(() => handedAt(levelOf('L2'), { previous: 'run' }), /L2 is one go from the prepared inputs/); assert.throws(() => handedAt(levelOf('L2'), { tryNumber: 2 }), /L2 is one go/);
-  assert.throws(() => handedAt(levelOf('L3'), {}), /L3 is a retry: it starts from the model's own L2 result\. Name that run's folder with --previous/); assert.throws(() => handedAt(levelOf('L4'), {}), /starts from the model's own L3 result/);
-  assert.throws(() => handedAt(levelOf('L3'), { tryNumber: 2, previous: 'run' }), /try 2: this benchmark gives 1 retry at a level \(--retries sets it\)/);
+test('the levels of 24 Nov: each one fresh session, handed no other level\'s result; L2 the studies and traced shapes, no Auto; L3 and L4 Auto\'s plan and painting; no critique at any level', () => {
+  assert.deepEqual(Object.keys(LEVELS), ['L1', 'L2', 'L3', 'L4', 'L4-retry']); assert.deepEqual(BENCHMARK_LEVELS, ['L1', 'L2', 'L3', 'L4']); assert.throws(() => levelOf('L9'), /one of L1, L2, L3, L4, L4-retry/); assert.equal(DEFAULT_RETRIES, 1);
+  const none = { previous: false, plan: false };
+  assert.deepEqual(handedAt(levelOf('L1'), {}), { ...none, autoPlan: false, auto: false, shapes: false, noInputs: true }, 'L1: the picture, the format and the tips');
+  assert.deepEqual(handedAt(levelOf('L2'), {}), { ...none, autoPlan: false, auto: false, shapes: true }, 'L2: the studies and the traced shapes; no Auto plan, no Auto painting');
+  assert.deepEqual(handedAt(levelOf('L3'), {}), { ...none, autoPlan: true, auto: true, shapes: true }, 'L3: L2 and Auto\'s plan and finished painting');
+  assert.deepEqual(handedAt(levelOf('L4'), { work: 'session' }), handedAt(levelOf('L3'), { work: 'rounds' }), 'L4: L3\'s inputs exactly');
+  assert.deepEqual(BENCHMARK_LEVELS.map(l => LEVELS[l].work), ['rounds', 'rounds', 'rounds', 'session'], 'L1 to L3 fixed rounds, L4 an open session with tools');
+  assert.throws(() => handedAt(levelOf('L4'), { work: 'rounds' }), /L4 is an open session with tools \(--work session\)/); assert.throws(() => handedAt(levelOf('L3'), { work: 'session' }), /L3 is fixed rounds/);
+  assert.ok(Object.values(LEVELS).every(l => l.codePlan === false), 'no level hands over the code\'s plan as a choice');
+  // no previous-level input anywhere in the benchmark: --previous and --try are refused at every benchmark level
+  for (const l of BENCHMARK_LEVELS) { assert.equal(LEVELS[l].previousTry, false, `${l} takes no earlier result`); assert.throws(() => handedAt(levelOf(l), { previous: 'run' }), /one fresh session, handed no other level's result/); assert.throws(() => handedAt(levelOf(l), { tryNumber: 2 }), /one fresh session/); }
+  // the old level 4 ("L4 after L2"), kept only to replay old runs: its own earlier result and the traced shapes, nothing of Auto
+  assert.equal(LEVELS['L4-retry'].replayOnly, true); assert.deepEqual(handedAt(levelOf('L4-retry'), { previous: 'l2-run' }), { ...none, previous: true, autoPlan: false, auto: false, shapes: true });
+  assert.throws(() => handedAt(levelOf('L4-retry'), {}), /replays an old retry: .*--previous/); assert.throws(() => handedAt(levelOf('L4-retry'), { tryNumber: 2, previous: 'run' }), /try 2: this benchmark gives 1 retry/);
   assert.ok(Object.values(LEVELS).every(l => !/critique|score|verdict/i.test(JSON.stringify(Object.keys(l)))));
 });
 
@@ -96,17 +101,17 @@ test('prepared inputs: kept for a subject, a commit and the run\'s settings; a s
     assert.match(preparedKey({ id: 'h36', variant: 'approved', commit: 'abcdef0123456789', dirty: true, diffSha256: '99887766554433', sets: [['floors', '8,4,2'], ['frames', '48']] }), /^h36-approved\/abcdef01-dirty-99887766-set-[0-9a-f]{8}$/);
     assert.equal(preparedKey({ id: 'a', commit: 'abcdef0123', sets: [['frames', '48'], ['video', '1']] }), path.join('a', 'abcdef01'), 'the film\'s settings do not change the plan');
     assert.throws(() => preparedKey({ id: 'a', commit: null }), /kept for a commit/);
-    const command = prepareCommand({ subject: 'mittens', level: 'L4', sets: [['floors', '8,4,2']] }); assert.equal(command, 'npm run paint -- mittens prepare --level L4 --set floors=8,4,2');
+    const command = prepareCommand({ subject: 'mittens', level: 'L3', sets: [['floors', '8,4,2']] }); assert.equal(command, 'npm run paint -- mittens prepare --level L3 --set floors=8,4,2'); assert.equal(prepareCommand({ subject: 'mittens', level: 'L2' }), 'npm run paint -- mittens prepare');
     const folder = path.join(root, 'mittens', 'abcdef01');
-    assert.throws(() => readPrepared(folder, { command }), /the automatic plan of this subject is not prepared .* a session never makes it on its own clock\. Make it once with:\n {2}npm run paint -- mittens prepare --level L4/);
+    assert.throws(() => readPrepared(folder, { command }), /the automatic plan of this subject is not prepared .* a session never makes it on its own clock\. Make it once with:\n {2}npm run paint -- mittens prepare --level L3/);
     writePrepared(folder, { commit: 'abcdef01', plan: { seconds: 80 }, painting: null }); fs.mkdirSync(path.join(folder, 'plan'));
     assert.throws(() => readPrepared(folder, { command }), /the subject's rendering unit \(one full look of the automatic plan, counted\) is not prepared/);
     writePrepared(folder, { commit: 'abcdef01', plan: { seconds: 80 }, unit: { look: 300, plan: 960 }, painting: null });
     assert.throws(() => readPrepared(folder, { command }), /its value-plan\.json/);
     for (const f of ['value-plan.json', 'plan-to-edit.json']) fs.writeFileSync(path.join(folder, 'plan', f), '{}');
-    assert.equal(readPrepared(folder, { command }).painting, null); assert.throws(() => readPrepared(folder, { painting: true, command }), /the block-in study's flat shapes as data \(level 4 hands them to the session\) is not prepared/); fs.writeFileSync(path.join(folder, 'shapes.json'), '{}');
-    assert.throws(() => readPrepared(folder, { painting: true, command }), /the plan's washes as data \(level 4 hands them to the session\)/); fs.writeFileSync(path.join(folder, 'washes.json'), '{}');
-    assert.throws(() => readPrepared(folder, { painting: true, command }), /the automatic painter's full-size painting of this subject \(level 4 hands it to the session\) is not prepared/);
+    assert.equal(readPrepared(folder, { command }).painting, null); assert.throws(() => readPrepared(folder, { painting: true, command }), /the block-in study's flat shapes as data \(levels 3 and 4 hand them over\) is not prepared/); fs.writeFileSync(path.join(folder, 'shapes.json'), '{}');
+    assert.throws(() => readPrepared(folder, { painting: true, command }), /the plan's washes as data \(levels 3 and 4 hand them over\)/); fs.writeFileSync(path.join(folder, 'washes.json'), '{}');
+    assert.throws(() => readPrepared(folder, { painting: true, command }), /the automatic painter's full-size painting of this subject \(levels 3 and 4 hand it over\) is not prepared/);
     writePrepared(folder, { commit: 'abcdef01', plan: { seconds: 80 }, unit: { look: 300, plan: 960 }, painting: { seconds: 900 } }); fs.mkdirSync(path.join(folder, 'painting')); fs.writeFileSync(path.join(folder, 'painting', 'run.json'), '{}');
     assert.throws(() => readPrepared(folder, { painting: true, command }), /the automatic painting's final-beside-subject\.jpg/);
     fs.mkdirSync(path.join(folder, 'sheets')); for (const f of Object.values(SHEET_FILES)) fs.writeFileSync(path.join(folder, 'sheets', f), 'x');
@@ -139,8 +144,9 @@ test('the sheets of a finished painting: beside the subject, the frames in order
   } finally { for (const d of [run, to]) fs.rmSync(d, { recursive: true, force: true }); }
 });
 
-test('no level\'s prepare paints the automatic painting (level 4 gets nothing of Auto), and the prepared key does not change for it', () => {
-  assert.deepEqual(preparedFilm(levelOf('L4')), []); assert.deepEqual(preparedFilm(levelOf('L2')), []);
+test('preparing levels 3 and 4 paints Auto\'s painting with its frames (they hand it over); below them nothing is painted; the prepared key does not change for it', () => {
+  assert.deepEqual(preparedFilm(levelOf('L3')), [['video', '1'], ['frames', '48']]); assert.deepEqual(preparedFilm(levelOf('L4')), [['video', '1'], ['frames', '48']]);
+  assert.deepEqual(preparedFilm(levelOf('L2')), []); assert.deepEqual(preparedFilm(levelOf('L1')), []); assert.deepEqual(preparedFilm(levelOf('L4-retry')), []);
   const key = sets => preparedKey({ id: 'm', commit: 'abc', sets });
-  assert.equal(key(preparedFilm(levelOf('L4'))), key([]));
+  assert.equal(key(preparedFilm(levelOf('L3'))), key([]));
 });

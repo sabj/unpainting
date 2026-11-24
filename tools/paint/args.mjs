@@ -1,6 +1,6 @@
 // The command line of `npm run paint`:
 //   npm run paint -- <subject[,subject...]> plan|paint|prepare|look|preflight [--author auto|<model key>[,...]] [--studies locked|author]
-//                    [--work session|rounds|reply] [--level L1|L2|L3|L4] [--retries N] [--try N] [--previous <dir>]
+//                    [--work session|rounds|reply] [--level L1|L2|L3|L4|L4-retry] [--retries N] [--try N] [--previous <dir>]
 //                    [--looks N] [--wallminutes N] [--graceminutes N] [--steps N] [--reverts N] [--from <dir>] [--lines FILE.json|standard]
 //                    [--set key=value ...] [--jobs N] [--out <dir>] [--dry-run] [--open]
 // Nothing here touches a file: it turns the words into one request object, or throws with the usage.
@@ -28,12 +28,13 @@ export const USAGE = `usage: npm run paint -- <subject[,subject...]> plan|paint|
                         folder; it hands over its own script, at every level (planner settings or the code's
                         plan are refused). Its work is measured (usage.json), not capped.
                         reply: one read-only reply holding a whole script (the earlier route).
-  --level L1|L2|L3|L4   what a session is handed (default L2; L1 in fixed rounds only: the subject alone). L2: the inputs the code planner gets (drawing,
-                        studies, named forms), not its plan; the model plans itself, one go. L3: L2 again from
-                        the model's own L2 result (--previous). L4: a retry from its L3 result with more
-                        help: the studies' traced shapes as regions it may use or ignore (nothing of Auto:
-                        not its plan, planner, painting, film or stroke map)
-  --retries N           retries at a level (L3, L4; default 1), and --try N which of them this is (default 1)
+  --level L1|L2|L3|L4   what a session is handed (default L2); every level is one fresh session, handed no other
+                        level's result. L1 (rounds): the picture, the script format, the painting tips. L2
+                        (rounds): + the drawing, the named forms and the studies' traced shapes; nothing of Auto.
+                        L3 (rounds): + Auto's plan and Auto's finished painting. L4 (--work session): L3's inputs
+                        in an open session with tools. L4-retry: the old level 4 (traced shapes and its own
+                        earlier result, --previous), to replay the runs of 23-24 Nov only
+  --retries N           retries at the replay level L4-retry (default 1), and --try N which of them this is (default 1)
   --previous <dir>      the run folder of the result this retry starts from (its finished full-size painting)
   --looks U             the benchmark's budget for looks in one try, in units (default 3). A look has a fixed price:
                         0.3 for the whole sheet at half size, 1.0 at full size, its share when stopped at a stage
@@ -101,8 +102,9 @@ export function parseArgs(argv) {
   const [names, word] = words;
   if (!['plan', 'paint', 'prepare', 'look', 'preflight'].includes(word)) throw new Error(`the second word is plan, paint, prepare, look or preflight, not "${word}"`);
   const level = given['--level'] ?? 'L2';
-  if (!['L1', 'L2', 'L3', 'L4'].includes(level)) throw new Error('--level is L1 (fixed rounds only), L2, L3 or L4');
-  const prepare = word === 'prepare', look = word === 'look', preflight = word === 'preflight', mode = prepare ? (level === 'L4' ? 'paint' : 'plan') : look || preflight ? 'plan' : word;
+  if (!['L1', 'L2', 'L3', 'L4', 'L4-retry'].includes(level)) throw new Error('--level is L1, L2 or L3 (fixed rounds), L4 (an open session), or L4-retry (the old level 4, to replay runs of 23-24 Nov only)');
+  // preparing at L3 or L4 paints Auto's full-size painting too: those levels hand it over
+  const prepare = word === 'prepare', look = word === 'look', preflight = word === 'preflight', mode = prepare ? (['L3', 'L4'].includes(level) ? 'paint' : 'plan') : look || preflight ? 'plan' : word;
   const subjects = list(names).map(s => { const [id, variant = null, more] = s.split(':'); if (!id || more !== undefined) throw new Error(`subject "${s}": write name or name:variant`); return { id, variant }; });
   const authors = list(given['--author'] ?? 'auto');
   if (prepare && (authors.length !== 1 || authors[0] !== 'auto')) throw new Error('prepare makes the automatic plan (and painting): it takes no --author');

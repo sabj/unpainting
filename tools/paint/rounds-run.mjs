@@ -2,7 +2,7 @@
 // the conversation, the run's own painter compiles each script and paints each look (the same calls an open session's
 // looks use, through the render pool when UNPAINT_RENDER=pool), and what the model hands in is painted at full size
 // as any session's choice is. Kept in the run folder: author/rounds.json and rounds.md (the transcript), each round's
-// raw output (R<n>.out.txt), each look's sheet, and author/folder/ (choice.json, script.json: what a later level's
+// raw output (R<n>.out.txt), each look's sheet, and author/folder/ (choice.json, script.json: what the replay level's
 // --previous reads). usage.json is written by cli.mjs from the session record made here.
 import fs from 'node:fs';
 import path from 'node:path';
@@ -17,7 +17,7 @@ import { sheetNumbers, sheetLine } from './rounds-sheet.mjs';
 import { LOOK_PRICE } from './look-cost.mjs';
 import { standInReplies } from './rounds-standin.mjs';
 import { namesShapes, resolveNumbered } from './study-shapes.mjs';
-import { previousHanded, shapesHandedRounds, levelOneTemplate } from './rounds-levels.mjs';
+import { previousHanded, shapesHandedRounds, levelOneTemplate, autoHandedRounds } from './rounds-levels.mjs';
 
 /** The long side, in pixels, of every picture sent in a round, and its JPEG quality: what the models read at full detail. */
 const SENT_PX = 1568, SENT_QUALITY = 88;
@@ -41,7 +41,7 @@ export function planText(compiled) {
 }
 
 /**
- * `r`: the run (cli.mjs). `x`: what cli.mjs lends: {root, briefFile, looksMost, level, say, guard(r), toolsCheck(r, tools),
+ * `r`: the run (cli.mjs). `x`: what cli.mjs lends: {root, briefFile, looksMost, level, say, guard(r), toolsCheck(r, tools), shapesFile(r), autoOf(r) (level 3: {painting, washes, from}),
  * compile(r, choice, script, plate), look(r, choice, script, plate, at, compiled, ask), paintChoice(r, fin), slot(cli)}.
  */
 export async function roundsRun(r, x) {
@@ -61,24 +61,31 @@ export async function roundsRun(r, x) {
   for (const f of packet.files) { const name = `${path.basename(f, '.png')}.jpg`; images.push(await sent(path.join(dir, f), path.join(dir, 'sent', name))); names.push([f, name]); }
   let brief = packet.brief.replace(/each form is one flat colour in the forms picture, and the\s+`FORMS` list at the end gives/, 'the `FORMS` list at the end gives');
   for (const [from, to] of names) brief = brief.replaceAll(from, to);
-  // level 4 may name the traced shapes by number: the brief's line against it gives way to the level's own section
+  // levels 2 and 3 may name the traced shapes by number: the brief's line against it gives way to the level's own section
   if (x.terms?.shapes) brief = brief.replace(/Do not use `shapes`, `reserve` or `along`: this\s+[^\n]*\n?/, 'At this level `shapes`, `reserve` and `along` may name the traced shapes by number (see the section on them below).\n');
   const roundsBrief = fs.readFileSync(path.join(HERE, 'ROUNDS-BRIEF.md'), 'utf8').replaceAll('LOOKS_MOST', String(x.looksMost)).replaceAll('LOOKS_WHOLE', String(Math.floor(x.looksMost / LOOK_PRICE.half + 1e-9)));
-  // a retry (levels 3 and 4) is a fresh conversation handed its own previous painting to look at and its own script as
-  // text, to reuse or ignore: its work, never its reasoning or its looks. Level 4 also: the studies' traced shapes.
+  // what the level adds (levels.mjs), each handed once in round 0. No level is handed another level's result; the
+  // replay level L4-retry alone is handed the model's own earlier painting to look at and its script as text.
   const extra = []; let numbered = null;
   if (x.terms?.previous) {
     const prev = previousHanded(x.previous, { subject: spec.id, author: author.key });
     images.push(await sent(await gridImage(prev.painting, W), path.join(dir, 'sent', 'your-previous-painting.jpg'))); names.push(['', 'your-previous-painting.jpg']);
-    // which level the previous result is from is the run's named choice (the ladder: L3 after L2, L4 after L3; or L4 after L2)
+    // which level the previous result is from is the run's named choice ("L4-retry after L2"): replaying old runs only
     extra.push(prev.text); record.author.previousTry = { from: x.previous, level: prev.level, painting: prev.painting, scriptSha256: prev.sha256 };
-    record.author.ladder = `${x.level} after ${prev.level}`; x.say(r, `this is ${record.author.ladder}: a fresh conversation handed its own ${prev.level} painting and script`);
+    record.author.ladder = `${x.level} after ${prev.level}`; x.say(r, `this is ${record.author.ladder} (a replay of the old ladder): a fresh conversation handed its own ${prev.level} painting and script`);
   }
   if (x.terms?.shapes) {
     numbered = JSON.parse(fs.readFileSync(x.shapesFile(r), 'utf8'));
     const handed = await shapesHandedRounds(numbered, sheet);
     images.push(await sent(await gridImage(handed.picture, W), path.join(dir, 'sent', 'traced-shapes.jpg'))); names.push(['', 'traced-shapes.jpg']);
     extra.push(handed.text); record.author.shapesHanded = { shapes: numbered.shapes.length, colour: true, geometry: 'by number: a passage names a shape and the harness lays its outline' };
+  }
+  // level 3: Auto's plan in numbers and Auto's finished painting as it dried at full size, prepared for this code
+  if (x.terms?.autoPlan || x.terms?.auto) {
+    const auto = await x.autoOf(r);
+    if (!auto?.painting || !auto?.washes) throw new Error(`level ${x.level} hands over Auto's plan and finished painting, and ${!auto?.painting ? 'the painting' : 'the plan'} is not there`);
+    images.push(await sent(await gridImage(auto.painting, W), path.join(dir, 'sent', 'auto-painting.jpg'))); names.push(['', 'auto-painting.jpg']);
+    extra.push(autoHandedRounds(auto.washes)); record.author.autoHanded = { plan: true, painting: true, from: auto.from ?? null, paintingSha256: auto.paintingSha256 ?? null, planSha256: auto.planSha256 ?? null };
   }
   const text = `${brief}\n\n${roundsBrief}${extra.map(e => `\n\n${e}`).join('')}\n\nThe pictures attached, in this order: ${names.map(([, n], i) => `${i + 1}. \`${n}\``).join(', ')}. Look at each before answering. Write your plan and script now. Answer with the JSON object only.`;
   fs.writeFileSync(path.join(dir, 'rounds-prompt.txt'), text);

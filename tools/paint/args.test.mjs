@@ -31,17 +31,17 @@ test('what is wrong is said', () => {
 });
 
 test('the budget of a try, the level and its retries are settings; prepare and look are words of their own; what is gone says so', () => {
-  const r = parseArgs(['mittens', 'paint', '--author', 'astra', '--level', 'L4', '--retries', '3', '--try', '2', '--previous', 'runs/l4-try1', '--looks', '7.5', '--wallminutes', '90', '--graceminutes', '5', '--reverts', '3']);
-  assert.deepEqual([r.level, r.retries, r.tryNumber, r.previous, r.looks, r.wallMinutes, r.graceMinutes, r.reverts, r.prepare, r.look], ['L4', 3, 2, 'runs/l4-try1', 7.5, 90, 5, 3, false, false]);
+  const r = parseArgs(['mittens', 'paint', '--author', 'astra', '--level', 'L4-retry', '--retries', '3', '--try', '2', '--previous', 'runs/l4-try1', '--looks', '7.5', '--wallminutes', '90', '--graceminutes', '5', '--reverts', '3']);
+  assert.deepEqual([r.level, r.retries, r.tryNumber, r.previous, r.looks, r.wallMinutes, r.graceMinutes, r.reverts, r.prepare, r.look], ['L4-retry', 3, 2, 'runs/l4-try1', 7.5, 90, 5, 3, false, false]);
   assert.deepEqual((({ mode, prepare, level }) => [mode, prepare, level])(parseArgs(['mittens', 'prepare'])), ['plan', true, 'L2']);
-  assert.deepEqual((({ mode, prepare }) => [mode, prepare])(parseArgs(['mittens', 'prepare', '--level', 'L4'])), ['paint', true], 'level 4 prepares the automatic painting too');
+  for (const l of ['L3', 'L4']) assert.deepEqual((({ mode, prepare }) => [mode, prepare])(parseArgs(['mittens', 'prepare', '--level', l])), ['paint', true], `${l} prepares the automatic painting too`); assert.deepEqual((({ mode }) => mode)(parseArgs(['mittens', 'prepare', '--level', 'L2'])), 'plan');
   assert.deepEqual((({ look, until, region, mode }) => [look, until, region, mode])(parseArgs(['mittens', 'look', '--author', 'choice:kept', '--until', '2', '--region', '10,10,90,80'])), [true, 2, '10,10,90,80', 'plan']);
   assert.equal(parseArgs(['mittens', 'preflight', '--author', 'neon-m,hydrogen-m']).preflight, true); assert.throws(() => parseArgs(['mittens', 'preflight']), /preflight checks models through the session harness/);
   assert.throws(() => parseArgs(['mittens', 'look']), /look paints one look of a kept choice.*--author choice:/); assert.throws(() => parseArgs(['mittens', 'plan', '--until', '2']), /--until and --region belong to the word look/);
   assert.throws(() => parseArgs(['mittens', 'prepare', '--author', 'opus']), /prepare makes the automatic plan .* it takes no --author/);
   assert.throws(() => parseArgs(['mittens', 'plan', '--minutes', '85']), /--minutes is gone: a session's own minutes are measured, not capped.*--wallminutes/);
   assert.throws(() => parseArgs(['mittens', 'plan', '--critique', 'w.txt']), /--critique is gone: no critique, score or verdict is handed to a model at any level/);
-  assert.throws(() => parseArgs(['mittens', 'plan', '--level', 'L5']), /--level is L1 \(fixed rounds only\), L2, L3 or L4/); assert.throws(() => parseArgs(['mittens', 'plan', '--looks', '0']), /--looks: the rendering budget of a try in units/);
+  assert.throws(() => parseArgs(['mittens', 'plan', '--level', 'L5']), /--level is L1, L2 or L3 \(fixed rounds\), L4 \(an open session\), or L4-retry/); assert.throws(() => parseArgs(['mittens', 'plan', '--looks', '0']), /--looks: the rendering budget of a try in units/);
 });
 
 test('no window is opened unless --open is given', () => {

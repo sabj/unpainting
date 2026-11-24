@@ -6,7 +6,8 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { levelOf, OWN_SCRIPT_ONLY } from './levels.mjs';
-import { shapesHanded, checkWithheld, WITHHELD } from './level4.mjs';
+import { shapesHanded, checkWithheld, WITHHELD, autoHanded, AUTO_GIVEN_FOLDER } from './level4.mjs';
+import sharp from 'sharp';
 import { DEFAULT_LOOKS, DEFAULT_WALL_MINUTES, DEFAULT_STEPS, forLevel, writeSession, sessionServer, ledgerLooks, ledgerShowings, safeRead, safeWrite, finalChoice, cleanEnv, seatbelt, sessionCall, readTranscript, transcriptFile, reachedOutside, ownFolderOf, ownPictures, runSession } from './session.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -489,12 +490,16 @@ test('a look has a fixed price by size and share, whatever is in it: how it pain
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });
 
-test('at every level the folder holds the code planner\'s inputs and no code plan: no auto/, words that do not speak of it, and the model\'s own script to write', () => {
+test('at every level the folder holds the code planner\'s inputs and no code plan as a choice: no auto/, words that do not speak of it, and the model\'s own script to write; L4 adds the traced shapes and Auto\'s plan and painting', async () => {
   const prev = tmp(); fs.writeFileSync(path.join(prev, 'a.jpg'), PNG);
   const previous = { folder: 'previous', title: 'Your own previous painting of this subject', words: 'Judge it yourself.', files: [{ from: path.join(prev, 'a.jpg'), name: 'final-beside-subject.jpg', what: 'your painting beside the subject', picture: true }] };
   fs.writeFileSync(path.join(prev, 'shapes.json'), '{"shapes": []}');
-  for (const [level, handed] of [['L2', []], ['L3', [previous]], ['L4', [previous, shapesHanded(path.join(prev, 'shapes.json'))]]]) {
-    const { dir, prompt } = folder({ level, handed });
+  // Auto's finished painting as prepared (prepared.mjs: painting/plate/painting.png), handed alone on the grid with its plan in numbers
+  fs.mkdirSync(path.join(prev, 'painting', 'plate'), { recursive: true }); await sharp({ create: { width: 56, height: 37, channels: 3, background: '#a09080' } }).png().toFile(path.join(prev, 'painting', 'plate', 'painting.png'));
+  const fromAuto = await autoHanded({ prepared: { painting: { run: path.join(prev, 'painting') } }, made: path.join(prev, 'made'), widthMm: 280, washes: 'THE PLAN IN NUMBERS\n3 washes' });
+  await assert.rejects(autoHanded({ prepared: { painting: null }, made: path.join(prev, 'm2'), widthMm: 280, washes: 'x' }), /Auto's finished painting, and it is not prepared/);
+  for (const [level, handed] of [['L2', []], ['L4-retry', [previous, shapesHanded(path.join(prev, 'shapes.json'))]], ['L4', [shapesHanded(path.join(prev, 'shapes.json')), fromAuto]]]) {
+    const { dir, prompt, eyesOnly } = folder({ level, handed });
     try {
       assert.ok(!fs.existsSync(path.join(dir, 'auto')), `${level}: no auto/ folder`);
       for (const f of ['TASK.md', 'README.md', 'choice.json', 'unpaint', 'own-script-brief.md', 'inputs/source.png', 'inputs/study-2.png', 'inputs/forms-ids.png', 'inputs/forms.json', 'drawing/lines.json']) assert.ok(fs.existsSync(path.join(dir, f)), `${level}: ${f}`);
@@ -506,8 +511,19 @@ test('at every level the folder holds the code planner\'s inputs and no code pla
       assert.match(prompt, /your own painting script/); assert.match(prompt, /has handed in nothing/); assert.match(prompt, /Looks: `2` units\. A look has a fixed price, whatever is in it: a\s+look of your whole plan on the whole sheet, painted at half size, costs 0\.3/); assert.match(prompt, /and at least 0\.2/); assert.match(prompt, /How you paint costs nothing: water, wetness, brushwork, the number of\s+strokes, waits and dryings are yours, and the final painting is not charged/); assert.doesNotMatch(prompt, /charged what it really took|brush sweeps and its dryings|painting work it really takes/, 'nothing says water or strokes cost budget');
       assert.match(readme, /`inputs\/study-2.png`: block-in STUDY 2: the subject simplified to flat shapes \(1 the broad shapes, 2 the middle study, 3 details and accents; to look at only\)\n/);
       assert.match(readme, /"kind": "erase"/, 'its erase passages are its own to write'); assert.match(readme, /"lines": "my-lines.json"/);
-      if (level !== 'L2') assert.match(prompt, /`previous\/final-beside-subject.jpg`/);
+      if (level === 'L4-retry') assert.match(prompt, /`previous\/final-beside-subject.jpg`/); else assert.doesNotMatch(prompt, /previous\//, `${level}: handed no earlier result`);
       if (level === 'L4') {
+        // L3's inputs: the traced shapes, and Auto's plan in numbers and its finished painting (a picture: for looking at, under the anti-cheat guard)
+        assert.ok(fs.existsSync(path.join(dir, 'resources/shapes.json'))); assert.match(prompt, /offered, not required, and they may be wrong/);
+        for (const f of ['auto-painting.png', 'auto-plan.txt']) assert.ok(fs.existsSync(path.join(dir, AUTO_GIVEN_FOLDER, f)), f);
+        assert.equal(fs.readFileSync(path.join(dir, AUTO_GIVEN_FOLDER, 'auto-plan.txt'), 'utf8'), 'THE PLAN IN NUMBERS\n3 washes');
+        assert.match(prompt, /`auto-painting\.png` is Auto's finished painting of this subject/); assert.match(prompt, /cannot be handed in/);
+        assert.ok(eyesOnly.includes(`${AUTO_GIVEN_FOLDER}/auto-painting.png`), 'Auto\'s painting is for looking at'); assert.ok(!eyesOnly.includes(`${AUTO_GIVEN_FOLDER}/auto-plan.txt`));
+        // never the code's plan as a choice, the plan's washes as shapes, or Auto's sheets beside the subject, film or stroke map
+        for (const f of WITHHELD) assert.ok(!fs.existsSync(path.join(dir, f)), `L4 withholds ${f}`); assert.doesNotThrow(() => checkWithheld(dir));
+        assert.deepEqual(JSON.parse(fs.readFileSync(path.join(dir, 'choice.json'), 'utf8')).kind, 'script');
+      }
+      if (level === 'L4-retry') {
         // given: the studies' traced shapes, offered and maybe wrong; nothing of Auto
         assert.ok(fs.existsSync(path.join(dir, 'resources/shapes.json')));
         assert.match(prompt, /offered, not required, and they may be wrong/); assert.match(prompt, /Use them, change them, redraw them, or ignore them/); assert.doesNotMatch(prompt, /\bmust use\b/i);
