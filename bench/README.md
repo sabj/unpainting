@@ -62,7 +62,7 @@ npm run bench:score04 -- ... --out DIR --repeat 2                  # scored agai
 npm run bench:summary04 -- DIR/results.json --set core             # levels against Auto; failed and missing runs count 0
 ```
 
-A level 1 target without a rendering unit is refused by name (today Prout and White Ships get theirs from their prepared Auto). `npm run bench:test` checks run records and that `results/` regenerates unchanged. [Adding a model](docs/rules.md#adding-a-model).
+A level 1 target without a rendering unit is refused by name (every core picture has one; Prout and White Ships took theirs from their prepared Auto). `npm run bench:test` checks run records and that `results/` regenerates unchanged. [Adding a model](docs/rules.md#adding-a-model).
 
 RESULTS: to be filled from the frozen run.
 

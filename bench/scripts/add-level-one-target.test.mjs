@@ -54,7 +54,7 @@ test('a level 1 target is the registered picture on the standard sheet, with its
   } finally { fs.rmSync(root, { recursive: true, force: true }); }
 });
 
-test('the five core pictures have level 1 targets on the standard sheet; the two whose Auto is not prepared are refused by name', async () => {
+test('the five core pictures have level 1 targets on the standard sheet; each with its rendering unit', async () => {
   const tasks = levelOneTargets('core'), specs = loadLevelOneCrops();
   assert.deepEqual(tasks, ['manet-morisot-fan-crop-full', 'prout-laundresses-full', 'turner-esseillon-full', 'white-ships-1488-full', 'mittens-closeup-full']);
   for (const t of tasks) {
@@ -64,9 +64,8 @@ test('the five core pictures have level 1 targets on the standard sheet; the two
     assert.ok(Math.abs(sheet.cells - s.width) <= 1 && Math.abs(sheet.rows - s.height) <= 1, `${t} is on the standard sheet (${sheet.cells} x ${sheet.rows})`);
     assert.ok(fs.existsSync(path.join(BENCH, 'v3', s.coarseFile)), t); assert.ok(s.licence && s.source && s.style, t);
   }
-  // the state today (23 Nov): Prout and the larger White Ships have no prepared Auto, so no unit; when they have, this line goes
-  assert.throws(() => guarded(tasks, specs), /level 1 targets prout-laundresses-full, white-ships-1488-full: no rendering unit/);
-  assert.doesNotThrow(() => guarded(tasks.filter(t => !/prout|white-ships/.test(t)), specs));
+  // every core picture has its rendering unit (Prout and the larger White Ships from their prepared Auto at 32698365)
+  assert.doesNotThrow(() => guarded(tasks, specs));
 });
 
 test('the 0.4 models carry one key, id and effort at level 1 (bench/models.json) and at levels 2 to 4 (tools/paint/authors.json)', () => {
