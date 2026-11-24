@@ -9,7 +9,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { REPO } from '../lib.mjs';
-import { seatbelt, cleanEnv, SIGN_IN_EXPOSURE } from '../../../tools/paint/session.mjs';
+import { seatbelt, cleanEnv, museFiles, SIGN_IN_EXPOSURE } from '../../../tools/paint/session.mjs';
 import { PROVIDER_HOSTS, startGate, makeToolbox, proxyEnv } from '../../../tools/paint/session-net.mjs';
 import { mainCheckoutOf, segPythonFor } from '../../../tools/paint/run.mjs';
 
@@ -35,6 +35,20 @@ function ofRunner(runner, home) {
   if (runner === 'agy') {
     const bin = which('agy');
     return { readable: [...(bin ? [bin] : []), path.join(home, 'Library', 'Application Support', 'antigravity'), path.join(home, 'Library', 'Keychains')], write: [path.join(home, '.gemini')], metadata: [...(bin ? [path.dirname(bin)] : []), home], signIn: true, env: { DO_NOT_TRACK: '1' }, args: a => a };
+  }
+  if (runner === 'codex') {
+    // its own folder holds its sign-in file and what it keeps as it runs; the user's config.toml is not loaded (no MCP
+    // servers or plugins of the operator's), nothing of the session is kept there, and its usage reports are off
+    const bin = which('codex'), add = ['--ignore-user-config', '--ephemeral', '-c', 'analytics.enabled=false'];
+    return { readable: bin ? [bin] : [], write: [path.join(home, '.codex')], metadata: [...(bin ? [path.dirname(bin)] : []), home], signIn: true, env: {},
+      args: a => (a[0] === 'exec' && !a.includes('--ignore-user-config') ? ['exec', ...add, ...a.slice(1)] : a) };
+  }
+  if (runner === 'muse') {
+    // its own sandbox off inside ours (two do not nest), its launcher's update off; its session log, which the round
+    // reads its tokens from (runners.mjs museUsage), is written in its data folder
+    const own = museFiles(home);
+    return { readable: own.readable, write: own.write, metadata: own.metadata, signIn: true, env: own.env,
+      args: a => (a[0] === 'exec' && !a.includes('--disable-sandbox') ? ['exec', '--disable-sandbox', ...a.slice(1)] : a) };
   }
   return { readable: [], write: [], metadata: [], signIn: false, env: {}, args: a => a };
 }

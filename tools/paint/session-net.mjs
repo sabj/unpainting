@@ -17,6 +17,16 @@ const PROBE = "import sys, numpy, PIL, scipy, skimage, cv2; print(f'Python {sys.
 export const PROVIDER_HOSTS = Object.freeze({
   agy: [/(^|\.)googleapis\.com$/, /(^|\.)googleusercontent\.com$/],
   claude: [/^api\.anthropic\.com$/],
+  // codex, signed in with a ChatGPT account, asks chatgpt.com (measured without a model: under the session's profile
+  // its model list is fetched there through the gate). auth.openai.com (where that sign-in is renewed) and
+  // api.openai.com (asked when it is signed in with an API key) are read from the program's own text, not yet measured
+  // in a session. A host it needs beyond these shows in the gate's refusals of its preflight.
+  codex: [/^chatgpt\.com$/, /^auth\.openai\.com$/, /^api\.openai\.com$/],
+  // muse: api.meta.ai is the service its sign-in file names (measured without a model: under the session's profile its
+  // model list is answered through the gate by this host alone). auth.meta.com is where its launcher signs in, read
+  // from the launcher, for a sign-in renewed in a session (not yet measured). Its update download host is left out:
+  // the launcher's update is off in a session.
+  muse: [/^api\.meta\.ai$/, /^auth\.meta\.com$/],
 });
 
 /** Whether `host` is one of `allow`. */
