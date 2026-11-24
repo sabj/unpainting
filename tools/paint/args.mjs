@@ -2,7 +2,7 @@
 //   npm run paint -- <subject[,subject...]> plan|paint|prepare|look|preflight [--author auto|<model key>[,...]] [--studies locked|author]
 //                    [--work session|reply] [--level L2|L3|L4] [--retries N] [--try N] [--previous <dir>]
 //                    [--looks N] [--wallminutes N] [--graceminutes N] [--steps N] [--reverts N] [--from <dir>] [--lines FILE.json|standard]
-//                    [--set key=value ...] [--jobs N] [--out <dir>] [--dry-run] [--no-open]
+//                    [--set key=value ...] [--jobs N] [--out <dir>] [--dry-run] [--open]
 // Nothing here touches a file: it turns the words into one request object, or throws with the usage.
 
 export const USAGE = `usage: npm run paint -- <subject[,subject...]> plan|paint|prepare|look|preflight [options]
@@ -64,13 +64,14 @@ export const USAGE = `usage: npm run paint -- <subject[,subject...]> plan|paint|
                         number written into <out>/jobs.
   --out <dir>           where the run is written (default work/paint/<time>-<subjects>-<mode>)
   --dry-run             print what would run and stop
-  --no-open             do not open the sheet in Preview
+  --open                open the finished sheet in Preview (nothing is opened without it; --no-open is still
+                        accepted and means the same as leaving --open out)
 
 A subject may name a variant kept in tools/paint/variants.json: h36:approved.
 "all" is every registered subject not already named: all, or a,b,all to paint a and b first.`;
 
 const VALUED = new Set(['--author', '--studies', '--set', '--out', '--jobs', '--work', '--looks', '--wallminutes', '--graceminutes', '--steps', '--reverts', '--level', '--try', '--retries', '--until', '--region', '--previous', '--from', '--lines']);
-const FLAGS = new Set(['--dry-run', '--no-open']);
+const FLAGS = new Set(['--dry-run', '--open', '--no-open']);
 
 /**
  * {subjects: [{id, variant}], mode, prepare, authors, studies, work, level, tryNumber, previous, looks,
@@ -130,7 +131,7 @@ export function parseArgs(argv) {
   const jobs = given['--jobs'] === undefined ? null : Number(given['--jobs']);
   if (jobs !== null && !(Number.isInteger(jobs) && jobs >= 1 && jobs <= 16)) throw new Error('--jobs: a whole number of paintings at once, 1 to 16');
   if (preflight && (authors.includes('auto') || authors.some(a => a.includes(':')))) throw new Error('preflight checks models through the session harness: give --author <model key>[,<model key>...]');
-  return { subjects, mode, prepare, preflight, look, until, region: given['--region'] ?? null, authors, studies, work, level, tryNumber, retries, previous: given['--previous'] ?? null, looks, wallMinutes, graceMinutes, steps, reverts, from: given['--from'] ?? null, lines: given['--lines'] ?? null, sets, jobs, out: given['--out'] ?? null, dryRun: flags.has('--dry-run'), open: !flags.has('--no-open') };
+  return { subjects, mode, prepare, preflight, look, until, region: given['--region'] ?? null, authors, studies, work, level, tryNumber, retries, previous: given['--previous'] ?? null, looks, wallMinutes, graceMinutes, steps, reverts, from: given['--from'] ?? null, lines: given['--lines'] ?? null, sets, jobs, out: given['--out'] ?? null, dryRun: flags.has('--dry-run'), open: flags.has('--open') && !flags.has('--no-open') };
 }
 
 function list(s) { return s.split(',').map(x => x.trim()).filter(Boolean); }
