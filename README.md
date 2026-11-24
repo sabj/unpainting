@@ -116,6 +116,28 @@ Unless told otherwise, the painter runs its default recipe, a preset of painter 
 
 Everything runs on a basic machine. A GPU, including a local one through WebGPU, runs faster and in parallel. That helps when you steer towards an outcome.
 
+## How long things take
+
+Measured on 0.4 rc7 candidates, Auto painting unless a model is named. Machines: a Mac mini (M4, 16 GB) and rented
+pods with one RTX 4090. Times are for one painting with nothing else on its GPU.
+
+| What | Where | Time |
+|---|---|---|
+| A half-size look of the whole sheet (Mittens, 543 cells across), no film | Mac mini | 4.4 min: plan 1.1, painting 2.0, finish 1.0 |
+| The same look with its film (175 frames) | Mac mini | 6.6 min: painting 3.9 |
+| A full-size painting with film (Mittens, 1,086 x 1,448 cells) | Mac mini | 13.1 min: plan 3.5, painting 7.6, finish 1.0 |
+| The same full-size painting with film | pod | 30.4 min: plan 9.8, painting 17.4, finish 0.9 |
+| Full-size paintings with film, eight pictures | pod | 8.4 to 38.6 min each: plan 1.2 to 12.2, painting 6.3 to 23.3, finish 0.3 to 1.3 |
+| The finish (drying, the 2x display render, writing the files) | either | 0.3 to 1.3 min; the 2x render was not timed apart from it |
+| A look inside a model's session (rc3 to rc5, before rc6's speed work) | as the sessions recorded | 3.1 to 8.1 min each, 29 looks |
+| One level's session, L2 or L3 (Neon, Argon, Sonnet at medium; rc3 to rc5) | a Mac | 11.7 to 65.9 min wall, of which the model's own 0.9 to 23 min; the rest is waiting for looks |
+| Preparing a picture: the three studies | a 128 GB Mac | about an hour (the preparation notes' figure; not timed by the gate) |
+| Preparing a picture: drawing, named forms, registration | a Mac | minutes; not timed apart |
+
+Not measured on rc7: a full-size painting without film, a level 1 session, a level 4 session, and a model's session
+on the one-area sheet. The pod's plan phase runs on the pod's CPU, which is why a pod can take longer than the mini
+for one painting; pods are used to paint many at once.
+
 ## Benchmark
 
 [unpaint-bench](bench/README.md) tests how well AI models paint, and how much of that is the model and how much is the code that helps it. The reference is "Auto", the code planner alone.

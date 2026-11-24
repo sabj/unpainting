@@ -37,8 +37,8 @@ TOOLS_NOTE
 
 ## Commands
 
-Run them from this folder. A plan takes from under a minute to several minutes on the CPU. A look is a painting: it
-takes about 5 to 15 minutes (longer when the machine is busy). A command that is still working after about 50
+Run them from this folder. A plan takes from under a minute to several minutes. A look is a painting: it
+takes about 3 to 8 minutes, as measured in earlier sessions (longer when the machine is busy). A command that is still working after about 50
 seconds returns with the words "still working"; run `./unpaint wait` (again and again, as often as need be) to get
 its answer. Give your shell commands a timeout of at least 60 seconds. The clock of this try is the wall clock: a
 plan's minutes and a look's painting are on it.
