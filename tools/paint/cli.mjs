@@ -152,7 +152,7 @@ for (const spec of specs) for (const author of authors) {
       subject: { key: `${spec.id}:${spec.variant ?? ''}`, id: spec.id, name: spec.name, variant: spec.variant, variantWhy: spec.variantWhy, registry: spec.registry,
         source: spec.source.path, sourceAbs: spec.source.abs, sourcePx: spec.source.px, sourceSha256: spec.source.sha256,
         labels: spec.labels?.path ?? null, labelCount: spec.labels?.count ?? null, deviations: spec.deviations },
-      sheet: spec.sheet,
+      sheet: spec.sheet, realSize: spec.realSize ?? null,
       drawing: { stem: spec.drawing.stem, medium: command.medium, pinned, files: spec.drawing.files.map(f => f.abs), sha256: spec.drawing.files.map(f => f.sha256 ?? f.unpinnedSha256) },
       studies: spec.studies.map(s => ({ path: s.path, abs: s.abs, sha256: s.sha256, role: s.role, floorMm2: s.floorMm2, read: s.read })),
       masks: spec.masks.receipt ? { receipt: spec.masks.receipt, from: spec.masks.from, mask: spec.masks.mask, review: spec.masks.review, forms: spec.masks.forms, read: command.masksRead,
@@ -506,7 +506,7 @@ async function sessionRun(r) {
       if (terms.previous) record.author.previousTry = { tryNumber: req.tryNumber, retries: req.retries, from: path.resolve(req.previous) };
       routes = await closedRoutes(author);
       // the code's plan and its settings are handed at no level (levels.mjs): the folder holds no auto/
-      const { prompt, pictures: handedPictures } = writeSession({ dir: cwd, tools: routes.toolbox ? toolsText(routes.toolbox.said) : undefined, packet, sheet: spec.sheet, medium: record.drawing.medium, codePlan: terms.plan, ...(terms.plan ? { auto: { picture: await planPicture({ planPreview: auto.planPreview, run: record }), washesText: washesText(auto), plan: { summary: auto.summary, washes: auto.rows }, toEdit: listing }, settings: settingsList(spec) } : {}),
+      const { prompt, pictures: handedPictures } = writeSession({ dir: cwd, tools: routes.toolbox ? toolsText(routes.toolbox.said) : undefined, packet, sheet: spec.sheet, realSize: spec.realSize, medium: record.drawing.medium, codePlan: terms.plan, ...(terms.plan ? { auto: { picture: await planPicture({ planPreview: auto.planPreview, run: record }), washesText: washesText(auto), plan: { summary: auto.summary, washes: auto.rows }, toEdit: listing }, settings: settingsList(spec) } : {}),
         forms: record.masks.mask ? await formBoxes(record.masks.mask, record.masks.forms, W) : null, formsIds: record.masks.mask ?? null, looks: looksMost, wallMinutes: wallMost, graceMinutes: graceMost, steps: stepsMost, reverts: revertsMost, briefFile: path.join(HERE, 'SESSION-BRIEF.md'), readmeFile: path.join(HERE, 'SESSION-README.md'), handed,
         drawing: base.listing ? { listing: base.listing, picture: await drawingPicture(allLinesDoc(base.vectors, base.lines, base.mask ? { ...base.mask, list: base.forms } : null), W) } : null });
       // nothing withheld is in the folder: the code's plan, its washes, anything of Auto's painting (level4.mjs)
@@ -815,7 +815,7 @@ async function preflightRun(r) {
     for (const f of packet.files) { fs.mkdirSync(path.dirname(path.join(cwd, f)), { recursive: true }); fs.copyFileSync(path.join(dir, f), path.join(cwd, f)); }
     routes = await closedRoutes(author);
     // a preflight checks the tools, not a level: it plans the code planner's plan, nothing changed, as it always has
-    writeSession({ dir: cwd, tools: routes.toolbox ? toolsText(routes.toolbox.said) : undefined, packet, sheet: spec.sheet, medium: record.drawing.medium, codePlan: true, auto: { picture: await planPicture({ planPreview: auto.planPreview, run: record }), washesText: washesText(auto), plan: { summary: auto.summary, washes: auto.rows } }, settings: settingsList(spec),
+    writeSession({ dir: cwd, tools: routes.toolbox ? toolsText(routes.toolbox.said) : undefined, packet, sheet: spec.sheet, realSize: spec.realSize, medium: record.drawing.medium, codePlan: true, auto: { picture: await planPicture({ planPreview: auto.planPreview, run: record }), washesText: washesText(auto), plan: { summary: auto.summary, washes: auto.rows } }, settings: settingsList(spec),
       looks: looksMost, wallMinutes: PREFLIGHT_MINUTES, graceMinutes: PREFLIGHT_GRACE_MINUTES, reverts: revertsMost, briefFile: path.join(HERE, 'SESSION-BRIEF.md'), readmeFile: path.join(HERE, 'SESSION-README.md') });
     picture = packet.files.find(f => /source/.test(f));
     const prompt = preflightTask(picture); fs.writeFileSync(path.join(cwd, 'TASK.md'), prompt);

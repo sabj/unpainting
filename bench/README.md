@@ -32,10 +32,17 @@ Details: [levels](docs/levels.md), [rules](docs/rules.md) and [scoring](docs/sco
 
 ## Real sizes of the originals (told to the model as a fact)
 
+At levels 2 to 4 the task says the original's size in one line beside the sheet's, for example "The original is
+19.7 x 28 cm; your sheet is 27 x 39.4 cm (height x width)." It is a fact for the model to weigh (how large a brush
+mark was on the original); it never sizes the sheet. A generated picture has no real size and is given a nominal one,
+said as such. The sizes are in [`real-sizes.json`](real-sizes.json), height x width in cm; a subject's record may
+carry its own. A picture with no recorded size is told nothing.
+
 Tiepolo 31.2 x 24.3 cm · Guardi 45.4 x 30.1 · Homer, The Water Fan 37.4 x 53.4 · Homer, Adirondacks Guide 32.9 x 54.5 ·
-Homer, Two Ladies 17.6 x 20.2 · Manet, Morisot with a Fan 20.9 x 16.8 (whole sheet) · Sargent, In Austrian Tyrol
-29.9 x 45.2 · Turner 19.7 x 28 · Ender 21 x 28.5 · Morisot, Avenue du Bois 20 x 28 · Cezanne 21 x 27.2 · Sargent,
-White Ships: to look up. Nominal, generated: Mittens and Kasha portrait 23 x 30.5 · Yale Rosewalk 28 x 38.
+Homer, Two Ladies 17.6 x 20.2 · Manet, Morisot with a Fan 20.9 x 16.8 (the whole sheet; the picture painted is a part
+of it) · Sargent, In Austrian Tyrol 29.9 x 45.2 · Turner 19.7 x 28 · Ender 21 x 28.5 · Cezanne 21 x 27.2 · Bonington
+18.1 x 14.3. Nominal, generated: Mittens and Kasha portrait 30.5 x 23 · Yale Rosewalk 28 x 38. Not yet recorded:
+Sargent, White Ships; Prout, Laundresses; Morisot, Avenue du Bois.
 
 RESULTS: to be filled from the frozen run.
 

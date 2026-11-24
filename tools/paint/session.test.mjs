@@ -14,10 +14,10 @@ const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'paint-session-test-'));
 const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', 'base64');
 // a session's folder: at a level (levels.mjs: no level is handed the code's plan), or by default the preflight's folder,
 // which still holds the code's plan in auto/ to check the tools with (codePlan true)
-function folder({ looks = 2, minutes = 85, handed = [], level = null, codePlan: plan = null } = {}) {
+function folder({ looks = 2, minutes = 85, handed = [], level = null, codePlan: plan = null, realSize = null } = {}) {
   const dir = tmp(); fs.mkdirSync(path.join(dir, 'inputs')); fs.writeFileSync(path.join(dir, 'inputs/source.png'), PNG); fs.writeFileSync(path.join(dir, 'inputs/study-2.png'), PNG);
   const codePlan = plan ?? (level ? levelOf(level).codePlan : true);
-  const out = writeSession({ dir, packet: { files: ['inputs/source.png', 'inputs/study-2.png'], brief: 'HOW TO WRITE A SCRIPT' }, sheet: { widthMm: 280, heightMm: 186.7 }, medium: 'pencil (graphite)', codePlan,
+  const out = writeSession({ dir, packet: { files: ['inputs/source.png', 'inputs/study-2.png'], brief: 'HOW TO WRITE A SCRIPT' }, sheet: { widthMm: 280, heightMm: 186.7 }, realSize, medium: 'pencil (graphite)', codePlan,
     ...(codePlan ? { auto: { picture: PNG, washesText: 'AUTO WASHES', plan: { summary: { washes: 3 }, washes: [] }, toEdit: { format: 'plan-edit 1', of: 'abc', washes: [] } }, settings: [{ set: 'floors', now: '6,4,2', meaning: 'the least shape' }] } : {}), forms: [{ id: 2, name: 'cat face', kind: 'face', boxMm: [1, 2, 3, 4] }], formsIds: path.join(dir, 'inputs/source.png'),
     looks, wallMinutes: minutes, handed, briefFile: path.join(HERE, 'SESSION-BRIEF.md'), readmeFile: path.join(HERE, 'SESSION-README.md'), drawing: { listing: { format: 'lines 1', strokes: [] }, picture: PNG } });
   return { dir, ledger: path.join(tmp(), 'looks.jsonl'), codePlan, ...out };
@@ -35,7 +35,7 @@ test('the preflight\'s folder holds the task, the tools, the code planner\'s pla
     for (const f of ['TASK.md', 'README.md', 'choice.json', 'unpaint', 'own-script-brief.md', 'auto/plan.png', 'auto/washes.txt', 'auto/plan.json', 'auto/settings.json', 'inputs/forms-ids.png', 'inputs/forms.json']) assert.ok(fs.existsSync(path.join(dir, f)), f);
     assert.deepEqual(JSON.parse(fs.readFileSync(path.join(dir, 'choice.json'), 'utf8')), { kind: 'settings', settings: {}, why: '' });
     assert.match(prompt, /`280` by `186.7` mm/); assert.match(prompt, /Steps: `1000` of your tool calls/); assert.match(prompt, /Time is not budgeted: waiting for a look or for the machine costs\s+you nothing \(a far safety stop ends a session after `85` minutes\)/); assert.match(prompt, /you are allowed to make mistakes/); assert.match(prompt, /you may do it `20` times/); assert.doesNotMatch(prompt, /\bmust\b|\bnever\b|ROUNDS ONLY|sent back/); assert.match(prompt, /No score is ever shown/); assert.match(prompt, /light pencil/);
-    assert.doesNotMatch(prompt, /SHEET_W|LOOKS_MOST|WALL_MINUTES|GRACE_MINUTES|REVERTS_MOST|STEPS_MOST|DRAWING_NOTE/);
+    assert.doesNotMatch(prompt, /REAL_SIZE_LINE|SHEET_W|LOOKS_MOST|WALL_MINUTES|GRACE_MINUTES|REVERTS_MOST|STEPS_MOST|DRAWING_NOTE/);
     const readme = fs.readFileSync(path.join(dir, 'README.md'), 'utf8');
     assert.match(readme, /`inputs\/source.png`: the SUBJECT/); assert.match(readme, /`inputs\/study-2.png`: block-in STUDY 2/); assert.match(readme, /\| `\.\/unpaint look` \|.*\| its cost in look units, of 4 for this try \(the benchmark's budget\) \|/); assert.doesNotMatch(readme, /INPUT_LIST|SHEET_W|LOOKS_MOST|REVERTS_MOST/); assert.match(readme, /"own": \[/); assert.match(readme, /`"medium": "pencil"`, `"pen"` or `"none"` beside your script/); assert.match(readme, /`"ink": "waterproof"` or `"soluble"` beside your script/);
     assert.ok(fs.statSync(path.join(dir, 'unpaint')).mode & 0o100, 'the command can be run');
@@ -554,4 +554,13 @@ test('at every level a session that hands in no script of its own has handed in 
     fin = finalChoice({ present: server.present, lastGood: rec.lastGood, good: rec.good, ended: 'done', codePlan: false });
     assert.equal(fin.submitted.kind, 'script'); assert.match(fin.submitted.from, /the last choice that compiled/);
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('levels 2 to 4 are told the original\'s real size in one line beside their sheet\'s; with none recorded, nothing', () => {
+  for (const level of ['L2', 'L3', 'L4']) {
+    const { dir, prompt } = folder({ level, realSize: { heightCm: 19.7, widthCm: 28, nominal: false, part: false } });
+    try { assert.match(prompt, /mm\. You do not paint stroke by stroke: you decide the plan the painter follows\.\nThe original is 19\.7 x 28 cm; your sheet is 18\.7 x 28 cm \(height x width\)\.\n\n\*\*The goal/, level); assert.equal(fs.readFileSync(path.join(dir, 'TASK.md'), 'utf8'), prompt); } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+  }
+  const none = folder({ level: 'L2' });
+  try { assert.doesNotMatch(none.prompt, /original is|REAL_SIZE/); assert.match(none.prompt, /the painter follows\.\n\n\*\*The goal/); } finally { fs.rmSync(none.dir, { recursive: true, force: true }); }
 });

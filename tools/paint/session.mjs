@@ -22,6 +22,7 @@
 // and the model's shell cannot read the repository, the subject list, the caches or other sessions (seatbelt).
 // What this cannot stop: a model drawing its own script's polygons with its own code. Its commands are kept.
 import { travelLine } from './hand-travel.mjs';
+import { realSizeLine } from './real-size.mjs';
 import fs from 'node:fs';
 import { proxyEnv, TOOLS_OPEN } from './session-net.mjs';
 import os from 'node:os';
@@ -140,14 +141,14 @@ const AUTO_FILES = ['auto/settings.json', 'auto/plan.json', 'auto/plan-to-edit.j
  * washesText, plan} (the preflight only); `settings` settingsList() (the preflight only); `forms` [{id, name, kind, boxMm}] with
  * `formsIds` the id map's file, or null. Returns {prompt, files}. Nothing of this machine's paths goes into any file.
  */
-export function writeSession({ dir, packet, sheet, medium, codePlan, auto = null, settings = null, forms = null, formsIds = null, looks, wallMinutes, steps = DEFAULT_STEPS, graceMinutes = DEFAULT_GRACE_MINUTES, reverts = DEFAULT_REVERTS, briefFile, readmeFile, handed = [], drawing = null, tools = TOOLS_OPEN }) {
+export function writeSession({ dir, packet, sheet, realSize = null, medium, codePlan, auto = null, settings = null, forms = null, formsIds = null, looks, wallMinutes, steps = DEFAULT_STEPS, graceMinutes = DEFAULT_GRACE_MINUTES, reverts = DEFAULT_REVERTS, briefFile, readmeFile, handed = [], drawing = null, tools = TOOLS_OPEN }) {
   if (typeof codePlan !== 'boolean') throw new Error('session: say whether this level hands over the code\'s plan (codePlan true for the preflight only)');
   if (codePlan && !(auto && settings)) throw new Error('session: the preflight\'s folder holds the code\'s plan and its settings, and none were given');
   if (!codePlan && (auto || settings)) throw new Error(`session: ${OWN_SCRIPT_ONLY}; it is not started`);
   const mk = d => fs.mkdirSync(path.join(dir, d), { recursive: true });
   for (const d of [...(codePlan ? ['auto'] : []), 'plans', 'looks', '.requests']) mk(d);
   const put = (f, text) => fs.writeFileSync(path.join(dir, f), text);
-  const ink = /^ink/.test(medium), v = { TOOLS_NOTE: tools, STEPS_MOST: steps, SHEET_W: sheet.widthMm, SHEET_H: sheet.heightMm, WALL_MINUTES: wallMinutes, GRACE_MINUTES: graceMinutes, LOOKS_MOST: looks, REVERTS_MOST: reverts,
+  const ink = /^ink/.test(medium), v = { TOOLS_NOTE: tools, STEPS_MOST: steps, 'REAL_SIZE_LINE\n': realSizeLine(realSize, sheet) ? `${realSizeLine(realSize, sheet)}\n` : '', SHEET_W: sheet.widthMm, SHEET_H: sheet.heightMm, WALL_MINUTES: wallMinutes, GRACE_MINUTES: graceMinutes, LOOKS_MOST: looks, REVERTS_MOST: reverts,
     DRAWING_NOTE: ink ? 'As prepared, the drawing is waterproof ink laid before the washes; it carries the form and the washes go over it. It is offered, not required: laying no drawing (`"medium": "none"` in `choice.json`) is a normal choice, and then the brush makes the shapes on clean paper.' : 'As prepared, the drawing is light pencil laid before the washes; it only places the forms, and the paint carries form, value and edge. It is offered, not required: laying no drawing (`"medium": "none"` in `choice.json`) is a normal choice, and then the brush makes the shapes on clean paper.',
     INPUT_LIST: packet.files.map(f => `- \`${f}\`: ${f.includes('source') ? 'the SUBJECT, the picture to paint' : f.includes('drawing') ? 'the opening DRAWING, already on the sheet before any wash' : f.includes('forms') ? 'the NAMED FORMS, each one flat colour' : `block-in STUDY ${/study-(\d)/.exec(f)?.[1]}: the subject simplified to flat shapes (1 the broad shapes, 2 the middle study, 3 details and accents)${codePlan ? '; the code planner reads its washes from these' : ''}`}`).join('\n') };
   let prompt = fill(forLevel(fs.readFileSync(briefFile, 'utf8'), codePlan), v);

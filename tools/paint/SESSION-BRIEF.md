@@ -2,6 +2,7 @@
 
 You are the painter's planner for one watercolour. A simulated hand, paper and paint will lay whatever plan you hand
 over, on a sheet `SHEET_W` by `SHEET_H` mm. You do not paint stroke by stroke: you decide the plan the painter follows.
+REAL_SIZE_LINE
 
 **The goal: make the best watercolour of this subject you can, one a skilled painter would be proud of, faithful to
 the subject.** Nothing else is asked.

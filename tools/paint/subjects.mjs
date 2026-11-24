@@ -7,6 +7,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { SHEET_RULE, standardSheet } from './sheet-rule.mjs';
+import { realSizeOf } from './real-size.mjs';
 
 /** Roles of the studies of a wash plan, coarse to fine, in plain words. */
 const ROLES = ['block-in (the broad shapes)', 'middle study (later washes)', 'fine study (details and accents)'];
@@ -125,7 +126,7 @@ export function resolveSubject(registry, id, { sets = [], variant = null, varian
   return {
     id: rec.id, name: rec.name ?? rec.id, variant: variantName, variantWhy: variant?.why ?? null, registry: registry.file, use: rec.use ?? null,
     source: { path: rec.source.path, abs: abs(rec.source.path), sha256: rec.source.sha256, px: rec.source.px ?? null },
-    sheet, drawing, studies, labels, masks, deviations, studySeed: rec.studySeed?.chosen ?? null,
+    sheet, realSize: realSizeOf(rec), drawing, studies, labels, masks, deviations, studySeed: rec.studySeed?.chosen ?? null,
     options,
     otherSets: [...all].filter(([k]) => !isSubjectKey(k)),
   };
