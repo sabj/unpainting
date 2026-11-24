@@ -6,7 +6,15 @@ export function dilate(m, w, h, r) {
   const a = new Float32Array(m.length), b = new Uint8Array(m.length), r2 = r * r;
   // a disc: rows by run, then the disc's half-chords
   for (let y = 0; y < h; y++) { let last = -1e9; for (let x = 0; x < w; x++) { if (m[y * w + x]) last = x; a[y * w + x] = x - last; } last = 1e9; for (let x = w - 1; x >= 0; x--) { if (m[y * w + x]) last = x; a[y * w + x] = Math.min(a[y * w + x], last - x); } }
-  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { let hit = 0; for (let dy = -r; dy <= r && !hit; dy++) { const yy = y + dy; if (yy < 0 || yy >= h) continue; if (a[yy * w + x] * a[yy * w + x] + dy * dy <= r2) hit = 1; } b[y * w + x] = hit; }
+  // A cell further than r along its row from the mask cannot lie under the disc from that row, so a column of 2r + 1
+  // such rows has no hit: counted down each column once (near), those cells are passed over without the walk, which was
+  // most of a full-size plan's 111 s here. Every other cell is walked as before, so the mask is the same.
+  const near = new Int32Array(w * (h + 1)), whole = Number.isInteger(r);   // a radius that is not whole is walked as it was
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) near[(y + 1) * w + x] = near[y * w + x] + (a[y * w + x] <= r ? 1 : 0);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    if (whole && near[Math.min(h, y + r + 1) * w + x] - near[Math.max(0, y - r) * w + x] === 0) continue;
+    let hit = 0; for (let dy = -r; dy <= r && !hit; dy++) { const yy = y + dy; if (yy < 0 || yy >= h) continue; if (a[yy * w + x] * a[yy * w + x] + dy * dy <= r2) hit = 1; } b[y * w + x] = hit;
+  }
   return b;
 }
 // a plain loop: Uint8Array.from with a mapping function walks the mask through an iterator and a call a cell, which
