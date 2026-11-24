@@ -29,14 +29,18 @@ def combined(h, q, w=WEIGHTS):
 def derive(paintings, originals, w=WEIGHTS):
     """Adds share, combined and the Auto adjustment to each painting (in place) and returns them."""
     for p in paintings:
-        o = (originals.get(p["subject"]) or {}).get("quality", {}).get("score")
+        o = (originals.get(p.get("original") or p["subject"]) or {}).get("quality", {}).get("score")
         q = p["quality"]["score"]
         p["share"] = 100 * q / o if q is not None and o else None
         p["combined"] = combined(p["human"]["percent"], p["share"], w)
     for p in paintings:
         autos = [a for a in paintings if a["auto"] and a["subject"] == p["subject"]]
-        if p["auto"]:
+        if p.get("failed"):
+            p["adjusted"] = {"auto": autos[0]["id"] if len(autos) == 1 else None, "note": "failed run"}
+        elif p["auto"]:
             p["adjusted"] = {"auto": p["id"], "note": "Auto itself"}
+        elif len(autos) == 1 and autos[0].get("failed"):
+            p["adjusted"] = {"auto": autos[0]["id"], "note": "Auto's own run of this picture failed; nothing to adjust against"}
         elif len(autos) != 1:
             p["adjusted"] = {"auto": None, "note": f"{len(autos)} Auto paintings of {p['subject']} among the inputs; the adjustment needs exactly one"}
         else:
@@ -115,18 +119,28 @@ def markdown(r):
          f"Rubric `{r['rubric']['path']}` sha256 `{r['rubric']['sha256'][:12]}`; prompts sequence `{r['prompts']['sequence'][:12]}`, single `{r['prompts']['single'][:12]}`" + (f", likeness `{r['prompts']['likeness'][:12]}`" if r['prompts'].get('likeness') else "") + ".", ""]
     faults = r.get("faults") or []
     L += ["## Faults first", ""] + ([f"- {x}" for x in faults] or ["- None: every reading has all its judges."]) + [""]
+    gone = [p for p in r["paintings"] if p.get("failed")]
+    if gone:
+        L += ["## Failed runs", "", f"{len(gone)} scheduled run{'s' if len(gone) != 1 else ''} left no painting to judge. Each is kept in the tables as FAILED and counts as the bottom of the scale in the summary; none is dropped.", ""]
+        L += [f"- {p['label']}, {p['subject']}: {p['failed']}" for p in gone] + [""]
     for sid in sorted({p["subject"] for p in r["paintings"]}):
         rows = [p for p in r["paintings"] if p["subject"] == sid]
-        o = (r["originals"].get(sid) or {}).get("quality") or {}
-        L += [f"## {sid}", "", f"The original scores {_f(o.get('score'))} of 10 read alone; each painting's quality share is its score over that.", "",
+        os_ = {k: v for k, v in r["originals"].items() if (v.get("subject") or k) == sid}
+        said = "; ".join(f"{'the original' if k == sid else k} scores {_f((v.get('quality') or {}).get('score'))} of 10 read alone" for k, v in os_.items()) or "no original was read (no painting of it to judge)"
+        L += [f"## {sid}", "", f"{said[0].upper() + said[1:]}; each painting's quality share is its score over its own original's.", "",
               f"| Picture | HUMAN-NESS (mean of {r['snapshots']} {'stills in progress, from the first wash to just before the finish' if wash else 'film snapshots'}, % of 5) | QUALITY (share of the original) | COMBINED ({w['humanness']} parts human-ness to {w['quality']} part quality) | LIKENESS (of 5; not in combined) | adjusted for Auto: human-ness | quality | combined |",
               "|---|---|---|---|---|---|---|---|"]
         for p in rows:
             a = p["adjusted"]
+            if p.get("failed"):
+                L.append(f"| {p['label']} | FAILED | FAILED | **FAILED** (counts as the bottom of the scale) | none | " + " | ".join(["failed run"] * 3) + " |")
+                continue
             adj = ["Auto itself"] * 3 if p["auto"] else [a["note"]] * 3 if a.get("note") else [_sg(a["humanness"]), _sg(a["quality"]), _sg(a["combined"])]
             L.append(f"| {p['label']} | {_f(p['human']['percent'], 0, '%')} | {_f(p['share'], 0, '%')} ({_f(p['quality']['score'])} of 10) | **{_f(p['combined'], 0, '%')}** | {likeness_text(p.get('likeness'))} | " + " | ".join(adj) + " |")
         L += ["", "### Human-ness in detail", "", f"| Picture | {'the drawing frame, before the first wash (of 5; not in the mean) | ' if wash else ''}first third | middle | last third (of 5) | the finished sheet (of 5; not in the mean) | tells (each judge's first reading, every snapshot shown) | a person would paint it in this order | one judge's sentence |", "|---|---|---|---|---|---|---|---|" + ("---|" if wash else "")]
         for p in rows:
+            if p.get("failed"):
+                continue
             h = p["human"]
             th = h["thirds"] or [None] * 3
             yes = "none read" if not h["of"] else f"{'yes' if h['yes'] * 2 > h['of'] else 'no'} ({h['yes']} of {h['of']} readings)"
@@ -136,7 +150,7 @@ def markdown(r):
         for p in rows:
             c = p.get("classic") or {}
             mt = c.get("metrics") or {}
-            adj = "Auto itself" if p["auto"] else p["adjusted"].get("note") or _sg(p["adjusted"]["classic"])
+            adj = "failed run" if p.get("failed") else "Auto itself" if p["auto"] else p["adjusted"].get("note") or _sg(p["adjusted"]["classic"])
             L.append(f"| {p['label']} | {cheat_text(p.get('cheat'))} | {progression_text(p.get('cheat'))} | {_f(c.get('mean'))} ({_f(mt.get('value'))} / {_f(mt.get('edge'))} / {_f(mt.get('marks'))}) | {adj} | {usage_text(p.get('usage'))} |")
         L.append("")
     L += ["## What each column is", "",

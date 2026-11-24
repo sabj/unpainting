@@ -158,7 +158,9 @@ def main(argv=None, judge=s04_judge, env=None, say=print):
     try:
         cfg = judge.settings(env)
         rubric, rubric_sha = R.load_rubric(RUBRIC)
-        paintings = s04_runs.entries(a.inputs)
+        everything = s04_runs.entries(a.inputs)
+        # a run that failed is kept and counted (never judged, never dropped); the paintings are judged
+        paintings, failed = [e for e in everything if not e.get("failed")], [e for e in everything if e.get("failed")]
         bad = []
         for e in paintings:
             try:
@@ -175,12 +177,17 @@ def main(argv=None, judge=s04_judge, env=None, say=print):
     import score_painting as SP  # classic.py's measurements and the scorer's picture preparation
     from common import load_rgb
     os.makedirs(a.out, exist_ok=True)
-    originals = {}
+    # each painting is measured against the original it was painted from. One file a subject is the rule; level 1's
+    # target is its own file of the same picture (the sheet's size), so it is read as an original of its own, named.
+    originals, shas = {}, {}
     for e in paintings:
-        originals.setdefault(e["subject"], {"target": e["target"], "style": e["style"]})
-        if originals[e["subject"]]["target"] != e["target"]:
-            print(f"bench:score04 refused: {e['id']} names a different original for {e['subject']} than another painting does", file=sys.stderr)
-            return 2
+        h = file_sha(e["target"])
+        key = next((k for k, v in shas.items() if v == h and originals[k]["subject"] == e["subject"]), None)
+        if key is None:
+            key = e["subject"] if e["subject"] not in originals else f"{e['subject']} ({'level 1 target' if e['level'] == 'L1' else 'another file'} {h[:8]})"
+            originals[key] = {"subject": e["subject"], "target": e["target"], "style": e["style"], "sha256": h}
+            shas[key] = h
+        e["original"] = key
         t, p = s04_runs.sized(e["target"], e["painting"], os.path.join(a.out, "sized"), e["id"])
         e["classic"] = SP.classic_scores(t, p)
     data_uri = lambda f, px: SP.data_uri(load_rgb(f), px)
@@ -191,12 +198,18 @@ def main(argv=None, judge=s04_judge, env=None, say=print):
         q = R.quality(got[(e["id"], "single")], cfg["panel"])
         lk = R.likeness(got[(e["id"], "likeness")], cfg["panel"])
         faults += [f"{e['id']}, human-ness: {x}" for x in h["faults"]] + [f"{e['id']}, quality: {x}" for x in q["faults"]] + [f"{e['id']}, likeness: {x}" for x in lk["faults"]]
-        rows.append({**{k: e[k] for k in ("id", "label", "subject", "auto", "author", "commit", "folder", "painting", "target", "style", "classic", "usage")},
+        rows.append({**{k: e[k] for k in ("id", "label", "subject", "auto", "author", "level", "original", "commit", "folder", "painting", "target", "style", "classic", "usage")}, "failed": None,
                      "opening": e["opening"], "drawingFrame": {"file": e["drawing"][0], "pct": e["drawing"][1]} if e["drawing"] else None, "firstWash": e["firstWash"],
                      "snapshots": [{"file": f, "pct": p, **({"frame": e["frames"][k]} if k < len(e["frames"]) else {"finished": True})} for k, (f, p) in enumerate(e["snapshots"])], "human": h, "quality": q, "likeness": lk, "cheat": cheat_summary(e["cheat"])})
     for sid, o in originals.items():
         o["quality"] = R.quality(got[("original--" + sid, "single")], cfg["panel"])
         faults += [f"original of {sid}, quality: {x}" for x in o["quality"]["faults"]]
+    # the failed runs: rows with no reading, counted as failures by the table and the summary
+    none_h = {"percent": None, "meanOf5": None, "thirds": None, "perSnapshot": None, "drawing": None, "finished": None, "tells": {}, "yes": 0, "of": 0, "why": None, "judges": {}, "faults": []}
+    for e in failed:
+        rows.append({**{k: e.get(k) for k in ("id", "label", "subject", "auto", "author", "level", "commit", "folder", "painting", "target", "style", "usage")}, "original": None, "classic": None,
+                     "failed": e["failed"], "opening": None, "drawingFrame": None, "firstWash": None, "snapshots": [], "human": dict(none_h),
+                     "quality": {"score": None, "judges": {}, "criteria": None, "spread": None, "faults": []}, "likeness": {"score": None, "judges": {}, "why": None, "flagged": None, "faults": []}, "cheat": None})
     # the panel's one reasoning setting is off: a judge whose route reports reasoning tokens all the same is named
     if jrec.get("reasoning") == "off":
         for m in cfg["panel"]:
@@ -206,11 +219,11 @@ def main(argv=None, judge=s04_judge, env=None, say=print):
     T.derive(rows, originals)
     res = {"schema": "unpaint-bench/score04@1", "written": time.strftime("%Y-%m-%d %H:%M"), "series": SERIES + " " + SCHEME_NOTE[a.snapshots], "judge": jrec,
            "rubric": {"path": os.path.relpath(RUBRIC, REPO), "sha256": rubric_sha}, "prompts": R.prompt_hashes(rubric, a.snapshots),
-           "weights": dict(T.WEIGHTS), "readings": R.READINGS, "repeat": a.repeat, "fresh": bool(a.fresh), "snapshots": R.SCHEMES[a.snapshots]["count"], "snapshotScheme": {**R.SCHEMES[a.snapshots], "note": SCHEME_NOTE[a.snapshots]}, "pictureLongSidePx": {"stills": SNAP_PX, "alone": ONE_PX, "likeness": ONE_PX}, "faults": faults, "originals": originals, "paintings": rows}
+           "weights": dict(T.WEIGHTS), "readings": R.READINGS, "repeat": a.repeat, "fresh": bool(a.fresh), "snapshots": R.SCHEMES[a.snapshots]["count"], "snapshotScheme": {**R.SCHEMES[a.snapshots], "note": SCHEME_NOTE[a.snapshots]}, "pictureLongSidePx": {"stills": SNAP_PX, "alone": ONE_PX, "likeness": ONE_PX}, "faults": faults, "failedRuns": [{"id": e["id"], "subject": e["subject"], "author": e["author"], "level": e["level"], "why": e["failed"]} for e in failed], "originals": originals, "paintings": rows}
     names = ("results.json", "SCORES.md") if a.repeat == 1 else (f"results-repeat-{a.repeat}.json", f"SCORES-repeat-{a.repeat}.md")
     write(os.path.join(a.out, names[0]), json.dumps(res, indent=1))
     write(os.path.join(a.out, names[1]), T.markdown(res))
-    say("written", os.path.join(a.out, names[0]), "and " + names[1] + (f"; {len(faults)} faults: " + "; ".join(faults) if faults else ""), flush=True)
+    say("written", os.path.join(a.out, names[0]), "and " + names[1] + (f"; {len(failed)} failed runs counted" if failed else "") + (f"; {len(faults)} faults: " + "; ".join(faults) if faults else ""), flush=True)
     return 1 if faults else 0
 
 

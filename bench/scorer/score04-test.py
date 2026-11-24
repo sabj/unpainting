@@ -53,6 +53,41 @@ def make_run(root, name, author, registry, source, frames=20, film=True, usage=N
     return f
 
 
+def make_level_one(bench, model="neon-m", painted=("cat-full",), asked=("cat-full", "dog-full"), frames=30, drawn=2, n=1):
+    """A level 1 try as bench/scripts/v3.mjs leaves it: the try's run.json (round V3, one record a painted target, a note
+    for one not painted), and under <bench>/<raw>/out/<target>/ the kit's final.png with its film in film/ (frames.json
+    as bench/v2/kit/kit.mjs writes it: each frame's stage, the strokes on the sheet and how many are brush strokes).
+    The targets are level 1's own (bench/v3/crops.json); cat-full is the benchmark picture `subj` (bench/run-sets.json)."""
+    bench = Path(bench)
+    (bench / "v3" / "targets").mkdir(parents=True, exist_ok=True); (bench / "v2").mkdir(exist_ok=True)
+    (bench / "v2" / "crops.json").write_text(json.dumps({"crops": []}))
+    (bench / "v3" / "crops.json").write_text(json.dumps({"crops": [{"task": t, "file": f"targets/{t}.png", "style": "watercolor sketch over faint pencil"} for t in ("cat-full", "dog-full")]}))
+    (bench / "run-sets.json").write_text(json.dumps({"pictures": [{"id": "subj", "levelOne": "cat-full"}, {"id": "dog", "levelOne": "dog-full"}]}))
+    for t in ("cat-full", "dog-full"):
+        picture(bench / "v3" / "targets" / f"{t}.png", 99, (48, 64))
+    raw = f"work/raw/v3-informed/{model}/try-{n}"
+    crops = {}
+    for t in painted:
+        out = bench / raw / "out" / t
+        (out / "film").mkdir(parents=True)
+        picture(out / "final.png", 31)
+        end = np.asarray(Image.open(out / "final.png").resize((30, 40), Image.BOX), dtype=np.float32)
+        paper, fr = np.full_like(end, 236), []
+        for i in range(frames):
+            Image.fromarray(np.rint(paper + i / (frames - 1) * (end - paper)).astype(np.uint8)).save(out / "film" / f"f{i:04d}.webp", lossless=True)
+            strokes = 2 * i
+            fr.append({"src": f"f{i:04d}.webp", "stage": "paper" if i == 0 else "finished" if i == frames - 1 else "painting", "strokes": strokes, "brush": max(0, strokes - 2 * drawn), "of": 2 * (frames - 1), "position": i / (frames - 1)})
+        (out / "film" / "frames.json").write_text(json.dumps({"painter": "bench kit v2", "task": t, "frames": fr}))
+        crops[t] = {"strokes": 2 * (frames - 1), "paintingsRun": 2, "runawayStop": None, "work": {"measured": {"sweeps": 58}}, "attempt": {"n": n, "minutes": 41.5, "killedAtCap": False, "exitCode": 0}}
+    try_dir = bench / "runs" / "v3-informed" / model / str(n)
+    try_dir.mkdir(parents=True)
+    (try_dir / "run.json").write_text(json.dumps({
+        "schema": "unpaint-bench/run@2", "round": "V3", "commit": "abcdef1234567", "try": n, "painter": {"key": model, "name": "Neon (Medium)"},
+        "settings": {"crops": list(asked), "paintingsPerAttempt": 3, "strokeBudget": None}, "session": {"tokens": 1234, "costUSD": None},
+        "crops": crops, "notPainted": {t: "no attempt" for t in asked if t not in painted}, "cheat": {"disqualified": False}, "raw": raw}))
+    return try_dir
+
+
 def fixtures(root):
     src = Path(root) / "source.png"
     picture(src, 99)
@@ -492,6 +527,59 @@ class Runs(unittest.TestCase):
             m = str(e.exception)
             self.assertIn("holds no painting", m); self.assertIn("is not on disk", m); self.assertIn("ok is given twice", m)
 
+    def test_a_level_one_try_is_read_target_by_target_and_a_target_not_painted_is_kept_as_failed(self):
+        with tempfile.TemporaryDirectory() as d:
+            bench = Path(d) / "bench"
+            t = make_level_one(bench)
+            with mock.patch.object(s04_runs, "BENCH", str(bench)):
+                es = s04_runs.entries([str(t)])
+                self.assertEqual([(e["id"], e["level"], e["subject"], e["author"], bool(e["failed"])) for e in es],
+                                 [("neon-m--L1--cat-full", "L1", "subj", "neon-m", False), ("neon-m--L1--dog-full", "L1", "dog", "neon-m", True)])
+                ok, gone = es
+                self.assertEqual(ok["painting"], str(bench / "work/raw/v3-informed/neon-m/try-1/out/cat-full/final.png"))
+                self.assertEqual((ok["target"], ok["style"], ok["label"], ok["commit"]), (str(bench / "v3/targets/cat-full.png"), "watercolor sketch over faint pencil", "Neon (Medium) L1", "abcdef12"))
+                self.assertEqual(ok["usage"]["session"]["lookUnits"], {"spent": 2, "budget": 3})
+                self.assertIn("no painting: no attempt", gone["failed"])
+                # its film is the kit's, in film/ beside final.png: the first wash is read from the brush strokes counted
+                g = R.frames_for(ok["painting"])
+                self.assertEqual((g["firstWash"]["frame"], os.path.basename(g["drawing"][0]), len(g["snapshots"])), (3, "f0002.webp", 11))
+                self.assertEqual(g["opening"], str(bench / "work/raw/v3-informed/neon-m/try-1/out/cat-full/film/f0000.webp"))
+                # a runaway stop, a disqualified try and a painting gone from disk are failures with their reason, not refusals
+                doc = json.loads((t / "run.json").read_text())
+                doc["crops"]["cat-full"]["runawayStop"] = "this painting has taken 99999 water steps"
+                (t / "run.json").write_text(json.dumps(doc))
+                self.assertIn("stopped as a runaway", s04_runs.entries([str(t)])[0]["failed"])
+                doc["crops"]["cat-full"]["runawayStop"] = None; doc["cheat"] = {"disqualified": True, "reason": "2 blocked target read(s) at paint time"}
+                (t / "run.json").write_text(json.dumps(doc))
+                self.assertIn("disqualified: 2 blocked target read(s)", s04_runs.entries([str(t)])[0]["failed"])
+                doc["cheat"] = {"disqualified": False}; doc["settings"]["crops"] = ["cat-full", "bird-full"]
+                (t / "run.json").write_text(json.dumps(doc))
+                with self.assertRaisesRegex(R.Refusal, "level 1 target bird-full is in neither"):
+                    s04_runs.entries([str(t)])
+
+    def test_a_failed_run_and_a_scheduled_run_that_left_nothing_are_kept_never_refused_or_dropped(self):
+        with tempfile.TemporaryDirectory() as d:
+            src, reg = fixtures(d)
+            ok = make_run(d, "ok", "auto", reg, src)
+            bad = make_run(d, "subj--neon-m", "neon-m", reg, src, usage={"level": "L3"})
+            run = json.loads((bad / "run.json").read_text()); run["failure"] = "nothing handed in: no script of its own had compiled"
+            (bad / "run.json").write_text(json.dumps(run))
+            nop = make_run(d, "subj--sonnet-m", "sonnet-m", reg, src, usage={"level": 2}); os.remove(nop / "plate" / "painting.png")
+            Path(d, "m.json").write_text(json.dumps({"runs": ["ok", "subj--neon-m", "subj--sonnet-m",
+                {"folder": "never-made", "subject": "subj", "author": "neon-m", "level": "L4"},
+                {"subject": "subj", "author": "hydrogen-m", "level": "L2", "failed": "the session never started: the model's command is not installed"}]}))
+            es = s04_runs.entries([os.path.join(d, "m.json")])
+            self.assertEqual([(e["id"], e["level"], e["author"], bool(e["failed"])) for e in es],
+                             [("ok", "Auto", "auto", False), ("subj--neon-m", "L3", "neon-m", True), ("subj--sonnet-m", "L2", "sonnet-m", True),
+                              ("never-made", "L4", "neon-m", True), ("subj--hydrogen-m--L2", "L2", "hydrogen-m", True)])
+            self.assertIn("nothing handed in", es[1]["failed"]); self.assertIn("holds no painting", es[2]["failed"]); self.assertIn("left no folder", es[3]["failed"])
+            # an input that is not a run at all is still refused by name
+            with self.assertRaisesRegex(R.Refusal, "neither a run folder nor a manifest"):
+                s04_runs.entries([os.path.join(d, "nowhere")])
+            Path(d, "m2.json").write_text(json.dumps([{"subject": "subj"}]))
+            with self.assertRaisesRegex(R.Refusal, "names no folder"):
+                s04_runs.entries([os.path.join(d, "m2.json")])
+
     def test_manifest_paths_are_read_from_its_folder(self):
         with tempfile.TemporaryDirectory() as d:
             src, reg = fixtures(d)
@@ -661,6 +749,46 @@ class EndToEnd(unittest.TestCase):
         k1 = json.loads(Path(out, "readings", "model-run", "single-j1-1.json").read_text())["cacheKey"]
         k2 = json.loads(Path(out, "readings", "model-run", "r2", "single-j1-1.json").read_text())["cacheKey"]
         self.assertNotEqual(k1, k2)
+
+    def test_every_level_into_one_scoring_and_one_summary_a_failed_run_counted(self):
+        """Auto, level 1 (the kit's own output), levels 2, 3 and 4 (painter runs), and a level 4 run that failed:
+        one bench:score04, then bench:summary04 over what it wrote."""
+        import subprocess
+        d = self.tmp.name
+        src, reg = fixtures(d)
+        bench = Path(d) / "bench"
+        l1 = make_level_one(bench, asked=("cat-full",))
+        auto = make_run(d, "subj--auto", "auto", reg, src)
+        l2 = make_run(d, "subj--neon-m", "neon-m", reg, src, usage={"level": "L2"})
+        l3 = make_run(d, "subj--neon-m--L3", "neon-m", reg, src, usage={"level": "L3"})
+        l4 = make_run(d, "subj--neon-m--L4", "neon-m", reg, src, usage={"level": "L4"})
+        run = json.loads((l4 / "run.json").read_text()); run["failure"] = "nothing handed in: no script of its own had compiled"
+        (l4 / "run.json").write_text(json.dumps(run))
+        j = self.stub(); j.marks = {}
+        out = os.path.join(d, "out")
+        with mock.patch.object(s04_runs, "BENCH", str(bench)):
+            rc = self.S.main([str(auto), str(l1), str(l2), str(l3), str(l4), "--out", out], judge=j, say=lambda *x, **k: None)
+        self.assertEqual(rc, 0)
+        res = json.loads(Path(out, "results.json").read_text())
+        by = {p["id"]: p for p in res["paintings"]}
+        self.assertEqual({i: (p["level"], bool(p["failed"])) for i, p in by.items()},
+                         {"subj--auto": ("Auto", False), "neon-m--L1--cat-full": ("L1", False), "subj--neon-m": ("L2", False), "subj--neon-m--L3": ("L3", False), "subj--neon-m--L4": ("L4", True)})
+        self.assertEqual({p["subject"] for p in res["paintings"]}, {"subj"}, "level 1's target is scored under the picture's own id")
+        self.assertIsNotNone(by["neon-m--L1--cat-full"]["combined"]); self.assertEqual(by["neon-m--L1--cat-full"]["style"], by["subj--neon-m"]["style"], "one picture, one style told to the judges")
+        self.assertEqual(len(res["originals"]), 2, "level 1's target is its own file of the picture: read as an original of its own")
+        self.assertEqual(res["failedRuns"], [{"id": "subj--neon-m--L4", "subject": "subj", "author": "neon-m", "level": "L4", "why": "nothing handed in: no script of its own had compiled"}])
+        md = Path(out, "SCORES.md").read_text()
+        self.assertIn("## Failed runs", md); self.assertIn("**FAILED** (counts as the bottom of the scale)", md)
+        # the summary: every level of the model against Auto, the failed level 4 counted as 0
+        repo = HERE.parent.parent
+        r = subprocess.run(["node", str(repo / "bench" / "scripts" / "summary04.mjs"), os.path.join(out, "results.json")], capture_output=True, text=True, cwd=repo)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        sm = Path(out, "SUMMARY.md").read_text()
+        self.assertIn("1 failed run counted", r.stdout)
+        self.assertIn("| Subject | Auto | L1 | L2 | L3 | L4 |", sm); self.assertIn("0 (failed)", sm)
+        self.assertIn("- neon-m L4, subj: nothing handed in", sm)
+        row = next(l for l in sm.splitlines() if l.startswith("| subj |"))
+        self.assertNotIn("not run", row, "all four levels and Auto are in the one row")
 
     def test_a_broken_judge_is_named_and_the_exit_is_not_clean(self):
         a, m = self.runs()

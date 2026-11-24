@@ -1,25 +1,30 @@
-// The 0.4 benchmark levels: Auto, L1, L2 and L3, and each model's score measured against Auto. See ../docs/levels.md.
-// Pure functions over flat painting records. Nothing here reads a file or a run folder.
+// The 0.4 benchmark levels: Auto and L1 to L4, and each model's score measured against Auto. See ../docs/levels.md.
+// Pure functions over flat painting records. Nothing here reads a file or a run folder (summary04.mjs does that).
 //
 // A record is one painting:
-//   { level: 'Auto' | 'L1' | 'L2' | 'L3', subject, model (not for Auto), try (default 1), score (on the scale),
-//     failed (true when the painter refused the plan or there is no painting), commit, judgeVersion, judgeProfile,
-//     autoCommit (optional, on a model record: the Auto commit it was given or compared with),
-//     progression, cheatRisk (side indexes, shown beside and never part of a score) }
+//   { level: 'Auto' | 'L1' | 'L2' | 'L3' | 'L4', subject, model (not for Auto), try (default 1), score (on the scale),
+//     failed (true when the run failed, the painter refused the script or there is no painting), commit, judgeVersion,
+//     judgeProfile, autoCommit (optional, on a model record: the Auto commit it was given or compared with),
+//     progression, cheatRisk, likeness (side readings, shown beside and never part of a score) }
+// Every level is ONE try (the definition, 23 Nov 2026: L1 one attempt; L2 one go; L3 one retry of L2; L4 one retry of
+// L3). Where a level holds several tries (a test run), the LAST counts, never the best.
 import { mean, bootstrapMean } from './lib.mjs';
 
-/** The levels in order. `was` is the old round name, for display only. */
+/** The levels in order. `was` is the old round the level grew out of, for display only. */
 export const LEVELS = [
   { id: 'Auto', header: 'Code planner alone', was: null },
-  { id: 'L1', header: 'Freehand, own tries', was: 'V3' },
-  { id: 'L2', header: 'Tuning the code planner, one try', was: 'V4' },
-  { id: 'L3', header: 'Tuning the code planner, third try', was: 'V5' },
+  { id: 'L1', header: 'Freehand kit and tips, one attempt', was: 'V3' },
+  { id: 'L2', header: 'The planner\'s inputs, one try', was: 'V4' },
+  { id: 'L3', header: 'One retry after studying its own painting', was: 'V5' },
+  { id: 'L4', header: 'One more retry, with the studies\' traced shapes', was: null },
 ];
-const MODEL_LEVELS = ['L1', 'L2', 'L3'];
-const L3_TRIES = 3;
+const MODEL_LEVELS = ['L1', 'L2', 'L3', 'L4'];
+/** A retry level and the level it retries: its gain is read against that one, on the pictures both ran. */
+const RETRIES = { L3: 'L2', L4: 'L3' };
+export const LEVEL_NOTE = 'Each level changes several things at once (level 1: another way of painting altogether; level 3: one more try and its own painting to study; level 4: one more try again and the traced shapes), so a gain between two levels is the effect of the whole step and cannot be assigned to one kind of help.';
 
 /** Old round name to new level name, for labels only. V1 and V2 have no new name: they are not in the new benchmark. */
-export const ALIASES = Object.freeze({ V3: 'L1', V4: 'L2', V5: 'L3' });
+export const ALIASES = Object.freeze({ V3: 'L1', V4: 'L2', V5: 'L3' });   // the rounds the first three levels grew out of; level 4 has none
 /** The new name of an old round, or null for a round that was dropped (V1, V2) or never existed. */
 export const levelFor = oldRound => ALIASES[oldRound] ?? null;
 export const headerFor = id => LEVELS.find(l => l.id === id)?.header ?? null;
@@ -92,11 +97,13 @@ function autoBaseline(autoRecords, scale) {
 
 /**
  * One model's results against Auto.
- * Every subject Auto painted counts at every level the model entered: a subject the model has no painting of scores
- * the bottom of the scale. L3 counts its third try; the best of the three tries (the L2 try is the first) is kept
- * beside it. Throws rather than combine records that do not belong together.
+ * `scheduled`: {level: [subjects]}, the pictures the benchmark runs at each level (bench/run-sets.json: the core on
+ * the whole ladder, the others at Auto and level 2). Without it every subject Auto painted is scheduled at every
+ * level the model entered. A scheduled picture the model has no painting of, or whose run failed, scores the bottom
+ * of the scale: it is counted, never dropped. A level counts its last try. Throws rather than combine records that do
+ * not belong together.
  */
-export function summarize(records, { scale = SCALES.score10, floorShare = DEFAULT_FLOOR_SHARE, model, seed = 7 } = {}) {
+export function summarize(records, { scale = SCALES.score10, floorShare = DEFAULT_FLOOR_SHARE, model, seed = 7, scheduled = null } = {}) {
   checkScale(scale, floorShare);
   for (const r of records) {
     if (ALIASES[r.level] || r.level === 'V1' || r.level === 'V2') throw new Error(`levels: a record is labelled ${r.level}. Old rounds are published history and are never recomputed or mixed with the new levels; the old names are for labels only`);
@@ -110,61 +117,60 @@ export function summarize(records, { scale = SCALES.score10, floorShare = DEFAUL
   for (const r of mine) {
     const label = `${name} ${r.level} ${r.subject}`;
     if (!auto.bySubject.has(r.subject)) throw new Error(`levels: ${label} has no Auto painting of that subject to measure against`);
-    if (judgeOf(r) !== auto.judge) throw new Error(`levels: ${label} was scored by ${judgeOf(r) || '(no judge)'} and Auto by ${auto.judge}. Scores from different judges are not comparable; rescore one side`);
+    if (r.failed !== true && judgeOf(r) !== auto.judge) throw new Error(`levels: ${label} was scored by ${judgeOf(r) || '(no judge)'} and Auto by ${auto.judge}. Scores from different judges are not comparable; rescore one side`);
     if (r.autoCommit != null && r.autoCommit !== auto.commit) throw new Error(`levels: ${label} was run against Auto at ${r.autoCommit}, but these Auto scores are from ${auto.commit}. A model is only measured against the Auto it was given`);
+    if (scheduled && !(scheduled[r.level] ?? []).includes(r.subject)) throw new Error(`levels: ${label} is not in the schedule: ${r.subject} is not run at ${r.level}. A painting outside the schedule is never averaged in`);
   }
   const tryOf = r => r.try ?? 1;
   const at = (level, subject) => mine.filter(r => r.level === level && r.subject === subject);
   const entered = Object.fromEntries(MODEL_LEVELS.map(l => [l, mine.some(r => r.level === l)]));
-  if (entered.L3 && !entered.L2) throw new Error(`levels: ${name} has L3 records and no L2 records. The first of the three L3 tries is the L2 try`);
+  for (const [l, before] of Object.entries(RETRIES)) if (entered[l] && !entered[before]) throw new Error(`levels: ${name} has ${l} records and no ${before} records. ${l} is a retry of ${before}`);
+  const runsAt = level => (scheduled ? (scheduled[level] ?? []) : [...auto.bySubject.keys()]);
+  for (const level of MODEL_LEVELS.filter(l => entered[l])) for (const sub of runsAt(level)) if (!auto.bySubject.has(sub)) throw new Error(`levels: ${sub} is scheduled at ${level} and Auto has no record of it. Every scheduled picture needs Auto painted and judged`);
   const opts = { scale, floorShare };
-  const missing = { score: scale.min, failed: true, missing: true, try: null, progression: null, cheatRisk: null };
+  const missing = { score: scale.min, failed: true, missing: true, try: null, progression: null, cheatRisk: null, likeness: null };
   const cell = (r, autoScore, label) => {
-    const c = r ? { ...counted(r, scale, label), try: tryOf(r), ...side(r) } : { ...missing };
+    const c = r ? { ...counted(r, scale, label), try: tryOf(r), ...side(r), likeness: r.likeness ?? null, why: r.failed === true ? r.why ?? null : null } : { ...missing };
     return { ...c, adjusted: adjustedScore(c.score, autoScore, opts) };
   };
 
   const subjects = [...auto.bySubject].map(([subject, a]) => {
     const room = headroom(a.score, opts);
     const row = { subject, auto: a, headroom: room, floored: room > scale.max - a.score, levels: {} };
-    for (const level of MODEL_LEVELS.filter(l => entered[l])) {
+    for (const level of MODEL_LEVELS.filter(l => entered[l] && runsAt(l).includes(subject))) {
       const rs = at(level, subject), label = `${name} ${level} ${subject}`;
       const tries = rs.map(tryOf);
       if (new Set(tries).size !== tries.length) throw new Error(`levels: ${label} has two records for the same try`);
-      if (level === 'L2' && rs.length > 1) throw new Error(`levels: ${label} has ${rs.length} tries. L2 is one try`);
-      if (level === 'L3') {
-        if (tries.some(t => t !== 2 && t !== L3_TRIES)) throw new Error(`levels: ${label} may only hold tries 2 and 3. Try 1 is the L2 record`);
-        const third = cell(rs.find(r => tryOf(r) === L3_TRIES), a.score, label);
-        const earlier = [at('L2', subject)[0], rs.find(r => tryOf(r) === 2)].filter(Boolean).map(r => ({ try: r.level === 'L2' ? 1 : 2, ...counted(r, scale, label) }));
-        const best = [...earlier, { try: L3_TRIES, score: third.score }].sort((x, y) => y.score - x.score || y.try - x.try)[0];
-        row.levels.L3 = { ...third, try: L3_TRIES, triesMade: 1 + rs.length - (at('L2', subject).length ? 0 : 1), best: { try: best.try, score: best.score } };
-      } else {
-        // L1 may hold several tries; the last one counts, as at L3
-        row.levels[level] = cell(rs.sort((x, y) => tryOf(y) - tryOf(x))[0], a.score, label);
-      }
+      // one try a level; where a test run made several, the last counts and never the best
+      row.levels[level] = { ...cell(rs.sort((x, y) => tryOf(y) - tryOf(x))[0], a.score, label), triesMade: rs.length };
     }
     return row;
   });
 
   const levels = {};
   for (const level of MODEL_LEVELS.filter(l => entered[l])) {
-    const cells = subjects.map(s => s.levels[level]), adj = cells.map(c => c.adjusted), rooms = subjects.map(s => s.headroom);
-    const total = rooms.reduce((a, b) => a + b, 0);
+    const rows = subjects.filter(s => s.levels[level]);
+    if (!rows.length) throw new Error(`levels: no picture is scheduled at ${level}, and ${name} has ${level} records`);
+    const cells = rows.map(s => s.levels[level]), adj = cells.map(c => c.adjusted), rooms = rows.map(s => s.headroom);
+    const total = rooms.reduce((x, y) => x + y, 0);
     levels[level] = {
-      header: headerFor(level), subjects: cells.length, failed: cells.filter(c => c.failed).length,
+      header: headerFor(level), subjects: cells.length, failed: cells.filter(c => c.failed).length, missing: cells.filter(c => c.missing).length,
       adjusted: mean(adj), interval: bootstrapMean(adj, { seed }),
       rawMean: mean(cells.map(c => c.score)),
-      weightedRaw: cells.reduce((a, c, i) => a + c.score * rooms[i], 0) / total,
-      autoWeightedRaw: subjects.reduce((a, s, i) => a + s.auto.score * rooms[i], 0) / total,
-      ...(level === 'L3' ? { bestOfThreeRawMean: mean(cells.map(c => c.best.score)) } : {}),
+      weightedRaw: cells.reduce((x, c, i) => x + c.score * rooms[i], 0) / total,
+      autoWeightedRaw: rows.reduce((x, s, i) => x + s.auto.score * rooms[i], 0) / total,
+      autoRawMean: mean(rows.map(s => s.auto.score)),
     };
   }
-  let learned = null;
-  if (entered.L3) {
-    const d = subjects.map(s => s.levels.L3.adjusted - s.levels.L2.adjusted);
-    learned = { subjects: d.length, adjusted: mean(d), interval: bootstrapMean(d, { seed }), raw: mean(subjects.map(s => s.levels.L3.score - s.levels.L2.score)) };
+  // each retry against the level it retries, on the pictures both ran
+  const steps = {};
+  for (const [l, before] of Object.entries(RETRIES)) {
+    if (!entered[l]) continue;
+    const rows = subjects.filter(s => s.levels[l] && s.levels[before]);
+    const d = rows.map(s => s.levels[l].adjusted - s.levels[before].adjusted);
+    steps[l] = { from: before, subjects: d.length, adjusted: d.length ? mean(d) : null, interval: d.length ? bootstrapMean(d, { seed }) : null, raw: d.length ? mean(rows.map(s => s.levels[l].score - s.levels[before].score)) : null };
   }
-  return { model: name, scale: scale.id ?? `${scale.min}..${scale.max}`, floorShare, auto: { commit: auto.commit, judge: auto.judge }, subjects, levels, learned };
+  return { model: name, scale: scale.id ?? `${scale.min}..${scale.max}`, floorShare, auto: { commit: auto.commit, judge: auto.judge }, subjects, levels, steps, learned: steps.L3 ?? null };
 }
 
 const num = (v, digits = 2) => (v == null ? 'n/a' : (+v.toFixed(digits)).toString());
@@ -175,18 +181,20 @@ const sideCell = (row, key) => ['Auto', ...MODEL_LEVELS].map(l => [l, l === 'Aut
 
 /** One model's subjects as a Markdown table. The last row is the model's headline for each level. */
 export function subjectTable(summary) {
-  const head = ['Subject', 'Auto', 'L1', 'L2', 'L3 (third try)', 'Headroom', 'Adjusted L1', 'Adjusted L2', 'Adjusted L3', 'Progression', 'Cheat-risk'];
+  const head = ['Subject', 'Auto', ...MODEL_LEVELS, 'Headroom', ...MODEL_LEVELS.map(l => `Adjusted ${l}`), 'Progression', 'Cheat-risk'];
   const rows = summary.subjects.map(s => [s.subject, num(s.auto.score),
-    scoreCell(s.levels.L1), scoreCell(s.levels.L2),
-    s.levels.L3 ? `${scoreCell(s.levels.L3)}, best of three ${num(s.levels.L3.best.score)}` : 'not run',
+    ...MODEL_LEVELS.map(l => scoreCell(s.levels[l])),
     `${num(s.headroom)}${s.floored ? ' (floor)' : ''}`,
     ...MODEL_LEVELS.map(l => (s.levels[l] ? signed(s.levels[l].adjusted) : 'not run')),
     sideCell(s, 'progression'), sideCell(s, 'cheatRisk')]);
   const headline = l => { const v = summary.levels[l]; return v ? `${signed(v.adjusted)}${v.interval ? ` (${signed(v.interval[0])} to ${signed(v.interval[1])})` : ''}` : 'not run'; };
-  rows.push(['Mean', '', ...MODEL_LEVELS.map(l => (summary.levels[l] ? num(summary.levels[l].rawMean) : 'not run')), '', ...MODEL_LEVELS.map(headline), '', '']);
+  const meanCell = l => { const v = summary.levels[l]; return v ? `${num(v.rawMean)} (${v.subjects} pictures${v.failed ? `, ${v.failed} failed` : ''})` : 'not run'; };
+  rows.push(['Mean', '', ...MODEL_LEVELS.map(meanCell), '', ...MODEL_LEVELS.map(headline), '', '']);
   const line = cells => `| ${cells.join(' | ')} |`;
-  const out = [line(head), line(head.map((_, i) => (i === 0 || i >= 9 ? '---' : '---:'))), ...rows.map(line)];
-  if (summary.learned) out.push('', `Learned (L3 minus L2, same subjects): ${signed(summary.learned.adjusted)} of headroom${summary.learned.interval ? ` (${signed(summary.learned.interval[0])} to ${signed(summary.learned.interval[1])})` : ''}.`);
-  out.push('', `Auto: commit ${summary.auto.commit}, judge ${summary.auto.judge}. Progression and cheat-risk are shown beside the score and are not part of it.`);
+  const out = [line(head), line(head.map((_, i) => (i === 0 || i >= head.length - 2 ? '---' : '---:'))), ...rows.map(line)];
+  out.push('');
+  for (const [l, st] of Object.entries(summary.steps ?? {})) if (st.subjects) out.push(`${l} minus ${st.from}, the ${st.subjects} pictures both ran: ${signed(st.adjusted)} of headroom${st.interval ? ` (${signed(st.interval[0])} to ${signed(st.interval[1])})` : ''}.`);
+  out.push(LEVEL_NOTE, '', 'A failed run, or a scheduled picture with no painting, counts as the bottom of the scale; none is left out of a mean.',
+    `Auto: commit ${summary.auto.commit}, judge ${summary.auto.judge}. Progression and cheat-risk are shown beside the score and are not part of it.`);
   return out.join('\n');
 }
