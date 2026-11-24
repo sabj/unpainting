@@ -18,12 +18,12 @@ import {ignoredSettings, badNumbers} from '../../src/paint/option-check.mjs';
 import {execFile} from 'node:child_process';
 import sharp from 'sharp';
 import {paperRelief} from '../../src/media/paper-relief.mjs';
-import {subcellLayers, SUBCELL_GAIN} from '../../src/media/subcell-grain.mjs';
+import {subcellSpread, SUBCELL_GAIN} from '../../src/media/subcell-grain.mjs';
 import {step, layersOf, thickness, layersChanged, coherent} from '../../src/media/sheet.mjs';
 import {gpuStats} from '../../src/media/gpu/link.mjs';
 import {assertDeviceHealthy} from '../../src/media/gpu/device-health.mjs';
 import {backendLine} from '../../src/media/gpu/backend-record.mjs';
-import {renderLayers} from '../../src/media/km.mjs';
+import {renderLayers, renderCells} from '../../src/media/km.mjs';
 import {measureLine} from '../../src/paint/methods/pencil-line.mjs';
 import {penEndPosition, eraseFactor} from '../../src/paint/methods/pencil-stage.mjs';
 import {followErase} from '../../src/paint/methods/fine-erase.mjs';
@@ -152,10 +152,18 @@ const renderSub = () => {
   // cell keeps its pigment, granulating paint gathers in the fine pits, staining paint only interpolates
   const N = SUBGRID, FW = W2 * N, FH = H2 * N, FN = FW * FH;
   const hF = paperRelief(FW, FH, CP_MM / N, { seed: PAPER_OPTS.seed, relief: PAPER_OPTS.relief ?? 'cold' }).height;
-  const fineLayers = subcellLayers(layersOf(ctx.sheet), SHEET_PIGS, ctx.sheet.paper, N, { gain: SUBCELL_GAIN * num('subgridgain', 1) });
+  const spread = subcellSpread(SHEET_PIGS, ctx.sheet.paper, N, { gain: SUBCELL_GAIN * num('subgridgain', 1) });
   const fbase = new Uint8Array(FN * 3);
   for (let i = 0; i < FN; i++) { const shade = 1 - SHADE + SHADE * hF[i]; for (let ch = 0; ch < 3; ch++) fbase[i * 3 + ch] = Math.round(Math.min(255, paperRGB[ch] * shade)); }
-  const fine = Buffer.from(renderLayers(fineLayers, SHEET_PIGS, fbase, FN)), avg = Buffer.alloc(N2 * 3), acc = new Float64Array(N2 * 3);
+  // each layer is spread and composited over the ones below as it is made (the composite kept in doubles between
+  // layers, km.mjs renderCells init and keep): the same arithmetic a cell as all the layers at once, with one
+  // layer's fine planes in memory, not every layer's
+  const Kp = SHEET_PIGS.map(p => p.K), Sp = SHEET_PIGS.map(p => p.S), under = new Float64Array(FN * 3), fineOut = new Uint8ClampedArray(FN * 3);
+  for (let i = 0; i < FN * 3; i++) under[i] = fbase[i] / 255;
+  const sheetLayers = layersOf(ctx.sheet);
+  sheetLayers.forEach((layer, q) => renderCells([spread(layer)], Kp, Sp, fbase, 0, FN, 1, null, q === sheetLayers.length - 1 ? fineOut : null, under, under));
+  if (!sheetLayers.length) fineOut.set(fbase);
+  const fine = Buffer.from(fineOut.buffer), avg = Buffer.alloc(N2 * 3), acc = new Float64Array(N2 * 3);
   for (let y = 0; y < FH; y++) for (let x = 0; x < FW; x++) { const c = ((y / N) | 0) * W2 + ((x / N) | 0); for (let ch = 0; ch < 3; ch++) acc[c * 3 + ch] += fine[(y * FW + x) * 3 + ch]; }
   for (let i = 0; i < N2 * 3; i++) avg[i] = Math.round(acc[i] / (N * N));
   console.log(`subgrid: settled pigment over ${N}x${N} sub-cells of the paper's relief at ${(CP_MM / N).toFixed(3)} mm, ${INKRES ? 'the painting with the pen over it' : 'painting-fine.jpg'} ${FW}x${FH}`);
