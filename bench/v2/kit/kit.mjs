@@ -100,7 +100,9 @@ async function takeSlot() {
       try { fs.mkdirSync(d); } catch {
         let pid = 0; try { pid = +fs.readFileSync(path.join(d, 'pid'), 'utf8'); } catch {}
         let alive = false; try { if (pid) { process.kill(pid, 0); alive = true; } } catch {}
-        if (alive || (!pid && Date.now() - fs.statSync(d).mtimeMs < 5000)) continue;
+        // (another process may free the slot between the two looks: a slot that is gone is simply taken below)
+        let fresh = false; try { fresh = !pid && Date.now() - fs.statSync(d).mtimeMs < 5000; } catch { /* gone */ }
+        if (alive || fresh) continue;
         fs.rmSync(d, { recursive: true, force: true }); try { fs.mkdirSync(d); } catch { continue; }
       }
       fs.writeFileSync(path.join(d, 'pid'), String(process.pid));
