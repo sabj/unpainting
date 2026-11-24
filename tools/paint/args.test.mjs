@@ -50,3 +50,10 @@ test('no window is opened unless --open is given', () => {
   assert.equal(parseArgs(['mittens-closeup', 'paint', '--no-open']).open, false, 'the old word is still accepted');
   assert.equal(parseArgs(['mittens-closeup', 'paint', '--open', '--no-open']).open, false);
 });
+
+test('no window is opened unless --open is given', () => {
+  assert.equal(parseArgs(['mittens-closeup', 'paint']).open, false, 'a run that says nothing opens nothing');
+  assert.equal(parseArgs(['mittens-closeup', 'paint', '--open']).open, true);
+  assert.equal(parseArgs(['mittens-closeup', 'paint', '--no-open']).open, false, 'the old word is still accepted');
+  assert.equal(parseArgs(['mittens-closeup', 'paint', '--open', '--no-open']).open, false);
+});

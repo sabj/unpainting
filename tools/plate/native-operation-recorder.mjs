@@ -41,7 +41,7 @@ export function verifyNativeMarkCoverage(tape,observed){
 
 if(!isMainThread&&workerData?.nativeRecorder){
  const {directory,width,height,provenance,resumeFrom,byteCap,diskFloor,pixels,control,error}=workerData,state=new Int32Array(control);
- let previous=null,used=0,overheadBytes=0,events=[],started=false,elapsedOffset=0;const began=Date.now();
+ let previous=null,previousHash=null,used=0,overheadBytes=0,events=[],started=false,elapsedOffset=0;const began=Date.now();
  const manifest={version:1,kind:'native-operation-recording',width,height,provenance,complete:false,events};
  function room(n){const s=fs.statfsSync(directory);if(used+overheadBytes+n>byteCap)throw Error('Native recording byte cap exceeded');if(s.bavail*s.bsize-n<diskFloor)throw Error('Native recording disk floor reached');}
  function write(name,b){room(b.length);fs.writeFileSync(path.join(directory,name),b);used+=b.length;}
@@ -51,8 +51,14 @@ if(!isMainThread&&workerData?.nativeRecorder){
   const key=!previous||final;let rect=null,payload=null,encoding='replace';
   if(key){rect={x:0,y:0,width,height};payload=await png(rgb,width,height);}
   else {
-   let x0=width,y0=height,x1=-1,y1=-1;
-   for(let y=0;y<height;y++)for(let x=0;x<width;x++){const i=(y*width+x)*3;if(rgb[i]!==previous[i]||rgb[i+1]!==previous[i+1]||rgb[i+2]!==previous[i+2]){x0=Math.min(x0,x);y0=Math.min(y0,y);x1=Math.max(x1,x);y1=Math.max(y1,y);}}
+   // The box of the pixels that changed. A row is compared whole first (most rows of a frame are as they were), and
+   // only a changed row is walked, from each end to its first changed byte: the same box as comparing every pixel.
+   let x0=width,y0=height,x1=-1,y1=-1;const row=width*3;
+   for(let y=0;y<height;y++){
+    const o=y*row;if(rgb.compare(previous,o,o+row,o,o+row)===0)continue;
+    let a=o;while(rgb[a]===previous[a])a++;let b=o+row-1;while(rgb[b]===previous[b])b--;
+    x0=Math.min(x0,((a-o)/3)|0);x1=Math.max(x1,((b-o)/3)|0);y0=Math.min(y0,y);y1=y;
+   }
    if(x1>=0){rect={x:x0,y:y0,width:x1-x0+1,height:y1-y0+1};const plain=Buffer.alloc(rect.width*rect.height*3),xor=Buffer.alloc(plain.length);
     for(let y=0;y<rect.height;y++){const offset=((rect.y+y)*width+rect.x)*3;rgb.copy(plain,y*rect.width*3,offset,offset+rect.width*3);for(let x=0;x<rect.width*3;x++)xor[y*rect.width*3+x]=rgb[offset+x]^previous[offset+x];}
     const a=await png(plain,rect.width,rect.height),b=await png(xor,rect.width,rect.height);if(b.length<a.length){payload=b;encoding='xor';}else payload=a;
@@ -60,8 +66,11 @@ if(!isMainThread&&workerData?.nativeRecorder){
   }
   let file=null,payloadSHA256=null;
   if(payload){payloadSHA256=hash(payload);file=payloadSHA256+'.png';if(!fs.existsSync(path.join(directory,file)))write(file,payload);}
-  const record={...event,elapsedMs:elapsedOffset+at-began,index:events.length,keyframe:key,rectangle:rect,encoding,file,payloadSHA256,previousSHA256:previous?hash(previous):null,pixelSHA256:hash(rgb)};
-  const line=Buffer.from(JSON.stringify(record)+'\n');room(line.length);fs.appendFileSync(path.join(directory,'events.jsonl'),line);used+=line.length;events.push(record);previous=Buffer.from(rgb);
+  const record={...event,elapsedMs:elapsedOffset+at-began,index:events.length,keyframe:key,rectangle:rect,encoding,file,payloadSHA256,previousSHA256:previous?previousHash:null,pixelSHA256:hash(rgb)};
+  const line=Buffer.from(JSON.stringify(record)+'\n');room(line.length);fs.appendFileSync(path.join(directory,'events.jsonl'),line);used+=line.length;events.push(record);
+  // the frame is kept for the next one's comparison with its hash, which the next record names (not hashed again); a
+  // capture's pixels are this worker's own copy already, the final frame's are the shared slot's and are copied
+  previous=final?Buffer.from(rgb):rgb;previousHash=record.pixelSHA256;
  }
  function copyPrefix(source,destination){
   fs.mkdirSync(destination,{recursive:true});
@@ -78,7 +87,8 @@ if(!isMainThread&&workerData?.nativeRecorder){
   const saved=JSON.parse(fs.readFileSync(path.join(resumeFrom,'operations.json')));
   if(saved.complete||saved.kind!==manifest.kind||saved.width!==width||saved.height!==height||JSON.stringify(saved.provenance)!==JSON.stringify(provenance)||!saved.events.length)throw Error('Native recording prefix mismatch');
   previous=await sharp(path.join(resumeFrom,'resume-frame.png')).removeAlpha().raw().toBuffer();
-  if(previous.length!==width*height*3||hash(previous)!==saved.events.at(-1).pixelSHA256)throw Error('Native recording prefix pixels mismatch');
+  previousHash=hash(previous);
+  if(previous.length!==width*height*3||previousHash!==saved.events.at(-1).pixelSHA256)throw Error('Native recording prefix pixels mismatch');
   // Verify every admitted payload before copying a prefix; no dangling provenance.
   for(const event of saved.events)if(event.file&&hash(fs.readFileSync(path.join(resumeFrom,event.file)))!==event.payloadSHA256)throw Error('Native prefix payload mismatch');
   copyPrefix(resumeFrom,directory);elapsedOffset=saved.events.at(-1).elapsedMs??0;events=saved.events;manifest.events=events;
