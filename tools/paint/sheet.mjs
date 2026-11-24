@@ -71,7 +71,7 @@ export function layout(headerLines, rows) {
 
 /**
  * Write the sheet. header: lines of text. rows: [{label?, height, panels: [{title, alert?, captions: [text], image: path | Buffer}]}].
- * `alert` paints a red band with that word across the picture (UNFINISHED, PLAN ONLY).
+ * `alert` paints a red band with that word across the picture (UNFINISHED, NOT PAINTED).
  */
 export async function composeSheet({ header = [], rows, file, quality = 88 }) {
   const sized = [];
@@ -146,14 +146,14 @@ export function runPanels(run, pics) {
   if (pics.plan) panels.push({ title: `Wash plan: ${run.author.label ?? run.author.name}`, alert: res?.planPreview ? null : 'NO PLAN',
     captions: [res?.planPreview ? planLine(res?.plan) : 'no plan compiled', res?.planPreview ? `widest wash brush ${mm(res?.plan?.widestBrushMm)}; ${res?.plan?.stages ?? '?'} stages` : '', authorLine(run.author)], image: pics.plan });
   const state = res?.state ?? 'not run';
-  panels.push({ title: state === 'finished' ? 'Painting' : `Painting: ${state.toUpperCase()}`, alert: state === 'finished' ? null : state === 'plan only' ? 'PLAN ONLY' : state === 'unfinished' ? 'UNFINISHED' : 'NOT PAINTED',
+  panels.push({ title: state === 'finished' ? 'Painting' : state === 'plan only' ? 'Plan preview, not painted' : `Painting: ${state.toUpperCase()}`, alert: state === 'finished' ? null : state === 'unfinished' ? 'UNFINISHED' : 'NOT PAINTED',
     captions: [state === 'finished' ? `painted in ${Math.round((run.seconds ?? 0) / 60)} min` : state === 'plan only' ? 'the plan preview shows intended shapes, not brush marks' : `painter exit ${run.exit ?? '?'}; see run.log`, riskLine(res?.cheatRisk)], image: pics.painting });
   return panels;
 }
 
 /** The header of one run. */
 export function runHeader(run) {
-  const c = run.code, h = [`${run.subject.id} (${run.subject.name}) · ${run.mode === 'plan' ? 'PLAN ONLY (CPU)' : 'painting (GPU)'} · ${run.author.label ?? run.author.name} · ${run.studiesMode === 'author' ? 'open tools' : 'locked inputs'} · ${c.commit ? c.commit.slice(0, 8) : 'no commit'}${c.dirty ? ' + uncommitted changes' : ''} · ${run.started}`];
+  const c = run.code, h = [`${run.subject.id} (${run.subject.name}) · ${run.mode === 'plan' ? 'plan preview, not painted · ' : ''}${run.author.label ?? run.author.name}${run.author.level ? ` · ${run.author.level}` : ''}${run.studiesMode === 'author' ? ' · open tools' : ''}${c.dirty ? ' · made with uncommitted changes' : ''}`];
   h.push(`sheet ${run.sheet.widthMm} mm, ${run.sheet.cells} cells, ${run.sheet.cellMm} mm a cell · ${riskLine(run.results?.cheatRisk)} · widest wash brush ${mm(run.results?.plan?.widestBrushMm)}`);
   for (const d of run.subject.deviations) h.push(`DIFFERS from the record: ${d.what} ${d.now} (record ${d.record})`);
   if (run.settings.length) h.push(`settings changed: ${run.settings.map(s => `${s.name}=${s.value ?? 'painter default'} (default ${s.default})`).join(', ')}`);
@@ -178,7 +178,7 @@ export async function runPictures(run, { panelWidth = 900 } = {}) {
   // a run whose plan did not compile keeps its cell, with the reason in it
   if (res?.planPreview) pics.plan = res.planPreview;
   else if (run.failure) pics.plan = await wordsImage(['NO PLAN', ...wrap(run.failure, 52)], W, H);
-  pics.painting = res?.painting ?? await wordsImage(res?.state === 'plan only' ? ['PLAN ONLY', 'not painted'] : ['NOT PAINTED', run.failure ? fit(run.failure, 560, 20) : 'no painting was written'], W, H);
+  pics.painting = res?.painting ?? await wordsImage(res?.state === 'plan only' ? ['plan preview', 'not painted'] : ['NOT PAINTED', run.failure ? fit(run.failure, 560, 20) : 'no painting was written'], W, H);
   return pics;
 }
 
@@ -208,7 +208,7 @@ export async function writeGridSheet(runs, file, { title, height = 400 } = {}) {
     rows.push({ label: `${mine[0].subject.id} (${mine[0].subject.name})`, height, panels });
   }
   const first = runs[0], c = first.code;
-  const header = [title ?? `${subjects.length} subjects x ${authors.length} authors`, `${first.mode === 'plan' ? 'PLAN ONLY (CPU)' : 'painting (GPU)'} · columns: Source | ${authors.map(a => { const x = runs.find(r => r.author.key === a).author; return x.key === 'auto' ? 'Code planner alone' : x.name; }).join(' | ')} · locked inputs · target guard gentle · ${c.commit ? c.commit.slice(0, 8) : 'no commit'}${c.dirty ? ' + uncommitted changes' : ''} · ${first.started}`];
+  const header = [title ?? `${subjects.length} subjects x ${authors.length} authors`, `${first.mode === 'plan' ? 'plan previews, not painted · ' : ''}columns: Source | ${authors.map(a => { const x = runs.find(r => r.author.key === a).author; return x.key === 'auto' ? 'Code planner alone' : x.name; }).join(' | ')}${c.dirty ? ' · made with uncommitted changes' : ''}`];
   if (Object.keys(first.switches).length) header.push(`SWITCHES in the environment: ${Object.entries(first.switches).map(([k, v]) => `${k}=${v}`).join(' ')}`);
   return composeSheet({ header, rows, file });
 }

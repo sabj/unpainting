@@ -17,7 +17,7 @@ test('the wash plan names each study with its floor and its settings', () => {
   assert.equal(washPlanOf(spec().studies), '/r/a.png:6,/r/b.png:4@clusters=20@join=6');
 });
 
-test('plan is the CPU plan only; paint is the GPU painting; the rest is the record', () => {
+test('plan makes the plan alone, on no GPU; paint is the painting; the rest is the record', () => {
   const plan = buildCommand(spec(), { mode: 'plan', out: '/o', known }), paint = buildCommand(spec(), { mode: 'paint', out: '/o', known });
   assert.equal(value(plan, 'gpu'), 'off'); assert.equal(value(plan, 'valuepreviewonly'), '1');
   assert.equal(value(paint, 'gpu'), 'on'); assert.ok(!paint.argv.includes('--valuepreviewonly'));
@@ -74,7 +74,7 @@ test('the block before a run says everything in plain rows', () => {
     code: { commit: 'db0bb9df1992', dirty: true, tracked: ['a'], untracked: [] },
   }).join('\n');
   for (const want of [/subject: +dune \(dune-dog\), variant "old"/, /sheet: +280 x 186.7 mm, 1200 x 800 cells, 0.2333 mm a cell/, /drawing: +vec\/old, ink \(not the record's drawing; unpinned\)/,
-    /study 1: +st\/a.png, block-in, shapes from 6 mm2, clusters 20/, /masks: +none/, /author: +the code planner alone \(the control\)/, /mode: +plan only, CPU; locked inputs; target guard gentle/,
+    /study 1: +st\/a.png, block-in, shapes from 6 mm2, clusters 20/, /masks: +none/, /author: +the code planner alone \(the control\)/, /mode: +plan preview, not painted; locked inputs; target guard gentle/,
     /DIFFERS: +cells across: 1200 \(the record: 1500\)/, /setting: +threads = 2/, /SWITCH: +X_NO_CHARGES=1/, /commit: +db0bb9df plus uncommitted changes/, /command: +node x/]) assert.match(lines, want);
 });
 

@@ -26,7 +26,7 @@ for (const run of runs) {
   const blank = async words => wordsImage(words, 700, Math.round(700 * (run.sheet.rows ?? 3) / (run.sheet.cells ?? 4)));
   const painted = res.state === 'finished' && res.painting && fs.existsSync(res.painting);
   rows.push({
-    label: `${row.subject} (${run.subject.name}) · ${run.author.label ?? run.author.name} · ${row.commit} · ${row.minutes ?? '?'} min · ${run.sheet.widthMm} mm, ${run.sheet.cells} cells${run.failure ? ` · FAILED: ${run.failure}` : ''}`,
+    label: `${row.subject} (${run.subject.name}) · ${run.author.label ?? run.author.name} · ${row.minutes ?? '?'} min · ${run.sheet.widthMm} mm, ${run.sheet.cells} cells${run.failure ? ` · FAILED: ${run.failure}` : ''}`,
     height,
     panels: [
       { title: 'Source', captions: [run.subject.source], image: run.subject.sourceAbs },

@@ -60,14 +60,14 @@ async function fixtures() {
   return dir;
 }
 
-test('a plan run: source, drawing, study, wash plan, and a painting panel marked PLAN ONLY', async () => {
+test('a plan run: source, drawing, study, wash plan, and a panel that says it is a plan preview, not painted', async () => {
   const dir = await fixtures();
   try {
     const r = run(dir), panels = runPanels(r, { source: r.subject.sourceAbs, drawing: r.subject.sourceAbs, plan: r.results.planPreview, painting: r.subject.sourceAbs });
-    assert.deepEqual(panels.map(p => p.title), ['Source', 'Opening drawing (pencil)', 'Study 1: block-in', 'Wash plan: auto', 'Painting: PLAN ONLY']);
-    assert.equal(panels[4].alert, 'PLAN ONLY'); assert.match(panels[3].captions.join(' '), /12 shapes, 30 washes, 400 strokes.*widest wash brush 25.4 mm/);
+    assert.deepEqual(panels.map(p => p.title), ['Source', 'Opening drawing (pencil)', 'Study 1: block-in', 'Wash plan: auto', 'Plan preview, not painted']);
+    assert.equal(panels[4].alert, 'NOT PAINTED'); assert.match(panels[3].captions.join(' '), /12 shapes, 30 washes, 400 strokes.*widest wash brush 25.4 mm/);
     assert.match(panels[2].captions[1], /gave 12 shapes/);
-    const h = runHeader(r); assert.match(h[0], /dune \(dune-dog\) · PLAN ONLY \(CPU\) · auto · locked inputs · db0bb9df/); assert.ok(h.some(l => /^DIFFERS.*cells across 1200/.test(l)));
+    const h = runHeader(r); assert.equal(h[0], 'dune (dune-dog) · plan preview, not painted · auto'); assert.doesNotMatch(h.join(' '), /CPU|GPU|db0bb9df/, 'no machine, no commit hash: those are in run.json'); assert.ok(h.some(l => /^DIFFERS.*cells across 1200/.test(l)));
     const out = await writeRunSheet(r, path.join(dir, 'sheet.jpg'), { height: 120 }), m = await sharp(out.file).metadata();
     assert.equal(m.format, 'jpeg'); assert.ok(m.width > 5 * 180 && m.height > 120);
     const unfinished = runPanels(run(dir, { mode: 'paint', results: { ...r.results, state: 'unfinished' } }), {}).at(-1);

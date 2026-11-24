@@ -16,7 +16,7 @@ export const USAGE = `usage: npm run paint -- <subject[,subject...]> plan|paint|
                         session: it opens a picture and says what it shows, runs ./unpaint plan once and writes a
                         file. Nothing is painted. Prints a table and writes preflight.json
   prepare               make the subject's prepared inputs for this code, once, before any session: the code
-                        planner's plan and the studies' traced shapes (CPU) and one look of it (GPU), the same
+                        planner's plan and the studies' traced shapes and one look of it, the same
                         for every level. A session finds them in seconds and does not start without them
   --author a[,b...]     who writes the wash plan: auto (the code planner, the control), a model key of
                         tools/paint/authors.json or bench/models.json, or script:FILE.json (a kept script).

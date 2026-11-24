@@ -30,5 +30,5 @@ for (const word of rest) {
     { title: 'Source', captions: [auto.subject.source], image: auto.subject.sourceAbs }, { title: 'Middle study', captions: [study.path.split('/').pop()], image: study.abs },
     await cell('auto (code planner)', autoDir), await cell('First brief (v1)', v1), await cell('Present brief (v2), first script', v2, [`author: ${cost[0]}`]), after] });
 }
-const done = await composeSheet({ header: [`${auto.subject.id} (${auto.subject.name}) · PLAN ONLY (CPU) · locked inputs · what the author's brief and one step back change in the plan`, 'a plan preview shows intended shapes and values, not wet edges or brush marks; "plan values" is the painter\'s own line: the plan\'s number, then the subject\'s in brackets'], rows, file, quality: 86 });
+const done = await composeSheet({ header: [`${auto.subject.id} (${auto.subject.name}) · plan previews, not painted · what the author's brief and one step back change in the plan`, 'a plan preview shows intended shapes and values, not wet edges or brush marks; "plan values" is the painter\'s own line: the plan\'s number, then the subject\'s in brackets'], rows, file, quality: 86 });
 console.log(`step-back sheet: ${done.file} (${done.width} x ${done.height})`);

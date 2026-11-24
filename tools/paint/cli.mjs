@@ -768,7 +768,7 @@ async function prepareRun(r) {
     if (out.plan && fs.existsSync(path.join(plan, 'value-plan.json'))) say(r, `the plan is already prepared (${plan})`);
     else {
       fs.rmSync(plan, { recursive: true, force: true });
-      say(r, 'preparing the code planner\'s plan (CPU)');
+      say(r, 'preparing the code planner\'s plan');
       const got = await compileChoice(r, readChoice({ kind: 'settings', settings: {} }), null, plan);
       if (!got.ok) throw new Error(`the code planner's plan did not compile: ${got.error}`);
       out.plan = { seconds: got.seconds, made: new Date().toISOString(), washes: got.summary.washes, strokes: got.summary.strokes };
@@ -783,7 +783,7 @@ async function prepareRun(r) {
     out.made = out.plan.made; writePrepared(folder, out);
     // the subject's rendering unit (look-cost.mjs): one full look of the automatic plan, painted at look size, counted
     if (!out.unit) {
-      say(r, 'painting one look of the automatic plan at look size: the subject\'s rendering unit (GPU)');
+      say(r, 'painting one look of the automatic plan at look size: the subject\'s rendering unit');
       const choice = readChoice({ kind: 'settings', settings: {} }), compiled = await compileChoice(r, choice, null, plan);
       const got = await paintLookOnce(r, choice, null, path.join(folder, 'unit-look', 'plate'), { plan: 0, look: 0 }, null, compiled, {});
       if (!got.ok || !got.painted.work) throw new Error(`the unit look was not painted or not counted: ${got.error ?? got.painted?.workFault}`);
@@ -797,7 +797,7 @@ async function prepareRun(r) {
       if (out.painting && fs.existsSync(path.join(record.out, 'run.json'))) say(r, `the automatic painting is already prepared (${record.out})`);
       else {
         fs.rmSync(record.out, { recursive: true, force: true });
-        say(r, 'preparing the automatic painter\'s full-size painting (GPU)');
+        say(r, 'preparing the automatic painter\'s full-size painting');
         await oneRun(r);
         if (record.failure) throw new Error(`the automatic painting failed: ${record.failure}`);
         out.painting = { seconds: record.seconds, made: new Date().toISOString(), backend: record.results.backend?.backend ?? null };

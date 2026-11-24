@@ -36,7 +36,7 @@ export function buildCommand(spec, { mode, out, known, script = null, edit = nul
     // bleeds into a wash; the painter stops a painting whose first wash moves more of it than its limit)
     if (k === 'ink') { if (!(v in INK)) throw new Error(`--set ink: ${Object.keys(INK).join(', ')} (got "${v}")`); set('inkfast', INK[v], `the pen's ink: ${v}`); continue; }
     if (k === 'targetguard') throw new Error('--set targetguard: gentle mode stays on');
-    if (OWNED.has(k)) throw new Error(`--set ${k}: the command sets this itself${k === 'gpu' || k === 'valuepreviewonly' ? ' (plan is the CPU plan, paint is the GPU painting)' : ''}`);
+    if (OWNED.has(k)) throw new Error(`--set ${k}: the command sets this itself${k === 'gpu' || k === 'valuepreviewonly' ? ' (plan makes the plan alone, paint the painting)' : ''}`);
     if (known && !known.has(k)) throw new Error(`--set ${k}: neither a setting of this command nor a paint-plate option`);
     set(k, v === 'default' ? null : v);
   }
@@ -82,7 +82,7 @@ export function describeRun(run) {
   row('masks', masks.receipt ? `${masks.forms.length} named forms (${masks.forms.map(f => f.name).join(', ')}) from ${masks.receipt} (${masks.from === 'set' ? '--set masks' : 'the named-forms folder'}); ${masks.read ? 'given to the planner' : 'shown to the author and on the sheet: ' + masks.whyNotRead}` : `none (${masks.none})`);
   row('labels', s.labels ? `${s.labels}${s.labelCount ? `, ${s.labelCount} things` : ''}` : 'none');
   row('author', author.key === 'auto' ? 'the code planner alone (the control)' : ['script', 'edit', 'choice'].includes(author.cli) ? author.label : author.work === 'session' ? `${author.name}${author.effort ? `, ${author.effort} effort` : ''} (${author.id}, through ${author.cli}): ${author.from ? 'what its earlier session handed over is painted; no model is called' : `a working session with a shell in its own folder, level ${author.level ?? 'L2'}, try ${author.tryNumber ?? 1}; the benchmark's budget for the try: ${author.budget?.looks ?? '?'} rendering units (looks, each a small real painting of its plan, dried), ${author.budget?.steps ?? '?'} steps, a safety stop at ${author.budget?.safetyMinutes ?? '?'} min, ${author.budget?.reverts ?? '?'} returns to an earlier choice; its work is measured, not capped; ${(author.level ?? 'L2') === 'L4' ? 'it gets the code planner\'s inputs and the studies\' traced shapes, nothing of Auto, and hands in its own script' : 'it gets the code planner\'s inputs, not its plan, and hands in its own script'}`}` : `${author.name}${author.effort ? `, ${author.effort} effort` : ''} (${author.id}, one read-only reply through ${author.cli}): ${author.label}`);
-  row('mode', `${run.mode === 'plan' ? 'plan only, CPU' : 'full painting, GPU'}; ${run.studiesMode === 'author' ? 'open tools (the author may brief and review its own studies)' : 'locked inputs'}; target guard gentle`);
+  row('mode', `${run.mode === 'plan' ? 'plan preview, not painted' : 'full painting'}; ${run.studiesMode === 'author' ? 'open tools (the author may brief and review its own studies)' : 'locked inputs'}; target guard gentle`);
   if (s.deviations.length) for (const d of s.deviations) row('DIFFERS', `${d.what}: ${d.now} (the record: ${d.record})`);
   if (run.settings.length) for (const d of run.settings) row('setting', `${d.name} = ${d.value ?? 'painter default'} (default ${d.default})`);
   else row('settings', 'all at their defaults');

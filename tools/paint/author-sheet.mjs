@@ -23,7 +23,7 @@ for (const run of runs) {
   const res = run.results ?? {}, name = authorLabel(run.author), done = res.state === 'finished' && res.painting && fs.existsSync(res.painting), p = res.plan;
   panels.push({
     title: `${name}${done ? '' : ': NOT FINISHED'}`, alert: done ? null : 'NOT FINISHED',
-    captions: [`${p ? `${p.passages != null ? `${p.passages} passages` : `${p.shapes ?? '?'} shapes`}, ${p.washes ?? '?'} washes, ${p.strokes ?? '?'} strokes, widest brush ${p.widestBrushMm ?? '?'} mm` : 'no plan'}; ${Math.round((run.seconds ?? 0) / 60)} min`, ...(run.author.work === 'session' ? [sessionLine(run.author)] : []), riskLine(res.cheatRisk), `${run.code.commit?.slice(0, 8)}${run.code.dirty ? ' + uncommitted changes' : ''}${run.failure ? ` · FAILED: ${run.failure}` : ''}`],
+    captions: [`${p ? `${p.passages != null ? `${p.passages} passages` : `${p.shapes ?? '?'} shapes`}, ${p.washes ?? '?'} washes, ${p.strokes ?? '?'} strokes, widest brush ${p.widestBrushMm ?? '?'} mm` : 'no plan'}; ${Math.round((run.seconds ?? 0) / 60)} min`, ...(run.author.work === 'session' ? [sessionLine(run.author)] : []), riskLine(res.cheatRisk), `${run.code.dirty ? 'made with uncommitted changes' : ''}${run.failure ? `${run.code.dirty ? ' · ' : ''}FAILED: ${run.failure}` : ''}`],
     image: res.painting && fs.existsSync(res.painting) ? res.painting : await blank(['NOT PAINTED', ...wrap(run.failure ?? '', 50)]),
   });
   if (res.strip && fs.existsSync(res.strip)) strips.push({ label: `${name}: the source, then the sheet at 10, 25, 50, 75 and 100% of the strokes`, height: Math.round(height * 0.42), panels: [{ title: '', captions: [], image: res.strip }] });
