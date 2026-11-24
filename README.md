@@ -168,7 +168,7 @@ Nothing of Auto (plan, planner, settings, painting, film or stroke map) is given
 - [Auto vs model script](docs/auto-vs-model.md) and [Painting script format](docs/painting-script.md)
 - [Benchmark levels, rules and replication](bench/README.md)
 - [Scoring and rubric](bench/docs/scoring.md)
-- [Changelog](CHANGELOG.md#040-not-released)
+- [Changelog](CHANGELOG.md)
 
 ### History: rounds V1 to V5
 
@@ -191,7 +191,7 @@ See the [leaderboard](bench/results/leaderboard.md), [gallery](bench/results/gal
 ## References and license
 
 - [Part 1 essay](https://samjackson.org/writing/whats-a-painting-anyway-part-1/)
-- [Documentation index](docs/README.md) and [Reading list](docs/reading-list.md)
+- [Reading list](docs/reading-list.md)
 - [Contributing](CONTRIBUTING.md)
 - Code: MIT ([LICENSE](LICENSE)). Painter output from public-domain inputs: CC BY 4.0. Bundled photos and third-party credits: [NOTICE](NOTICE) and [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 

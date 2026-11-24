@@ -56,4 +56,4 @@ Only add images you have permission to distribute. Record the source and rights 
 
 Keep credentials in ignored `.env` files. See [docs/running.md](docs/running.md#cloud-rendering) for the optional cloud tools.
 
-[tools/README.md](tools/README.md) maps the command-line tools. [docs/README.md](docs/README.md) maps the painter.
+[tools/README.md](tools/README.md) maps the command-line tools.
