@@ -20,6 +20,8 @@
 export const DEFAULT_RETRIES = 1;
 
 export const LEVELS = Object.freeze({
+  // level 1 here is its fixed-rounds form (rounds.mjs): the subject, the toolkit and the tips, and nothing prepared
+  L1: { previousTry: false, codePlan: false, autoPainting: false, shapesData: false, noInputs: true, what: 'the subject, the toolkit and the tips; no prepared drawing, study or named form (fixed rounds only: its kit-and-shell form is bench/scripts/run.mjs --round V3)' },
   L2: { previousTry: false, codePlan: false, autoPainting: false, shapesData: false, what: 'one go from the same inputs the code planner gets (drawing, studies, named forms), planned by the model itself; no code plan' },
   L3: { previousTry: true, codePlan: false, autoPainting: false, shapesData: false, what: 'L2 again from the model\'s own L2 result: its painting, replay sheet, arrows sheet and what it handed over; it judges its own sheet; no code plan' },
   L4: { previousTry: true, codePlan: false, autoPainting: false, shapesData: true, what: 'a retry from the model\'s L3 result with one more help: the studies\' traced shapes as regions it may use or ignore; nothing of Auto (plan, planner, painting, film or stroke map)' },
@@ -47,5 +49,5 @@ export function handedAt(level, { tryNumber = 1, retries = DEFAULT_RETRIES, prev
   if (!level.previousTry && (previous || tryNumber > 1)) throw new Error(`--level ${level.name} is one go from the prepared inputs: --previous and --try belong to L3 and L4`);
   if (level.previousTry && tryNumber > retries) throw new Error(`--level ${level.name}, try ${tryNumber}: this benchmark gives ${retries} ${retries === 1 ? 'retry' : 'retries'} at a level (--retries sets it)`);
   if (level.previousTry && !previous) throw new Error(`--level ${level.name} is a retry: it starts from the model's own ${level.name === 'L4' && tryNumber === 1 ? 'L3' : level.name === 'L3' && tryNumber === 1 ? 'L2' : 'previous'} result. Name that run's folder with --previous`);
-  return { previous: Boolean(previous), plan: level.codePlan, auto: level.autoPainting, shapes: level.shapesData };
+  return { previous: Boolean(previous), plan: level.codePlan, auto: level.autoPainting, shapes: level.shapesData, ...(level.noInputs ? { noInputs: true } : {}) };
 }

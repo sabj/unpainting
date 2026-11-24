@@ -1,6 +1,6 @@
 // The command line of `npm run paint`:
 //   npm run paint -- <subject[,subject...]> plan|paint|prepare|look|preflight [--author auto|<model key>[,...]] [--studies locked|author]
-//                    [--work session|reply] [--level L2|L3|L4] [--retries N] [--try N] [--previous <dir>]
+//                    [--work session|rounds|reply] [--level L1|L2|L3|L4] [--retries N] [--try N] [--previous <dir>]
 //                    [--looks N] [--wallminutes N] [--graceminutes N] [--steps N] [--reverts N] [--from <dir>] [--lines FILE.json|standard]
 //                    [--set key=value ...] [--jobs N] [--out <dir>] [--dry-run] [--no-open]
 // Nothing here touches a file: it turns the words into one request object, or throws with the usage.
@@ -21,11 +21,14 @@ export const USAGE = `usage: npm run paint -- <subject[,subject...]> plan|paint|
   --author a[,b...]     who writes the wash plan: auto (the code planner, the control), a model key of
                         tools/paint/authors.json or bench/models.json, or script:FILE.json (a kept script).
                         Several authors make a grid, subjects down and authors across. Default auto.
+  --work rounds         fixed rounds in place of a working session (rounds.mjs): no shell and no tools; the model
+                        answers the brief with its script, is shown its own sheet after each look and answers
+                        with edits, then the full-size final. The benchmark's way (bench/run-sets.json, rounds).
   --work session|reply  how a model author works. session (default): a working session with a shell in its own
                         folder; it hands over its own script, at every level (planner settings or the code's
                         plan are refused). Its work is measured (usage.json), not capped.
                         reply: one read-only reply holding a whole script (the earlier route).
-  --level L2|L3|L4      what a session is handed (default L2). L2: the inputs the code planner gets (drawing,
+  --level L1|L2|L3|L4   what a session is handed (default L2; L1 in fixed rounds only: the subject alone). L2: the inputs the code planner gets (drawing,
                         studies, named forms), not its plan; the model plans itself, one go. L3: L2 again from
                         the model's own L2 result (--previous). L4: a retry from its L3 result with more
                         help: the studies' traced shapes as regions it may use or ignore (nothing of Auto:
@@ -97,7 +100,7 @@ export function parseArgs(argv) {
   const [names, word] = words;
   if (!['plan', 'paint', 'prepare', 'look', 'preflight'].includes(word)) throw new Error(`the second word is plan, paint, prepare, look or preflight, not "${word}"`);
   const level = given['--level'] ?? 'L2';
-  if (!['L2', 'L3', 'L4'].includes(level)) throw new Error('--level is L2, L3 or L4');
+  if (!['L1', 'L2', 'L3', 'L4'].includes(level)) throw new Error('--level is L1 (fixed rounds only), L2, L3 or L4');
   const prepare = word === 'prepare', look = word === 'look', preflight = word === 'preflight', mode = prepare ? (level === 'L4' ? 'paint' : 'plan') : look || preflight ? 'plan' : word;
   const subjects = list(names).map(s => { const [id, variant = null, more] = s.split(':'); if (!id || more !== undefined) throw new Error(`subject "${s}": write name or name:variant`); return { id, variant }; });
   const authors = list(given['--author'] ?? 'auto');
@@ -113,7 +116,8 @@ export function parseArgs(argv) {
   if (!['locked', 'author'].includes(studies)) throw new Error('--studies is locked or author');
   if (studies === 'author' && authors.every(a => a === 'auto')) throw new Error('--studies author needs a model as --author (the code planner makes no studies)');
   const work = given['--work'] ?? 'session';
-  if (!['session', 'reply'].includes(work)) throw new Error('--work is session or reply');
+  if (!['session', 'reply', 'rounds'].includes(work)) throw new Error('--work is session, rounds or reply');
+  if (level === 'L1' && (work !== 'rounds' || prepare)) throw new Error('--level L1 is run here as fixed rounds (--work rounds): the subject, the toolkit and the tips, no prepared inputs. Level 1 with its own kit and a shell is bench/scripts/run.mjs --round V3');
   if (studies === 'author' && work === 'session') throw new Error('--studies author needs --work reply: a working session cannot make its own studies yet');
   const whole = (flag, least, most) => { if (given[flag] === undefined) return null; const n = Number(given[flag]); if (!(Number.isInteger(n) && n >= least && n <= most)) throw new Error(`${flag}: a whole number, ${least} to ${most}`); return n; };
   const looks = given['--looks'] === undefined ? null : Number(given['--looks']);

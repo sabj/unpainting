@@ -41,5 +41,5 @@ test('the budget of a try, the level and its retries are settings; prepare and l
   assert.throws(() => parseArgs(['mittens', 'prepare', '--author', 'opus']), /prepare makes the automatic plan .* it takes no --author/);
   assert.throws(() => parseArgs(['mittens', 'plan', '--minutes', '85']), /--minutes is gone: a session's own minutes are measured, not capped.*--wallminutes/);
   assert.throws(() => parseArgs(['mittens', 'plan', '--critique', 'w.txt']), /--critique is gone: no critique, score or verdict is handed to a model at any level/);
-  assert.throws(() => parseArgs(['mittens', 'plan', '--level', 'L5']), /--level is L2, L3 or L4/); assert.throws(() => parseArgs(['mittens', 'plan', '--looks', '0']), /--looks: the rendering budget of a try in units/);
+  assert.throws(() => parseArgs(['mittens', 'plan', '--level', 'L5']), /--level is L1 \(fixed rounds only\), L2, L3 or L4/); assert.throws(() => parseArgs(['mittens', 'plan', '--looks', '0']), /--looks: the rendering budget of a try in units/);
 });

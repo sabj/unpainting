@@ -24,7 +24,8 @@ os.environ.setdefault("UNPAINTING_RUNNING_FILE", str(POOL / "RUNNING.txt"))
 spec = importlib.util.spec_from_file_location("rb", A.helper); rb = importlib.util.module_from_spec(spec); spec.loader.exec_module(rb)
 REPO = Path(subprocess.run(["git", "-C", str(Path(__file__).resolve().parent), "rev-parse", "--path-format=absolute", "--git-common-dir"], capture_output=True, text=True, check=True).stdout.strip()).parent
 PODS, LOG, STOP = POOL / "pods.json", POOL / "pods.log", POOL / "STOP-PODS"
-LADDER = [("NVIDIA GeForce RTX 4090", "SECURE"), ("NVIDIA GeForce RTX 4090", "COMMUNITY"), ("NVIDIA RTX 4000 Ada Generation", "SECURE"), ("NVIDIA L40S", "SECURE")]
+# the fastest type measured first (23 Nov: an RTX 5090 community host painted in 812 s against 1,264 on a 4090 secure, at $0.69 against $0.89 an hour); it is often not to be had, and the ladder goes on
+LADDER = [("NVIDIA GeForce RTX 5090", "COMMUNITY"), ("NVIDIA GeForce RTX 4090", "SECURE"), ("NVIDIA GeForce RTX 4090", "COMMUNITY"), ("NVIDIA RTX 4000 Ada Generation", "SECURE"), ("NVIDIA L40S", "SECURE")]
 lock = threading.Lock()
 st = {"pods": [], "adding": 0, "spentUSD": 0.0}
 
@@ -64,7 +65,8 @@ def painting_demand():
             w = json.loads(f.read_text())
         except Exception:
             continue
-        if alive(int(w["pid"])) and (f.parent.name == "claims" or w.get("kind") == "painting"):
+        # a waiting painting whose command may not use a pod (UNPAINT_POOL_ONLY without "pod") wants none
+        if alive(int(w["pid"])) and (f.parent.name == "claims" or (w.get("kind") == "painting" and (not w.get("only") or "pod" in w["only"]))):
             n += 1
             if w.get("commit"): commits.add(w["commit"])
     return n, commits

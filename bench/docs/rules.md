@@ -35,6 +35,23 @@ More freedom than before, and mistakes are allowed.
 - The shell has no internet and one fixed, pre-installed toolbox, the same for every model. Only the model tool itself reaches its own provider, through a gate on the machine that passes the provider's hosts and refuses every other. Installs fail. Each attempt is recorded.
 - The model may not read the subject's pixels with code. See [anti-cheat](anti-cheat.md).
 
+## Fixed rounds (how the benchmark is run)
+
+The benchmark runs each level of each picture as fixed rounds (`npm run paint -- ... --work rounds`). The open session with a shell, described under "The session's workspace", stays in the harness as a second way to run a level and is not what the benchmark's scores come from. Where the two differ, this section is the rule for a rounds run.
+
+- A level is a short conversation with no shell, no tools and no files. The model looks at the pictures and writes.
+- **No code reads a picture.** There is no code on the model's side at all, so the subject, the drawing and the studies are for its eyes only. The harness never measures a model's sheet against the subject or a study for the model.
+- What the model loses: it cannot compute stroke positions, sample a colour or generate geometry with a program. It writes a wash as a shape and a way of laying it (`region`, `kind`, `handling`), and the painter fills the shape with strokes.
+- Round 0: the brief, the level's data and the pictures go out once and stay in the conversation. Showing them is recorded, not priced. The model answers with its whole painting script.
+- A script or an edit that cannot be read or compiled is returned once, free, with the reason. A second such answer in a row ends the try when there is no script yet (a failed painting); otherwise the last script that compiled is painted.
+- A look returns the model's own sheet as it dried, on the millimetre grid, with numbers about the sheet and the script. It never includes the subject or a study, or a number measured against them.
+- After a look the model answers with edits to its script (`set`, `add`, `remove`, `replace`, `move`, `drawing`), names its next look (whole, stopped after a stage, or a region) or says it is done. A whole new script is allowed.
+- Looks are priced as below: 0.3 a whole half-size look, a stage or a region its share, never under 0.2, budget 3.0 a level. The full-size final, with its full film, is not charged.
+- Every level is a fresh conversation with its own budget. Level 3 is handed what level 2 gets, plus its own level 2 painting and script. Level 4 is handed the same from level 3, plus the studies' traced shapes as a numbered picture and list; a passage may name a shape by number, and the share of a script's washes that do is recorded. Level 1 is handed the subject alone: no drawing, study or named form, and nothing is on the sheet before it starts.
+- Named forms at levels 2 to 4 are names and boxes, not a mask picture.
+- Recorded for each round: seconds, tokens (fresh, cached, output, where the command reports them) and look units. The transcript is kept with the run.
+- Screening: every model of the roster first paints two core pictures at level 2. The top half by mean combined score, and at least one model of each family, go on to the remaining pictures and levels (`bench/run-sets.json`, `rounds`).
+
 ## Budgets: measured, not limited
 
 - Looks A look has a fixed price by size, whatever is in it: a half-size look of the whole sheet 0.3, full size 1.0, a look stopped at a stage or of a region its share of that (the share of the plan's washes or passages it paints), never under 0.2. At L2 to L4 a look is painted at half size; at L1 each run of the script is a full-size painting (1.0). The budget for one try is 3.0 at every level. At L2 to L4 the full-size final is not charged; at L1 the painting is its last completed run. How a model paints is never charged: water, strokes, waits and dryings are free; simulation work (cell-steps), sweeps, dryings, seconds, tokens (fresh, cached, output) and steps are recorded in `usage.json` beside the charge. One guard only, as resource management: a painting whose water steps pass ten times those of Auto's painting of the subject is stopped with a plain message, reported as a stop and not scored. The model chooses where and when to look: to a stage, or in a region.

@@ -1,7 +1,7 @@
 """The judge panel and route for 0.4's scoring (score04.py).
 
 ONE named panel is the default on every route: JUDGE_PANEL=open3, three open-weight models (GLM-5.3-Flash, Qwen3.8-27B,
-Gemma-4-31B) read with one reasoning setting (REASONING: off) wherever they are served. Any other panel is asked for
+Gemma-4-31B) read with one reasoning setting (REASONING: low) wherever they are served. Any other panel is asked for
 by name (PANELS). The route is JUDGE_ROUTE, local by default:
 
   local       Ollama (local_route.py): one model in memory at a time, unloaded after its readings
@@ -18,9 +18,14 @@ import local_route
 
 ROUTES = ("local", "together", "openrouter")
 READINGS_LABEL = "3x"
-# One reasoning setting for every judge on every route: off. Local: Ollama's think false. OpenRouter: reasoning effort
-# "none". A hosted judge that reasons all the same is named in the results (its usage reports reasoning tokens).
-REASONING = "off"
+# One reasoning setting for every judge on every route: low. It is the least setting under which all three models of
+# the panel answer: with reasoning off, GLM-5.3-Flash's hosted provider refuses the call outright (HTTP 400 on every
+# reading, 23 Nov 2026: a whole batch came back without a score). OpenRouter: reasoning effort "low", with room for
+# the thinking beside the answer; local: Ollama's think "low". SENT is what each setting sends on each route.
+REASONING = "low"
+SENT = {"off": {"effort": "none", "think": False}, "low": {"effort": "low", "think": "low"}}
+# What a judge is asked before a batch is read (probe): one short answer, no picture.
+PROBE = 'Answer with exactly this JSON object and nothing else: {"ok": true}'
 HOSTED = {"together": ("https://api.together.xyz/v1/chat/completions", "TOGETHER_API_KEY"),
           "openrouter": ("https://openrouter.ai/api/v1/chat/completions", "OPENROUTER_API_KEY")}
 # The panels by name. `models`: the judges' own names, the same in every results file whatever the route. Under each
@@ -108,17 +113,17 @@ def post(cfg, model, content, max_tokens=1024, num_ctx=local_route.NUM_CTX, open
     """One call with one user message. Returns (reply text, usage). Raises RuntimeError when the route fails."""
     messages = [{"role": "user", "content": content}]
     if cfg["route"] == "local":
-        return local_route.post(cfg, sent_name(cfg, model), messages, max_tokens=max_tokens, opener=opener, sleep=sleep, num_ctx=num_ctx, max_predict=max_tokens)
+        return local_route.post(cfg, sent_name(cfg, model), messages, max_tokens=max_tokens, opener=opener, sleep=sleep, num_ctx=num_ctx, max_predict=max_tokens, think=SENT[cfg.get("reasoning", REASONING)]["think"])
     opener = opener or urllib.request.urlopen
     payload = {"model": sent_name(cfg, model), "messages": messages,
                "max_tokens": max_tokens, "temperature": 0}
     if cfg["route"] == "openrouter":
         payload["provider"] = {"zdr": True, "data_collection": "deny"}
-        # reasoning off, as on the local route (REASONING). A model that reasons all the same is given room, so its
-        # answer is not cut short (23 Nov 2026: thinking used the answer's own limit and replies came back empty),
-        # and its reasoning tokens are reported, so the results can name it.
+        # the panel's one reasoning setting (REASONING), as on the local route. The thinking is given room of its own,
+        # so the answer is not cut short (23 Nov 2026: thinking used the answer's own limit and replies came back
+        # empty); the reasoning tokens are reported in the usage.
         payload["max_tokens"] = max_tokens + 6000
-        payload["reasoning"] = {"effort": "none"}
+        payload["reasoning"] = {"effort": SENT[cfg.get("reasoning", REASONING)]["effort"]}
     hdr = {"Authorization": "Bearer " + cfg["env"][cfg["keyName"]], "User-Agent": "unpaint-bench-judge/1", "Content-Type": "application/json"}
     last = None
     for i in range(3):
@@ -136,6 +141,34 @@ def post(cfg, model, content, max_tokens=1024, num_ctx=local_route.NUM_CTX, open
     raise RuntimeError(f"{cfg['route']} call failed ({model}): {last}")
 
 
+def probe(cfg, post=None, opener=None, sleep=time.sleep):
+    """One cheap call to every judge of a hosted panel before a batch is read: each must answer the short question
+    with its JSON. Raises RouteError naming every judge that did not, with what came back, so a batch never runs to
+    its end with a dead judge. The local route is not probed here: it holds one model in memory at a time, reads a
+    judge's every picture before the next judge is loaded, and a probe would load all three first."""
+    if cfg["route"] == "local":
+        return []
+    post = post or globals()["post"]
+    dead = []
+    for m in cfg["panel"]:
+        try:
+            text, _ = post(cfg, m, [{"type": "text", "text": PROBE}], max_tokens=64, **({"opener": opener, "sleep": sleep} if opener else {}))
+            s = (text or "").strip()
+            ok = False
+            try:
+                ok = json.loads(s[s.index("{"):s.rindex("}") + 1]).get("ok") is True
+            except Exception:
+                ok = False
+            if not ok:
+                dead.append(f"{m}: {'an empty reply' if not s else 'no valid answer (' + s[:80] + ')'}")
+        except RuntimeError as e:
+            dead.append(f"{m}: {e}")
+    if dead:
+        raise RouteError(f"the judges were asked one short question before the batch and {len(dead)} of {len(cfg['panel'])} gave no valid answer; nothing is scored with a dead judge:\n  " + "\n  ".join(dead) +
+                         f"\n(route {cfg['route']}, panel {cfg.get('panelName')}, reasoning {cfg.get('reasoning', REASONING)})")
+    return list(cfg["panel"])
+
+
 def record(cfg, opener=None):
     """What every results file keeps about the judges: the panel by name, its models as this route serves them, and
     the settings they were read with. On the local route a panel model the server does not hold is an error."""
@@ -145,10 +178,10 @@ def record(cfg, opener=None):
     if cfg["route"] == "local":
         held = local_route.digests({**cfg, "panel": list(sent.values())}, opener)
         out["digests"] = {m: held[sent[m]] for m in cfg["panel"]}
-        out["options"] = {"reasoning": out["reasoning"], "think": False, "temperature": 0}
+        out["options"] = {"reasoning": out["reasoning"], "think": SENT[out["reasoning"]]["think"], "temperature": 0}
     else:
         out["digests"] = None
-        out["options"] = {"reasoning": out["reasoning"], "temperature": 0, **({"sent": {"reasoning": {"effort": "none"}, "provider": {"zdr": True, "data_collection": "deny"}}} if cfg["route"] == "openrouter" else {})}
+        out["options"] = {"reasoning": out["reasoning"], "temperature": 0, **({"sent": {"reasoning": {"effort": SENT[out["reasoning"]]["effort"]}, "provider": {"zdr": True, "data_collection": "deny"}}} if cfg["route"] == "openrouter" else {})}
     return out
 
 

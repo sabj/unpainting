@@ -76,7 +76,7 @@ A picture larger than its limit is brought down (Lanczos, then JPEG quality 88);
 
 ## Judges
 
-- ONE panel is the default on every route: `open3`, three open-weight models, GLM-5.3-Flash, Qwen3.8-27B and Gemma-4-31B, read with one reasoning setting, off, wherever they are served (`bench/scorer/s04_judge.py`: `PANELS`, `REASONING`).
+- ONE panel is the default on every route: `open3`, three open-weight models, GLM-5.3-Flash, Qwen3.8-27B and Gemma-4-31B, read with one reasoning setting, low (with reasoning off one hosted provider refuses the call), wherever they are served (`bench/scorer/s04_judge.py`: `PANELS`, `REASONING`).
 - `JUDGE_ROUTE` picks where: `local` (the default), `openrouter` or `together`. The judge label names panel and route: `open3-local-3x`, `open3-openrouter-3x`.
 - `openrouter`: `z-ai/glm-5.3-flash`, `qwen/qwen3.8-27b`, `google/gemma-4-31b-it`, zero-data-retention providers only, reasoning effort `none`. Needs `OPENROUTER_API_KEY`. A judge that reasons all the same is named under "Faults first".
 - `local`: Ollama (`bench/scorer/local_route.py`; `JUDGE_LOCAL_URL`), thinking off: `qwen3.8:27b-mlx`, `gemma4:31b-mlx`, and GLM-5.3-Flash under the tag named in `JUDGE_LOCAL_TAGS` (`zai-org/GLM-5.3-Flash=<tag>`). Without that tag the local route refuses the panel by name; nothing stands in. One model in memory at a time: every picture for one judge, then it is unloaded. The run waits while the server holds another job's model.

@@ -127,6 +127,9 @@ export function places({ pods = [], mini = null, local = DEFAULT_LOCAL, commit, 
   const out = [];
   if (POD_KINDS.has(kind)) {
     for (const p of pods) if (p.ready && p.trees?.[commit.slice(0, 8)] && (p.limit ?? Infinity) * 1000 - now > POD_MARGIN_S * 1000) out.push({ slot: `pod-${p.name}`, worker: { kind: 'pod', name: p.name, host: p.ip, port: p.port, rate: p.rate, tree: p.trees[commit.slice(0, 8)], base: '/root/render-pool' } });
+    // the operator may name the mini for full-size paintings too (UNPAINT_POOL_ONLY=mini, or mini,pod): it is free, and
+    // paints one about twice as fast as a pod; unnamed, a painting goes to a pod as before
+    if (only?.includes('mini') && mini) for (let k = 0; k < (mini.slots ?? 2); k++) out.push({ slot: `mini-${k}`, worker: { kind: 'mini', name: 'Mac mini', host: mini.host ?? 'mini', slots: mini.slots ?? 2 } });
     return out.filter(p => p.worker.name !== avoid && (!only || only.includes(p.worker.kind)));
   }
   for (let k = 0; k < local; k++) out.push({ slot: `local-${k}`, worker: { kind: 'local', name: 'this Mac' } });
@@ -331,7 +334,8 @@ const logLine = (dir, line) => { fs.mkdirSync(dir, { recursive: true }); fs.appe
  * look while it waits (final-wait.mjs: a line a minute, and the stop past the final's limit).
  */
 async function takePlace({ dir, env, id, commit, avoid, gpuCount, kind, remoteFor, pollMs, daemonAlive, tick }) {
-  const w = path.join(dir, 'waiting', `${id}.json`); writeJson(w, { id, pid: process.pid, since: Date.now(), commit, kind });
+  // (`only`: the kinds of worker this job may take, when the operator named them: the pods daemon rents no pod for a job that cannot use one)
+  const w = path.join(dir, 'waiting', `${id}.json`); writeJson(w, { id, pid: process.pid, since: Date.now(), commit, kind, ...(env.UNPAINT_POOL_ONLY ? { only: env.UNPAINT_POOL_ONLY.split(',') } : {}) });
   const most = Number(env.UNPAINT_POOL_LOCAL ?? DEFAULT_LOCAL); let goneSince = null;
   try {
     for (;;) {
@@ -342,7 +346,8 @@ async function takePlace({ dir, env, id, commit, avoid, gpuCount, kind, remoteFo
       // however stale its heartbeat (it is busy setting up a pod); one that is gone is waited for a while, then a plain stop
       const podsAt = readJson(path.join(dir, 'pods.json'))?.updated, nowS = Date.now() / 1000;
       let why = 'every place is busy';
-      if (POD_KINDS.has(kind)) {
+      // (a painting the operator lets the mini take does not need a pod, so it does not need the daemon)
+      if (POD_KINDS.has(kind) && !any.some(p => p.worker.kind === 'mini')) {
         const state = podsDaemon({ updated: podsAt, nowS, processAlive: daemonAlive() }), said = `${path.join(dir, 'pods.json')} ${podsAt ? `last written ${Math.round(nowS - podsAt)} s ago` : 'is missing'}`;
         if (state === 'never') throw new Error(`render pool: a full-size painting is painted on a pod, and the pods daemon is not running (${said}, no daemon process); start it: python3 tools/cloud/render-pool-pods.py ${dir}`);
         if (state === 'gone') { goneSince ??= nowS; if (nowS - goneSince > DAEMON_GONE_GRACE_S) throw new Error(`render pool: a full-size painting is painted on a pod, and the pods daemon has stopped (${said}, no daemon process for ${Math.round((nowS - goneSince) / 60)} min); start it: python3 tools/cloud/render-pool-pods.py ${dir}`); why = `the pods daemon's process is gone (${said}); waiting ${Math.round(DAEMON_GONE_GRACE_S / 60)} min for it to be started again`; }

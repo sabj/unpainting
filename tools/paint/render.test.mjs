@@ -165,3 +165,12 @@ test('a kept command line reads back as the command, with its output moved', () 
   assert.deepEqual(c, { cmd: 'node', args: ['--max-old-space-size=9', 'tools/paint-plate.mjs', '--out', '/new'], env: { W2_CACHE_DIR: '/c/paint-plain' } });
   assert.throws(() => keptCommand('python x', '/n'), /not a painter command/);
 });
+
+test('a full-size painting goes to a pod, and to the mini only when the operator names it', () => {
+  const mini = { host: 'mini', slots: 3 }, commit = 'abcdef0123456789';
+  assert.deepEqual(places({ pods: [], mini, commit, kind: 'painting' }), []);
+  assert.deepEqual(places({ pods: [], mini, commit, kind: 'painting', only: ['pod'] }), []);
+  assert.deepEqual(places({ pods: [], mini, commit, kind: 'painting', only: ['mini'] }).map(p => p.slot), ['mini-0', 'mini-1', 'mini-2']);
+  // a look named for the mini alone leaves this Mac out
+  assert.deepEqual(places({ pods: [], mini, commit, kind: 'look', only: ['mini'] }).map(p => p.worker.kind), ['mini', 'mini', 'mini']);
+});
