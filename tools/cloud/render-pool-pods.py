@@ -45,7 +45,7 @@ LADDER = [("NVIDIA GeForce RTX 5090", "COMMUNITY"), ("NVIDIA GeForce RTX 4090", 
 # places are also held to its memory (--gb-a-painting) and its cores (VCPU_A_PAINTING).
 SLOTS = {"NVIDIA GeForce RTX 4090": 3, "NVIDIA GeForce RTX 5090": 3}
 SLOTS_OTHER = 2
-VCPU_A_PAINTING = 2
+VCPU_A_PAINTING = 2.2
 LOOK_WAIT_S = 30  # a look that has waited this long for this Mac and the mini wants a pod's place
 lock = threading.Lock()
 tree_lock = threading.Lock()
@@ -53,10 +53,16 @@ st = {"pods": [], "adding": 0, "spentUSD": 0.0}
 
 
 def slots_of(gpu, ram_gb=None, vcpu=None):
-    """Places on a pod of this GPU type; with its memory and cores known, no more than they hold, and at least one."""
-    n = A.per_pod if A.per_pod > 0 else SLOTS.get(gpu, SLOTS_OTHER)
-    if ram_gb: n = min(n, int(ram_gb // A.gb_a_painting))
-    if vcpu: n = min(n, int(vcpu // VCPU_A_PAINTING))
+    """Places on a pod. With its memory and cores measured they are what it holds: memory at --gb-a-painting each and
+    cores at VCPU_A_PAINTING each (the painter keeps one to two and a half cores busy and leaves the GPU nearly idle,
+    so the GPU type does not bound it). Unmeasured, the GPU type's setting (SLOTS). --per-pod, when given, is the most
+    on any pod. At least one."""
+    if ram_gb and vcpu: n = min(int(ram_gb // A.gb_a_painting), int(vcpu // VCPU_A_PAINTING))
+    else:
+        n = SLOTS.get(gpu, SLOTS_OTHER)
+        if ram_gb: n = min(n, int(ram_gb // A.gb_a_painting))
+        if vcpu: n = min(n, int(vcpu // VCPU_A_PAINTING))
+    if A.per_pod > 0: n = min(n, A.per_pod)
     return max(1, n)
 
 
@@ -201,7 +207,7 @@ mkdir -p work; touch work/runs.jsonl; ln -sfn {b}/work/models work/models
 
 def measure(pod):
     """What the pod really has (its container's memory and cores, its GPU), and so how many it paints at once."""
-    r = ssh(pod, "echo MEM=$(cat /sys/fs/cgroup/memory.max 2>/dev/null || cat /sys/fs/cgroup/memory/memory.limit_in_bytes); echo CPU=$(nproc); echo GPU=$(nvidia-smi --query-gpu=name --format=csv,noheader | head -1)", timeout=60)
+    r = ssh(pod, "echo MEM=$(cat /sys/fs/cgroup/memory.max 2>/dev/null || cat /sys/fs/cgroup/memory/memory.limit_in_bytes); echo CPU=$(awk '$1 != \"max\" { printf \"%d\", $1 / $2 }' /sys/fs/cgroup/cpu.max 2>/dev/null | grep . || nproc); echo GPU=$(nvidia-smi --query-gpu=name --format=csv,noheader | head -1)", timeout=60)
     said = dict(l.split("=", 1) for l in r.stdout.decode().splitlines() if "=" in l)
     gpu = said.get("GPU", "").strip()
     ram = int(said["MEM"]) / 1e9 if said.get("MEM", "").isdigit() and int(said["MEM"]) < 1e13 else None
