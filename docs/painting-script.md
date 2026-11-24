@@ -1,16 +1,13 @@
 # Painting script
 
-A painting script is a wash plan written the way a teacher writes out how to paint a picture: passages in the order a
-painter lays them, each saying what it is, where (a loose region on the sheet), the paint, the brush, the move and the
-kind of mark. A model that understands painting writes it by looking at the subject, the pen drawing and the block-in
-studies; the painter executes it. It replaces the wash plan the painter computes from the studies:
+A painting script is a wash plan a model writes: passages in the order a painter lays them, each with its region, paint, brush, move and kind of mark. It replaces the wash plan the painter computes from the studies:
 
 ```sh
 node tools/paint-plate.mjs ... --washplan script:SCRIPT.json --paints <the script's palette> --paintsextend 0
 ```
 
 Code: `src/paint/methods/script-washes.mjs` (the plan), `src/paint/methods/script-marks.mjs` (the marks),
-`tools/painter/script-crop.mjs` (a script cut to a window of its sheet, for trying a piece fast) and
+`tools/painter/script-crop.mjs` (a script cut to a window of its sheet) and
 `tools/painter/script-overlay.mjs` (the passages and their strokes drawn over the subject).
 
 ## Format (painting-script 2)
@@ -40,7 +37,7 @@ Code: `src/paint/methods/script-washes.mjs` (the plan), `src/paint/methods/scrip
 
 | field | meaning |
 |---|---|
-| `sheet.widthMm` | must be the painter's `--sheetmm`; positions are sheet millimetres, x right, y down |
+| `sheet.widthMm` | the painter's `--sheetmm`; positions are sheet millimetres, x right, y down |
 | `palette` | box keys (`src/crop/box.mjs`); give them to the painter with `--paints` |
 | `brushes` | the kit by name; `widthMm` is the loaded belly's width at full pressure. Every brush is laid as a round today |
 | `lights` | paper kept: no wash lane runs through a light and no touch is set down in one (they are worked round, not masked) |
@@ -61,21 +58,13 @@ Code: `src/paint/methods/script-washes.mjs` (the plan), `src/paint/methods/scrip
 | `edges` | `lost` on dry paper: laid into a damp bed of clean water under its own footprint, so its edges run soft; `found` or `mixed`: on the paper as it is |
 | `what`, `dryFirst`, `why` | for people and judges; a stage-3 passage on dry paper is laid as a glaze |
 
-Touches are set down like a hand: scattered (no two nearer than half the even spacing, never on a grid), in clumps,
-or along the region's long axis, weighted toward the side `denser` names, and visited nearest-next from the top left.
-Each is held to the region's chord along its direction (and stops at a light), so it keeps inside the shape it is
-laying without being cut. Every stroke has its own small irregularity of place, angle, length and pressure from a hand
-seeded by the passage's id. Format 1 scripts (`mark`, `move`, `strokes` as a count) are upgraded on reading.
+Touches are set down like a hand: scattered (no two nearer than half the even spacing), in clumps, or along the region's long axis, weighted toward the side `denser` names, nearest-next from the top left. Each is held to the region's chord along its direction and stops at a light. Every stroke has a small irregularity of place, angle, length and pressure, seeded by the passage's id. Format 1 scripts are upgraded on reading.
 
-`tools/painter/script-overlay.mjs` draws a script as the painting it describes, before it is painted: each stroke a
-ribbon as wide as its pressure, in its paint, each passage multiplied over the last, the lights blank, a dot at each
-stroke's start and an arrow at its end; with `--stages` and `--order`, the same after each stage and after 5 to 100% of
-the passages.
+`tools/painter/script-overlay.mjs` draws a script as the painting it describes, before it is painted: each stroke a ribbon as wide as its pressure, in its paint, the lights blank, a dot at each start and an arrow at each end; `--stages` and `--order` draw it after each stage and after 5 to 100% of the passages.
 
 ## A real passage
 
-Passage "crown" from a model's script for Mittens (gpt-6-astra, 22 Nov 2026, commit `66690c4f`). Its two
-outlines are cut short here.
+Passage "crown" from a model's script for Mittens (gpt-6-astra, 22 Nov 2026), its two outlines cut short:
 
 ```json
 { "id": "crown", "what": "Honey shadow near the parting of the brow", "stage": 3, "kind": "wash",
@@ -86,31 +75,6 @@ outlines are cut short here.
   "why": "Honey shadow near the parting of the brow." }
 ```
 
-| Part | In "crown" |
-|---|---|
-| Shape | two outlines, in sheet millimetres |
-| Paint | burnt sienna 2, yellow ochre 2, burnt umber 0.3 (parts); pale |
-| Brush | the script's 10 mm round |
-| Paper | wet: clean water is laid first |
-| Into | none; a passage on damp paper names one, such as `"into": "headlight"` |
-| Wait | dry: the sheet dries before it |
-| Strokes | sweeps with the side of the brush, pulled up and to the right (-65 degrees) |
-| Stage | 3, shadows and glazes |
-
 <img src="img/auto-vs-model-model-zoom.webp" width="60%" alt="The passage crown as painted: 17 clean-water strokes, then 14 numbered paint strokes along the stripes and brow">
 
-As painted: 17 clean-water strokes, then 14 paint strokes. How Auto fills a wash, for comparison: [How Auto paints](auto-vs-model.md#3-a-wash-is-filled-with-strokes).
-
-## What it adds to the plan format
-
-The wash plan becomes a file a model writes (`bench/v6/TASK.md`, "not yet executable": the wash plan was computed inside
-the painter from the studies). New in the plan's vocabulary: passages with a mark kind, brush, move, direction, count
-and length; charges at named points; `into` for a wet session; swatch colours. The painter's own plan (`value-plan.json`)
-records each passage as an instruction with its strokes, so a script and the strokes it became can be compared.
-
-## Not yet
-
-- Flat brushes are laid as rounds; `hold: side` only steadies the width.
-- `swatch` is the mix on white paper; glazes over earlier passages compound. The plan writes, for each passage, the
-  finished film it predicts over its cells against the subject's mean there (`summary.colourCheck`), as a check only.
-- Lifting, scraping and masking fluid are not marks.
+Seventeen clean-water strokes, then 14 paint strokes. Auto fills a wash differently: [How Auto paints](auto-vs-model.md). The painter's own plan (`value-plan.json`) records each passage as an instruction with its strokes, so a script and the strokes it became can be compared.

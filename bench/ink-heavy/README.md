@@ -1,6 +1,6 @@
 # Ink-heavy set
 
-Eight targets for judging pen ink. Seven are pen-and-wash drawings and ink-led sketches. One, the Fragonard, is a brush-only control with no pen line. The five general benchmark targets are mostly not ink works, so ink changes are judged here too.
+Eight targets for judging pen ink: seven pen-and-wash drawings and ink-led sketches, and the Fragonard, a brush-only control with no pen line.
 
 ## Targets
 
@@ -27,53 +27,6 @@ Paintings made from these targets are © 2026 Sam Jackson under [CC BY 4.0](http
 
 ## Full-size A/B
 
-This protocol was run on 0.2.x and 0.3.x; tag v0.3.2 replays it. On 0.4 each painting also needs a drawing file and a block-in study ([Running the painter](../../docs/running.md#your-own-image)), so the commands below do not run on the trunk as written.
+Run on 0.2.x and 0.3.x; tag v0.3.2 replays it. On 0.4 each painting also needs a drawing file and a block-in study ([running](../../docs/running.md#your-own-image)), so it does not run on the trunk.
 
-Paint each target at up to 1200 px wide. The camel stays at its own 880, so it is not upsampled. Use three seeds and these configurations:
-
-- `d020`: the default painter at tag `v0.2.0`.
-- `pencil`: the default painter from this release, pencil only (`--inkrecipe none`).
-- `auto`: `--inkrecipe auto`, which chose ink or pencil from the pen line in the target (0.3.x).
-- `wash`: `--inkrecipe wash`, to force the recipe.
-
-Run `npm run doctor` first.
-
-```sh
-set -e
-T="guardi:bench/ink-heavy/targets/guardi-colonnade.jpg:1200
-tiepolo-bacchus:bench/ink-heavy/targets/tiepolo-bacchus-ariadne.jpg:1200
-tiepolo-burial:bench/ink-heavy/targets/tiepolo-burial-punchinello.jpg:1200
-tiepolo-camel:examples/targets/tiepolo-punchinello-camel.jpg:880
-rembrandt:examples/targets/rembrandt-woman-reading.jpg:1200
-h36-a:demos/lab/examples/h36-a/h36-a.png:1200
-h34-a:bench/ink-heavy/targets/h34-a.jpg:1200
-fragonard:bench/ink-heavy/targets/fragonard-rinaldo.jpg:1200"
-paint() { # paint <config> <flags...>
-  cfg=$1; shift
-  for row in $(echo "$T"); do
-    name=${row%%:*}; rest=${row#*:}; img=${rest%%:*}; width=${rest##*:}
-    for seed in 0 1 2; do
-      node tools/paint-plate.mjs --image "$img" --width "$width" --seed "$seed" "$@" --out "work/ink-heavy/$cfg/$name-s$seed"
-    done
-  done
-}
-paint pencil
-paint auto --inkrecipe auto
-paint wash --inkrecipe wash
-# in a checkout of v0.2.0, with the same T and paint(), and with the h36-a image given by an absolute path:
-#   paint d020
-```
-
-Score each painting three times with J1. J1 on one painting moves by up to 0.33 with nothing changed.
-
-```sh
-for row in $(echo "$T"); do
-  name=${row%%:*}; rest=${row#*:}; img=${rest%%:*}
-  for cfg in d020 pencil auto wash; do for seed in 0 1 2; do for rep in 1 2 3; do
-    python3 bench/scorer/score_painting.py --target "$img" --image "work/ink-heavy/$cfg/$name-s$seed/painting.jpg" \
-      --style "pen and ink with wash" --judge J1 --out "work/ink-heavy/$cfg/$name-s$seed/j1-$rep.json"
-  done; done; done
-done
-```
-
-Compare the mean of the nine scores per target and configuration (3 seeds x 3 repeats).
+Each target was painted at up to 1200 px wide (the camel at its own 880), three seeds each, with `node tools/paint-plate.mjs --image IMG --width W --seed S --out DIR` under four configurations: `d020` (painter at tag `v0.2.0`), `pencil` (`--inkrecipe none`), `auto` (`--inkrecipe auto`) and `wash` (`--inkrecipe wash`). Each painting was scored three times with J1 (`python3 bench/scorer/score_painting.py --target IMG --image DIR/painting.jpg --style "pen and ink with wash" --judge J1 --out OUT`); one painting's J1 moves by up to 0.33 with nothing changed. Compare the mean of nine scores per target and configuration.

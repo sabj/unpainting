@@ -2,7 +2,7 @@
 
 All positions are sheet millimetres, x to the right, y down; the sheet is `SHEET_W` by `SHEET_H` mm. Every picture in `inputs/`, and every look's `beside.png`, carries the same millimetre grid (red numbers across, blue down).
 
-**A look paints your plan for real, small, and shows you the dried sheet.** The painter that will paint your final choice lays your present choice on half the cells across (the same millimetres, coarser grain), with real water, pigment and brush, lets it dry, and shows you what dried: brush marks, direction, soft and hard edges, how much pigment really lay down, blooms and back-runs, and what a later wash did to the one under it.
+A look paints your plan for real, small, and shows you the dried sheet: the painter that will paint your final choice lays your present choice on half the cells across (same millimetres, coarser grain), with real water, pigment and brush, lets it dry, and shows what dried: brush marks, direction, edges, how much pigment lay down, blooms, back-runs, and what a later wash did to the one under it.
 
 ## Files
 
@@ -12,7 +12,7 @@ INPUT_LIST
 - `mine/`: after a plan or a look of a choice that names lines of your own, `mine/drawing.png` shows your lines (grey before the washes, black after them).
 - `own-script-brief.md`: the brief for writing your own painting script (format, kit, paints).
 - `choice.json`: your choice. What it holds when you stop is painted.
-- `self-review.md`: yours to write before you stop if you wish (`TASK.md`, "Before you stop"): the five worst differences between your last look's dried sheet and the subject, and whether a major fault remains. It is kept with the session; nothing depends on it.
+- `self-review.md`: yours to write before you stop (`TASK.md`, "Before you stop"): the five worst differences between your last look's dried sheet and the subject, and whether a major fault remains. Nothing depends on it.
 - `seen.md`: only when you were handed pictures of your previous painting (`previous/`): one line on each, written before your first plan (`TASK.md` says which).
 
 ## Tools
@@ -33,7 +33,7 @@ Run them from this folder. A plan takes under a minute to several minutes. A loo
 | `./unpaint cost [--until S] [--region ...]` | prices that look of your present choice and paints nothing | the cost in units and what you have left | none |
 | `./unpaint wait` | waits for the answer of the command that said "still working" | that answer | none |
 
-A choice that is refused costs no look. A choice that is exactly one you planned before and then left is a return to an earlier choice: it is counted, and past REVERTS_MOST of them it is refused (`TASK.md` says why). A painting that fails on this side costs no look either: the answer says NOT PAINTED, and you may ask again. The same look of a choice you have already looked at renders nothing and costs nothing. A look's price is fixed: 0.3 units for your whole plan at half size, its share when stopped at a stage or cut to a region, and never under 0.2, whatever the look holds. The final, painted at full size after you stop, is not charged. How you paint (water, strokes, waits, dryings) is not charged. One guard only, to keep the machines free: a painting that runs to more than ten times the water steps of the automatic painting of this subject is stopped and said so; it costs no look.
+A refused choice costs no look. A choice exactly like one you planned before and then left is a return to an earlier choice: it is counted, and past REVERTS_MOST of them it is refused (`TASK.md` says why). A painting that fails on this side costs no look: the answer says NOT PAINTED, and you may ask again. The same look of a choice you have already looked at renders nothing and costs nothing. A look's price is fixed: 0.3 units for your whole plan at half size, its share when stopped at a stage or cut to a region, never under 0.2. The final, painted at full size after you stop, is not charged. How you paint (water, strokes, waits, dryings) is not charged. One guard: a painting that runs to more than ten times the water steps of the automatic painting of this subject is stopped and said so; it costs no look.
 
 ## Everything you can call or change
 
@@ -45,13 +45,12 @@ A choice that is refused costs no look. A choice that is exactly one you planned
 | The drawing's lines | `"lines": "my-lines.json"` beside any kind of choice (below) | when each prepared line is drawn (before the first wash, with a stage of the washes, after them over the dry paint) or not at all, and how dark each is: by named form, by kind of line, by length, width or darkness, or one by one |
 | Lines of your own | `"own"` in that same file (below) | new lines, drawn where you put them point by point: pen or pencil, their width and darkness, before or after the washes |
 | The painter itself | your own script (`own-script-brief.md`) | every passage: its shape, paint and dilution, brush and width, paper wet, damp or dry, what it is laid into, how long the sheet dries first, stroke paths, pressure and hold, the order, the lights kept as paper. Write strokes in the order a hand would travel: finish one area before the next, neighbours after each other, long strokes before short; the replay is watched |
-| The preview | `./unpaint look` | the painter run for real, small: the dried sheet, the stages, each form measured on the dried sheet |
-| The compile check | `./unpaint plan` | whether your choice compiles, and its counts |
+| The preview and the compile check | `./unpaint look`, `./unpaint plan` | the dried sheet, the stages and each form measured; whether your choice compiles, and its counts |
 | Your shell | any command in this folder | measure the input pictures, compute positions and colours, write and check your files, keep notes |
 
 Given and fixed in this session: the three studies, the sheet size, the painter's guard and its seed. New studies cannot be asked for here.
 
-**What is refused and what is only warned of.** A file that cannot be read, or a request the painter cannot lay (more paints than the sheet holds, a brush not in the kit, a wash with no cells), is refused with the reason. A choice that may spoil the painting is NOT refused: it is laid as you wrote it and listed under WARNINGS (a weight or strength far outside the usual, pencil over dry paint, a rule that matches nothing, a colour lighter than what is under it). Ignore it if you meant what you wrote; the result shows in your next look.
+Refused, with the reason: a file that cannot be read, or a request the painter cannot lay (more paints than the sheet holds, a brush not in the kit, a wash with no cells). Only warned of: a choice that may spoil the painting is laid as you wrote it and listed under WARNINGS (a weight or strength far outside the usual, pencil over dry paint, a rule that matches nothing, a colour lighter than what is under it). Ignore a warning if you meant what you wrote.
 
 ## The drawing: its medium, its lines, and lines of your own
 
@@ -78,9 +77,9 @@ Rules apply in order and a later rule wins. `where` holds conditions that must a
 What to know:
 
 - Ink set before the washes stays put under them; pencil is pale and the washes cover it. Pen over dry washes is a crisp closing line. Pencil over dry washes sits grey on top of the paint and hardly shows over a dark wash: the answer warns you, and draws it if you leave it.
-- Choosing `"pen"` for a drawing prepared in pencil lays its lines in ink as dark as drawn. Its hatching and texture (tagged `drop`) start dropped as on any pencil drawing; if your rules draw them, in ink they are as dark as drawn and the answer warns you.
+- Choosing `"pen"` for a drawing prepared in pencil lays its lines in ink as dark as drawn. Its hatching and texture (tagged `drop`) start dropped as on any pencil drawing; if your rules draw them they are as dark as drawn and the answer warns you.
 - On a pen drawing the ink of your own script is set before the washes, unless your choice says `"ink": "soluble"`.
 - `./unpaint plan` checks the file, counts what it does and lists its warnings; `mine/drawing.png` shows the result (grey: before the washes; black: after them).
 - Rubbing out (advice, yours to use or not): a pencil lay-in line that the paint has replaced, or a line drawn twice, can be rubbed out with an erase passage in your own script, anywhere in the order: `{ "id": "e1", "kind": "erase", "stage": 1, "widthMm": 3, "strokes": [{ "points": [[x, y, 1], [x, y, 1]] }] }` (or a `region` with `handling.pressure`). Before the first wash a firm rub takes most of the pencil off; after a wash has dried it takes far less (about a fifth under a pale wash, a twentieth under a medium one, less under a dark one). The eraser needs dry paper: leave its `wait` at `dry`. `./unpaint plan` says what each erase will take.
 
-Your shell is yours: read the files, measure the input pictures (sampling a colour or a position is fair), compute, keep notes, write and check your script with your own code. The folder is all there is to work from: the painter and other sessions are out of reach, and a session whose commands name them is not painted. A plan is painted, drawn or measured against the subject only by `./unpaint look`.
+In your shell you may read the files, measure the input pictures (sampling a colour or a position is fair), compute, keep notes, and write and check your script with your own code. The folder is all there is to work from: the painter and other sessions are out of reach, and a session whose commands name them is not painted. A plan is painted, drawn or measured against the subject only by `./unpaint look`.

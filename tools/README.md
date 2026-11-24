@@ -2,18 +2,17 @@
 
 Command-line tools, run from the repository root with `node tools/<path>`.
 
-| Folder | What it holds | Entry points |
-|---|---|---|
-| `tools/` | Image painter, stroke-plan runner, environment doctor and stroke gates | `paint-plate.mjs`, `run-plan.mjs`, `doctor.mjs`, `stroke-stats.mjs`, `stroke-gate.mjs` |
-| `paint/` | Registered subjects and model author sessions (`npm run paint`, [docs/running.md](../docs/running.md#registered-subjects-npm-run-paint)) | `cli.mjs`, `run-sets.mjs`, `contact.mjs`, `author-sheet.mjs` |
-| `plate/` & `painter/` | Stage modules and helpers imported by `paint-plate.mjs` (study loading, wet beds, softening, scrap swatches) | [docs/how-it-paints.md](../docs/how-it-paints.md) |
-| `seg/` | Tracing and ordering a prepared drawing, SAM regions and masks | [seg/README.md](seg/README.md) |
-| `guard/` | Target-pixel read guard, cheat-risk score, deliberate-cheat test and source lint | `cheat-test.mjs`, `promote-check.mjs`, `lint-target-use.mjs` ([docs/honesty.md](../docs/honesty.md)) |
-| `judge/` | Classic image measurements, stage checks and blind vision-judge rounds | `judge-plate.mjs`, `stage-check.mjs`, `concert-judge.mjs`, `rounds/` ([docs/judging.md](../docs/judging.md)) |
-| `lab/` | Paint Lab live example builders and `src/media/` browser sync | `sync-site-media.mjs`, `build-live-examples.mjs`, `build-site.mjs` |
-| `speed/` | Pixel/hash comparison and paired commit timing | `compare.mjs BASE.png CANDIDATE.png OUT`, `run-pair.py CONFIG.json` |
-| `cloud/` | Optional batch rendering and render-pool pods on RunPod | `render-batch.py`, `render-pool-pods.py` ([docs/running.md](../docs/running.md#cloud-rendering)) |
-| `readme/` | Builders for the documentation figures and animations in `docs/img/` | `build-readme-media.mjs`, `animations.mjs`, `pipeline-map.mjs`, `paper-figure.mjs` |
-| `aware/` | Pause/resume helpers (`--pausedir`, `--resumestate`) from retired V4/V5 rounds | `pause.mjs` |
+- `tools/`: `paint-plate.mjs` (image painter), `run-plan.mjs` (stroke plans), `doctor.mjs`, `stroke-stats.mjs`, `stroke-gate.mjs`.
+- `paint/`: registered subjects and model sessions, `npm run paint` ([running](../docs/running.md#registered-subjects-npm-run-paint)): `cli.mjs`, `run-sets.mjs`, `contact.mjs`, `author-sheet.mjs`.
+- `plate/`, `painter/`: stage modules and helpers imported by `paint-plate.mjs` ([how it paints](../docs/how-it-paints.md)).
+- `seg/`: tracing and ordering a drawing, SAM regions ([README](seg/README.md)).
+- `prepare/`: preparing a picture ([README](prepare/README.md)).
+- `guard/`: target-read guard, cheat risk, `cheat-test.mjs`, `promote-check.mjs`, `lint-target-use.mjs` ([honesty](../docs/honesty.md)).
+- `judge/`: image measurements, stage checks, blind judge rounds: `judge-plate.mjs`, `stage-check.mjs`, `concert-judge.mjs`, `rounds/` ([judging](../docs/judging.md)).
+- `lab/`: Paint Lab builders and the `src/media/` browser sync (`sync-site-media.mjs`, `build-live-examples.mjs`, `build-site.mjs`).
+- `speed/`: `compare.mjs BASE.png CANDIDATE.png OUT` compares pixels and hashes; `run-pair.py CONFIG.json` times a pair of commits.
+- `cloud/`: RunPod batch rendering and render-pool pods ([running](../docs/running.md#cloud-rendering)).
+- `readme/`: builders for the figures in `docs/img/` (`build-readme-media.mjs`, `animations.mjs`, `pipeline-map.mjs`, `paper-figure.mjs`).
+- `aware/`: `pause.mjs`, pause and resume (`--pausedir`, `--resumestate`) from retired rounds.
 
-Run all unit and tool tests with `npm test` and benchmark tests with `npm run bench:test`.
+`npm test` runs unit and tool tests; `npm run bench:test` the benchmark tests.

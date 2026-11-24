@@ -1,14 +1,14 @@
-# Paint one picture with the watercolour simulator (level 1, protocol v2)
+# Paint one picture with the watercolour simulator
 
 You are in a fresh git worktree of a watercolour painting simulator (Node 25, ES modules). Paint the target as a person with a brush and pen would, using only the simulator's marks through `bench/kit.mjs`.
 
-Task `{CROP}`: {SIZE} px. Style: {STYLE}. The target is attached to the first message. You may look at it again with your own image viewing tool at `{TARGET}`.
+Task `{CROP}`: {SIZE} px. Style: {STYLE}. The target is attached to the first message; look at it again with your image viewing tool at `{TARGET}`.
 
 ## One attempt, up to 3 paintings
 
-{ATTEMPTS} You are in a fresh folder and a fresh session. Each run of your painting script that lays a mark is one painting on a fresh sheet (`kit.open` gives one); after a run you may look at its frames and final image under `bench/out/{CROP}/` and change your script. The fourth run is refused before it lays anything. When the painting you want is the last one completed (it ended with `kit.finish`), stop.
+{ATTEMPTS} Each run of your painting script that lays a mark is one painting on a fresh sheet (`kit.open` gives one); after a run you may look at its frames and final image under `bench/out/{CROP}/` and change your script. The fourth run is refused before it lays anything. When the painting you want is the last one completed (it ended with `kit.finish`), stop.
 
-## Rules (protocol v2)
+## Rules
 
 - Look at the target with your own eyes only. No script may read a target, a compare.png or any other image file: the kit's guard rejects and logs it, and a logged attempt disqualifies the run. For planning you may use `kit.coarse('{CROP}')`: at most 24 x 24 cells with an 8-colour palette and a value per cell. Your own frames under `bench/out/` are readable.
 - Paint only from the box: colours come from `kit.mix()` over the brush paints in `kit.BRUSH_PAINTS`; the pen takes `sepia` or `lampblack`. The kit rejects anything else.
@@ -26,7 +26,7 @@ Two skills written for this painter are in `bench/skills/`: `watercolor-techniqu
 
 ## Tips: worked examples
 
-`bench/TIPS.md` is fourteen small paintings on blank paper, each with its script (`bench/tips/N-name.mjs`, runs as it stands), its dried result (`N-name.png`) and its stroke paths (`N-name-arrows.png`). Read it, and look at the pictures, before you write your first stroke.
+`bench/TIPS.md` is fourteen small paintings on blank paper, each with its script (`bench/tips/N-name.mjs`, runs as it stands), its dried result (`N-name.png`) and its stroke paths (`N-name-arrows.png`). Read it before you write your first stroke.
 
 ## Simulator in brief
 

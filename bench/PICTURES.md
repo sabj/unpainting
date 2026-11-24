@@ -1,8 +1,6 @@
 # Benchmark pictures
 
-The 0.4 benchmark paints fifteen pictures: four groups of three museum works and a bonus group of three pictures made with an image generator. Five form the core (one per group); all fifteen form the extended set ([README](README.md#pictures)).
-
-Museum records were read on 23 November 2026. Medium, size and credit lines use each museum's words; see [NOTICE](../NOTICE) sections 5 and 6.
+Fifteen pictures: four groups of three museum works and three made with an image generator. Core is five (one per group); extended is all fifteen ([README](README.md#pictures)). Museum records were read on 23 November 2026; medium, size and credit lines are each museum's words ([NOTICE](../NOTICE) sections 5 and 6).
 
 ## Museum works
 
@@ -23,12 +21,12 @@ Museum records were read on 23 November 2026. Medium, size and credit lines use 
 
 - Art Institute of Chicago public-domain works are released under [CC0](https://www.artic.edu/open-access/open-access-images).
 - Metropolitan Museum of Art public-domain works are released under [Open Access CC0](https://www.metmuseum.org/hubs/open-access); our files come from the Met's Wikimedia Commons donations.
-- National Gallery of Art and Brooklyn Museum records were read by hand on 23 November 2026.
+- National Gallery of Art and Brooklyn Museum records were read by hand.
 - Manet's *Morisot with a Fan* is painted as a detail; every other picture is the whole sheet.
 
 ## Bonus group: generated pictures
 
-Each started from a photograph and was stylized with an image generator. Nominal sizes are given to the model.
+Each started from a photograph, stylized with an image generator. The model is given a nominal size.
 
 | Set | Picture | Source photograph | Modified with an image generator | Size | Rights | File |
 |---|---|---|---|---|---|---|
@@ -74,4 +72,4 @@ Beach and Overlook: photographs by Sam Jackson, modified with an image generator
 
 ## Earlier benchmarks
 
-Rounds V1 to V5 painted five small targets: Hills, France, Ships, Mittens and Trumbull ([sizes](crops/README.md)). Ships is Sargent's *White Ships*, carried into 0.4 at full size. Trumbull and the first Mittens are optional; Hills and France are in no 0.4 set, though their historical files and scores remain in the repository.
+Rounds V1 to V5 painted Hills, France, Ships, Mittens and Trumbull ([sizes](crops/README.md)). Ships is Sargent's *White Ships*, in 0.4 at full size. Trumbull and the first Mittens are optional; Hills and France are in no 0.4 set.
