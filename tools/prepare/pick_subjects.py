@@ -12,8 +12,7 @@ STACK = [('s3L8', 6), ('s1L8', 4), ('s4L8', 2)]
 SEEDS = ('42', '7', '11')
 # seed-42 studies made on the Mac (mflux 8-bit): their RunPod twin (-s42r, same seed, same backend as seeds 7 and 11) stands
 # for seed 42, so all three candidates come from one backend
-MAC42 = {'sterling': ('s3L8', 's1L8', 's4L8'), 'beach': ('s3L8', 's1L8', 's4L8'), 'fragonard': ('s3L8', 's1L8'), 'guardi': ('s3L8', 's1L8'),
-         'rembrandt': ('s3L8', 's1L8'), 'tiepolo-camel': ('s3L8', 's1L8'), 'tiepolo-bacchus': ('s3L8', 's1L8'), 'sargent-venice': ('s3L8', 's1L8')}
+MAC42 = {k: tuple(v) for k, v in json.load(open(os.path.join(HERE, 'subjects-table.json')))['MAC42'].items()}
 def subjects():
     out = []
     for s in M['subjects']:

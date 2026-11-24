@@ -34,7 +34,7 @@ test('the registry writer sizes a sheet under the rule exactly as the painter ch
 });
 
 test('the registry writer registers each of the benchmark\'s fifteen a second time under the rule, as the run sets name them', () => {
-  const src = fs.readFileSync(path.join(HERE, 'register.py'), 'utf8'), ids = /RULE_IDS = \(([^)]*)\)/s.exec(src)[1].match(/"[^"]+"/g).map(s => s.slice(1, -1));
+  const ids = JSON.parse(fs.readFileSync(path.join(HERE, 'subjects-table.json'), 'utf8')).RULE_IDS;
   assert.deepEqual(ids.map(i => `${i}-qs`).sort(), picturesAt('extended').map(p => p.id).sort());
 });
 

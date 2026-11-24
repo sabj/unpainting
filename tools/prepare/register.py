@@ -20,49 +20,18 @@ from subjects_lib import R, MANIFEST, sha256, image_size, sheet_for, standard_sh
 from prep_root import prep_python, REPO
 
 PY = prep_python()
+# The hand-written table of pictures (names, sources, provenance, crops, the owner's rulings) is data, not code: it is
+# read from subjects-table.json beside this file. Nothing below names a picture.
+T = json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "subjects-table.json")))
 S = "handoff/sources/"
 I = "studio/img/"
 GEN = "made by an image generator"
 HAND = "by the artist's hand"
 # name, file id, role, source, provenance, note on the source
 # The order is the studio's order (the owner, 21 Nov): the Kasha group, Mittens, Yale, the museum pictures.
-SPEC = [
- ("kasha-hills", "kasha-watercolor", "core", S + "kasha-page-watercolor-v1.png", GEN, "Kasha, front view on the dune, watercolour, no ink."),
- ("kasha-portrait", "kasha-portrait", "core", S + "kasha-portrait.jpg", GEN, "Kasha, head and shoulders against blue sky, in pen and watercolour: the owner's target. Made by an image generator from the owner's photograph (handoff/sources/kasha-portrait-photo.jpg: reference only, never a subject). Added 21 Nov: 'use it as an additional kasha-portrait option'."),
- ("kasha-portrait-wash", "kasha-portrait-wash", "core", S + "kasha-portrait-wash.jpg", GEN, "The same Kasha portrait in watercolour, no ink: kept as a matched pair with kasha-portrait, to test classification and black fur with and without line. Made by an image generator from the owner's photograph (reference only). Added 21 Nov."),
- ("ks-beach", "beach", "core", S + "beach-artwork.png", GEN, "Man, ball and black dog on a beach, watercolour over pen: the painting, not the photograph."),
- ("ks-overlook", "overlook", "core", S + "overlook-art.jpg", GEN, "From Sam's photo. Pencil lines visible under the paint."),
- ("mittens", "mittens", "core", S + "mittens-artwork.png", GEN, "From Sam's photo."),
- ("mittens-closeup", "mittens-closeup", "core", S + "mittens-closeup.png", GEN, "The Mittens face close-up as a watercolour sketch over visible pencil, no ink, made by an image generator from the owner's photograph (handoff/sources/mittens-closeup-photo.png: reference only, never a subject). A byte copy of handoff/sources/candidates/mittens-closeup-sketch-b.png ('darker pencil, more background', the lead's default; -a and -c are the alternatives: a swap is one copy over this file plus a rerun of its inputs under a new input id). Replaces the 540 px oil frame first used (21 Nov)."),
- ("yale-rosewalk", "h36", "core", S + "h36-artwork.png", GEN, "AI-generated ink-and-wash image from a public-domain Yale photograph (studio/make-catalog.py)."),
- ("yale-trumbull", "trumbull", "core", S + "trumbull-watercolor-v1.png", GEN, "Made 5 Oct 2026 by a cloud image generator from Sam's photo of Trumbull College. The painted target, not the photograph."),
- ("yale-sterling", "sterling", "core", S + "sterling-artwork.jpg", GEN, "Sterling Memorial Library with the Women's Table, watercolour over ink."),
- ("fragonard-rinaldo", "fragonard", "core", I + "fragonard-rinaldo.jpg", HAND, "Jean-Honore Fragonard, Rinaldo in the Enchanted Forest, brown wash over chalk on buff paper, public domain."),
- ("guardi-colonnade", "guardi", "core", I + "guardi-colonnade.jpg", HAND, "Francesco Guardi, A Colonnade, Partly Ruined, c. 1780-90, pen and wash, public domain."),
- ("homer-daughter", "homer-daughter", "core", I + "homer-daughter.jpg", HAND, "Winslow Homer, A Fisherman's Daughter, 1873, watercolour and gouache over graphite, Cleveland Museum of Art 1943.660, CC0 (added by the owner, 21 Nov)."),
- ("homer-guide", "homer-guide", "core", S + "homer-guide-crop.png", HAND, "A detail of Winslow Homer, Adirondacks Guide, 1892, watercolour over traces of graphite, AIC 16772, CC0: the guide's head, white beard, hat and shoulders (the owner's pick C2; paint/SET.md:32). Cut once from the whole picture (see cutFrom); the detail is the picture."),
- ("morisot-face", "morisot-face", "core", S + "morisot-face-crop.png", HAND, "A detail of Edouard Manet, Portrait of Berthe Morisot with a Fan, 1874, watercolour over traces of graphite, AIC 1963.812, CC0: head and shoulders (the owner's pick C1; paint/SET.md:31). Cut once from the whole picture (see cutFrom); the detail is the picture."),
- ("rembrandt-reading", "rembrandt", "comparison", I + "rembrandt-woman-reading.jpg", HAND, "Rembrandt, a woman reading, pen and wash, public domain. Same bytes as wt/main/examples/targets/rembrandt-woman-reading.jpg."),
- ("sargent-ships", "white-ships", "core", I + "white-ships.jpg", HAND, "John Singer Sargent, White Ships, 1908, Brooklyn Museum, public domain. Same bytes as wt/main/examples/targets/white-ships.jpg."),
- ("sargent-venice", "sargent-venice", "core", S + "sargent-venice-crop.png", HAND, "A detail of John Singer Sargent, Venice, c. 1903, watercolour, gouache and graphite, no pen line, Met 50.130.37, CC0: door base, step and canal water (the detail the owner kept of six; paint/SET.md:30). Cut once from the whole picture (see cutFrom); the detail is the picture."),
- ("signac-boat", "signac-boat", "exploratory", I + "signac-boat-sheet.jpg", HAND, "Paul Signac, Boat in Port, c. 1929-31, watercolour over black crayon, Cleveland Museum of Art 2012.26, CC0. The sheet off its mount (paint/SET.md:34); studio/img/signac-boat.jpg is the same work with its mount. Exploratory: the owner, 'add signac for now'; replaces signac-notredame (21 Nov)."),
- ("tiepolo-bacchus", "tiepolo-bacchus", "core", I + "tiepolo-bacchus-ariadne.jpg", HAND, "G. B. Tiepolo, Bacchus and Ariadne, pen and wash, public domain."),
- ("homer-water-fan", "homer-water-fan", "core", I + "homer-water-fan.jpg", HAND, "Winslow Homer, The Water Fan, 1898/99, \"Watercolor, with blotting and touches of scraping, over graphite, on thick, rough twill-textured, ivory wove paper\", Art Institute of Chicago 38666, CC0 (https://www.artic.edu/artworks/38666). Whole sheet, no trim: the museum's full IIIF file, 3000 x 2089 px (studio/img/candidates/hires/homer-water-fan.jpg, same bytes). Inputs made locally on this Mac with the 8-bit MLX model (qwen_local_prep.py), not on a pod. Added 23 Nov (owner). The sheet size here may be re-set once the owner decides the new sheet-size rule (23 Nov)."),
- ("sargent-tyrol", "sargent-tyrol", "core", I + "sargent-tyrol.jpg", HAND, "John Singer Sargent, In Austrian Tyrol, 1911, \"watercolor with traces of graphite\", Cleveland Museum of Art 1921.1734, CC0 (https://clevelandart.org/art/1921.1734). Whole sheet from the museum's 3400 x 2290 print file (studio/img/candidates/hires/sargent-tyrol.jpg), trimmed only of the white mount: left 28, top 36, right 40 (to x 3360), bottom 24 px (to y 2266), leaving 3332 x 2230. Inputs made locally on this Mac with the 8-bit MLX model, not on a pod. Added 23 Nov (owner). The sheet size here may be re-set once the owner decides the new sheet-size rule (23 Nov)."),
- ("homer-guide-whole", "homer-guide-whole", "core", I + "homer-guide-whole.jpg", HAND, "Winslow Homer, Adirondacks Guide, 1892, the WHOLE painting (the old `homer-guide` is a crop of it and is left as it is): \"Transparent watercolor with touches of opaque watercolor, rewetting, blotting and scraping, over traces of graphite, on thick, moderately textured, ivory wove paper\", Art Institute of Chicago 16772, CC0. The museum's full file, 3000 x 1831 px, no trim (same bytes as candidates/hires/homer-guide.jpg); real size about 32.9 x 54.5 cm. Has touches of opaque colour (the owner accepts them). Inputs made locally on this Mac with the 8-bit MLX model, not on a pod. Added 23 Nov (owner). The sheet size here may be re-set once the owner decides the new sheet-size rule (23 Nov)."),
- ("turner-esseillon", "turner-esseillon", "core", I + "turner-esseillon.jpg", HAND, "J. M. W. Turner, The Fort of L'Esseillon, 1835-36, \"Watercolor\", The Metropolitan Museum of Art 343384, public domain. Whole sheet: the Met's full file (Wikimedia Commons copy) 3536 x 2422 px, trimmed of its mount to 3451 x 2363 (untrimmed original in studio/benchmark-set/img/untrimmed/turner.jpg); real size about 19.7 x 28 cm. Inputs made locally on this Mac with the 8-bit MLX model, not on a pod. Added 23 Nov (owner). The sheet size here may be re-set once the owner decides the new sheet-size rule (23 Nov)."),
- ("ender-mountain-valley", "ender-mountain-valley", "core", I + "ender-mountain-valley.jpg", HAND, "Ender, Mountain Valley, The Metropolitan Museum of Art 372683, public domain, \"Watercolor over graphite\". Whole sheet, Met file 3511 x 2557 px, trimmed of its mount to 3437 x 2512 (untrimmed original in studio/benchmark-set/img/untrimmed/ender.jpg); real size about 21 x 28.5 cm. Inputs made locally on this Mac with the 8-bit MLX model, not on a pod. Added 23 Nov (owner). The sheet size here may be re-set once the owner decides the new sheet-size rule (23 Nov)."),
- ("morisot-avenue-du-bois", "morisot-avenue-du-bois", "core", I + "morisot-avenue-du-bois.jpg", HAND, "Berthe Morisot, A Woman Seated at a Bench on the Avenue du Bois, 1885, \"Watercolor over traces of graphite\", The Metropolitan Museum of Art 337864, public domain. Whole sheet, the Met's file 3193 x 2943 px (downloaded 23 Nov), no trim; real size about 20 x 28 cm. Inputs made locally on this Mac with the 8-bit MLX model, not on a pod. Added 23 Nov (owner). The sheet size here may be re-set once the owner decides the new sheet-size rule (23 Nov)."),
- ("cezanne-bathers-bridge", "cezanne-bathers-bridge", "core", I + "cezanne-bathers-bridge.jpg", HAND, "Paul Cezanne, Bathers Under a Bridge, 1900-06, \"Watercolor over graphite\", The Metropolitan Museum of Art 334173, public domain. Whole sheet, 3859 x 2984 px (Wikimedia Commons copy of the Met's file), no trim; real size about 21 x 27.2 cm. Inputs made locally on this Mac with the 8-bit MLX model, not on a pod. Added 23 Nov (owner). The sheet size here may be re-set once the owner decides the new sheet-size rule (23 Nov)."),
- ("homer-two-ladies", "homer-two-ladies", "core", I + "homer-two-ladies.jpg", HAND, "Winslow Homer, Two Ladies, 1880, \"Watercolor and graphite\", The Metropolitan Museum of Art 11144, public domain. Whole sheet, file 2224 x 1924 px, trimmed of its mount to 2001 x 1725 (untrimmed original in studio/benchmark-set/img/untrimmed/twoladies.jpg); real size about 17.6 x 20.2 cm. Inputs made locally on this Mac with the 8-bit MLX model, not on a pod. Added 23 Nov (owner). The sheet size here may be re-set once the owner decides the new sheet-size rule (23 Nov)."),
- ("manet-morisot-fan-crop", "manet-morisot-fan-crop", "core", I + "manet-morisot-fan-crop.jpg", HAND, "Edouard Manet, Portrait of Berthe Morisot with a Fan, 1874, \"Watercolor over traces of graphite on cream wove paper\", Art Institute of Chicago 18667, CC0. The owner-approved CROP (head, shoulders, hand) of the 2477 x 3000 px whole sheet: 2100 x 1767 px, file studio/benchmark-set/img/manet.jpg (the old `morisot-face` is left as it is); the whole sheet is about 20.9 x 16.8 cm. Inputs made locally on this Mac with the 8-bit MLX model, not on a pod. Added 23 Nov (owner). The sheet size here may be re-set once the owner decides the new sheet-size rule (23 Nov)."),
- ("prout-laundresses", "prout-laundresses", "core", I + "prout-laundresses.jpg", HAND, "Prout, Laundresses before the Wasserturm, Nuremberg, National Gallery of Art 70364, \"watercolor on wove paper; laid down\". Whole sheet, 2902 x 4036 px (portrait); the broken brown line over the washes is brush or pen: the classifier decides its class. Inputs made locally on this Mac with the 8-bit MLX model, not on a pod. Added 23 Nov (owner). The sheet size here may be re-set once the owner decides the new sheet-size rule (23 Nov)."),
- ("sargent-ships-large", "white-ships-1488", "core", I + "white-ships-1488.jpg", HAND, "John Singer Sargent, White Ships, 1908, Brooklyn Museum, \"Translucent and touches of opaque watercolor and wax resist with graphite underdrawing\". The larger file, 1488 x 1057 px (the older 768 x 548 px registration `white-ships` / `sargent-ships` is left as it is, with its inputs, so last night's results keep them). Touches of opaque colour. Inputs made locally on this Mac with the 8-bit MLX model, not on a pod. Added 23 Nov (owner). The sheet size here may be re-set once the owner decides the new sheet-size rule (23 Nov)."),
- ("bonington-french-town", "bonington-french-town", "core", I + "bonington-french-town.jpg", HAND, "Bonington, French Town, Buildings and River, Art Institute of Chicago 30925, \"Watercolor on paper\", 18.1 x 14.3 cm. Whole sheet, 1664 x 2104 px (portrait; studio/benchmark-set/img/bonington.jpg). No line named by the museum: the classifier decides. Inputs made locally on this Mac with the 8-bit MLX model, not on a pod. Added 23 Nov (owner). The sheet size here may be re-set once the owner decides the new sheet-size rule (23 Nov)."),
-]
+SPEC = [tuple(x) for x in T["SPEC"]]
 # The benchmark's fifteen (bench/run-sets.json), each registered a second time under the one-area rule as <id>-qs.
-RULE_IDS = ("manet-morisot-fan-crop", "tiepolo-bacchus", "homer-water-fan", "prout-laundresses", "guardi", "bonington-french-town", "turner-esseillon", "sargent-tyrol",
-            "ender-mountain-valley", "white-ships-1488", "morisot-avenue-du-bois", "cezanne-bathers-bridge", "mittens-closeup", "kasha-portrait", "h36")
+RULE_IDS = tuple(T["RULE_IDS"])
 SPEC += [(name + RULE_SUFFIX, fid + RULE_SUFFIX, role, src, prov, note + " Registered under the one-area sheet rule (a quarter sheet's area in the picture's proportions); the earlier registration `%s` is left as it is." % fid)
          for name, fid, role, src, prov, note in SPEC if fid in RULE_IDS]
 REAL_SIZES = json.load(open(os.path.join(REPO, "bench", "real-sizes.json")))["sizes"]
@@ -71,40 +40,24 @@ ROLE_WHY = {"comparison": "the owner: these cannot be matched; comparison only, 
             "core": "in the scored set"}
 # Use (the owner, 21 Nov: "pick some illustrations if you want a wider further set to test but this is fine we can use all for this
 # development process"); "use the ones we liked". Every subject is development. The held-out list is empty today.
-TIER1 = ("yale-rosewalk", "yale-trumbull", "kasha-portrait", "ks-beach", "mittens", "morisot-face", "homer-guide", "sargent-ships", "tiepolo-bacchus")   # the owner's working set, rendered first (21 Nov)
+TIER1 = tuple(T["TIER1"])
 HELD_OUT = ()   # a held-out set may be named later by the owner ("we can fine tune later which will actually be in benchmark")
 USE_WHY = {"development": "use freely to broaden the painter: look at its paintings, tune on it",
            "held-out": "inputs, class and segmentation are prepared like any other subject, but no engineer looks at its paintings or tunes on it; rendered only by render.sh --gate or --final, and scored with the rest"}
-HISTORY = {"sargent-venice": ["21 Nov, before the (later revised) held-out decision: rendered twice by the onboarding worker with an old drawing (Qwen p6 pencil fits, hatched; replay/vectors/held-p6/, paint/set/_held-p6/). Set aside, not shown, not scored. Stated here rather than hidden: those two renders were seen."]}
+HISTORY = T["HISTORY"]
 # Details of a larger picture (paint/SET.md windows; the owner's picks C1/C2 and the kept Venice detail). A detail is simply a
 # picture: its source file IS the cut (made once, byte-identical to the window of the whole), and every input is made from that
 # file alone, exactly as for any whole picture. Nothing is cut from whole-picture inputs (21 Nov 03:55: whole-picture studies cut
 # to the window carried the water band and shoreline across Homer's figure). This table is provenance only: where the cut came from.
-CUT_FROM = {
- "morisot-face": dict(path=I + "morisot-face.jpg", sha256="a7dcb77fcab82454c5224e8f441072917ee25523968f5607f9c972816ad2443b", boxPx=[0, 80, 977, 1038], mm280=[0, 17, 207, 203], why="the owner's pick C1: head and shoulders (soft skin washes, painted eyes, dark hair and black lace); paint/SET.md:31"),
- "homer-guide": dict(path=I + "homer-guide.jpg", sha256="3460e21bad28874beb6ac5a45d63b06c6b2bb062f701bc1d6ad9d6fe06216fdf", boxPx=[211, 171, 857, 634], mm280=[37, 30, 113, 81], why="the owner's pick C2: the guide's head, white beard, hat and shoulders; paint/SET.md:32"),
- "sargent-venice": dict(path=I + "sargent-venice.jpg", sha256="cebf442fb4bd869f8d97b3957c4600b19e39045a8d19f98a98da4768ca7acd4c", boxPx=[114, 640, 657, 1126], mm280=[20, 112, 95, 85], why="door base, step and canal water, the detail the owner kept of six; paint/SET.md:30"),
-}
+CUT_FROM = T["CUT_FROM"]
 # Input id: the name every derived input file of a subject carries (guides/<iid>-layin.png, studies/<iid>-study-*, labels/<iid>.json,
 # classify/<iid>.json, replay/vectors/<iid>-std-*). A new source gets a new input id, so no pinned file is ever rewritten.
-INPUT_ID = {"morisot-face": "morisot-face-v2", "homer-guide": "homer-guide-v2", "sargent-venice": "sargent-venice-v2", "mittens-closeup": "mittens-closeup-v2"}
+INPUT_ID = T["INPUT_ID"]
 # ink lines accepted without a seed choice, their per-stroke tagging counted as the cleaning (each with its reason)
-TAG_CLEANED = {"trumbull": "coordinator's ruling, 21 Nov: the seed-42 e6L8 is acceptable; the tagging against the source drops 14,163 of its strokes and is its cleaning"}
+TAG_CLEANED = T["TAG_CLEANED"]
 # pen-and-wash works by the artist's hand whose own pen line was extracted (replay/r10/master-line.py): their ink is HIS line
-OWN_LINE = ("tiepolo-bacchus", "guardi", "rembrandt")
-REMOVED = [
- ("tiepolo camel", ["tiepolo-camel"], "Owner removed Tiepolo Camel from the active 0.4 set on November 21. Historical evidence is retained."),
- ("leaping dog", ["dog-paint", "dog-ink"], "owner: 'dog leaping is not priority... remove it... it is a crop from the other' (covered by ks-beach). The ink example was also wrong (21 Nov 07:58): do not reuse it."),
- ("kasha ink", ["kasha-ink"], "owner: 'remove kasha, ink. keep only kasha, watercolor'"),
- ("kasha walnut", ["kasha-walnut"], "owner: 'remove kasha, ink. keep only kasha, watercolor'"),
- ("tiepolo burial", ["tiepolo-burial"], "owner: 'remove camel or burial, pick one plus bacchus' (the camel was kept)"),
- ("sargent tramp", ["sargent-tramp"], "owner: 'remove tramp'"),
- ("cotman", ["cotman-rievaulx"], "owner: 'remove cotman'"),
- ("girtin", ["girtin-lindisfarne"], "owner: 'i dont like girtin'"),
- ("zorn", ["zorn", "zorn-mona"], "owner: 'dont like zorn'; 21 Nov again: 'i said no zorn i dont like it' (covers Mona and Karin too)"),
- ("murray", ["murray"], "owner: 'dont like murray'"),
- ("signac notre dame", ["signac-notredame"], "owner: 'do this signac instead [Cleveland 2012.26] easier i guess' (signac-boat)"),
-]
+OWN_LINE = tuple(T["OWN_LINE"])
+REMOVED = [(a, b, c) for a, b, c in T["REMOVED"]]
 
 # ---- generation records: each input's prompt, seed, steps and host, read from the run records, never from its name
 RECORDS = ["guides/tools/qwen-local-water-fan-tyrol.log", "guides/tools/onboard-local-driver.log", "guides/tools/qwen-runpod.log", "guides/tools/onboard-sterling-beach.log", "guides/README.md", "studies/README.md",
@@ -140,7 +93,7 @@ def generation(path):
                 if g.get("prompt") is None:
                     m = re.search(r"prompt[= ]([a-z]\d+b?)\b", line); g["prompt"] = m.group(1) if m else "not on the record line"
                 g["record"] = "%s:%d" % (f, n); found.append(g)
-    m = re.match(r"(h36|trumbull|kasha-walnut|guardi|tiepolo-burial|robert-washerwomen)-inkprep-e6L8\.png$", base)
+    m = re.match(r"(%s)-inkprep-e6L8\.png$" % "|".join(T["INKPREP_RUN"]), base)
     if not found and m:
         found.append(dict(host="RunPod (H100 80GB SXM)", prompt="e6 (the run names its files *-inkprep-<prompt>L8.png)", steps="8", seed="42",
                           record="guides/README.md:72-78 (run header; subject %s named at :77; no per-file line)" % m.group(1)))
@@ -321,14 +274,7 @@ def options(cls, paper_toned):
 
 # Citations (23 Nov 2026): every picture's registry entry carries the museum's own words, from bench/PICTURES.md of the credits engineer's
 # branch (claude/04-credits-docs; a copy is register/PICTURES-0.4-credits-branch.md). The row is found by a title fragment.
-CITE_KEY = {"homer-water-fan": "The Water Fan", "sargent-tyrol": "In Austrian Tyrol", "turner-esseillon": "L'Esseillon", "ender-mountain-valley": "Mountain Valley",
-    "morisot-avenue-du-bois": "Avenue du Bois", "cezanne-bathers-bridge": "Bathers Under a Bridge", "manet-morisot-fan-crop": "Morisot with a Fan",
-    "prout-laundresses": "Laundresses", "bonington-french-town": "French Town", "white-ships-1488": "White Ships", "white-ships": "White Ships",
-    "homer-guide-whole": "Adirondacks Guide", "homer-two-ladies": "Two Ladies", "varley-hammersmith": "Hammersmith", "randal-resegone": "Resegone",
-    "marlow-grotto": "door of a grotto", "hunt-snowdon": "Snowdon", "prout-turret": "Medieval Turret", "bennett-south-street": "South Street",
-    "constable-cloud-study": "Cloud study", "homer-leaping-trout": "Leaping Trout", "sargent-pilatus": "Pilatus", "sargent-murren": "Chalets",
-    "guardi": "A Colonnade", "tiepolo-bacchus": "Bacchus and Ariadne", "rembrandt": "Woman Reading", "fragonard": "Rinaldo", "homer-daughter": "Fisherman's Daughter",
-    "homer-guide": "Adirondacks Guide", "morisot-face": "Morisot with a Fan"}
+CITE_KEY = T["CITE_KEY"]
 def citation_rows():
     import re as _re
     out = []
