@@ -140,7 +140,7 @@ if (opt('draw', '1') !== '0' && PEN_FIRST && DRAWING !== 'none' && vectorFile('d
   if (P.phases.length) {
     ctx.DRAWING_PHASES = P;
     ctx.DRAWING_PHASE_RUN = phaseRunner(P, { sheet: () => ctx.sheet, measurePaperDry, dry: () => clock('dry', () => dry(ctx.sheet, 30000, O, { levelMax: 140, dt: 2 })),
-      inkres: INKRES, out, log: m => console.log(m), onLaid: k => ctx.onDrawingPhase?.(k) });
+      inkres: INKRES, out, log: m => console.log(m), hand: () => vectorHand(V, { closing: false }), onLaid: k => ctx.onDrawingPhase?.(k) });
   }
 }
 // --texflow d: short texture marks follow the reference's value smoothed over about 2 mm (direction only); d scales density.
@@ -267,8 +267,14 @@ function vectorHand(V, { closing = false } = {}) {
   const pencilOver = closing && doc.pencilAfterWashes === true && graphiteMarked;
   if (pencilOver && !(GRAPHITE_AT != null && GRAPHITE)) throw new Error(`ink vectors: ${path.basename(file)} draws pencil over the dry washes but this run has no graphite on the sheet`);
   const withLayin = (!closing || pencilOver) && graphiteMarked && GRAPHITE_AT != null && GRAPHITE;
-  /** Lays `strokes` (a whole drawing, or one phase of it: `phase` names it); returns {graphite, ink}: what it laid. */
-  async function lay(strokes, { phase = null } = {}) {
+  // what the drawing has laid so far over all its calls (the opening and each phase): the check that a drawing inked
+  // something is of the whole drawing, never of one phase (a phase may hold one stroke finer than the sheet samples)
+  const whole = { strokes: 0, cells: 0 };
+  /** The drawing laid in strokes and inked no cell: a sheet too coarse for its lines, said, never passed over. */
+  const checkWhole = () => { if (whole.strokes && !whole.cells) throw new Error(`ink vectors: ${whole.strokes} strokes of ${path.basename(file)} inked no cell of the ${w} x ${h} sheet (${(sheetMm / w).toFixed(2)} mm cells): the lines are too fine for it`); };
+  /** Lays `strokes` (a whole drawing; or its opening, `part`, its later phases to come; or one phase of it, `phase`
+   *  names it); returns {graphite, ink, nothing}: what it laid, and how many strokes added no cell. */
+  async function lay(strokes, { phase = null, part = false } = {}) {
     const layin = withLayin ? strokes.filter(q => q.medium === 'graphite' && !q.wash) : [];
     if (layin.length) {
       const gp = ctx.sheet.pigments[GRAPHITE_AT], gDark = t => { const c = renderLayers([[Float32Array.of(t)]], [gp], white, 1, 1); return 1 - (c[0] + c[1] + c[2]) / 765; };
@@ -287,19 +293,23 @@ function vectorHand(V, { closing = false } = {}) {
     // (a whole drawing is laid and told even with no line of its own medium; a phase only when it has some)
     if (phase && !rest.length) return { graphite: layin.length > 0, ink: false };
     const sheet = sheetOf();
+    // the strokes that add no cell: finer than the sheet's sampling (a white-ships phase held one stroke 0.03 mm long,
+    // 0.0001 mm2), or wholly under a darker line laid with them; counted and told, never a stop
+    let nothing = 0; const each = (_, n) => { if (!n) nothing++; };
     const r = await inBatches(rest, sub => {
       if (!fineSheet) coherent(sheet);
-      const q = layVectors({ ...doc, strokes: sub }, sheet.D[at], w, h, sheetMm / w, inkForDarkness(darkOf), { fill });
+      const q = layVectors({ ...doc, strokes: sub }, sheet.D[at], w, h, sheetMm / w, inkForDarkness(darkOf), { fill, each });
       if (fineSheet) { INKRES.changed(); INKRES.carry(); } else { layersChanged(sheet); sheet._gpu?.cpuWroteAll?.(); }
       return q;
     }, phase ? `${pencil ? 'pencil' : 'pen'}, ${phase}` : pencil ? 'pencil' : 'pen');
-    // a drawing that inked nothing is a sheet too coarse for its lines: said, never passed over
-    if (r.strokes && !r.cells) throw new Error(`ink vectors: ${r.strokes} strokes of ${path.basename(file)} inked no cell of the ${w} x ${h} sheet (${(sheetMm / w).toFixed(2)} mm cells): the lines are too fine for it`);
+    whole.strokes += r.strokes; whole.cells += r.cells;
+    // a whole drawing (not one of its phases) that inked nothing is a sheet too coarse for its lines
+    if (!phase && !part) checkWhole();
     ctx.drawnCount += r.strokes;
-    console.log(`ink vectors${phase ? `, ${phase}` : ''}: ${r.strokes} strokes laid exactly from ${path.basename(file)} (${pencil ? 'graphite' : 'ink'}) on a ${w} x ${h} sheet (${(sheetMm / w).toFixed(3)} mm cells), ${r.cells} cells inked${fill < 1 ? `, ${r.fills} fills at ${fill} inside` : ''}${r.widened ? `, ${r.widened} lines finer than a cell laid a cell wide` : ''}; no tracer, no pen gestures`);
-    return { graphite: layin.length > 0 || (pencil && rest.length > 0), ink: !pencil && rest.length > 0 };
+    console.log(`ink vectors${phase ? `, ${phase}` : ''}: ${r.strokes} strokes laid exactly from ${path.basename(file)} (${pencil ? 'graphite' : 'ink'}) on a ${w} x ${h} sheet (${(sheetMm / w).toFixed(3)} mm cells), ${r.cells} cells inked${fill < 1 ? `, ${r.fills} fills at ${fill} inside` : ''}${r.widened ? `, ${r.widened} lines finer than a cell laid a cell wide` : ''}; no tracer, no pen gestures${nothing ? `; ${nothing} of them added no cell (finer than this sheet samples, or under a darker line laid with them)` : ''}`);
+    return { graphite: layin.length > 0 || (pencil && rest.length > 0), ink: !pencil && rest.length > 0, nothing };
   }
-  return { lay };
+  return { lay, checkWhole };
 }
 // The painter's own record of what a drawing file lays, for the drawing harness (tools/drawing-harness): ids and their
 // hash, and for the opening drawing when each goes down (drawing-phases.mjs)
@@ -317,7 +327,7 @@ async function layExactVectors(file, { closing = false } = {}) {
   writeLaid(V, closing, P);
   const hand = vectorHand(V, { closing });
   if (P) P.hand = hand;
-  await hand.lay(P ? P.opening : V.doc.strokes);
+  await hand.lay(P ? P.opening : V.doc.strokes, { part: Boolean(P) });
   fs.copyFileSync(file, path.join(out, closing ? 'ink-vectors-closing.json' : 'ink-vectors.json'));
 }
 async function drawPass(_unused, { first = false, fine = false } = {}) {
@@ -408,6 +418,14 @@ if (!ctx.RESUMING && PEN_FIRST && opt('draw', '1') !== '0' && DRAWING !== 'none'
   if (PREP_ERASE && STAGE_PLAN?.files.prep && GRAPHITE) followErase(INKRES, ctx.sheet, GRAPHITE_AT, () => erasePrep({ sheet: ctx.sheet, k: GRAPHITE_AT, dabs: PREP_ERASE, strength: num('preperase', 0.85), SC, w, W2, layersChanged, log: console.log }));
   ctx.INK_THK = thickness(ctx.sheet).map((a, j) => Float32Array.from(a, (v, i) => Math.max(0, v - before[j][i])));
   await sharp(INKRES ? INKRES.compose(view()) : render(), { raw: { width: OUT_W, height: OUT_H, channels: 3 } }).png().toFile(path.join(out, 'drawing-opening.png'));
+}
+// PHASE_EXIT=drawing-phases-dry (a check of the drawing, not a painting; with the CPU plan run, `paint ... plan`): every
+// later phase of the drawing laid in turn on the dry opening, as the paint loop lays them, then the whole drawing's
+// check; drawing-phases.json written, and the run ends before any wash
+if (process.env.PHASE_EXIT === 'drawing-phases-dry') {
+  if (ctx.DRAWING_PHASE_RUN) { await ctx.DRAWING_PHASE_RUN.finish(); ctx.DRAWING_PHASE_RUN.write(); }
+  await drainFrames(); ctx.FRAMER?.close(); ctx.sheet._gpu?.close();
+  console.log(`drawing-phases-dry: ${ctx.DRAWING_PHASES?.phases.length ?? 0} later phases laid on the dry opening, ${ctx.drawnCount} strokes in all`); process.exit(0);
 }
 // An actual dry-pen checkpoint, using the same planned strokes and physics as
 // the full painting. The process exit hook still writes the strict guard report.

@@ -279,7 +279,8 @@ const pencilDraw=(target,gs,pigment,options)=>{
   const passes=ctx.layers.flatMap((l,L)=>l.shapes.map(sh=>{const m=sh.mask,cells=[];if(m)for(let i=0;i<n;i++)if(m[i])cells.push(i);return {L,id:sh._valuePlan?.id??null,phase:l._valuePhase??null,value:l.value,pigment:l.pigment,amount:sh.amount,area:sh.area,cells};}));
   fs.writeFileSync(path.join(out,'value-maps.json.gz'),zlib.gzipSync(JSON.stringify({w,h,caps,band,value:Array.from(vv,v=>+v.toFixed(3)),labels:Array.from(ctx.VALUE_PLAN.regions.labels),protected:ctx.VALUE_PLAN.protectedCells?Array.from(ctx.VALUE_PLAN.protectedCells):[],passes})));}
  console.log(ctx.VALUE_PLAN.mixes?`wash plan: ${ctx.layers.length} mixes, ${ctx.VALUE_PLAN.instructions.length} washes in ${ctx.VALUE_PLAN.summary.stages} stages`:`target values: ${ctx.layers.length} pigment/region passes, ${ctx.VALUE_PLAN.instructions.length} connected shapes; five light-to-dark bands; shadows never split by region`);
- if(num('valuepreviewonly',0)){
+ // (PHASE_EXIT=drawing-phases-dry: the CPU plan run goes on to the drawing's phases, drawing.mjs)
+ if(num('valuepreviewonly',0)&&process.env.PHASE_EXIT!=='drawing-phases-dry'){
   // the plan itself is kept for looks (plan-file.mjs): a look is this plan painted on fewer cells
   if(PLAN_FROM==='own'&&!SCRIPT){const kept=writePlanFile(out,{plan:ctx.VALUE_PLAN,w,h,sheetWidthMm:valueOptions.sheetWidthMm,pigments:PIGS});console.log(`plan kept for looks: ${kept.washes} washes, plan hash ${kept.hash}`);}
   const preview=await writeValuePreview({plan:ctx.VALUE_PLAN,out,w,h,pigments:PIGS,paperRGB,target:path.resolve(root,opt('image')),photo:VALUE_CONFIG?.photo,subject:VALUE_CONFIG?.subject??'subject',name:VALUE_CONFIG?.name,root,opening:opt('drawingfile',''),closing:opt('drawinglast',''),variant:opt('valuevariant','lighttodark'),version:opt('valueversion','W4'),sheetMm:num('sheetmm', DEFAULT_SHEET_MM)});
