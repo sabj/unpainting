@@ -345,8 +345,8 @@ async function paintLookOnce(r, choice, script, plate, at, edit, compiled, ask =
   const { spec, record } = r, scriptFile = `${plate}.script.json`, editFile = `${plate}.plan-edit.json`;
   try {
     const full = await specWith(r, choice);
-    // a rounds look records no film (ask.noFilm): the final alone is filmed, so a look does not pay for frames
-    const small = await specWith(r, choice, lookSets(withChoice(req.sets, choice).filter(([k]) => !ask.noFilm || !['video', 'frames'].includes(k)), full.sheet.cells));
+    // a look records no film, a session's or a round's (look.mjs LOOK_RECORDING): the final alone is filmed
+    const small = await specWith(r, choice, lookSets(withChoice(req.sets, choice), full.sheet.cells));
     // the code planner's plan is never planned again for the small sheet: the look is painted from the plan this
     // choice was planned with at the final size (plan-file.mjs), with that plan's paints
     let planOf = null;
@@ -713,7 +713,7 @@ const roundsLent = {
   },
   toolsCheck: async (r, tools) => { try { resolveTools(tools, await baseOf(r)); } catch (e) { throw new Error(tidy(e.message)); } },
   compile: (r, choice, script, plate) => compileChoice(r, choice, script, plate),
-  look: (r, choice, script, plate, at, compiled, ask) => paintLook(r, choice, script, plate, at, null, compiled, { ...ask, noFilm: true, sheetOnly: true }),
+  look: (r, choice, script, plate, at, compiled, ask) => paintLook(r, choice, script, plate, at, null, compiled, { ...ask, sheetOnly: true }),
   paintChoice: (r, fin) => paintChoice(r, fin),
   // level 3: Auto's plan in numbers and its finished painting, prepared for this code (prepare --level L3); never made here
   async autoOf(r) {

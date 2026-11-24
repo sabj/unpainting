@@ -24,13 +24,24 @@ export function lookCells(cells) {
 export const lookFromPlan = kind => kind !== 'script';
 
 /**
+ * What a look records of its making. A look is shown as its dried sheet and the sheet at 10, 25, 50, 75 and 100% of
+ * the strokes (the stage strip, made from the kept checkpoint frames); it needs no film. So no video is encoded (with
+ * --video 1 every frame is also kept lossless and carried back from the worker) and the recording is light: native
+ * frames at the start and the end only and at most 40 film frames, enough to place the stages
+ * (tools/plate/recording.mjs). Recording only reads the sheet: the look's painting is the same.
+ */
+const LOOK_RECORDING = Object.freeze([['video', '0'], ['recording', 'light']]);
+const RECORDING_KEYS = new Set(LOOK_RECORDING.map(([k]) => k));
+
+/**
  * The run's --set list for a look's painting: the same, with the cells across of the look and, when the look is smaller
  * than the painting, the painting's own cells (finalwidth: the painter then reckons what it reckons from the cells
- * across, its swatches first, as the final painting will; src/paint/methods/look-scale.mjs).
+ * across, its swatches first, as the final painting will; src/paint/methods/look-scale.mjs), recorded lightly
+ * (LOOK_RECORDING), whatever the run records of its final.
  */
 export function lookSets(sets, cells) {
   const small = lookCells(cells);
-  return [...sets.filter(([k]) => k !== 'width' && k !== 'finalwidth'), ['width', String(small)], ...(small < cells ? [['finalwidth', String(cells)]] : [])];
+  return [...sets.filter(([k]) => k !== 'width' && k !== 'finalwidth' && !RECORDING_KEYS.has(k)), ['width', String(small)], ...(small < cells ? [['finalwidth', String(cells)]] : []), ...LOOK_RECORDING];
 }
 
 /**
