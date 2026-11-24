@@ -3,7 +3,7 @@
 // of it, and whether it was reached. Looks are charged a fixed price by size and share (look-cost.mjs); how a model
 // paints is recorded beside the charge (sweeps, dryings, water steps, cell-steps, seconds, tokens, steps), never
 // charged. Pure: nothing is read or written here.
-import { LOOK_PRICE, LEAST_LOOK_COST } from './look-cost.mjs';
+import { LOOK_PRICE, LEAST_LOOK_COST, SHOW_ORIGINAL_COST } from './look-cost.mjs';
 
 const minutes = s => (s == null ? null : +(s / 60).toFixed(1));
 
@@ -18,7 +18,7 @@ export function usageOf({ subject, author, level, tryNumber, budget, session, fi
   return {
     schema: 'unpaint-paint/usage@2',
     // what is charged and what is not, as the try ran
-    pricing: { charged: 'looks only: a fixed price by size and by the share of the sheet or script painted, whatever is in the look', halfSizeWholeLook: LOOK_PRICE.half, fullSizeWholeLook: LOOK_PRICE.full, leastLook: LEAST_LOOK_COST, finalCharged: false, recordedNeverCharged: ['brush sweeps', 'dryings', 'water steps', 'cell-steps', 'seconds', 'tokens', 'steps'] },
+    pricing: { charged: 'looks, at a fixed price by size and by the share of the sheet or script painted, whatever is in the look; and each showing of the original after the first, from the same budget', halfSizeWholeLook: LOOK_PRICE.half, fullSizeWholeLook: LOOK_PRICE.full, leastLook: LEAST_LOOK_COST, showingTheOriginal: SHOW_ORIGINAL_COST, showingAnyOtherPicture: 0, finalCharged: false, recordedNeverCharged: ['brush sweeps', 'dryings', 'water steps', 'cell-steps', 'seconds', 'tokens', 'steps'] },
     // the one guard, resource management only: a painting past this many water steps is stopped, recorded as a stop, never scored
     waterGuard: waterGuard ? { ...waterGuard, stoppedFinal: Boolean(final?.guardStop) } : null, subject, author: { key: author.key, name: author.name, id: author.id ?? null, cli: author.cli ?? null, effort: author.effort ?? null }, level, try: tryNumber, commit,
     budget: { ...budget, reached: session.budgetReached ?? null, note: session.budgetReached ? `reached the benchmark's resource budget (${session.budgetReached.what}); the session was asked to hand in what it had. Recorded, not a failure` : null },
@@ -27,10 +27,14 @@ export function usageOf({ subject, author, level, tryNumber, budget, session, fi
       steps: session.steps ?? null, cutOffBySafetyStop: Boolean(session.budgetReached?.safetyStop),
       looks: looks.length, lookUnits: session.lookUnits ?? null, looksEach: looks.map(l => ({ look: l.look, cost: l.cost ?? 1, chargedFrom: l.chargedFrom ?? null, size: l.size ?? null, until: l.ask?.until ?? null, region: l.ask?.region?.box ?? null, work: l.work ?? null, machineSeconds: l.painted?.seconds ?? null, render: l.painted?.render ?? null })), plans: plans.length, plansRefused: plans.filter(p => !p.ok).length, toolCalls: session.toolCallsTotal ?? null, toolCallsByKind: session.toolCalls ?? null,
       selfReviews: (session.selfReviews ?? []).filter(r => r.written).length, assessmentWritten: session.assessment ? session.assessment.written : null, reverts: session.reverts ?? null, warningsGiven: session.warningsGiven ?? null,
+      // every showing of a picture (which, when, its cost): the ones the session began with, and each ./unpaint show
+      showings: session.eyesOnly ? { count: session.eyesOnly.showings.length, ofTheOriginal: session.eyesOnly.showings.filter(e => /source/.test(e.shown)).length, units: +session.eyesOnly.showings.reduce((a, e) => a + (e.cost ?? 0), 0).toFixed(2), each: session.eyesOnly.showings.map(e => ({ picture: e.shown, at: e.at, cost: e.cost ?? 0, atStart: Boolean(e.atStart) })) } : null,
       picturesHanded: session.pictures?.handed ?? [], picturesDescribed: session.pictures ? Object.keys(session.pictures.said ?? {}).length : 0,
     },
     // what it did with its tools, from its transcript and its folder (tool-use.mjs); null for a session kept before this was recorded
     toolUse: session.toolUse ?? null,
+    // the one disqualification: a picture read with code (eyes-only.mjs); null for a session kept before this was recorded
+    guard: session.guard ?? null, cheat: session.cheat ?? null,
     // what of the network it asked for, from the session's gate (session-net.mjs): the hosts passed, and every refusal with its host
     network: session.network ?? null,
     model: { tokensIn: author.tokensIn ?? null, tokensOut: author.tokensOut ?? null, tokens: author.tokens ?? null, costUSD: author.costUSD ?? null, costFrom: author.costUSD != null ? 'reported by the command' : 'not reported by this command',

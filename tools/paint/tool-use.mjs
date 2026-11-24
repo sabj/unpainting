@@ -7,7 +7,7 @@ import path from 'node:path';
 
 const LANG = { '.py': 'python', '.js': 'javascript', '.mjs': 'javascript', '.cjs': 'javascript', '.ts': 'typescript', '.sh': 'shell', '.zsh': 'shell', '.bash': 'shell', '.rb': 'ruby', '.pl': 'perl', '.r': 'r', '.jl': 'julia', '.swift': 'swift', '.c': 'c', '.go': 'go' };
 const PICTURE = /\.(png|jpe?g|gif|webp|bmp|tiff?|svg)$/i;
-const UNPAINT = /(?:^|[\s;&|/])unpaint\s+(status|plan|look|cost|wait)\b/g;
+const UNPAINT = /(?:^|[\s;&|/])unpaint\s+(status|plan|look|cost|show|wait)\b/g;
 const INLINE = [[/\bpython[\d.]*\s+-c\b|\bpython[\d.]*\s+-\s*<</, 'python'], [/\bnode\s+(-e|--eval|-p)\b|\bnode\s+-\s*<</, 'javascript'], [/\b(ruby|perl)\s+-e\b/, 'other']];
 // an answer of the harness or the shell that says a thing was not done
 const REFUSED = /^(REFUSED|NOT PAINTED)|Operation not permitted|Permission denied|command not found|Could(?: not|n't) (?:resolve|connect)|No such file or directory/m;

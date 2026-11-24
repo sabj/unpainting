@@ -39,6 +39,7 @@ import { preparedRoot, preparedKey, prepareCommand, readPrepared, writePrepared,
 import crypto from 'node:crypto';
 import { writeWorkSheets } from './work-sheets.mjs';
 import { logReads } from './seen.mjs';
+import { eyesOnlyOf, pictureReadsByCode, guardRecord, isProgram, EYES_ONLY_WORDS } from './eyes-only.mjs';
 import { PREFLIGHT_MINUTES, PREFLIGHT_GRACE_MINUTES, PREFLIGHT_FILE, preflightTask, preflightRow, preflightLine } from './preflight.mjs';
 import { handedOverRecord, checkHandedOver, checkChoice } from './parity.mjs';
 import { qwenRoute, studyRequestPrompt, parseStudyRequests, writeStudyRequest, makeStudies, withAuthorStudies } from './studies.mjs';
@@ -382,7 +383,7 @@ async function paintLookOnce(r, choice, script, plate, at, edit, compiled, ask =
     // and what the painter's backend record says of it (water steps, cell-steps): recorded, never charged
     if (work) Object.assign(work, backendWork(plate, cellsOf(small.sheet.cells, spec.sheet)) ?? { waterSteps: null, waterStepsWhy: 'no backend record (a look stopped at a stage writes none)' });
     say(r, `look ${at.look} painted and dried in ${Math.round(done.seconds / 60)} min (${results.backend.backend}, no fallback); ${numbers.marked.forms} named forms marked`);
-    return { ok: true, picture: await lookPicture({ planPreview: results.painting, run: record }), stages: results.strip ? await stagesPicture(results.strip) : null,
+    return { ok: true, picture: await lookPicture({ planPreview: results.painting, run: record }), sheet: await sharp(results.painting).png().toBuffer(), stages: results.strip ? await stagesPicture(results.strip) : null,
       planPicture: compiled.planPreview ? await planPicture({ planPreview: compiled.planPreview, run: record }) : null,
       numbersText: `${stoppedAt ? `${stoppedText(stoppedAt, ask.until)}\n\n` : ''}${numbersText(numbers, { script: Boolean(script), painted: size })}`, marked: numbers.marked, stoppedText: stoppedAt ? stoppedText(stoppedAt, ask.until) : null,
       painted: { work, workFault, until: ask.until ?? null, stopped: stoppedAt ? { passesDone: stoppedAt.passesDone, passesPlanned: stoppedAt.passesPlanned, strokes: stoppedAt.strokes } : null, region: ask.region?.box ?? null, regionPassages: inRegion ? `${inRegion.kept} of ${inRegion.of} passages` : null, cells: small.sheet.cells, fullCells: full.sheet.cells, size, seconds: done.seconds, waitedSeconds: Math.round((started - asked) / 1000), backend: results.backend, plate, painting: results.painting, strip: results.strip, render: rendered } };
@@ -476,6 +477,7 @@ async function sessionRun(r) {
     const outside = reachedOutside(commands, sessionDeny(spec), own ? [own, own.replace(/^\/private/, '')] : []);
     session = { ...earlier.author.session, reusedFrom: from, routes: { ...earlier.author.session.routes, commandsNamingOutside: outside, judgedAgain: 'the kept commands were judged again when this was painted' } };
     if (outside.length) fin = { failure: `the look limit was not held: ${outside.length} of its commands name the painter or a place outside its folder (${path.join(from, 'author', 'S.commands.txt')}); nothing of this session is painted` };
+    else if (earlier.author.session.cheat?.disqualified) fin = { failure: `disqualified: ${earlier.author.session.cheat.reason} (${EYES_ONLY_WORDS}); nothing of this session is painted` };
     else {
       // its script as the session left it in its folder (kept whole in the earlier run), never one written since
       const scriptFile = choice.kind === 'script' ? path.join(from, 'author', 'folder', choice.script) : null;
@@ -513,27 +515,36 @@ async function sessionRun(r) {
       if (terms.previous) record.author.previousTry = { tryNumber: req.tryNumber, retries: req.retries, from: path.resolve(req.previous) };
       routes = await closedRoutes(author);
       // the code's plan and its settings are handed at no level (levels.mjs): the folder holds no auto/
-      const { prompt, pictures: handedPictures } = writeSession({ dir: cwd, tools: routes.toolbox ? toolsText(routes.toolbox.said) : undefined, packet, sheet: spec.sheet, realSize: spec.realSize, medium: record.drawing.medium, codePlan: terms.plan, ...(terms.plan ? { auto: { picture: await planPicture({ planPreview: auto.planPreview, run: record }), washesText: washesText(auto), plan: { summary: auto.summary, washes: auto.rows }, toEdit: listing }, settings: settingsList(spec) } : {}),
+      const { prompt, pictures: handedPictures, eyesOnly } = writeSession({ dir: cwd, tools: routes.toolbox ? toolsText(routes.toolbox.said) : undefined, packet, sheet: spec.sheet, realSize: spec.realSize, medium: record.drawing.medium, codePlan: terms.plan, ...(terms.plan ? { auto: { picture: await planPicture({ planPreview: auto.planPreview, run: record }), washesText: washesText(auto), plan: { summary: auto.summary, washes: auto.rows }, toEdit: listing }, settings: settingsList(spec) } : {}),
         forms: record.masks.mask ? await formBoxes(record.masks.mask, record.masks.forms, W) : null, formsIds: record.masks.mask ?? null, looks: looksMost, wallMinutes: wallMost, graceMinutes: graceMost, steps: stepsMost, reverts: revertsMost, briefFile: path.join(HERE, 'SESSION-BRIEF.md'), readmeFile: path.join(HERE, 'SESSION-README.md'), handed,
         drawing: base.listing ? { listing: base.listing, picture: await drawingPicture(allLinesDoc(base.vectors, base.lines, base.mask ? { ...base.mask, list: base.forms } : null), W) } : null });
       // nothing withheld is in the folder: the code's plan, its washes, anything of Auto's painting (level4.mjs)
       checkWithheld(cwd);
+      // the pictures that are for looking at only (eyes-only.mjs), kept outside the folder to be shown again when asked
+      const eyesStore = path.join(dir, 'eyes-only');
+      for (const f of eyesOnly) { fs.mkdirSync(path.dirname(path.join(eyesStore, f)), { recursive: true }); fs.copyFileSync(path.join(cwd, f), path.join(eyesStore, f)); }
       // what was handed, by hash, as it lies in the session's folder: a retry's first message can be shown to carry it
       const sha = f => crypto.createHash('sha256').update(fs.readFileSync(f)).digest('hex');
       record.author.handed = handed.map(h => ({ folder: h.folder, files: h.files.map(f => ({ name: f.name, sha256: sha(path.join(cwd, h.folder, f.name)), picture: Boolean(f.picture), namedInTheFirstMessage: prompt.includes(`\`${h.folder}/${f.name}\``) })) }));
       if (terms.previous) { const painting = ['painting.png', 'painting.jpg'].map(f => path.join(path.resolve(req.previous), 'plate', f)).find(f => fs.existsSync(f)); record.author.previousTry.paintingSha256 = sha(painting); record.author.previousTry.painting = painting; }
       fs.writeFileSync(path.join(dir, 'session-prompt.txt'), prompt);
-      const server = sessionServer({ dir: cwd, sheet: { widthMm: spec.sheet.widthMm, heightMm: spec.sheet.heightMm }, forms: record.masks.mask ? await formBoxes(record.masks.mask, record.masks.forms, W) : [], looks: looksMost, wallMinutes: wallMost, graceMinutes: graceMost, steps: stepsMost, stepsTaken: stepCounter(author.cli, path.join(dir, 'S.out.txt')), lookSize: lookSizeOf(lookCells(spec.sheet.cells), spec.sheet.cells), reverts: revertsMost, codePlan: terms.plan, startKey: terms.plan ? choiceKey(readChoice({ kind: 'settings', settings: {} }), '') : null, pictures: handedPictures, checkScript: check, checkPlan: terms.plan ? obj => checkEdit(obj, listing) : null, checkTools, ledger: path.join(dir, 'looks.jsonl'), keep: path.join(dir, 'looks'), compile: (choice, script, n, edit) => compileChoice(r, choice, script, path.join(dir, 'plans', String(n)), edit),
+      const server = sessionServer({ dir: cwd, sheet: { widthMm: spec.sheet.widthMm, heightMm: spec.sheet.heightMm }, forms: record.masks.mask ? await formBoxes(record.masks.mask, record.masks.forms, W) : [], looks: looksMost, wallMinutes: wallMost, graceMinutes: graceMost, steps: stepsMost, stepsTaken: stepCounter(author.cli, path.join(dir, 'S.out.txt')), lookSize: lookSizeOf(lookCells(spec.sheet.cells), spec.sheet.cells), reverts: revertsMost, codePlan: terms.plan, startKey: terms.plan ? choiceKey(readChoice({ kind: 'settings', settings: {} }), '') : null, pictures: handedPictures, eyes: { files: eyesOnly, store: eyesStore }, checkScript: check, checkPlan: terms.plan ? obj => checkEdit(obj, listing) : null, checkTools, ledger: path.join(dir, 'looks.jsonl'), keep: path.join(dir, 'looks'), compile: (choice, script, n, edit) => compileChoice(r, choice, script, path.join(dir, 'plans', String(n)), edit),
         look: (choice, script, at, edit, compiled, ask) => paintLook(r, choice, script, path.join(dir, 'look-paints', `${at.plan}-${at.look}`), at, edit, compiled, ask) });
       // what nothing of the session may read: this checkout, the checkout it is a worktree of (with every worktree, cache
       // and earlier run under it), the subject list with its inputs, and whatever UNPAINT_SESSION_DENY adds (a:b:c)
       const deny = [...sessionDeny(spec), ...runs.filter(o => o !== r && o.sessionDir).map(o => o.sessionDir)];
-      const call = sessionCall(author, { prompt, cwd, deny, images: packet.files.filter(f => /source|study-2/.test(f)).map(f => path.join(cwd, f)), gate: routes.gate, toolbox: routes.toolbox });
+      const call = sessionCall(author, { prompt, cwd, deny, images: packet.files.filter(f => /source|study-2/.test(f)).map(f => path.join(cwd, f)), gate: routes.gate, toolbox: routes.toolbox, eyesOnly });
+      // no silent fallback: a command whose sandbox cannot hold the pictures to looking is not started
+      if (!call.eyesHeld || !call.probe) throw new Error(`the session's sandbox cannot hold its pictures to looking for the ${author.cli} command (${EYES_ONLY_WORDS}); the session is not started`);
       // the profile is tried before the model is started: a file of the repository must not be readable under it
       if (call.probe) {
         const can = file => { const p = call.probe(file); try { execFileSync(p.cmd, p.args, { stdio: 'pipe' }); return true; } catch { return false; } };
         if (can(path.join(ROOT, 'package.json'))) throw new Error('the session\'s sandbox does not hold: a file of the repository can be read under it; the session is not started');
         if (!can(path.join(cwd, 'README.md'))) throw new Error('the session\'s sandbox cannot be started on this machine (its own folder is not readable under it); the session is not started');
+        // ... and a picture must not be readable by a program, while the data beside it is
+        const read = eyesOnly.filter(f => can(path.join(cwd, f)));
+        if (read.length) throw new Error(`the session's sandbox does not hold its pictures: a program can read ${read.join(', ')} under it; the session is not started`);
+        if (!can(path.join(cwd, 'drawing/lines.json')) && fs.existsSync(path.join(cwd, 'drawing/lines.json'))) throw new Error('the session\'s sandbox refuses the drawing\'s data, which is the session\'s to read; the session is not started');
       }
       say(r, `${author.name} starts its working session (${author.cli}; level ${level.name}, try ${req.tryNumber}; the benchmark's budget for this try: ${looksMost} rendering units, ${stepsMost} steps, ${revertsMost} returns to an earlier choice; safety stop at ${wallMost} min${handed.length ? `; handed: ${handed.map(h => h.folder).join(', ')}` : ''}): ${call.closed}`);
       // the folder as the model is given it, so the files it made can be told from the ones it was handed
@@ -554,6 +565,9 @@ async function sessionRun(r) {
       const seen = readTranscript(author.cli, fs.existsSync(path.join(dir, 'S.out.txt')) ? fs.readFileSync(path.join(dir, 'S.out.txt'), 'utf8') : '');
       fin = done.ended === 'not started' ? { failure: `the model could not be called: ${done.error}` } : finalChoice({ present: server.present, lastGood: kept.lastGood, good: kept.good, ended: done.ended, barred: server.barred, codePlan: terms.plan });
       const outside = reachedOutside(seen.commands, deny, [cwd, real]), pictures = ownPictures(cwd);
+      // the one disqualification (bench/docs/rules.md): a picture read with code. Refused reads and scripts that name a picture, from the transcript and the folder
+      const endFiles = listFiles(cwd), readOwn = f => { try { return safeRead(cwd, f); } catch { return null; } };
+      const guarded = guardRecord(pictureReadsByCode({ steps: seen.steps, scripts: endFiles.filter(f => !startFiles.includes(f) && isProgram(f)).map(f => ({ name: f, text: readOwn(f) })), pictures: eyesOnly }), { held: call.eyesHeld });
       // a session ended by the budget is not a failure: it is marked, and what it had is painted
       const budgetReached = kept.budgetReached ?? (done.ended === 'budget reached' ? { what: `the safety stop (${wallMost} minutes on the clock)`, safetyStop: true } : null);
       session = {
@@ -563,9 +577,11 @@ async function sessionRun(r) {
         looks: kept.looks, selfReviews: reviews, turns: 1, plans: kept.plans.map(({ key, ...p }) => p), reverts: kept.reverts, warningsGiven: kept.warningsGiven, toolCalls: seen.calls, toolCallsTotal: Object.values(seen.calls).reduce((a, b) => a + b, 0),
         // the pictures it was handed: its own line on each (seen.md), and what its command's log shows of a read (null: that log cannot show one)
         pictures: kept.pictures ? { ...kept.pictures, logShowsRead: logReads(author.cli, seen.commands, kept.pictures.handed) } : null,
+        // eyes only: the pictures, every showing of one (which, when, its cost), and what the guard found
+        eyesOnly: { pictures: eyesOnly, words: EYES_ONLY_WORDS, showings: kept.showings }, guard: guarded.guard, cheat: guarded.cheat,
         submitted: fin.submitted ?? null, lastMessage: seen.text.slice(0, 4000), routes: { closed: call.closed, commandsNamingOutside: outside, picturesItMade: pictures, signInExposure: call.signIn?.length ? { readable: call.signIn, words: SIGN_IN_EXPOSURE } : null },
         network: network ?? { gated: false },
-        toolUse: toolUseOf({ steps: seen.steps, startFiles, endFiles: listFiles(cwd), read: f => { try { return safeRead(cwd, f); } catch { return null; } }, own: [cwd, real] }),
+        toolUse: toolUseOf({ steps: seen.steps, startFiles, endFiles, read: readOwn, own: [cwd, real] }),
       };
       if (budgetReached) say(r, `REACHED THE BENCHMARK'S RESOURCE BUDGET (${budgetReached.what}): the session was asked to hand in what it had; recorded, not a failure`);
       Object.assign(record.author, { seconds: kept.ownSeconds, tokens: seen.tokens, tokensIn: seen.tokensIn, tokensOut: seen.tokensOut, tokenSplit: seen.tokenSplit, costUSD: seen.costUSD });
@@ -576,6 +592,8 @@ async function sessionRun(r) {
       if (fin.submitted) record.author.parity = { ...checkHandedOver(path.join(dir, 'folder'), JSON.parse(fs.readFileSync(path.join(dir, 'handed-over.json'), 'utf8'))), of: path.join(dir, 'handed-over.json') };
       // a session that named the painter, the repository or another session in a command went round its looks: it is not painted
       if (outside.length && !fin.failure) fin = { failure: `the look limit was not held: ${outside.length} of its commands name the painter or a place outside its folder (author/S.commands.txt); nothing of this session is painted`, submitted: fin.submitted };
+      // a try that read a picture with code is disqualified: recorded, kept, and nothing of it is painted
+      if (guarded.cheat.disqualified) { say(r, `DISQUALIFIED: ${guarded.cheat.reason}`); if (!fin.failure) fin = { failure: `disqualified: ${guarded.cheat.reason} (${EYES_ONLY_WORDS}); nothing of this session is painted`, submitted: fin.submitted }; }
       say(r, `session ${session.ended === 'done' ? 'ended' : `ended (${session.ended})`}: ${session.wallMinutes} min on the clock (${session.ownMinutes} its own), ${kept.looks.length} looks for ${kept.lookUnits.spent} of ${looksMost} rendering units, ${kept.steps.taken} of ${stepsMost} steps, ${kept.plans.length} plans, ${session.toolCallsTotal} tool calls, ${kept.reverts.count} returns to an earlier choice, ${kept.warningsGiven} warnings given; handed over: ${fin.submitted ? `${fin.submitted.what}${fin.submitted.note ? ` (${fin.submitted.note})` : ''}` : 'nothing'}${outside.length ? `; ${outside.length} COMMANDS NAME PLACES OUTSIDE ITS FOLDER (S.commands.txt)` : ''}${pictures.length ? `; it made ${pictures.length} pictures of its own` : ''}`);
     } finally { if (routes) await routes.done(); fs.rmSync(cwd, { recursive: true, force: true }); }
   }
@@ -828,7 +846,8 @@ async function preflightRun(r) {
     const prompt = preflightTask(picture); fs.writeFileSync(path.join(cwd, 'TASK.md'), prompt);
     const server = sessionServer({ dir: cwd, codePlan: true, looks: looksMost, wallMinutes: PREFLIGHT_MINUTES, graceMinutes: PREFLIGHT_GRACE_MINUTES, pictures: [picture], checkScript: obj => checkAuthored(obj, { sheetWidthMm: W }).script, ledger: path.join(dir, 'looks.jsonl'),
       compile: (choice, script, n, edit) => compileChoice(r, choice, script, path.join(dir, 'plans', String(n)), edit), look: async () => ({ ok: false, error: 'a preflight paints nothing' }) });
-    const deny = [...sessionDeny(spec), ...runs.filter(o => o !== r && o.sessionDir).map(o => o.sessionDir)], call = sessionCall(author, { prompt, cwd, deny, images: [path.join(cwd, picture)], gate: routes.gate, toolbox: routes.toolbox });
+    const deny = [...sessionDeny(spec), ...runs.filter(o => o !== r && o.sessionDir).map(o => o.sessionDir)], call = sessionCall(author, { prompt, cwd, deny, images: [path.join(cwd, picture)], gate: routes.gate, toolbox: routes.toolbox, eyesOnly: eyesOnlyOf(packet.files) });
+    // (the pictures are held to looking as in a session, so the preflight shows whether this command's own viewer opens one under the rule)
     say(r, `preflight of ${author.id} (${author.cli}, effort ${author.effort ?? 'not set'}): ${PREFLIGHT_MINUTES} minutes, nothing painted`);
     server.start();
     done = await modelSlot(() => (call.serial ? agySlot : f => f())(() => { server.begin(); return runSession(call, { cwd, outFile: path.join(dir, 'S.out.txt'), errFile: path.join(dir, 'S.err.txt'), over: server.over }); }));

@@ -13,6 +13,19 @@ export const DEFAULT_LOOK_UNITS = 3;
 export const LOOK_PRICE = Object.freeze({ half: 0.3, full: 1.0 });
 /** The least any look costs, however small or partial. */
 export const LEAST_LOOK_COST = 0.2;
+/**
+ * What one showing of the ORIGINAL costs, from the same budget as the looks (owner, 23 Nov: "keep the picture away and
+ * use it as part of a looks budget"). The pictures are put away when a session plans or looks, and `./unpaint show`
+ * brings one back. Small enough that a painter glances at the reference often, and not free: twenty glances are one
+ * unit of the three, and a session that never looked could be shown the original 60 times. The old hard mode gave about
+ * 100 looks at the target as its whole budget (bench/docs/anti-cheat.md), which would be 0.03 here; 0.05 is kept
+ * because the looks share this budget and every look already shows the subject beside the sheet. The pictures lie in
+ * the folder when the session starts (the first showing, free); the studies and a retry's own earlier painting are
+ * shown free, and counted.
+ */
+export const SHOW_ORIGINAL_COST = 0.05;
+/** What showing a picture costs: the original its price, any other nothing. */
+export const showCost = original => (original ? SHOW_ORIGINAL_COST : 0);
 const round = v => +v.toFixed(2);
 
 /** A look's size from its cells across against the final's: 'full' when it is painted at the final's size, else 'half'. */
