@@ -1,16 +1,22 @@
 #!/usr/bin/env python3
-"""render-pool-pods.py POOL_DIR [--cap N] [--hours H] [--helper render-batch.py]: the pods of the render pool
-(tools/paint/render-pool.mjs). Pods paint the full-size paintings (finals, prepared Auto paintings); looks go to the
-Macs. One pod a painting waiting or painting on a pod, never more than --cap (default 10, UNPAINT_POOL_CAP), none
-when there is none: it reads POOL_DIR/waiting/*.json and POOL_DIR/claims/pod-*.json, rents or deletes pods to match,
-gives each pod a checkout of every commit asked for (waiting jobs and live clients), and writes POOL_DIR/pods.json,
-which the sessions read to find a free pod. A pod whose place is claimed
-(POOL_DIR/claims/pod-<name>.json) is never deleted under its painting. Every pod also deletes itself at its limit
+"""render-pool-pods.py POOL_DIR [--cap N] [--hours H] [--helper render-batch.py] [--dry-run]: the pods of the render
+pool (tools/paint/render-pool.mjs). Pods paint the full-size paintings (finals, prepared Auto paintings) and the looks
+this Mac and the mini have no place for. A pod paints several at once: its places (`slots` in pods.json) are what
+its GPU type was measured to paint at once (SLOTS below, --per-pod to override). Pods are rented for the jobs that
+want a pod's place: every painting waiting or on a pod, and every look that has waited over LOOK_WAIT_S; and one pod
+is kept warm for every --warm-sessions sessions in flight (the live clients' sessions), so a look never waits for a
+pod to be rented; none when there is no job and no session. Never more than --cap (default 10, UNPAINT_POOL_CAP).
+It reads POOL_DIR/waiting/*.json, POOL_DIR/claims/pod-*.json and POOL_DIR/clients/*.json, rents or deletes pods to
+match, gives each pod a checkout of every commit asked for (waiting jobs and live clients), and writes
+POOL_DIR/pods.json, which the sessions read to find a free place. A pod with a place claimed
+(POOL_DIR/claims/pod-<name>[-k].json) is never deleted under its painting. Every pod also deletes itself at its limit
 (self-destruct.sh), so a crash of this process leaves nothing running past it.
+  --dry-run: read the pool folder once, print what it would rent and delete and why, and end. Nothing is rented,
+  deleted or written.
   Stop: touch POOL_DIR/STOP-PODS (every pod is deleted and this ends). Log: POOL_DIR/pods.log.
 The RunPod calls are the cloud helper's (render-batch.py, api.py: the key is read there and never printed).
 Run it detached:  nohup python3 tools/cloud/render-pool-pods.py <pool dir> > /dev/null 2>&1 &"""
-import argparse, importlib.util, json, os, shlex, subprocess, sys, threading, time
+import argparse, importlib.util, json, math, os, shlex, subprocess, sys, threading, time
 from pathlib import Path
 
 ap = argparse.ArgumentParser()
@@ -18,16 +24,57 @@ ap.add_argument("pool"); ap.add_argument("--cap", type=int, default=int(os.envir
 ap.add_argument("--hours", type=float, default=8.0, help="no pod is rented after this many hours; the daemon then ends when none is left")
 ap.add_argument("--limit-min", type=int, default=240, help="each pod deletes itself this many minutes after it is made")
 ap.add_argument("--helper", default=str(Path(__file__).resolve().parent / "render-batch.py"))
+ap.add_argument("--per-pod", type=int, default=int(os.environ.get("UNPAINT_POOL_PER_POD", "0")), help="the most paintings at once on every pod; 0 (default): by GPU type (SLOTS)")
+ap.add_argument("--gb-a-painting", type=float, default=float(os.environ.get("UNPAINT_POOL_GB_A_PAINTING", "36")), help="memory one painting needs at its peak; a pod paints no more at once than its memory holds")
+ap.add_argument("--warm-sessions", type=int, default=int(os.environ.get("UNPAINT_POOL_WARM_SESSIONS", "8")), help="one pod is kept warm for every this many sessions in flight; 0: pods only for waiting jobs")
+ap.add_argument("--dry-run", action="store_true")
 A = ap.parse_args()
-POOL = Path(A.pool).resolve(); POOL.mkdir(parents=True, exist_ok=True)
-os.environ.setdefault("UNPAINTING_RUNNING_FILE", str(POOL / "RUNNING.txt"))
-spec = importlib.util.spec_from_file_location("rb", A.helper); rb = importlib.util.module_from_spec(spec); spec.loader.exec_module(rb)
+POOL = Path(A.pool).resolve()
+if not A.dry_run:
+    POOL.mkdir(parents=True, exist_ok=True)
+    os.environ.setdefault("UNPAINTING_RUNNING_FILE", str(POOL / "RUNNING.txt"))
+    spec = importlib.util.spec_from_file_location("rb", A.helper); rb = importlib.util.module_from_spec(spec); spec.loader.exec_module(rb)
 REPO = Path(subprocess.run(["git", "-C", str(Path(__file__).resolve().parent), "rev-parse", "--path-format=absolute", "--git-common-dir"], capture_output=True, text=True, check=True).stdout.strip()).parent
 PODS, LOG, STOP = POOL / "pods.json", POOL / "pods.log", POOL / "STOP-PODS"
 # the fastest type measured first (23 Nov: an RTX 5090 community host painted in 812 s against 1,264 on a 4090 secure, at $0.69 against $0.89 an hour); it is often not to be had, and the ladder goes on
 LADDER = [("NVIDIA GeForce RTX 5090", "COMMUNITY"), ("NVIDIA GeForce RTX 4090", "SECURE"), ("NVIDIA GeForce RTX 4090", "COMMUNITY"), ("NVIDIA RTX 4000 Ada Generation", "SECURE"), ("NVIDIA L40S", "SECURE")]
+# The most paintings at once on one pod, by GPU type. Three at once was the pods' setting until 22 Nov and the mini's
+# measured one (RENDER-POOL.md); the painter keeps one or two CPU cores busy and leaves the GPU nearly idle (a look
+# alone on an RTX 4090: GPU busy 6% of the time, 4.3 GB of its 24 GB). What runs out first is memory: a painting
+# peaks at about 35 GB while it writes its finished sheet (measured resident, half-size look, 23 Nov), so a pod's
+# places are also held to its memory (--gb-a-painting) and its cores (VCPU_A_PAINTING).
+SLOTS = {"NVIDIA GeForce RTX 4090": 3, "NVIDIA GeForce RTX 5090": 3}
+SLOTS_OTHER = 2
+VCPU_A_PAINTING = 2
+LOOK_WAIT_S = 30  # a look that has waited this long for this Mac and the mini wants a pod's place
 lock = threading.Lock()
 st = {"pods": [], "adding": 0, "spentUSD": 0.0}
+
+
+def slots_of(gpu, ram_gb=None, vcpu=None):
+    """Places on a pod of this GPU type; with its memory and cores known, no more than they hold, and at least one."""
+    n = A.per_pod if A.per_pod > 0 else SLOTS.get(gpu, SLOTS_OTHER)
+    if ram_gb: n = min(n, int(ram_gb // A.gb_a_painting))
+    if vcpu: n = min(n, int(vcpu // VCPU_A_PAINTING))
+    return max(1, n)
+
+
+def size(jobs, sessions, pods, adding, now):
+    """How many pods to rent and which to delete: pure, so --dry-run and the loop decide alike.
+    jobs: paintings and looks that want a pod's place (those on one included). sessions: sessions in flight.
+    pods: [{name, slots, limit, claimed}]. Returns (pods to add, [(name, why)] to delete, what is wanted in words)."""
+    warm = math.ceil(sessions / A.warm_sessions) if A.warm_sessions > 0 else 0
+    usable = [p for p in pods if p["limit"] - now > 45 * 60]
+    places = sum(p["slots"] for p in usable) + adding * slots_of(LADDER[0][0])
+    add = 0
+    while len(usable) + adding + add < A.cap and (places < jobs or len(usable) + adding + add < warm):
+        add += 1; places += slots_of(LADDER[0][0])
+    go, kept, room = [], len(pods), sum(p["slots"] for p in pods)
+    for p in sorted(pods, key=lambda p: p["created"]):
+        if p["claimed"]: continue
+        if p["limit"] - now <= 45 * 60: go.append((p["name"], "near its limit")); kept -= 1; room -= p["slots"]
+        elif room - p["slots"] >= jobs and kept - 1 >= warm: go.append((p["name"], "more pods than the jobs and sessions need")); kept -= 1; room -= p["slots"]
+    return add, go, f"jobs wanting a pod's place {jobs}, sessions in flight {sessions} (warm pods {warm}), places up {sum(p['slots'] for p in usable)} on {len(usable)} pods, being set up {adding}"
 
 
 def log(*a):
@@ -57,33 +104,38 @@ def live_clients():
     return out
 
 
-def painting_demand():
-    """(paintings waiting for a pod or on one now, the commits they need)."""
+def demand(now):
+    """(jobs that want a pod's place: paintings waiting, looks waiting over LOOK_WAIT_S, every job on a pod; the commits waiting jobs need)."""
     n, commits = 0, set()
     for f in list((POOL / "waiting").glob("*.json")) + list((POOL / "claims").glob("pod-*.json")):
         try:
             w = json.loads(f.read_text())
         except Exception:
             continue
-        # a waiting painting whose command may not use a pod (UNPAINT_POOL_ONLY without "pod") wants none
-        if alive(int(w["pid"])) and (f.parent.name == "claims" or (w.get("kind") == "painting" and (not w.get("only") or "pod" in w["only"]))):
+        if not alive(int(w["pid"])): continue
+        # a waiting job whose command may not use a pod (UNPAINT_POOL_ONLY without "pod") wants none
+        if f.parent.name == "waiting" and w.get("only") and "pod" not in w["only"]: continue
+        if f.parent.name == "waiting" and w.get("commit"): commits.add(w["commit"])
+        if f.parent.name == "claims" or w.get("kind") == "painting" or now - float(w.get("since") or 0) / 1000 > LOOK_WAIT_S:
             n += 1
-            if w.get("commit"): commits.add(w["commit"])
     return n, commits
 
 
 def claimed(name):
-    f = POOL / "claims" / f"pod-{name}.json"
-    try:
-        return alive(int(json.loads(f.read_text())["pid"]))
-    except Exception:
-        return False
+    """A place of this pod is held by a live job (pod-<name>.json, pod-<name>-<k>.json)."""
+    for f in (POOL / "claims").glob(f"pod-{name}*.json"):
+        if f.stem != f"pod-{name}" and not f.stem[len(name) + 5:].isdigit(): continue
+        try:
+            if alive(int(json.loads(f.read_text())["pid"])): return True
+        except Exception:
+            pass
+    return False
 
 
 def save():
     with lock:
         now = time.time()
-        rows = [{k: p[k] for k in ("name", "id", "ip", "port", "rate", "created", "limit", "ready", "trees")} for p in st["pods"]]
+        rows = [{k: p[k] for k in ("name", "id", "ip", "port", "rate", "created", "limit", "ready", "trees", "gpu", "slots", "ramGB", "vcpu")} for p in st["pods"]]
         spent = st["spentUSD"] + sum(p["rate"] * (now - p["created"]) / 3600 for p in st["pods"])
         tmp = PODS.with_suffix(".tmp"); tmp.write_text(json.dumps({"updated": now, "pods": rows, "adding": st["adding"], "target": st.get("target", 0), "live": st.get("live", 0), "spentUSD": round(spent, 2)}, indent=1)); tmp.replace(PODS)
 
@@ -143,16 +195,35 @@ mkdir -p work; touch work/runs.jsonl; ln -sfn {b}/work/models work/models
     log("tree", sha[:8], "on", pod["name"])
 
 
+def measure(pod):
+    """What the pod really has (its container's memory and cores, its GPU), and so how many it paints at once."""
+    r = ssh(pod, "echo MEM=$(cat /sys/fs/cgroup/memory.max 2>/dev/null || cat /sys/fs/cgroup/memory/memory.limit_in_bytes); echo CPU=$(nproc); echo GPU=$(nvidia-smi --query-gpu=name --format=csv,noheader | head -1)", timeout=60)
+    said = dict(l.split("=", 1) for l in r.stdout.decode().splitlines() if "=" in l)
+    gpu = said.get("GPU", "").strip()
+    ram = int(said["MEM"]) / 1e9 if said.get("MEM", "").isdigit() and int(said["MEM"]) < 1e13 else None
+    pod["gpu"] = pod.get("gpu") or (gpu if gpu.startswith("NVIDIA") else "NVIDIA " + gpu if gpu else None)
+    pod["ramGB"], pod["vcpu"] = ram and round(ram), int(said["CPU"]) if said.get("CPU", "").isdigit() else None
+    pod["slots"] = slots_of(pod["gpu"], ram, pod["vcpu"])
+
+
 def add_pod(commit, n):
     name = f"unpaint-rp-{time.strftime('%H%M%S')}-{n}"; box = None
     try:
         sha, tree = tree_of(commit)
         cs = json.loads(bundle_of(sha, tree).with_name(f"{sha[:8]}.code-state.json").read_text())
         rb.SHA, rb.DIRTY, rb.HARD_LIMIT, rb.T0, rb.LADDER = cs["commit"], 0, A.limit_min, time.time(), LADDER
-        box = rb.Box(name)
-        class Args: image = rb.RP_IMAGE; min_ram = 48; min_vcpu = 12; per_pod = 1
-        rb.provision(box, Args, str(bundle_of(sha, tree)), tree)
-        pod = {"name": name, "id": box.id, "ip": box.ip, "port": box.port, "rate": box.rate, "created": time.time(), "limit": time.time() + A.limit_min * 60, "ready": False, "trees": {sha[:8]: str(tree)}}
+        # memory for the widest pod first, then for two paintings, then what one needs: a big pod is not always in stock
+        most = max(slots_of(g) for g, _ in LADDER)
+        for k in sorted({most, min(most, 2), 1}, reverse=True):
+            box = rb.Box(name)
+            class Args: image = rb.RP_IMAGE; min_ram = max(48, math.ceil(A.gb_a_painting * k)); min_vcpu = max(12, VCPU_A_PAINTING * k * 2); per_pod = k
+            try:
+                rb.provision(box, Args, str(bundle_of(sha, tree)), tree); break
+            except RuntimeError as e:
+                if k == 1 or "no pod came up" not in str(e): raise
+                log("no pod with", Args.min_ram, "GB:", name, "asks for less")
+        pod = {"name": name, "id": box.id, "ip": box.ip, "port": box.port, "rate": box.rate, "created": time.time(), "limit": time.time() + A.limit_min * 60, "ready": False, "trees": {sha[:8]: str(tree)}, "gpu": getattr(box, "gpu", None), "slots": 1}
+        measure(pod)
         # the pool sends inputs with rsync; the pod image has none
         r = ssh(pod, "command -v rsync >/dev/null || (apt-get install -y -qq rsync >/dev/null 2>&1 || (apt-get update -qq && apt-get install -y -qq rsync >/dev/null)); command -v rsync && echo RSYNC", timeout=600)
         if b"RSYNC" not in r.stdout:
@@ -160,7 +231,7 @@ def add_pod(commit, n):
         pod["ready"] = True
         with lock:
             st["pods"].append(pod)
-        log("pod ready", name, box.id, f"${box.rate}/h", "commit", sha[:8])
+        log("pod ready", name, box.id, f"${box.rate}/h", "commit", sha[:8], pod["gpu"], f"{pod['ramGB']} GB, {pod['vcpu']} cores: {pod['slots']} at once")
     except BaseException as e:
         log("pod FAILED", name, type(e).__name__, str(e)[:300])
         try:
@@ -183,12 +254,31 @@ def drop(pod, why):
     log("pod deleted", pod["name"], why)
 
 
+def dry_run():
+    """What the daemon would do now, from the pool folder as it is: nothing is rented, deleted or written."""
+    now = time.time()
+    try: pods = [{"gpu": None, "slots": 1, **p} for p in json.loads(PODS.read_text()).get("pods", [])]
+    except Exception: pods = []
+    clients = live_clients(); live, wanted = demand(now)
+    add, go, said = size(live, sum(c[1] for c in clients), [{**p, "claimed": claimed(p["name"])} for p in pods], 0, now)
+    print("dry run:", said)
+    for p in pods: print(f"  pod {p['name']} {p.get('gpu') or 'GPU type not recorded'}: {p['slots']} at once, {'a place claimed' if claimed(p['name']) else 'idle'}, {round((p['limit'] - now) / 60)} min left")
+    print(f"  would rent {add} pod(s) ({LADDER[0][0]} first: {slots_of(LADDER[0][0])} at once) for commits {sorted(c[:8] for c in wanted | {c[2] for c in clients}) or 'none'}")
+    for name, why in go: print(f"  would delete {name}: {why}")
+
+
 def main():
+    if A.dry_run:
+        return dry_run()
     (POOL / "pods.pid").write_text(str(os.getpid()))
     # pods an earlier run of this daemon left up are taken over, not forgotten
     try:
-        was = json.loads(PODS.read_text()); st["pods"] = [p for p in was.get("pods", []) if p.get("ready") and time.time() < p["limit"]]; st["spentUSD"] = float(was.get("spentUSD") or 0) - sum(p["rate"] * (time.time() - p["created"]) / 3600 for p in st["pods"])
+        was = json.loads(PODS.read_text()); st["pods"] = [{"gpu": None, "slots": 1, "ramGB": None, "vcpu": None, **p} for p in was.get("pods", []) if p.get("ready") and time.time() < p["limit"]]; st["spentUSD"] = float(was.get("spentUSD") or 0) - sum(p["rate"] * (time.time() - p["created"]) / 3600 for p in st["pods"])
         if st["pods"]: log("took over", len(st["pods"]), "pods from pods.json")
+        for p in st["pods"]:  # a pod an earlier daemon rented without its measure is measured now
+            if not p.get("ramGB"):
+                try: measure(p); log("pod", p["name"], p["gpu"], f"{p['ramGB']} GB, {p['vcpu']} cores: {p['slots']} at once")
+                except Exception as e: log("could not measure", p["name"], str(e)[:120])
     except Exception:
         pass
     t0, n = time.time(), 0
@@ -199,29 +289,26 @@ def main():
             if STOP.exists():
                 for p in list(st["pods"]): drop(p, "STOP-PODS")
                 save(); log("stopped by STOP-PODS"); break
-            clients = live_clients(); live, wanted = painting_demand(); commits = sorted(wanted | ({c[2] for c in clients} if wanted else set()))
+            clients = live_clients(); live, wanted = demand(now); commits = sorted(wanted | {c[2] for c in clients})
             past = now - t0 > A.hours * 3600
-            target = 0 if past else min(A.cap, live)
-            st["target"], st["live"] = target, live
             for p in list(st["pods"]):  # a pod past its limit has deleted itself
                 if now > p["limit"] + 60: drop(p, "past its limit")
-            usable = [p for p in st["pods"] if p["limit"] - now > 45 * 60]
-            for _ in range(max(0, target - len(usable) - st["adding"])):
+            add, go, said = size(0 if past else live, 0 if past else sum(c[1] for c in clients), [{**p, "claimed": claimed(p["name"])} for p in st["pods"]], st["adding"], now)
+            st["target"], st["live"] = len(st["pods"]) + st["adding"] + add - len(go), live
+            for _ in range(add):
                 if not commits: break
                 with lock: st["adding"] += 1
                 n += 1; threading.Thread(target=add_pod, args=(commits[0], n), daemon=True).start()
-                log("adding a pod: paintings wanting a pod", live, "target", target, "have", len(usable))
+                log("adding a pod:", said)
             for p in [p for p in st["pods"] if p["ready"]]:
                 for c in commits:
                     if c[:8] not in p["trees"]:
                         try: add_tree(p, c)
                         except Exception as e: log("tree FAILED", c[:8], "on", p["name"], str(e)[:200])
-            # more pods than sessions, or near its limit: an idle pod goes (never one painting)
-            extra = len(st["pods"]) - target
-            for p in sorted(st["pods"], key=lambda p: p["created"]):
-                if claimed(p["name"]): continue
-                if p["limit"] - now <= 45 * 60: drop(p, "near its limit")
-                elif extra > 0: drop(p, "more pods than paintings"); extra -= 1
+            # more pods than the jobs and sessions need, or near its limit: an idle pod goes (never one painting)
+            for name, why in go:
+                p = next((p for p in st["pods"] if p["name"] == name), None)
+                if p and not claimed(name): drop(p, why)
             save()
             if past and not st["pods"] and not st["adding"]:
                 log("past its hours and no pod left: ending"); break
