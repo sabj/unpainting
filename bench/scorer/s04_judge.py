@@ -12,7 +12,7 @@ A panel a route cannot serve is refused before any work, by name: never a differ
 name, its models as each route names them, and the reasoning setting are written into every results file
 (record()). The key of a hosted route is sent as a header and is never written into a result, a log or an error.
 """
-import json, os, time, urllib.error, urllib.request
+import json, os, random, time, urllib.error, urllib.request
 
 import local_route
 
@@ -126,19 +126,40 @@ def post(cfg, model, content, max_tokens=1024, num_ctx=local_route.NUM_CTX, open
         payload["reasoning"] = {"effort": SENT[cfg.get("reasoning", REASONING)]["effort"]}
     hdr = {"Authorization": "Bearer " + cfg["env"][cfg["keyName"]], "User-Agent": "unpaint-bench-judge/1", "Content-Type": "application/json"}
     last = None
-    for i in range(3):
+    for i in range(HOSTED_TRIES):
         try:
             o = json.load(opener(urllib.request.Request(cfg["url"], json.dumps(payload).encode(), hdr), timeout=300))
             u = o.get("usage") or {}
             return o["choices"][0]["message"].get("content") or "", {**u, "reasoning_tokens": (u.get("completion_tokens_details") or {}).get("reasoning_tokens"), "provider": o.get("provider") or cfg["route"]}
         except urllib.error.HTTPError as e:
             last = f"HTTP {e.code}"
-            if e.code not in (408, 409, 429, 500, 502, 503, 504):
+            if e.code not in RETRY_CODES:
                 break
+            wait = backoff(i, e.headers.get("Retry-After") if e.headers else None)
         except Exception as e:  # timeout, connection reset
             last = type(e).__name__
-        sleep(2 ** (i + 1))
+            wait = backoff(i)
+        if i + 1 < HOSTED_TRIES:
+            sleep(wait)
     raise RuntimeError(f"{cfg['route']} call failed ({model}): {last}")
+
+
+# A hosted call is tried up to HOSTED_TRIES times on a busy or failing server (RETRY_CODES, a timeout, a dropped
+# connection): with several readings in flight at once (score04 --concurrency), a 429 is expected, not a fault.
+HOSTED_TRIES = 6
+RETRY_CODES = (408, 409, 429, 500, 502, 503, 504)
+
+
+def backoff(i, retry_after=None, rand=random.random):
+    """Seconds to wait before try i + 2: the server's Retry-After when it gives one in seconds (at most 120), else
+    2, 4, 8 ... up to 60, with up to a quarter more at random so readings in flight do not retry in step."""
+    try:
+        if retry_after is not None:
+            return min(120.0, max(0.0, float(retry_after)))
+    except ValueError:
+        pass
+    base = min(60.0, 2.0 ** (i + 1))
+    return base * (1 + 0.25 * rand())
 
 
 def probe(cfg, post=None, opener=None, sleep=time.sleep):

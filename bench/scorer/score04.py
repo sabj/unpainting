@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """0.4's scoring: every painting and its original, read by one judge panel, into results.json and SCORES.md.
 
-  npm run bench:score04 -- RUN_FOLDER... | MANIFEST.json --out DIR [--snapshots progress10|film13] [--fresh] [--repeat N]
+  npm run bench:score04 -- RUN_FOLDER... | MANIFEST.json --out DIR [--snapshots progress10|film13] [--fresh] [--repeat N] [--concurrency N]
 
 For each painting (s04_runs.py says what a run folder must hold):
   1 HUMAN-NESS, the main reading, from the film under the human-ness rubric (bench/docs/human-ness-rubric.md; its
@@ -26,8 +26,11 @@ For each painting (s04_runs.py says what a run folder must hold):
     route is JUDGE_ROUTE: local by default, openrouter or together with their key. Panel, route and settings are
     written into results.json; a judge that reasoned although the setting is off is named under "Faults first".
   6 usage beside the score: each run's usage.json.
-Three readings a judge; every picture for one judge before the next judge is loaded; on the local route the model is
-unloaded after its readings, and the run waits while the server holds another job's model. Readings are kept in
+Three readings a judge. On the local route every picture for one judge before the next judge is loaded, one reading
+at a time; the model is unloaded after its readings, and the run waits while the server holds another job's model.
+On a hosted route every judge reads at once, up to --concurrency N readings in flight for each (default 8; a busy
+server's 429 or 5xx is retried with backoff). results.json and SCORES.md are rewritten (whole, never half-written) as
+each painting completes, marked "inProgress" until the last. Readings are kept in
 DIR/readings/ and reused only when everything that could change a reply is the same (cache_key: panel, route,
 endpoint, the judge as named and as served, its digest, the options sent, the rubric, the prompt, the pictures and
 their sizes, the repeat). --fresh reads everything again. --repeat N scores the same paintings a further time, kept
@@ -35,7 +38,8 @@ apart (readings/.../rN, results-repeat-N.json, SCORES-repeat-N.md), for a noise 
 a reading. Exit 0 complete, 1 written but a reading is short of a judge (named under "Faults first"), 2 refused
 (nothing judged).
 """
-import argparse, json, os, sys, time
+import argparse, json, os, sys, threading, time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
@@ -52,6 +56,7 @@ import s04_judge, s04_readings as R, s04_runs, s04_table as T  # noqa: E402
 SEQ_CTX, SEQ_TOKENS = 16384, 3000   # up to fourteen pictures (film13: opening, twelve, finished; progress10: opening, drawing, ten, finished) need a longer window than the scorer's 8,192
 ONE_CTX, ONE_TOKENS = 8192, 1024
 SNAP_PX, ONE_PX = 640, 768   # the long side each picture is brought down to: film stills, and a picture read alone or beside its original
+CONCURRENCY = 8   # hosted route: readings in flight at once for each judge (--concurrency); the local route reads one at a time
 
 
 def file_sha(p):
@@ -60,8 +65,11 @@ def file_sha(p):
 
 
 def write(path, text):
-    with open(path, "w") as fh:
+    """Written whole or not at all: a page reading the file while it is rewritten sees the old one or the new one."""
+    tmp = f"{path}.{os.getpid()}.{threading.get_ident()}.tmp"
+    with open(tmp, "w") as fh:
         fh.write(text)
+    os.replace(tmp, path)
 
 
 def read_json(path):
@@ -73,23 +81,31 @@ class Job:
     """One reading of one picture (or sequence) by every judge, three times each."""
     def __init__(self, key, kind, images, text_of, ctx, tokens, parse, data_uri):
         self.key, self.kind, self.images, self.ctx, self.tokens, self.parse = key, kind, images, ctx, tokens, parse
-        self.text_of, self.data_uri, self._content = text_of, data_uri, None
+        self.text_of, self.data_uri, self._content, self._lock = text_of, data_uri, None, threading.Lock()
         self.imagesSha = R.sha("".join(file_sha(f) for f, _ in images))
         self.promptSha = R.sha("".join(t for t in text_of))
         self.options = {"ctx": ctx, "maxTokens": tokens, "longSidePx": [px for _, px in images]}
 
     def content(self):
-        if self._content is None:
-            c = []
-            for t, (f, px) in zip(self.text_of, self.images):
-                c += [{"type": "text", "text": t}, {"type": "image_url", "image_url": {"url": self.data_uri(f, px)}}]
-            self._content = c
-        return self._content
+        with self._lock:   # several readings of one job may be in flight at once: the pictures are encoded once
+            if self._content is None:
+                c = []
+                for t, (f, px) in zip(self.text_of, self.images):
+                    c += [{"type": "text", "text": t}, {"type": "image_url", "image_url": {"url": self.data_uri(f, px)}}]
+                self._content = c
+            return self._content
 
 
 def jobs_for(paintings, originals, rubric, data_uri):
-    out = []
-    for e in paintings:
+    """Every job, painting by painting: Auto's first (the others are adjusted against it), each painting's three
+    jobs, and its original's quality just after the first painting of it, so a painting can be complete early."""
+    out, seen = [], set()
+    for e in sorted(paintings, key=lambda e: not e.get("auto")):
+        sid = e.get("original")
+        if sid in originals and sid not in seen:
+            seen.add(sid)
+            o = originals[sid]
+            out.append(Job("original--" + sid, "single", [(o["target"], ONE_PX)], [R.SINGLE.format(style=o["style"])], ONE_CTX, ONE_TOKENS, R.parse_single, data_uri))
         # the scored pictures in the order shown: the drawing frame first when the scheme has one, then the snapshots
         snaps = ([e["drawing"]] if e.get("drawing") else []) + e["snapshots"]
         head = R.sequence_prompt(e.get("scheme", "film13"), rubric, e["style"], len(snaps), bool(e.get("drawing")))
@@ -99,7 +115,8 @@ def jobs_for(paintings, originals, rubric, data_uri):
         out.append(Job(e["id"], "single", [(e["painting"], ONE_PX)], [R.SINGLE.format(style=e["style"])], ONE_CTX, ONE_TOKENS, R.parse_single, data_uri))
         out.append(Job(e["id"], "likeness", [(e["target"], ONE_PX), (e["painting"], ONE_PX)], [R.LIKENESS.format(style=e["style"]) + "\nThe original:", "The painting made of it:"], ONE_CTX, ONE_TOKENS, R.parse_likeness, data_uri))
     for sid, o in originals.items():
-        out.append(Job("original--" + sid, "single", [(o["target"], ONE_PX)], [R.SINGLE.format(style=o["style"])], ONE_CTX, ONE_TOKENS, R.parse_single, data_uri))
+        if sid not in seen:
+            out.append(Job("original--" + sid, "single", [(o["target"], ONE_PX)], [R.SINGLE.format(style=o["style"])], ONE_CTX, ONE_TOKENS, R.parse_single, data_uri))
     return out
 
 
@@ -113,12 +130,21 @@ def cache_key(jb, model, jrec, rubric_sha, repeat):
                              "rubric": rubric_sha, "prompt": jb.promptSha, "images": jb.imagesSha, "job": jb.options, "readings": R.READINGS, "repeat": repeat}, sort_keys=True))
 
 
-def read_all(jobs, cfg, judge, out, say=print, jrec=None, rubric_sha=None, fresh=False, repeat=1):
-    """{(key, kind): {model: [readings]}}, every job for one judge before the next is loaded. A kept reading is reused
-    only under the same cache_key; `fresh` reads everything again; `repeat` > 1 is a further scoring kept apart."""
-    got, jrec = {}, jrec or {}
-    for m in cfg["panel"]:
-        judge.wait_turn(cfg, m)
+def read_all(jobs, cfg, judge, out, say=print, jrec=None, rubric_sha=None, fresh=False, repeat=1, concurrency=CONCURRENCY, on_done=None, got=None):
+    """{(key, kind): {model: [readings in order 1..READINGS]}}. A kept reading is reused only under the same
+    cache_key; `fresh` reads everything again; `repeat` > 1 is a further scoring kept apart. `on_done(key, kind)` is
+    called (on this thread) as soon as a job has every reading of every judge; `got`, when given, is the dict filled
+    (so on_done can read the readings so far).
+
+    Local route: one model in memory at a time, so every job for one judge before the next is loaded, one reading
+    after another. Hosted route: every judge at once, up to `concurrency` readings in flight for each judge; the
+    readings land in the same files under the same keys, and the result does not depend on the order they came back."""
+    jrec = jrec or {}
+    slots = {} if got is None else got
+    slots.update({(jb.key, jb.kind): {m: [None] * R.READINGS for m in cfg["panel"]} for jb in jobs})
+    left = {(jb.key, jb.kind): len(cfg["panel"]) * R.READINGS for jb in jobs}
+
+    def tasks(m):
         tag = m.replace(":", "_").replace("/", "_")
         for jb in jobs:
             d = os.path.join(out, "readings", jb.key, *([f"r{repeat}"] if repeat > 1 else []))
@@ -127,16 +153,51 @@ def read_all(jobs, cfg, judge, out, say=print, jrec=None, rubric_sha=None, fresh
             for k in range(1, R.READINGS + 1):
                 f = os.path.join(d, f"{jb.kind}-{tag}-{k}.json")
                 old = read_json(f) if os.path.isfile(f) and not fresh else None
-                if not (old and old.get("ok") and old.get("cacheKey") == key):
-                    t = time.time()
-                    r, why = R.ask(lambda model, c: judge.post(cfg, model, c, max_tokens=jb.tokens, num_ctx=jb.ctx), m, jb.content(), jb.parse)
-                    old = {"ok": bool(r), "judge": m, "kind": jb.kind, "cacheKey": key, "repeat": repeat, "promptSha": jb.promptSha, "imagesSha": jb.imagesSha, "seconds": round(time.time() - t, 1), **(r or {"error": why})}
-                    write(f, json.dumps(old, indent=1))
-                    score = (old.get("overall") if jb.kind == "single" else old.get("likeness") if jb.kind == "likeness" else [s["score"] for s in old["snapshots"]]) if r else f"FAILED {why}"
-                    say(time.strftime("%H:%M:%S"), jb.key, jb.kind, m, k, score, f"{old['seconds']} s", flush=True)
-                got.setdefault((jb.key, jb.kind), {}).setdefault(m, []).append(old if old.get("ok") else None)
-        judge.unload(cfg, m)
-    return got
+                yield jb, k, f, key, (old if old and old.get("ok") and old.get("cacheKey") == key else None)
+
+    def read(jb, m, k, f, key):
+        t = time.time()
+        r, why = R.ask(lambda model, c: judge.post(cfg, model, c, max_tokens=jb.tokens, num_ctx=jb.ctx), m, jb.content(), jb.parse)
+        new = {"ok": bool(r), "judge": m, "kind": jb.kind, "cacheKey": key, "repeat": repeat, "promptSha": jb.promptSha, "imagesSha": jb.imagesSha, "seconds": round(time.time() - t, 1), **(r or {"error": why})}
+        write(f, json.dumps(new, indent=1))
+        return new
+
+    def land(jb, m, k, rd, fresh_read):
+        if fresh_read:
+            score = (rd.get("overall") if jb.kind == "single" else rd.get("likeness") if jb.kind == "likeness" else [s["score"] for s in rd["snapshots"]]) if rd["ok"] else f"FAILED {rd.get('error')}"
+            say(time.strftime("%H:%M:%S"), jb.key, jb.kind, m, k, score, f"{rd['seconds']} s", flush=True)
+        slots[(jb.key, jb.kind)][m][k - 1] = rd if rd.get("ok") else None
+        left[(jb.key, jb.kind)] -= 1
+        if not left[(jb.key, jb.kind)] and on_done:
+            on_done(jb.key, jb.kind)
+
+    if cfg["route"] == "local":
+        for m in cfg["panel"]:
+            judge.wait_turn(cfg, m)
+            for jb, k, f, key, kept in tasks(m):
+                land(jb, m, k, kept or read(jb, m, k, f, key), not kept)
+            judge.unload(cfg, m)
+    else:
+        pools = {m: ThreadPoolExecutor(max_workers=max(1, concurrency), thread_name_prefix="judge") for m in cfg["panel"]}
+        try:
+            pending = {}
+            # the kept readings land first, in order; then every reading still wanted goes into its judge's pool,
+            # job by job, so the paintings first in the list are the first to be complete
+            for m in cfg["panel"]:
+                for jb, k, f, key, kept in tasks(m):
+                    if kept:
+                        land(jb, m, k, kept, False)
+                    else:
+                        pending[(jb, m, k)] = (f, key)
+            order = sorted(pending, key=lambda t: (jobs.index(t[0]), t[2], cfg["panel"].index(t[1])))
+            futs = {pools[m].submit(read, jb, m, k, *pending[(jb, m, k)]): (jb, m, k) for jb, m, k in order}
+            for fu in as_completed(futs):
+                jb, m, k = futs[fu]
+                land(jb, m, k, fu.result(), True)
+        finally:
+            for p in pools.values():
+                p.shutdown(wait=True, cancel_futures=True)
+    return slots
 
 
 def cheat_summary(c):
@@ -152,9 +213,12 @@ def main(argv=None, judge=s04_judge, env=None, say=print):
     ap.add_argument("--snapshots", default=R.DEFAULT_SCHEME, choices=sorted(R.SCHEMES) + sorted(R.GONE), metavar="{" + ",".join(sorted(R.SCHEMES)) + "}", help="what the judges are shown: progress10 (default: opening, drawing frame, ten stills in progress placed by measured progress, the finished sheet beside) or film13 (the first scheme: opening, twelve by frame number, the finished sheet). Scores under one are not comparable with the other")
     ap.add_argument("--fresh", action="store_true", help="read every picture again: no kept reading is reused (the new readings replace the kept ones)")
     ap.add_argument("--repeat", type=int, default=1, metavar="N", help="score the same paintings a further time, kept apart from repeat 1 (results-repeat-N.json, SCORES-repeat-N.md): for measuring the judges' noise")
+    ap.add_argument("--concurrency", type=int, default=CONCURRENCY, metavar="N", help=f"hosted route: readings in flight at once for each judge, every judge at once (default {CONCURRENCY}). The local route holds one model at a time and reads one reading after another")
     a = ap.parse_args(argv)
     if a.repeat < 1:
         ap.error("--repeat is 1 or more")
+    if a.concurrency < 1:
+        ap.error("--concurrency is 1 or more")
     try:
         cfg = judge.settings(env)
         rubric, rubric_sha = R.load_rubric(RUBRIC)
@@ -194,7 +258,34 @@ def main(argv=None, judge=s04_judge, env=None, say=print):
         t, p = s04_runs.sized(e["target"], e["painting"], os.path.join(a.out, "sized"), e["id"])
         e["classic"] = SP.classic_scores(t, p)
     data_uri = lambda f, px: SP.data_uri(load_rgb(f), px)
-    got = read_all(jobs_for(paintings, originals, rubric, data_uri), cfg, judge, a.out, say, jrec=jrec, rubric_sha=rubric_sha, fresh=a.fresh, repeat=a.repeat)
+    names = ("results.json", "SCORES.md") if a.repeat == 1 else (f"results-repeat-{a.repeat}.json", f"SCORES-repeat-{a.repeat}.md")
+    done, written = set(), set()
+    whole = lambda e: {(e["id"], "sequence"), (e["id"], "single"), (e["id"], "likeness"), ("original--" + e["original"], "single")} <= done
+
+    def on_done(key, kind):
+        # results.json and SCORES.md are rewritten as each painting completes, so a page can show the scores as they come
+        done.add((key, kind))
+        now = [e for e in paintings if e["id"] not in written and whole(e)]
+        if now and len(written) + len(now) < len(paintings):
+            written.update(e["id"] for e in now)
+            ready = [e for e in paintings if e["id"] in written]
+            res, faults = results(a, cfg, jrec, rubric, rubric_sha, ready, failed, {k: v for k, v in originals.items() if ("original--" + k, "single") in done}, got)
+            res["inProgress"] = {"paintingsScored": len(ready), "of": len(paintings), "note": "scoring is still running: this file is rewritten as each painting completes"}
+            write(os.path.join(a.out, names[0]), json.dumps(res, indent=1))
+            write(os.path.join(a.out, names[1]), T.markdown(res))
+            say("so far", os.path.join(a.out, names[0]), f"{len(ready)} of {len(paintings)} paintings scored", flush=True)
+
+    got = {}
+    read_all(jobs_for(paintings, originals, rubric, data_uri), cfg, judge, a.out, say, jrec=jrec, rubric_sha=rubric_sha, fresh=a.fresh, repeat=a.repeat, concurrency=a.concurrency, on_done=on_done, got=got)
+    res, faults = results(a, cfg, jrec, rubric, rubric_sha, paintings, failed, originals, got)
+    write(os.path.join(a.out, names[0]), json.dumps(res, indent=1))
+    write(os.path.join(a.out, names[1]), T.markdown(res))
+    say("written", os.path.join(a.out, names[0]), "and " + names[1] + (f"; {len(failed)} failed runs counted" if failed else "") + (f"; {len(faults)} faults: " + "; ".join(faults) if faults else ""), flush=True)
+    return 1 if faults else 0
+
+
+def results(a, cfg, jrec, rubric, rubric_sha, paintings, failed, originals, got):
+    """(the results document, its faults) for these paintings and originals from the readings in `got`."""
     faults, rows = [], []
     for e in paintings:
         h = R.human(got[(e["id"], "sequence")], cfg["panel"], a.snapshots, bool(e["drawing"]))
@@ -216,18 +307,14 @@ def main(argv=None, judge=s04_judge, env=None, say=print):
     # the panel's one reasoning setting is off: a judge whose route reports reasoning tokens all the same is named
     if jrec.get("reasoning") == "off":
         for m in cfg["panel"]:
-            n = sum(1 for by in got.values() for r in by.get(m, []) if r and r.get("reasoningTokens"))
+            n = sum(1 for by in list(got.values()) for r in by.get(m, []) if r and r.get("reasoningTokens"))
             if n:
                 faults.append(f"{m} reasoned in {n} readings although the panel's reasoning setting is off: its figures are not read as the panel's other routes read them")
     T.derive(rows, originals)
     res = {"schema": "unpaint-bench/score04@1", "written": time.strftime("%Y-%m-%d %H:%M"), "series": SERIES + " " + SCHEME_NOTE[a.snapshots], "judge": jrec,
            "rubric": {"path": os.path.relpath(RUBRIC, REPO), "sha256": rubric_sha}, "prompts": R.prompt_hashes(rubric, a.snapshots),
            "weights": dict(T.WEIGHTS), "readings": R.READINGS, "repeat": a.repeat, "fresh": bool(a.fresh), "snapshots": R.SCHEMES[a.snapshots]["count"], "snapshotScheme": {**R.SCHEMES[a.snapshots], "note": SCHEME_NOTE[a.snapshots]}, "pictureLongSidePx": {"stills": SNAP_PX, "alone": ONE_PX, "likeness": ONE_PX}, "faults": faults, "failedRuns": [{"id": e["id"], "subject": e["subject"], "author": e["author"], "level": e["level"], "why": e["failed"]} for e in failed], "originals": originals, "paintings": rows}
-    names = ("results.json", "SCORES.md") if a.repeat == 1 else (f"results-repeat-{a.repeat}.json", f"SCORES-repeat-{a.repeat}.md")
-    write(os.path.join(a.out, names[0]), json.dumps(res, indent=1))
-    write(os.path.join(a.out, names[1]), T.markdown(res))
-    say("written", os.path.join(a.out, names[0]), "and " + names[1] + (f"; {len(failed)} failed runs counted" if failed else "") + (f"; {len(faults)} faults: " + "; ".join(faults) if faults else ""), flush=True)
-    return 1 if faults else 0
+    return res, faults
 
 
 if __name__ == "__main__":

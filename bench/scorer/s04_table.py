@@ -118,6 +118,9 @@ def markdown(r):
          f"Judge label **{j['label']}**, panel **{j.get('panelName') or 'not named'}**, route `{j['route']}` ({j['endpoint']}), reasoning {j.get('reasoning') or 'not recorded'}; judges " + ", ".join(f"`{m}`" + (f" (served as `{(j.get('sentAs') or {}).get(m)}`)" if (j.get('sentAs') or {}).get(m, m) != m else "") for m in j["panel"]) +
          f"; {r['readings']} readings a judge, a judge's figure the median of its three, the panel's the mean of the judges'. "
          f"Rubric `{r['rubric']['path']}` sha256 `{r['rubric']['sha256'][:12]}`; prompts sequence `{r['prompts']['sequence'][:12]}`, single `{r['prompts']['single'][:12]}`" + (f", likeness `{r['prompts']['likeness'][:12]}`" if r['prompts'].get('likeness') else "") + ".", ""]
+    if r.get("inProgress"):
+        ip = r["inProgress"]
+        L += [f"**Still scoring: {ip['paintingsScored']} of {ip['of']} paintings so far.** This page is rewritten as each painting completes.", ""]
     faults = r.get("faults") or []
     L += ["## Faults first", ""] + ([f"- {x}" for x in faults] or ["- None: every reading has all its judges."]) + [""]
     gone = [p for p in r["paintings"] if p.get("failed")]
