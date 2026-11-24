@@ -39,7 +39,7 @@ test('the scorer reads a rounds run: its level, author, painting and usage', asy
     const [e] = JSON.parse(got.stdout);
     assert.deepEqual([e.level, e.author, e.subject, e.failed, e.auto], ['L2', 'dry-rounds', 'mittens-closeup', null, false]);
     assert.equal(e.painting, path.join(run, 'plate', 'painting.png'));
-    assert.equal(e.usage.session.lookUnits.spent, 0.8); assert.equal(e.usage.session.looks, 3); assert.deepEqual(e.usage.session.looksEach.map(l => l.cost), [0.3, 0.2, 0.3]);
+    assert.equal(e.usage.session.lookUnits.spent, 0.7); assert.equal(e.usage.session.looks, 3); assert.deepEqual(e.usage.session.looksEach.map(l => l.cost), [0.3, 0.1, 0.3]);
     assert.equal(e.usage.model.tokenSplit.reported, true); assert.ok(e.usage.model.tokensOut > 0);
     // a rounds run that failed is kept and counted, never dropped
     fs.writeFileSync(path.join(run, 'run.json'), JSON.stringify({ subject: { id: 'mittens-closeup' }, author: { ...author, level: 'L2' }, failure: 'no script: two answers in a row could not be used' }));

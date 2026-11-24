@@ -95,7 +95,7 @@ export async function roundsRun(r, x) {
   x.say(r, `${author.name} starts fixed rounds (${author.cli}; level ${x.level}; no shell, no tools; look budget ${x.looksMost} units; ${images.length} pictures sent once)`);
   try {
     res = await runRounds({
-      first: { text, images }, ask, sheet, forms, budget: x.looksMost, say: line => x.say(r, line),
+      first: { text, images }, ask, sheet, forms, budget: x.looksMost, wallMinutes: x.wallMinutes ?? null, say: line => x.say(r, line),
       check: async state => { const script = checkAuthored(numbered && namesShapes(state.script) ? resolveNumbered(state.script, numbered) : state.script, { sheetWidthMm: W }).script, choice = choiceOf(laid(state)); if (choice.tools) await x.toolsCheck(r, choice.tools); return script; },
       compile: (state, checked, n) => x.compile(r, choiceOf(laid(state)), checked, path.join(dir, 'plans', String(n))),
       look: async (state, checked, compiled, want, n) => {
@@ -122,7 +122,7 @@ export async function roundsRun(r, x) {
   const t = res.tokens, reported = t.fresh != null || t.cached != null || t.output != null, total = res.rounds.reduce((a, q) => a + (q.tokensTotal ?? 0), 0);
   Object.assign(record.author, { seconds: res.seconds, tokensIn: reported ? (t.fresh ?? 0) + (t.cached ?? 0) : null, tokensOut: reported ? t.output ?? 0 : null, tokens: reported ? (t.fresh ?? 0) + (t.cached ?? 0) + (t.output ?? 0) : total || null, costUSD: res.costUSD,
     tokenSplit: reported ? { reported: true, freshIn: t.fresh ?? 0, cachedIn: t.cached ?? 0, out: t.output ?? 0, from: 'each round\'s own report, added up (rounds.json has them a round)' } : undefined });
-  record.author.session = { work: 'rounds', ended: res.ended, level: x.level, ladder: record.author.ladder ?? null, previousLevel: record.author.previousTry?.level ?? null, tryNumber: r.record.author.tryNumber ?? 1, budget: record.author.budget ?? null, budgetReached: null, looksMost: x.looksMost,
+  record.author.session = { work: 'rounds', ended: res.ended, level: x.level, ladder: record.author.ladder ?? null, previousLevel: record.author.previousTry?.level ?? null, tryNumber: r.record.author.tryNumber ?? 1, budget: record.author.budget ?? null, budgetReached: res.ended === 'wall clock' ? { what: `${x.wallMinutes} minutes on the clock`, safetyStop: true } : null, looksMost: x.looksMost,
     ownMinutes: +(res.seconds / 60).toFixed(1), wallMinutes: +((Date.now() - t0) / 60000).toFixed(1), waitMinutes: null,
     lookUnits: res.lookUnits, steps: { taken: res.rounds.length, budget: null, what: 'rounds (model replies)' }, looks: res.looks.filter(l => !l.failed), looksNotPainted: res.looks.filter(l => l.failed).length,
     plans: res.rounds.filter(q => q.kind && q.kind !== 'done' && q.kind !== 'look').map(q => ({ ok: !q.refused, round: q.round })), turns: res.rounds.length, rounds: res.rounds.map(q => ({ round: q.round, kind: q.kind ?? null, hash: q.hash, seconds: q.seconds, tokens: q.tokens, lookUnits: q.lookUnits, refused: q.refused ?? null, change: q.change ?? null, continuedBy: q.continuedBy ?? null })),

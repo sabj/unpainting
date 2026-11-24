@@ -3,16 +3,16 @@ import assert from 'node:assert/strict';
 import { DEFAULT_LOOK_UNITS, LEAST_LOOK_COST, LOOK_PRICE, lookSizeOf, readLookAsk, regionBox, lookCost, costLine, scriptInRegion, SHOW_ORIGINAL_COST, showCost } from './look-cost.mjs';
 
 const rows = [...Array(3).fill({ stage: 1 }), ...Array(5).fill({ stage: 3 }), ...Array(2).fill({ stage: 4 })];
-test('a look has a fixed price: 0.3 for a half-size look of the whole sheet, 1.0 full size, its share when partial or regional, never under 0.2', () => {
-  assert.equal(DEFAULT_LOOK_UNITS, 3); assert.equal(LEAST_LOOK_COST, 0.2); assert.deepEqual(LOOK_PRICE, { half: 0.3, full: 1 });
-  assert.deepEqual(lookCost(rows), { cost: 0.3, size: 'half', washShare: 1, regionShare: null, washes: 10, of: 10, stages: [{ stage: 1, cost: 0.2 }, { stage: 3, cost: 0.24 }, { stage: 4, cost: 0.3 }] });
+test('a look has a fixed price: 0.3 for a half-size look of the whole sheet, 1.0 full size, its share when partial or regional, never under 0.05', () => {
+  assert.equal(DEFAULT_LOOK_UNITS, 3); assert.equal(LEAST_LOOK_COST, 0.05); assert.deepEqual(LOOK_PRICE, { half: 0.3, full: 1 });
+  assert.deepEqual(lookCost(rows), { cost: 0.3, size: 'half', washShare: 1, regionShare: null, washes: 10, of: 10, stages: [{ stage: 1, cost: 0.09 }, { stage: 3, cost: 0.24 }, { stage: 4, cost: 0.3 }] });
   assert.deepEqual(lookCost(rows, { size: 'full' }).stages, [{ stage: 1, cost: 0.3 }, { stage: 3, cost: 0.8 }, { stage: 4, cost: 1 }]);
   assert.equal(lookCost(rows, { until: 3, size: 'full' }).cost, 0.8); assert.equal(lookCost(rows, { until: 2, size: 'full' }).cost, 0.3, 'a stage the plan has no washes in adds nothing'); assert.equal(lookCost(rows, { until: 9 }).cost, 0.3);
-  assert.equal(lookCost(rows, { regionShare: 0.5, size: 'full' }).cost, 0.5); assert.equal(lookCost(rows, { regionShare: 0.5 }).cost, 0.2, 'half of 0.3 is under the floor');
-  assert.equal(lookCost(rows, { until: 1, regionShare: 0.001, size: 'full' }).cost, LEAST_LOOK_COST, 'no look is under 0.2');
+  assert.equal(lookCost(rows, { regionShare: 0.5, size: 'full' }).cost, 0.5); assert.equal(lookCost(rows, { regionShare: 0.5 }).cost, 0.15, 'half of 0.3 is above the 0.05 floor');
+  assert.equal(lookCost(rows, { until: 1, regionShare: 0.001, size: 'full' }).cost, LEAST_LOOK_COST, 'no look is under 0.05');
   assert.equal(lookCost([], {}).cost, 0.3); assert.throws(() => lookCost(rows, { size: 'quarter' }), /half or full size/);
   assert.equal(lookSizeOf(543, 1086), 'half'); assert.equal(lookSizeOf(731, 731), 'full');
-  assert.equal(costLine(rows, 2.4), ' A look of this plan costs 0.3 of your 2.4 units left; stopped after a stage, its share (--until 1: 0.2, --until 3: 0.24); a look of a region of your own script, the share of its passages that touch it; never under 0.2. The price is fixed by size and share: how you paint costs nothing.');
+  assert.equal(costLine(rows, 2.4), ' A look of this plan costs 0.3 of your 2.4 units left; stopped after a stage, its share (--until 1: 0.09, --until 3: 0.24); a look of a region of your own script, the share of its passages that touch it; never under 0.05. The price is fixed by size and share: how you paint costs nothing.');
 });
 
 test('what a look is asked of is read from its words; a region is a box in millimetres or a named form', () => {
@@ -41,5 +41,5 @@ test('the work a painting does is recorded, never charged: brush sweeps and dryi
 
 test('showing the original is priced lightly from the look budget: twenty glances are one unit; any other picture is free', () => {
   assert.equal(SHOW_ORIGINAL_COST, 0.05); assert.equal(showCost(true), 0.05); assert.equal(showCost(false), 0);
-  assert.equal(Math.round(1 / SHOW_ORIGINAL_COST), 20); assert.ok(SHOW_ORIGINAL_COST < LEAST_LOOK_COST, 'a glance costs less than the least look');
+  assert.equal(Math.round(1 / SHOW_ORIGINAL_COST), 20); assert.ok(SHOW_ORIGINAL_COST <= LEAST_LOOK_COST, 'a glance costs no more than the least look');
 });

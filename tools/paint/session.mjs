@@ -553,14 +553,14 @@ export function sessionCall(author, { prompt, cwd, deny = [], images = [], home 
     // Loopback and a pseudo-terminal are allowed as for agy (it keeps a session server and runs a managed shell): the
     // best reading of its help and data folder, not yet measured in a session.
     const own = museFiles(home), id = crypto.randomUUID(), signIn = gate ? own.signIn : [];
-    const profile = seatbelt({ deny: all, write: [...new Set([...own.write, real(tmp), '/private/tmp', '/private/var/folders'])], cwd: real(cwd), local: true, gated: Boolean(gate),
+    const profile = seatbelt({ deny: all, write: [...new Set([...own.write, real(tmp), '/private/tmp', '/private/var/folders'])], cwd: real(cwd), local: true, gated: Boolean(gate), eyes,
       readable: gate ? [...new Set([...(toolbox?.readable ?? []), ...own.readable])] : [], hidden: gate ? [...new Set([home, real(home), '/Users', '/Volumes'])] : [], metadata: gate ? own.metadata : [] });
     return { cmd: 'sandbox-exec', env: { ...own.env, ...(gate ? proxyEnv(gate.url) : {}), ...(toolbox?.env ?? {}) }, unset: [], profile, gated: Boolean(gate), signIn,
       // its transcript is not its output: it is the log it keeps under its data folder, in a folder named for the session
       log: { root: own.sessions, id },
       args: ['-p', profile, 'muse', 'exec', '--json', '--model', author.id, ...(author.effort ? ['--effort', author.effort] : []), '--contributor-mode', 'off', '--no-foreign-personal-context', '--disable-web-tools', '--disable-reminders', '--disable-approval', '--disable-sandbox', '--workspace', cwd, '--session-id', id, prompt],
       probe: file => ({ cmd: 'sandbox-exec', args: ['-p', profile, '/bin/cat', file] }),
-      closed: `the whole command runs under a seatbelt profile of this harness (its own sandbox and permission prompts off inside it): neither its shell nor its file tools can read the repository, the subject list, the caches or other sessions, it writes only in its folder, its own settings and data folders and temporary folders, and ${gate ? `of the home folder reads only those, its program and the login keychain (${SIGN_IN_EXPOSURE}); it reaches only this machine's loopback, where a gate passes its own service's hosts and refuses every other (no downloads, no installs)` : 'reaches the network on port 443 and this machine\'s loopback only'}` };
+      closed: `the whole command runs under a seatbelt profile of this harness (its own sandbox and permission prompts off inside it): neither its shell nor its file tools can read the repository, the subject list, the caches or other sessions, it writes only in its folder, its own settings and data folders and temporary folders, and ${gate ? `of the home folder reads only those, its program and the login keychain (${SIGN_IN_EXPOSURE}); it reaches only this machine's loopback, where a gate passes its own service's hosts and refuses every other (no downloads, no installs)` : 'reaches the network on port 443 and this machine\'s loopback only'}${HELD}`, eyesHeld: Boolean(eyes) };
   }
   if (author.cli === 'agy') {
     // with a gate (session-net.mjs) its network is the gate's: the model's service only; with a toolbox, its Python is on PATH and installs are answered by shims

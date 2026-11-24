@@ -6,7 +6,7 @@
 // stage, or a region) or says it is done. Then the full-size final with its film (cli.mjs paints it).
 // A script that does not compile is returned once, free, for a corrected answer; a second failure ends the try when
 // there is no script yet, and otherwise keeps the last script that compiled. Looks are charged as in the open
-// session (look-cost.mjs: 0.3 a whole half-size look, a stage or a region its share, never under 0.2; budget 3.0).
+// session (look-cost.mjs: 0.3 a whole half-size look, a stage or a region its share, never under 0.05; budget 3.0).
 // Everything else is measured, never limited: seconds, tokens (fresh, cached, output) and look units a round.
 // Pure but for the calls it is handed (ask, check, compile, look): nothing is read, written or started here.
 import crypto from 'node:crypto';
@@ -157,10 +157,10 @@ const ANSWER = `Answer with ONE JSON object and nothing else: {"edits": [...], "
  * painted), state, checked, compiled, rounds: [..], looks: [..], lookUnits: {spent, budget}, tokens, seconds}.
  * Never throws for what a model did: that is a result.
  */
-export async function runRounds({ first, ask, check, compile, look, sheet, forms = [], budget = DEFAULT_LOOK_UNITS, lookSize = 'half', roundsMost = ROUNDS_MOST, say = () => {} }) {
+export async function runRounds({ first, ask, check, compile, look, sheet, forms = [], budget = DEFAULT_LOOK_UNITS, lookSize = 'half', roundsMost = ROUNDS_MOST, wallMinutes = null, now = Date.now, say = () => {} }) {
   const rounds = [], looks = [], seen = new Set();
   let state = null, checked = null, compiled = null, spent = 0, ended = null, failure = null, compiles = 0;
-  const left = () => round2(budget - spent);
+  const left = () => round2(budget - spent), deadline = wallMinutes != null ? now() + wallMinutes * 60000 : null;
   let send = { text: first.text, images: first.images ?? [] }, corrected = false;
   const accept = async candidate => {
     const c = await check(candidate); compiles++;
@@ -169,7 +169,9 @@ export async function runRounds({ first, ask, check, compile, look, sheet, forms
     return { c, got };
   };
   for (let n = 0; n < roundsMost && !ended; n++) {
-    const reply = await ask({ ...send, round: n });
+    const leftMin = deadline == null ? null : (deadline - now()) / 60000;
+    if (leftMin != null && leftMin <= 0) { ended = 'wall clock'; say(`round ${n}: ${wallMinutes} min on the clock reached; ${state ? `script ${stateHash(state)} is painted` : 'nothing was painted'}`); if (!state) failure = `the ${wallMinutes}-minute clock ran out before any script compiled`; break; }
+    const reply = await ask({ ...send, round: n, ...(leftMin != null ? { maxMinutes: Math.max(1, Math.ceil(leftMin)) } : {}) });
     const row = { round: n, sent: { text: send.text, images: send.images.map(f => String(f).split('/').slice(-3).join('/')) }, reply: reply.text ?? '', seconds: reply.seconds ?? null, tokens: reply.tokens ?? null, costUSD: reply.costUSD ?? null, lookUnits: 0, ok: Boolean(reply.ok), correction: corrected, continuedBy: reply.continuedBy ?? null, tokensTotal: reply.tokensTotal ?? null };
     rounds.push(row);
     if (!reply.ok) { row.error = reply.error; ended = 'model failed'; if (!state) failure = `the model gave no answer in round ${n}: ${reply.error}`; break; }

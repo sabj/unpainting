@@ -18,7 +18,7 @@ fills the shape with strokes itself. Stroke-by-stroke paths are for the few mark
      filmed, and that is your painting. When the edits you are sending are your last, say `"done": true` in that
      same answer: an answer that only says done afterwards is a round spent on nothing.
 4. **Budget**: LOOKS_MOST look units for this try: enough for LOOKS_WHOLE looks of the whole script. A look of the whole script costs 0.3; stopped after a stage or cut
-   to a region, its share; never under 0.2. The full-size final is not charged. How you paint (water, strokes, waits)
+   to a region, its share; never under 0.05. The full-size final is not charged. How you paint (water, strokes, waits)
    is never charged. Each message tells you what is left. When too little is left for a look, the script as it
    stands is painted.
 5. A script or an edit that cannot be read or compiled is returned to you once, free, with the reason. A second

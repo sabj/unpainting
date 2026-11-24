@@ -101,9 +101,9 @@ export function roundsAsker(author, { dir, minutes = ROUND_MINUTES, run = launch
   roundCall(author, { text: '', images: [], cwd: '', state: { uuid: 'x', id: 'x' }, resume: false });
   const cwd = fs.mkdtempSync(path.join(os.tmpdir(), `unpaint-rounds-${author.key}-`)), state = { uuid: crypto.randomUUID(), id: null }, history = [], firstImages = [];
   fs.mkdirSync(dir, { recursive: true });
-  const once = async ({ text, images, round, resume, stem }) => {
+  const once = async ({ text, images, round, resume, stem, maxMinutes = null }) => {
     const call = roundCall(author, { text, images, cwd, state, resume }), at = f => path.join(dir, `${stem}.${f}`), t0 = Date.now();
-    const done = await slot(() => run(call, { cwd, outFile: at('out.txt'), errFile: at('err.txt'), minutes }));
+    const done = await slot(() => run(call, { cwd, outFile: at('out.txt'), errFile: at('err.txt'), minutes: maxMinutes != null ? Math.min(minutes, maxMinutes) : minutes }));
     const seconds = Math.round((Date.now() - t0) / 1000), stdout = fs.existsSync(at('out.txt')) ? fs.readFileSync(at('out.txt'), 'utf8') : '';
     const got = call.parse(stdout), errTail = fs.existsSync(at('err.txt')) ? fs.readFileSync(at('err.txt'), 'utf8').trim().split('\n').slice(-3).join(' ').slice(0, 300) : '';
     let error = null;
@@ -113,17 +113,17 @@ export function roundsAsker(author, { dir, minutes = ROUND_MINUTES, run = launch
     fs.writeFileSync(at('call.json'), JSON.stringify({ author: author.key, model: author.id, effort: author.effort ?? null, cli: author.cli, round, resume, command: [call.cmd, ...call.args.map(a => (a.length > 200 ? `<${a.length} characters>` : a.replaceAll(cwd, '<its folder>')))], seconds, exit: done.exit, tokens: got.tokens ?? null, tokensTotal: got.tokensTotal ?? null, costUSD: got.costUSD ?? null, error }, null, 1) + '\n');
     return { ok: !error, text: got.text ?? '', error, seconds, tokens: got.tokens ?? null, tokensTotal: got.tokensTotal ?? null, costUSD: got.costUSD ?? null };
   };
-  const ask = async ({ text, images = [], round }) => {
+  const ask = async ({ text, images = [], round, maxMinutes = null }) => {
     // the pictures as copies in its folder, named for the round
     const mine = images.map((f, i) => { const to = path.join(cwd, round === 0 ? path.basename(f) : `round-${round}-${i + 1}${path.extname(f)}`); fs.copyFileSync(f, to); return to; });
     if (round === 0) firstImages.push(...mine);
     // claude and muse continue under the id given them; codex and agy under the id their first call reported
     const canResume = author.cli === 'claude' || author.cli === 'muse' || Boolean(state.id);
-    let got = round > 0 && !canResume ? { ok: false, seconds: 0, error: 'the command reported no conversation id to continue' } : await once({ text, images: mine, round, resume: round > 0, stem: `R${round}` }), continuedBy = round > 0 ? 'the command\'s own resume' : null;
+    let got = round > 0 && !canResume ? { ok: false, seconds: 0, error: 'the command reported no conversation id to continue' } : await once({ text, images: mine, round, resume: round > 0, stem: `R${round}`, maxMinutes }), continuedBy = round > 0 ? 'the command\'s own resume' : null;
     if (!got.ok && round > 0) {
       // the command could not continue: once more as a fresh call that carries the transcript, and the record says so
       state.uuid = crypto.randomUUID(); state.id = null;
-      const again = await once({ text: resent(history, text), images: [...firstImages, ...mine], round, resume: false, stem: `R${round}-resent` });
+      const again = await once({ text: resent(history, text), images: [...firstImages, ...mine], round, resume: false, stem: `R${round}-resent`, maxMinutes });
       got = { ...again, seconds: got.seconds + again.seconds, resumeError: got.error }; continuedBy = 'the transcript, sent again in a fresh call (the resume failed)';
     }
     if (got.ok) history.push({ sent: text, reply: got.text });

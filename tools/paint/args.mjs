@@ -38,7 +38,7 @@ export const USAGE = `usage: npm run paint -- <subject[,subject...]> plan|paint|
   --previous <dir>      the run folder of the result this retry starts from (its finished full-size painting)
   --looks U             the benchmark's budget for looks in one try, in units (default 3). A look has a fixed price:
                         0.3 for the whole sheet at half size, 1.0 at full size, its share when stopped at a stage
-                        or cut to a region, never under 0.2. How it paints (sweeps, water, dryings) and machine
+                        or cut to a region, never under 0.05. How it paints (sweeps, water, dryings) and machine
                         seconds are recorded, never charged
   --wallminutes N       the safety stop, not a budget: minutes on the wall clock after which a session is cut off and
                         marked so (default 360). Waiting for a look, a queue or the provider is never charged

@@ -54,7 +54,7 @@ test('every level of every model against Auto; a failed run and a scheduled pict
   assert.match(md, /Judges: \*\*open3-local-3x\*\* \(panel open3, reasoning off\); human-ness scheme progress10/);
   assert.match(md, /\| neon-m \| -0\.2 \|/); assert.match(md, /1, 1 failed/);
   assert.match(md, /- neon-m L4, a: nothing handed in/); assert.match(md, /## Likeness at the bottom of the scale/);
-  assert.match(md, /cannot be assigned to one kind of help/);
+  assert.match(md, /Each level is one fresh, independent session/);
   assert.match(md, /\| c \| 90 \| not run \| 0 \(no painting\) \| not run \| not run \|/);
 });
 

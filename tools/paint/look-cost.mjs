@@ -1,7 +1,7 @@
 // What a look costs (owner, 23 Nov): a model is never charged for how it paints. A look has a fixed price by its size
 // and by the share of the sheet or script it paints, whatever is in it: a half-size look of the whole sheet 0.3, a
 // full-size one 1.0; a look stopped after a stage its share of the plan's washes; a look of a region the share of the
-// script's passages that touch it (both together, their product); never under 0.2. A try's budget is 3.0. The final is
+// script's passages that touch it (both together, their product); never under 0.05. A try's budget is 3.0. The final is
 // not charged. Brush sweeps, dryings, water steps, cell-steps, seconds, tokens and steps are recorded beside the
 // charge (usage.json), never charged or limited. Why washes for a stage: the late stages are few strokes but many
 // sittings (22 Nov, Mittens close-up). A region is not priced by its area: a box of a quarter of the sheet touched 42
@@ -12,7 +12,7 @@ export const DEFAULT_LOOK_UNITS = 3;
 /** The price of a look of the whole sheet and script, by its size. */
 export const LOOK_PRICE = Object.freeze({ half: 0.3, full: 1.0 });
 /** The least any look costs, however small or partial. */
-export const LEAST_LOOK_COST = 0.2;
+export const LEAST_LOOK_COST = 0.05;
 /**
  * What one showing of the ORIGINAL costs, from the same budget as the looks (owner, 23 Nov: "keep the picture away and
  * use it as part of a looks budget"). The pictures are put away when a session plans or looks, and `./unpaint show`

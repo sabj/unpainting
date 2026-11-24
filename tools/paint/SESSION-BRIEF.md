@@ -43,7 +43,7 @@ None of that is held against you, and no number of them is too many or too few.
 Two things are limited, and they are the benchmark's, not a judgment of your work: **the budget for one try**, the
 same for every model and every machine. Looks: `LOOKS_MOST` units. A look has a fixed price, whatever is in it: a
 look of your whole plan on the whole sheet, painted at half size, costs 0.3; a look stopped after a stage you name
-(`./unpaint look --until 2`) or of a region of your own script (`--region`) costs its share of that, and at least 0.2.
+(`./unpaint look --until 2`) or of a region of your own script (`--region`) costs its share of that, and at least 0.05.
 Where and when you look is yours to choose. How you paint costs nothing: water, wetness, brushwork, the number of
 strokes, waits and dryings are yours, and the final painting is not charged. Each price is told before anything is
 painted (`./unpaint plan` lists it; `./unpaint cost ...` prices any look and paints nothing); a look is refused only

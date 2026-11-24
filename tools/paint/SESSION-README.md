@@ -74,7 +74,7 @@ A choice that is refused costs no look. A choice that is exactly one you planned
 return to an earlier choice: it is counted, and past REVERTS_MOST of them it is refused (`TASK.md` says why). A painting that fails on this side costs no look either: the answer
 says NOT PAINTED, and you may ask again. The same look of a choice you have already looked at renders nothing and
 costs nothing. A look's price is fixed: 0.3 units for your whole plan at half size, its share when stopped at a stage
-or cut to a region, and never under 0.2, whatever the look holds. The final, painted at full size after you stop,
+or cut to a region, and never under 0.05, whatever the look holds. The final, painted at full size after you stop,
 is not charged. How you paint (water, strokes, waits, dryings) is not charged. One guard only, to keep the machines free: a painting that runs to more than ten times the water steps of
 the automatic painting of this subject is stopped and said so; it costs no look.
 

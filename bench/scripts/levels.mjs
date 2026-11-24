@@ -6,22 +6,23 @@
 //     failed (true when the run failed, the painter refused the script or there is no painting), commit, judgeVersion,
 //     judgeProfile, autoCommit (optional, on a model record: the Auto commit it was given or compared with),
 //     progression, cheatRisk, likeness (side readings, shown beside and never part of a score) }
-// Every level is ONE try (the definition, 23 Nov 2026: L1 one attempt; L2 one go; L3 one retry of L2; L4 one retry of
-// L3). Where a level holds several tries (a test run), the LAST counts, never the best.
+// Every level is ONE fresh, independent session (the definition, 24 Nov 2026: L1 picture + format + tips; L2 +
+// prepared studies, drawing, named forms, traced shapes; L3 + Auto's plan and finished painting; L4 L3's inputs in an
+// open session with tools). Where a level holds several tries (a test run), the LAST counts, never the best.
 import { mean, bootstrapMean } from './lib.mjs';
 
 /** The levels in order. `was` is the old round the level grew out of, for display only. */
 export const LEVELS = [
   { id: 'Auto', header: 'Code planner alone', was: null },
-  { id: 'L1', header: 'Freehand kit and tips, one attempt', was: 'V3' },
-  { id: 'L2', header: 'The planner\'s inputs, one try', was: 'V4' },
-  { id: 'L3', header: 'One retry after studying its own painting', was: 'V5' },
-  { id: 'L4', header: 'One more retry, with the studies\' traced shapes', was: null },
+  { id: 'L1', header: 'Picture, format and painting tips', was: 'V3' },
+  { id: 'L2', header: 'Prepared studies, drawing, named forms and traced shapes', was: 'V4' },
+  { id: 'L3', header: 'L2 plus Auto\'s plan and finished painting', was: 'V5' },
+  { id: 'L4', header: 'L3\'s inputs in an open session with tools', was: null },
 ];
 const MODEL_LEVELS = ['L1', 'L2', 'L3', 'L4'];
-/** A retry level and the level it retries: its gain is read against that one, on the pictures both ran. */
-const RETRIES = { L3: 'L2', L4: 'L3' };
-export const LEVEL_NOTE = 'Each level changes several things at once (level 1: another way of painting altogether; level 3: one more try and its own painting to study; level 4: one more try again and the traced shapes), so a gain between two levels is the effect of the whole step and cannot be assigned to one kind of help.';
+/** Adjacent levels whose pairwise delta is reported whenever both ran on the same pictures. */
+const STEPS = { L3: 'L2', L4: 'L3' };
+export const LEVEL_NOTE = 'Each level is one fresh, independent session (L1: picture, format and tips; L2: + prepared studies, drawing, named forms and traced shapes; L3: + Auto\'s plan and finished painting; L4: L3\'s inputs in an open session with tools).';
 
 /** Old round name to new level name, for labels only. V1 and V2 have no new name: they are not in the new benchmark. */
 export const ALIASES = Object.freeze({ V3: 'L1', V4: 'L2', V5: 'L3' });   // the rounds the first three levels grew out of; level 4 has none
@@ -124,7 +125,6 @@ export function summarize(records, { scale = SCALES.score10, floorShare = DEFAUL
   const tryOf = r => r.try ?? 1;
   const at = (level, subject) => mine.filter(r => r.level === level && r.subject === subject);
   const entered = Object.fromEntries(MODEL_LEVELS.map(l => [l, mine.some(r => r.level === l)]));
-  for (const [l, before] of Object.entries(RETRIES)) if (entered[l] && !entered[before]) throw new Error(`levels: ${name} has ${l} records and no ${before} records. ${l} is a retry of ${before}`);
   const runsAt = level => (scheduled ? (scheduled[level] ?? []) : [...auto.bySubject.keys()]);
   for (const level of MODEL_LEVELS.filter(l => entered[l])) for (const sub of runsAt(level)) if (!auto.bySubject.has(sub)) throw new Error(`levels: ${sub} is scheduled at ${level} and Auto has no record of it. Every scheduled picture needs Auto painted and judged`);
   const opts = { scale, floorShare };
@@ -162,10 +162,10 @@ export function summarize(records, { scale = SCALES.score10, floorShare = DEFAUL
       autoRawMean: mean(rows.map(s => s.auto.score)),
     };
   }
-  // each retry against the level it retries, on the pictures both ran
+  // each adjacent step on the pictures both levels ran (levels are independent, so either may be absent)
   const steps = {};
-  for (const [l, before] of Object.entries(RETRIES)) {
-    if (!entered[l]) continue;
+  for (const [l, before] of Object.entries(STEPS)) {
+    if (!entered[l] || !entered[before]) continue;
     const rows = subjects.filter(s => s.levels[l] && s.levels[before]);
     const d = rows.map(s => s.levels[l].adjusted - s.levels[before].adjusted);
     steps[l] = { from: before, subjects: d.length, adjusted: d.length ? mean(d) : null, interval: d.length ? bootstrapMean(d, { seed }) : null, raw: d.length ? mean(rows.map(s => s.levels[l].score - s.levels[before].score)) : null };

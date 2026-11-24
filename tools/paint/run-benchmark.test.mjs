@@ -12,7 +12,7 @@ test('the whole benchmark at once: models x core pictures x L1 to L4, each its o
   for (const r of runs) {
     assert.ok(!r.args.includes('--previous') && !r.args.includes('--try'), `${r.folder}: handed no other level's result`);
     assert.deepEqual(r.args.slice(0, 7), [r.subject, 'paint', '--work', r.level === 'L4' ? 'session' : 'rounds', '--level', r.level, '--author']);
-    assert.equal(r.args.includes('--wallminutes'), r.level === 'L4'); assert.ok(!r.args.includes('--looks'), 'the default look budget, 3 units');
+    assert.ok(r.args.includes('--wallminutes'), 'every level gets the 60-minute session cap'); assert.ok(!r.args.includes('--looks'), 'the default look budget, 3 units');
     assert.equal(r.folder, sessionFolder(r));
   }
   const l4 = runs.find(r => r.level === 'L4' && r.author === 'opus-m'); assert.deepEqual(l4.args.slice(7), ['opus-m', '--wallminutes', String(L4_MINUTES), '--set', 'video=1', '--set', 'frames=240']);

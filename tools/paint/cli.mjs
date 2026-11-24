@@ -541,7 +541,7 @@ async function sessionRun(r) {
       // the stand-in calls no model: the folder as a model would be handed it is kept, and nothing is handed in
       if (author.cli === 'dry') {
         fs.cpSync(cwd, path.join(dir, 'folder'), { recursive: true, verbatimSymlinks: true });
-        session = { ended: 'stand-in: no model called', standIn: true, level: level.name, budget, looksMost, eyesOnly: { pictures: eyesOnly, words: EYES_ONLY_WORDS }, submitted: null };
+        session = { ended: 'stand-in: no model called', standIn: true, level: level.name, budget, looksMost, eyesOnly: { pictures: eyesOnly, words: EYES_ONLY_WORDS, showings: [] }, submitted: null };
         fin = { failure: `the stand-in calls no model in an open session: the folder it would be handed is kept in ${path.join(dir, 'folder')}, and nothing is painted` };
         say(r, `stand-in: the open session's folder is written and kept (${handed.map(h => h.folder).join(', ') || 'nothing beside the inputs'}); no model is called`);
         throw Object.assign(new Error('stand-in'), { standIn: true });
@@ -690,7 +690,7 @@ async function lookOfChoice(r, fin) {
 // replies at once, a provider (rounds-call.mjs): the runs themselves all go on together
 const roundsSlots = Object.fromEntries(Object.entries(ROUNDS_AT_ONCE).map(([cli, n]) => [cli, pool(n)]));
 const roundsLent = {
-  root: ROOT, briefFile: BRIEF_FILE, looksMost, get level() { return level.name; }, get terms() { return terms; }, get previous() { return req.previous ? path.resolve(req.previous) : null; }, say,
+  root: ROOT, briefFile: BRIEF_FILE, looksMost, get wallMinutes() { return req.wallMinutes ?? null; }, get level() { return level.name; }, get terms() { return terms; }, get previous() { return req.previous ? path.resolve(req.previous) : null; }, say,
   // the traced shapes (levels 2 and 3): a prepared input, from the prepared folder of this code, else the newest of the subject that holds them (said)
   shapesFile(r) {
     const mine = preparedAt(r.spec), root = path.dirname(mine), all = [mine, ...(fs.existsSync(root) ? fs.readdirSync(root).map(d => path.join(root, d)).filter(d => d !== mine).sort((a, b) => (fs.existsSync(path.join(b, 'prepared.json')) ? fs.statSync(path.join(b, 'prepared.json')).mtimeMs : 0) - (fs.existsSync(path.join(a, 'prepared.json')) ? fs.statSync(path.join(a, 'prepared.json')).mtimeMs : 0)) : [])];

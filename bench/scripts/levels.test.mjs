@@ -17,10 +17,10 @@ const FULL = [...AUTO,
 test('names, sheet headers and the display-only alias map', () => {
   assert.deepEqual(LEVELS.map(l => l.id), ['Auto', 'L1', 'L2', 'L3', 'L4']);
   assert.equal(headerFor('Auto'), 'Code planner alone');
-  assert.equal(headerFor('L1'), 'Freehand kit and tips, one attempt');
-  assert.equal(headerFor('L2'), 'The planner\'s inputs, one try');
-  assert.equal(headerFor('L3'), 'One retry after studying its own painting');
-  assert.equal(headerFor('L4'), 'One more retry, with the studies\' traced shapes');
+  assert.equal(headerFor('L1'), 'Picture, format and painting tips');
+  assert.equal(headerFor('L2'), 'Prepared studies, drawing, named forms and traced shapes');
+  assert.equal(headerFor('L3'), 'L2 plus Auto\'s plan and finished painting');
+  assert.equal(headerFor('L4'), 'L3\'s inputs in an open session with tools');
   assert.deepEqual(ALIASES, { V3: 'L1', V4: 'L2', V5: 'L3' });
   assert.deepEqual(['V1', 'V2', 'V3', 'V4', 'V5'].map(levelFor), [null, null, 'L1', 'L2', 'L3']);
   assert.deepEqual(LEVELS.map(l => l.was), [null, 'V3', 'V4', 'V5', null]);
@@ -100,8 +100,11 @@ test('every level is one try; where a test run made several, the last counts and
   assert.equal(s.subjects[0].levels.L3.score, 6.5); assert.equal(s.subjects[0].levels.L3.try, 3); assert.equal(s.subjects[0].levels.L3.triesMade, 3);
   assert.equal(s.subjects[0].levels.L3.best, undefined, 'no best-of is kept: the last try is the level\'s painting');
   near(s.steps.L3.adjusted, (6.5 - 9) / 4);
-  assert.throws(() => summarize([auto('hills', 6), m('L3', 'hills', 9)]), /L3 records and no L2 records\. L3 is a retry of L2/);
-  assert.throws(() => summarize([auto('hills', 6), m('L2', 'hills', 9), m('L4', 'hills', 9)]), /L4 records and no L3 records\. L4 is a retry of L3/);
+  // levels are independent: L3 or L4 alone summarizes cleanly without earlier levels
+  const soloL3 = summarize([auto('hills', 6), m('L3', 'hills', 9)]);
+  assert.equal(soloL3.subjects[0].levels.L3.score, 9); assert.equal(soloL3.steps.L3, undefined);
+  const soloL4 = summarize([auto('hills', 6), m('L2', 'hills', 9), m('L4', 'hills', 9)]);
+  assert.equal(soloL4.subjects[0].levels.L4.score, 9); assert.equal(soloL4.steps.L4, undefined);
   assert.throws(() => summarize([auto('hills', 6), m('L2', 'hills', 9), m('L2', 'hills', 8)]), /two records for the same try/);
 });
 
@@ -202,7 +205,7 @@ test('Markdown table per subject', () => {
   const text = lines.join('\n');
   assert.match(text, /L3 minus L2, the 3 pictures both ran: \+0\.25 of headroom/);
   assert.match(text, /L4 minus L3, the 3 pictures both ran: -0\.08 of headroom/);
-  assert.match(text, /cannot be assigned to one kind of help/);
+  assert.match(text, /Each level is one fresh, independent session/);
   assert.match(lines.at(-1), /Auto: commit abc1234, judge J2 J2-full\. Progression and cheat-risk are shown beside the score/);
   const failed = subjectTable(summarize([auto('hills', 6), m('L2', 'hills', null, { failed: true })]));
   assert.match(failed, /\| hills \| 6 \| not run \| 0 \(failed\) \| not run \| not run \| 4 \| not run \| -1\.5 \| not run \| not run \|/);

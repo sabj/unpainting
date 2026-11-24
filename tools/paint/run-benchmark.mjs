@@ -25,7 +25,7 @@ import { registryPath } from './subjects.mjs';
 const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..', '..');
 /** What every session of the run gets on its command line beside its level: the 240-frame film of its final. */
 export const FINAL_SETS = Object.freeze([['video', '1'], ['frames', '240']]);
-/** The open session's clock (L4), in minutes: the same 60 as the rounds levels are given. */
+/** The session clock across every level (L1 to L4), in minutes. */
 export const L4_MINUTES = 60;
 
 /** The folder name of one session. */
@@ -42,7 +42,7 @@ export function planRuns({ models, levels, pictures }) {
   for (const level of levels) {
     const { work } = levelOf(level);
     for (const subject of pictures(level)) for (const author of models) {
-      const args = [subject, 'paint', '--work', work, '--level', level, '--author', author, ...(work === 'session' ? ['--wallminutes', String(L4_MINUTES)] : []), ...FINAL_SETS.flatMap(([k, v]) => ['--set', `${k}=${v}`])];
+      const args = [subject, 'paint', '--work', work, '--level', level, '--author', author, '--wallminutes', String(L4_MINUTES), ...FINAL_SETS.flatMap(([k, v]) => ['--set', `${k}=${v}`])];
       runs.push({ author, subject, level, work, folder: sessionFolder({ author, subject, level }), args });
     }
   }

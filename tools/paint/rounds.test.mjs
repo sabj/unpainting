@@ -67,8 +67,8 @@ test('the stand-in runs a whole level: script, edits, a stage look, a region loo
   const p = painter(), got = await run(standInReplies(SHEET), p);
   assert.equal(got.ended, 'done'); assert.equal(got.failure, null);
   assert.deepEqual(got.rounds.map(r => r.kind), ['script', 'edits', 'edits', 'done']);
-  // look 1 whole 0.3; look 2 until stage 1 (1 wash of 3: its share, floored at 0.2); look 3 a region every passage touches: 0.3
-  assert.deepEqual(got.looks.map(l => l.cost), [0.3, 0.2, 0.3]); assert.equal(got.lookUnits.spent, 0.8);
+  // look 1 whole 0.3; look 2 until stage 1 (1 wash of 3: 0.1); look 3 a region every passage touches: 0.3
+  assert.deepEqual(got.looks.map(l => l.cost), [0.3, 0.1, 0.3]); assert.equal(got.lookUnits.spent, 0.7);
   assert.deepEqual(p.seen.looks.map(l => [l.want.until, Boolean(l.want.region)]), [[null, false], [1, false], [null, true]]);
   assert.equal(got.checked.passages.length, 4); assert.equal(got.state.script.passages.find(q => q.id === 'p3').paint.dilution, 'strong');
   // records are complete: every round has its tokens and its look units, and the sums are there
@@ -98,9 +98,13 @@ test('the budget is enforced: looks stop when it is used, and a look it cannot p
   const script = JSON.stringify(standInScript(SHEET)), edit = n => JSON.stringify({ edits: [{ op: 'set', id: 'p1', path: 'what', value: `v${n}` }], look: 'whole' });
   const p = painter(), got = await run([script, ...Array.from({ length: 20 }, (_, i) => edit(i))], p);
   assert.equal(got.ended, 'budget used'); assert.equal(got.looks.length, 10); assert.equal(got.lookUnits.spent, 3); assert.equal(p.seen.looks.length, 10);
-  // 0.25 left: a whole look (0.3) is refused and said, a stage look (0.2) is painted
+  // 0.25 left: a whole look (0.3) is refused and said, a stage look (0.1) is painted
   const q = painter(), tight = await run([script, edit(1), JSON.stringify({ edits: [{ op: 'set', id: 'p1', path: 'what', value: 'x' }], look: { until: 1 } }), '{"done": true}'], q, { budget: 0.55 });
-  assert.match(tight.rounds[2].sent.text, /costs 0.3 units and you have 0.25 left; nothing was painted/); assert.deepEqual(tight.looks.map(l => l.cost), [0.3, 0.2]);
+  assert.match(tight.rounds[2].sent.text, /costs 0.3 units and you have 0.25 left; nothing was painted/); assert.deepEqual(tight.looks.map(l => l.cost), [0.3, 0.1]);
+  // wall-clock cap stops further rounds cleanly and keeps the last compiled script
+  let clock = 0;
+  const timed = await runRounds({ first: { text: 'B', images: [] }, ask: async a => { clock += 40 * 60000; return dryModel({ replies: [script, edit(1)] })(a); }, sheet: SHEET, wallMinutes: 60, now: () => clock, ...painter() });
+  assert.equal(timed.ended, 'wall clock'); assert.equal(timed.failure, null); assert.equal(timed.checked.passages.length, 3);
   // the same look of the same script is not painted or charged twice
   const same = await run([script, '{"look": "whole"}', '{"done": true}']);
   assert.equal(same.looks.length, 1); assert.match(same.rounds[2].sent.text, /already seen this look/);
