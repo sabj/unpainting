@@ -30,5 +30,16 @@ test('the real size never sizes the sheet', () => {
 
 test('every listed size is whole and plain', () => {
   const { sizes } = JSON.parse(fs.readFileSync(new URL('../../bench/real-sizes.json', import.meta.url), 'utf8'));
-  for (const [id, r] of Object.entries(sizes)) { assert.ok(r.heightCm > 5 && r.heightCm < 100 && r.widthCm > 5 && r.widthCm < 100, id); assert.deepEqual(Object.keys(r).filter(k => !['heightCm', 'widthCm', 'nominal', 'part'].includes(k)), [], id); }
+  for (const [id, r] of Object.entries(sizes)) { assert.ok(r.heightCm > 5 && r.heightCm < 100 && r.widthCm > 5 && r.widthCm < 100, id); assert.deepEqual(Object.keys(r).filter(k => !['heightCm', 'widthCm', 'nominal', 'part', 'sheet'].includes(k)), [], id); }
+});
+
+test('a museum sheet size of another shape than the file is told as the museum\'s figure, and a crop as a part', () => {
+  // Morisot, Avenue du Bois: the Met gives "sheet: 20 x 28 cm"; the file is 3193 x 2943 px, nearly square
+  const morisot = { id: 'morisot-avenue-du-bois', source: { px: [3193, 2943] } }, size = realSizeOf(morisot);
+  assert.deepEqual(size, { heightCm: 20, widthCm: 28, nominal: false, part: false, sheet: true });
+  assert.match(realSizeLine(size, standardSheet([3193, 2943])), /^The museum gives the original's sheet as 20 x 28 cm, which is not the shape of the picture you are given; your sheet is /);
+  assert.throws(() => realSizeOf({ ...morisot, realSize: { heightCm: 20, widthCm: 28 } }), /not the shape of the picture.*"sheet": true/s, 'unmarked, the mismatch still stops');
+  assert.throws(() => realSizeOf({ id: 'x', source: { px: [1400, 1000] }, realSize: { heightCm: 20, widthCm: 28, sheet: true } }), /drop the mark/);
+  // Manet's crop: the whole sheet's size, said as such, never a throw
+  assert.equal(realSizeOf({ id: 'manet-morisot-fan-crop', source: { px: [2100, 1767] } }).part, true);
 });
