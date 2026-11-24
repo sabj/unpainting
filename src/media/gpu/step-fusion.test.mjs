@@ -29,13 +29,14 @@ test('fused faces bind exactly ten storage buffers',()=>{
   }
 });
 
-test('GPU fusion and tight frontier retain fields across boundaries, drying and re-upload', {timeout:120000}, async t=>{
+// (time limit: 100 to 130 s when the GPU is shared with other work, against a 120 s limit; a hang is still caught)
+test('GPU fusion and tight frontier retain fields across boundaries, drying and re-upload', {timeout:600000}, async t=>{
   const keys=['GPU_RESIDENT','GPU_PERSISTENT','GPU_FUSE_FACES','GPU_FUSE_WETSCAN','GPU_SPARSE_TIGHT','GPU_WORKERS'];
   const saved=keys.map(k=>process.env[k]);let device;
   try {
     let gpu;
     try {const w=await import('webgpu');Object.assign(globalThis,w.globals);gpu=w.create([]);({device}=await openGpu(gpu));}
-    catch(e){t.skip(`GPU unavailable: ${e.message}`);return;}
+    catch(e){if(process.env.GPU_REQUIRED==='1')throw e;t.skip(`GPU unavailable: ${e.message}`);return;}
     // The old step mode is the reference schedule: it never had the tight frontier (padC is 0 there).
     const tight=process.env.GPU_STEP!=='old';
     // 0.1 mm cells take ten pore passes a step: the tight halo must still cull and match.

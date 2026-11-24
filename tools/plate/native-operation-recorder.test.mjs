@@ -74,9 +74,15 @@ test('fine ink captures each deposited gesture with fresh native rendering and u
  const {manifest,rgb}=await reconstruct(directory);assert.deepEqual(Buffer.from(rgb),Buffer.from(on.pixels));assert.deepEqual(manifest.events.map(e=>e.operation),['initial','drawing-dry','ink','drawing-dry','ink','final']);const inkEvents=manifest.events.filter(e=>e.operation==='ink');assert.notEqual(inkEvents[0].pixelSHA256,inkEvents[1].pixelSHA256);
 });
 
-test('GPU recording parity through brush, fine carry, drawing dry and graphite', {skip:process.platform!=='darwin',timeout:120000},async t=>{
+// Without a GPU the test is skipped and says so (GPU_REQUIRED=1: it fails instead). Time limit: 4 s idle, over the old 120 s
+// when the GPU and the processors are shared with other work; a hang is still caught.
+test('GPU recording parity through brush, fine carry, drawing dry and graphite', {skip:process.platform!=='darwin'&&'GPU recording parity is checked on macOS only',timeout:600000},async t=>{
  const {attachGpu}=await import('../../src/media/gpu/link.mjs');
  const {coherent,step}=await import('../../src/media/sheet.mjs');
+ {const probe=createSheet(makePaper(8,8,{seed:15}),[materialProfile('graphite-HB').pigment]);let info;
+  try{info=attachGpu(probe,DEFAULTS,{mode:'on',log:()=>{}});}catch(e){if(process.env.GPU_REQUIRED==='1')throw e;t.skip(`no GPU: ${e.message}`);return;}
+  finally{probe._gpu?.close();}
+  if(info.backend!=='gpu'){if(process.env.GPU_REQUIRED==='1')assert.fail(`no GPU: ${info.reason}`);t.skip(`no GPU: ${info.reason}`);return;}}
  const width=48,height=32,pigments=[materialProfile('graphite-HB').pigment,materialProfile('drawing-ink').pigment],directory=dir(t);
  function run(record){
   const sheet=createSheet(makePaper(width,height,{seed:15}),pigments),info=attachGpu(sheet,DEFAULTS,{mode:'on',log:()=>{}});assert.equal(info.backend,'gpu');assert.equal(info.fallback,false);

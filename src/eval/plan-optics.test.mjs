@@ -46,13 +46,14 @@ test('cellRGB averages the sheet render over each picture cell', () => {
   assert.deepEqual([...cellRGB(big, { w: 2, h: 1, SC, W2 })], [20, 30, 40, 50, 50, 50]);
 });
 
-test('the painter reports the plan carried in the sheet\'s units, not hundreds of per cent at pass 1', () => {
+// (time limit: a hang is still caught; on a busy machine the same run takes five times its idle time)
+test('the painter reports the plan carried in the sheet\'s units, not hundreds of per cent at pass 1', { timeout: 960000 }, () => {
   const root = fileURLToPath(new URL('../..', import.meta.url));
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'plan-optics-'));
   try {
     const r = spawnSync(process.execPath, ['tools/paint-plate.mjs', '--image', 'examples/targets/trumbull.jpg', '--washplan', 'examples/targets/trumbull.jpg', '--width', '64', '--mode', 'fast', '--video', '0',
       // segmentation is not under test: off keeps the run free of the SAM python and checkpoint (src/crop/segment-prep.mjs)
-      '--gpu', 'off', '--segments', 'off', '--allowdirty', '1', '--out', path.join(dir, 'p')], { cwd: root, encoding: 'utf8', timeout: 290000 });
+      '--gpu', 'off', '--segments', 'off', '--allowdirty', '1', '--out', path.join(dir, 'p')], { cwd: root, encoding: 'utf8', timeout: 900000 });
     assert.equal(r.status, 0, r.error?.message ?? r.stderr);
     const carried = r.stdout.match(/carried the plan: forms (\d+)% at agreement ([\d.]+)/);
     assert.ok(carried, 'the run reports how much of the plan it carried');

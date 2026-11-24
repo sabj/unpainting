@@ -51,7 +51,8 @@ test('the bundled value plans use only keys the painter reads', () => {
   assert.deepEqual(unusedPlanKeys(bench, { pipeline: false }), [], 'bench/v4v5/example/plan/config.json (--recipe none)');
 });
 
-test('the painter exits 3 on a plan key it never reads, unless --allowunusedplan 1', () => {
+// (time limit: a hang is still caught; on a busy machine the same run takes five times its idle time)
+test('the painter exits 3 on a plan key it never reads, unless --allowunusedplan 1', { timeout: 1260000 }, () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'plan-keys-'));
   try {
     const plan = path.join(dir, 'plan.json');
@@ -59,7 +60,7 @@ test('the painter exits 3 on a plan key it never reads, unless --allowunusedplan
     const run = (out, extra = []) => spawnSync(process.execPath, ['tools/paint-plate.mjs', '--image', 'examples/targets/trumbull.jpg', '--washplan', 'examples/targets/trumbull.jpg', '--width', '48',
       // segmentation is not under test: off keeps the run free of the SAM python and checkpoint (src/crop/segment-prep.mjs)
       '--mode', 'fast', '--video', '0', '--gpu', 'off', '--segments', 'off', '--valueplan', plan, '--valuepreviewonly', '1', '--allowdirty', '1', '--out', path.join(dir, out), ...extra],
-    { cwd: root, encoding: 'utf8', timeout: 120000 });
+    { cwd: root, encoding: 'utf8', timeout: 600000 });
     const strict = run('strict');
     assert.equal(strict.status, 3, strict.stderr);
     assert.match(strict.stdout, /UNUSED PLAN KEYS .*families\[\]\.looseness/);

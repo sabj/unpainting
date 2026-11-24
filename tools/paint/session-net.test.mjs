@@ -81,7 +81,7 @@ test('the command line starts: a dry run of a model session and of a plan resolv
   const here = path.dirname(new URL(import.meta.url).pathname), root = path.resolve(here, '..', '..');
   const run = args => { try { return { code: 0, out: execFileSync(process.execPath, [path.join(here, 'cli.mjs'), ...args], { cwd: root, encoding: 'utf8', stdio: 'pipe', timeout: 120000 }) }; } catch (e) { return { code: e.status, out: `${e.stdout}${e.stderr}` }; } };
   const plan = run(['mittens-closeup', 'plan', '--dry-run']);
-  if (plan.code !== 0 && /not registered|no such subject|registry/i.test(plan.out)) { t.skip('the subject list is not on this machine'); return; }
+  if (plan.code !== 0 && /no subject list at|not registered|no such subject|registry/i.test(plan.out)) { t.skip('the subject list is not on this machine'); return; }
   assert.equal(plan.code, 0, plan.out.slice(-600)); assert.match(plan.out, /dry run: nothing was started/);
   const session = run(['mittens-closeup', 'paint', '--author', 'argon-m', '--level', 'L2', '--dry-run']);
   assert.equal(session.code, 0, session.out.slice(-600)); assert.match(session.out, /dry run: nothing was started/);

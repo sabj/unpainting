@@ -7,12 +7,13 @@ import {execFileSync} from 'node:child_process';
 import sharp from 'sharp';
 
 // Segmentation is not under test here: --segments off keeps the run free of the SAM python and checkpoint.
-test('a fair full painting uses frozen charges with no target look or element read', async () => {
+// (time limit: a hang is still caught; on a busy machine the same run takes five times its idle time)
+test('a fair full painting uses frozen charges with no target look or element read', {timeout: 660000}, async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'planner-no-looks-'));
   try {
     const target = path.join(dir, 'target.png'), out = path.join(dir, 'paint');
     await sharp(Buffer.from('<svg width="48" height="36"><rect width="48" height="36" fill="#faf7ef"/><rect x="4" y="4" width="30" height="25" fill="#7796b0"/><rect x="24" y="15" width="18" height="17" fill="#473c32"/></svg>')).png().toFile(target);
-    try { execFileSync(process.execPath, ['tools/paint-plate.mjs', '--allowdirty', '1', '--image', target, '--washplan', target, '--width', '48', '--scale', '1', '--sheetmm', '152.4', '--mode', 'fast', '--gpu', 'off', '--threads', '1', '--drawing', 'none', '--feedback', '0', '--notargetlooks', '1', '--targetguard', 'strict', '--frames', '0', '--video', '0', '--segments', 'off', '--out', out], {cwd: new URL('../../', import.meta.url), env: {...process.env, W2_CACHE_DIR: path.join(dir, 'cache')}, stdio: 'pipe', timeout: 60000}); } catch (e) { throw Error(String(e.stdout).split('\n').slice(-20).join('\n') + String(e.stderr)); }
+    try { execFileSync(process.execPath, ['tools/paint-plate.mjs', '--allowdirty', '1', '--image', target, '--washplan', target, '--width', '48', '--scale', '1', '--sheetmm', '152.4', '--mode', 'fast', '--gpu', 'off', '--threads', '1', '--drawing', 'none', '--feedback', '0', '--notargetlooks', '1', '--targetguard', 'strict', '--frames', '0', '--video', '0', '--segments', 'off', '--out', out], {cwd: new URL('../../', import.meta.url), env: {...process.env, W2_CACHE_DIR: path.join(dir, 'cache')}, stdio: 'pipe', timeout: 600000}); } catch (e) { throw Error((e.code === 'ETIMEDOUT' ? 'the painter ran past its 600 s limit\n' : '') + String(e.stdout).split('\n').slice(-20).join('\n') + String(e.stderr)); }
     const guard = JSON.parse(fs.readFileSync(path.join(out, 'target-guard.json'), 'utf8'));
     assert.equal(guard.looks.count, 0);
     assert.equal(guard.violations, 0);

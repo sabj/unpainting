@@ -194,14 +194,27 @@ test('multigrid and IC(0) give the same pressure and fluxes to 1e-9 on an oval, 
     assert.ok(r.out.mg.res.iterations <= 60, note);
   }
 });
-test('a full-scale first wash (900k cells) is solved by multigrid in bounded time', { timeout: 120000 }, () => {
+// "Bounded time" is measured in the machine's own speed at that moment, not in seconds, so a busy machine cannot fail it:
+// the time of one plain five-point pass over a grid of the same size, taken just before and just after the solve (the
+// slower of the two). A full-scale multigrid solve takes 300 to 1000 such passes (18 iterations); the bound is 6000,
+// where the 20 s and 30 s limits these tests had stood on an idle machine. The iteration bound is the count of the work.
+function sweepSeconds(w, h, passes = 10) {
+  const n = w * h, a = new Float64Array(n).fill(1), b = new Float64Array(n), t = performance.now();
+  for (let k = 0; k < passes; k++) { const s = k & 1 ? b : a, d = k & 1 ? a : b; for (let i = w; i < n - w; i++) d[i] = 0.2 * (s[i] + s[i - 1] + s[i + 1] + s[i - w] + s[i + w]); }
+  return (performance.now() - t) / 1000 / passes;
+}
+const SWEEPS_A_SOLVE = 6000;
+function inSweeps(w, h, solve) {
+  const before = sweepSeconds(w, h), out = solve(), sweep = Math.max(before, sweepSeconds(w, h));
+  return { ...out, sweeps: out.seconds / sweep, note: `${out.seconds.toFixed(1)} s, ${(out.seconds / sweep).toFixed(0)} plain passes of ${(sweep * 1000).toFixed(1)} ms` };
+}
+test('a full-scale first wash (900k cells) is solved by multigrid in bounded time', { timeout: 600000 }, () => {
   const w = 1462, h = 975, n = w * h, index = new Uint8Array(n), order = new Int32Array(n); let count = 0;
   for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (((x - w / 2) / (w * .45)) ** 2 + ((y - h / 2) / (h * .45)) ** 2 < 1) { const i = y * w + x; index[i] = 1; order[count++] = i; }
   const sink = Float64Array.from(index, (m, i) => m && (!index[i - 1] || !index[i + 1] || !index[i - w] || !index[i + w]) ? 1e-3 : 0);
-  const t = performance.now(), res = dryingPressure(order, count, index, w, sink, new Float64Array(n), new Float64Array(n), new Float64Array(n), 'mg');
-  const seconds = (performance.now() - t) / 1000;
+  const r = inSweeps(w, h, () => { const t = performance.now(), res = dryingPressure(order, count, index, w, sink, new Float64Array(n), new Float64Array(n), new Float64Array(n), 'mg'); return { res, seconds: (performance.now() - t) / 1000 }; }), res = r.res;
   assert.ok(res.relativeResidual <= 1.5e-11, String(res.relativeResidual));
-  assert.ok(res.iterations <= 60 && seconds < 20, `${count} cells: ${res.iterations} iterations, ${seconds.toFixed(1)} s`);
+  assert.ok(res.iterations <= 60 && r.sweeps < SWEEPS_A_SOLVE, `${count} cells: ${res.iterations} iterations, ${r.note}`);
 });
 
 // Inputs Astra built against the first multigrid (review/consult/*perf-mg1*): each must converge on the equations themselves.
@@ -229,11 +242,11 @@ test('puddles at the same place in two labellings never share a coarse node (655
   const r = centredResidual(w, h, (x, y) => (x === 4 && y <= 515) || dots.has(y * w + x) || (x === 2 && y >= 512) || (y === 519 && x <= 1), (x, y) => x === 4 && y === 510 ? 1 : 0);
   assert.ok(r.res.relativeResidual < 1e-9, JSON.stringify(r.res));
 });
-test('a fragmented full-scale footprint (6200 puddles) solves in bounded time and memory', { timeout: 120000 }, () => {
+test('a fragmented full-scale footprint (6200 puddles) solves in bounded time and memory', { timeout: 600000 }, () => {
   const before = process.memoryUsage().rss;
-  const r = centredResidual(1500, 930, (x, y) => x % 15 < 14 && y % 15 < 14, (x, y) => (x % 15 === 0 || y % 15 === 0) ? 1e-3 : 0);
+  const r = inSweeps(1500, 930, () => centredResidual(1500, 930, (x, y) => x % 15 < 14 && y % 15 < 14, (x, y) => (x % 15 === 0 || y % 15 === 0) ? 1e-3 : 0));
   const grown = (process.memoryUsage().rss - before) / 2 ** 20;
-  assert.ok(r.res.relativeResidual < 1e-9 && r.seconds < 30, `${r.res.iterations} iterations, ${r.seconds.toFixed(1)} s`);
+  assert.ok(r.res.relativeResidual < 1e-9 && r.res.iterations <= 60 && r.sweeps < SWEEPS_A_SOLVE, `${r.res.iterations} iterations, ${r.note}`);
   assert.ok(grown < 1500, `${grown.toFixed(0)} MB`);
 });
 
