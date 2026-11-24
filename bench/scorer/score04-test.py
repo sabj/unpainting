@@ -520,6 +520,52 @@ class EndToEnd(unittest.TestCase):
         self.assertEqual(self.S.main([str(a), str(m), "--out", out, "--snapshots", "film13"], judge=j3, say=lambda *x, **k: None), 0)
         self.assertEqual(len([1 for _, n, _c in j3.calls if n == 14]), 18, "every sequence is read again under the other scheme")
 
+    def test_a_kept_reading_is_reused_only_for_the_same_panel_route_options_and_pictures(self):
+        a, m = self.runs()
+        out = os.path.join(self.tmp.name, "out")
+        run = lambda j, *more: self.S.main([str(a), str(m), "--out", out, *more], judge=j, say=lambda *x, **k: None)
+        j = self.stub(); j.marks = {}
+        self.assertEqual(run(j), 0); n = len(j.calls); self.assertGreater(n, 0)
+        again = self.stub(); again.marks = {}
+        self.assertEqual(run(again), 0); self.assertEqual(again.calls, [], "the same scoring again reuses every reading")
+        # each of these changes what a reply could be: nothing kept is reused
+        changes = {"route": lambda r: {**r, "route": "openrouter"}, "endpoint": lambda r: {**r, "endpoint": "elsewhere"}, "panel name": lambda r: {**r, "panelName": "other"},
+                   "options": lambda r: {**r, "options": {**r["options"], "think": True}}, "reasoning": lambda r: {**r, "reasoning": "low"},
+                   "model digest": lambda r: {**r, "digests": {**r["digests"], "j1": "d-new"}}, "served name": lambda r: {**r, "sentAs": {"j1": "j1:other"}}}
+        for what, change in changes.items():
+            jx = self.stub(); jx.marks = {}; rec = jx.record
+            jx.record = lambda cfg, change=change, rec=rec: change(rec(cfg))
+            self.assertEqual(run(jx), 0)
+            # (the last: only j1 is served under another name, and j2's and j3's kept readings are theirs again)
+            self.assertEqual(len(jx.calls), n // 3 if what == "served name" else n, f"a different {what} reads again")
+        back = self.stub(); back.marks = {}
+        self.assertEqual(run(back), 0); self.assertEqual(len(back.calls), n // 3, "back to the first settings: j1's readings, kept under the other name, are read again")
+        # a changed picture
+        from PIL import Image as I
+        I.new("RGB", (60, 80), (9, 9, 9)).save(m / "plate" / "painting.png")
+        jp = self.stub(); jp.marks = {}
+        self.assertEqual(run(jp), 0)
+        self.assertEqual(len(jp.calls), 18, "only the changed painting is read again: alone (9), and its sequence, which shows the finished sheet (9)")
+
+    def test_fresh_reads_again_and_a_repeat_is_kept_apart_for_a_noise_measurement(self):
+        a, m = self.runs()
+        out = os.path.join(self.tmp.name, "out")
+        run = lambda j, *more: self.S.main([str(a), str(m), "--out", out, *more], judge=j, say=lambda *x, **k: None)
+        j = self.stub(); j.marks = {}
+        self.assertEqual(run(j), 0); n = len(j.calls)
+        f = self.stub(); f.marks = {}
+        self.assertEqual(run(f, "--fresh"), 0); self.assertEqual(len(f.calls), n, "--fresh reuses nothing")
+        r2 = self.stub(); r2.marks = {}
+        self.assertEqual(run(r2, "--repeat", "2"), 0); self.assertEqual(len(r2.calls), n, "a repeat shares no reading with repeat 1")
+        one, two = json.loads(Path(out, "results.json").read_text()), json.loads(Path(out, "results-repeat-2.json").read_text())
+        self.assertEqual((one["repeat"], two["repeat"]), (1, 2))
+        self.assertTrue(Path(out, "readings", "model-run", "r2").is_dir()); self.assertIn("repeat 2 of the same paintings", Path(out, "SCORES-repeat-2.md").read_text())
+        r2b = self.stub(); r2b.marks = {}
+        self.assertEqual(run(r2b, "--repeat", "2"), 0); self.assertEqual(r2b.calls, [], "the same repeat again is the same scoring")
+        k1 = json.loads(Path(out, "readings", "model-run", "single-j1-1.json").read_text())["cacheKey"]
+        k2 = json.loads(Path(out, "readings", "model-run", "r2", "single-j1-1.json").read_text())["cacheKey"]
+        self.assertNotEqual(k1, k2)
+
     def test_a_broken_judge_is_named_and_the_exit_is_not_clean(self):
         a, m = self.runs()
         j = self.stub(broken="j3"); j.marks = {}

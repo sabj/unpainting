@@ -9,7 +9,7 @@ npm run bench:score04 -- RUN_FOLDER... --out DIR
 npm run bench:score04 -- runs.json --out DIR
 ```
 
-`bench/scripts/score04.mjs` runs `bench/scorer/score04.py` under `BENCH_SCORE_PYTHON` (else `python3`), which needs `bench/scorer/requirements.txt`. It writes `DIR/results.json` (every figure, every setting) and `DIR/SCORES.md` (the readable table, faults first), and keeps each judge reply in `DIR/readings/`. A reply is reused only for the same judge, prompt and pictures.
+`bench/scripts/score04.mjs` runs `bench/scorer/score04.py` under `BENCH_SCORE_PYTHON` (else `python3`), which needs `bench/scorer/requirements.txt`. It writes `DIR/results.json` (every figure, every setting) and `DIR/SCORES.md` (the readable table, faults first), and keeps each judge reply in `DIR/readings/`. A reply is reused only when everything that could change it is the same: panel, route, endpoint, the judge and the name it is served under, its digest, the options sent, the rubric, the prompt, the pictures and their sizes. `--fresh` reads everything again. `--repeat N` scores the same paintings a further time and shares no reading with another repeat (`results-repeat-N.json`, `SCORES-repeat-N.md`): two repeats give the judges' noise on the same painting.
 
 - A run folder holds `run.json` and the painting (`plate/painting.png` or `painting.png`) with its film, `frames.json`, beside it. The original is `run.json`'s `subject.sourceAbs`. The style the judges are told comes from the subject registry.
 - A manifest is JSON: a list, or `{"runs": [...]}`, of folders or of `{folder, label?, subject?, target?, style?}`. Relative paths are read from the manifest's folder.

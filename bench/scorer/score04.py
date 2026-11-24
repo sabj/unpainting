@@ -23,8 +23,12 @@ For each painting (s04_runs.py says what a run folder must hold):
   6 usage beside the score: each run's usage.json.
 Three readings a judge; every picture for one judge before the next judge is loaded; on the local route the model is
 unloaded after its readings, and the run waits while the server holds another job's model. Readings are kept in
-DIR/readings/ and reused when the same judge, prompt and pictures were read before. Exit 0 complete, 1 written but a
-reading is short of a judge (named under "Faults first"), 2 refused (nothing judged).
+DIR/readings/ and reused only when everything that could change a reply is the same (cache_key: panel, route,
+endpoint, the judge as named and as served, its digest, the options sent, the rubric, the prompt, the pictures and
+their sizes, the repeat). --fresh reads everything again. --repeat N scores the same paintings a further time, kept
+apart (readings/.../rN, results-repeat-N.json, SCORES-repeat-N.md), for a noise measurement: two repeats never share
+a reading. Exit 0 complete, 1 written but a reading is short of a judge (named under "Faults first"), 2 refused
+(nothing judged).
 """
 import argparse, json, os, sys, time
 
@@ -67,6 +71,7 @@ class Job:
         self.text_of, self.data_uri, self._content = text_of, data_uri, None
         self.imagesSha = R.sha("".join(file_sha(f) for f, _ in images))
         self.promptSha = R.sha("".join(t for t in text_of))
+        self.options = {"ctx": ctx, "maxTokens": tokens, "longSidePx": [px for _, px in images]}
 
     def content(self):
         if self._content is None:
@@ -91,22 +96,34 @@ def jobs_for(paintings, originals, rubric, data_uri):
     return out
 
 
-def read_all(jobs, cfg, judge, out, say=print):
-    """{(key, kind): {model: [readings]}}, every job for one judge before the next is loaded."""
-    got = {}
+def cache_key(jb, model, jrec, rubric_sha, repeat):
+    """The sha256 a kept reading is reused under: everything that could change the reply. A reading kept under any
+    other panel, route, endpoint, served name, digest, option, rubric, prompt, picture, picture size or repeat is not
+    this reading."""
+    return R.sha(json.dumps({"kind": jb.kind, "panel": jrec.get("panelName"), "label": jrec.get("label"), "route": jrec.get("route"), "endpoint": jrec.get("endpoint"),
+                             "judges": jrec.get("panel"), "judge": model, "servedAs": (jrec.get("sentAs") or {}).get(model, model),
+                             "digest": (jrec.get("digests") or {}).get(model), "options": jrec.get("options"), "reasoning": jrec.get("reasoning"),
+                             "rubric": rubric_sha, "prompt": jb.promptSha, "images": jb.imagesSha, "job": jb.options, "readings": R.READINGS, "repeat": repeat}, sort_keys=True))
+
+
+def read_all(jobs, cfg, judge, out, say=print, jrec=None, rubric_sha=None, fresh=False, repeat=1):
+    """{(key, kind): {model: [readings]}}, every job for one judge before the next is loaded. A kept reading is reused
+    only under the same cache_key; `fresh` reads everything again; `repeat` > 1 is a further scoring kept apart."""
+    got, jrec = {}, jrec or {}
     for m in cfg["panel"]:
         judge.wait_turn(cfg, m)
         tag = m.replace(":", "_").replace("/", "_")
         for jb in jobs:
-            d = os.path.join(out, "readings", jb.key)
+            d = os.path.join(out, "readings", jb.key, *([f"r{repeat}"] if repeat > 1 else []))
             os.makedirs(d, exist_ok=True)
+            key = cache_key(jb, m, jrec, rubric_sha, repeat)
             for k in range(1, R.READINGS + 1):
                 f = os.path.join(d, f"{jb.kind}-{tag}-{k}.json")
-                old = read_json(f) if os.path.isfile(f) else None
-                if not (old and old.get("ok") and old.get("promptSha") == jb.promptSha and old.get("imagesSha") == jb.imagesSha):
+                old = read_json(f) if os.path.isfile(f) and not fresh else None
+                if not (old and old.get("ok") and old.get("cacheKey") == key):
                     t = time.time()
                     r, why = R.ask(lambda model, c: judge.post(cfg, model, c, max_tokens=jb.tokens, num_ctx=jb.ctx), m, jb.content(), jb.parse)
-                    old = {"ok": bool(r), "judge": m, "kind": jb.kind, "promptSha": jb.promptSha, "imagesSha": jb.imagesSha, "seconds": round(time.time() - t, 1), **(r or {"error": why})}
+                    old = {"ok": bool(r), "judge": m, "kind": jb.kind, "cacheKey": key, "repeat": repeat, "promptSha": jb.promptSha, "imagesSha": jb.imagesSha, "seconds": round(time.time() - t, 1), **(r or {"error": why})}
                     write(f, json.dumps(old, indent=1))
                     score = (old.get("overall") if jb.kind == "single" else [s["score"] for s in old["snapshots"]]) if r else f"FAILED {why}"
                     say(time.strftime("%H:%M:%S"), jb.key, jb.kind, m, k, score, f"{old['seconds']} s", flush=True)
@@ -126,7 +143,11 @@ def main(argv=None, judge=s04_judge, env=None, say=print):
     ap.add_argument("inputs", nargs="+", help="run folders, or a manifest .json listing them")
     ap.add_argument("--out", required=True, help="folder for results.json, SCORES.md and the kept readings")
     ap.add_argument("--snapshots", default=R.DEFAULT_SCHEME, choices=sorted(R.SCHEMES), help="what the judges are shown: wash10 (default: opening, drawing frame, ten frames from the first wash to the finished sheet) or film13 (the earlier scheme: opening, twelve through the film, the finished sheet). Scores under one are not comparable with the other")
+    ap.add_argument("--fresh", action="store_true", help="read every picture again: no kept reading is reused (the new readings replace the kept ones)")
+    ap.add_argument("--repeat", type=int, default=1, metavar="N", help="score the same paintings a further time, kept apart from repeat 1 (results-repeat-N.json, SCORES-repeat-N.md): for measuring the judges' noise")
     a = ap.parse_args(argv)
+    if a.repeat < 1:
+        ap.error("--repeat is 1 or more")
     try:
         cfg = judge.settings(env)
         rubric, rubric_sha = R.load_rubric(RUBRIC)
@@ -156,7 +177,7 @@ def main(argv=None, judge=s04_judge, env=None, say=print):
         t, p = s04_runs.sized(e["target"], e["painting"], os.path.join(a.out, "sized"), e["id"])
         e["classic"] = SP.classic_scores(t, p)
     data_uri = lambda f, px: SP.data_uri(load_rgb(f), px)
-    got = read_all(jobs_for(paintings, originals, rubric, data_uri), cfg, judge, a.out, say)
+    got = read_all(jobs_for(paintings, originals, rubric, data_uri), cfg, judge, a.out, say, jrec=jrec, rubric_sha=rubric_sha, fresh=a.fresh, repeat=a.repeat)
     faults, rows = [], []
     for e in paintings:
         h = R.human(got[(e["id"], "sequence")], cfg["panel"], a.snapshots, bool(e["drawing"]))
@@ -177,10 +198,11 @@ def main(argv=None, judge=s04_judge, env=None, say=print):
     T.derive(rows, originals)
     res = {"schema": "unpaint-bench/score04@1", "written": time.strftime("%Y-%m-%d %H:%M"), "series": SERIES + " " + SCHEME_NOTE[a.snapshots], "judge": jrec,
            "rubric": {"path": os.path.relpath(RUBRIC, REPO), "sha256": rubric_sha}, "prompts": R.prompt_hashes(rubric, a.snapshots),
-           "weights": dict(T.WEIGHTS), "readings": R.READINGS, "snapshots": R.SCHEMES[a.snapshots]["count"], "snapshotScheme": {**R.SCHEMES[a.snapshots], "note": SCHEME_NOTE[a.snapshots]}, "faults": faults, "originals": originals, "paintings": rows}
-    write(os.path.join(a.out, "results.json"), json.dumps(res, indent=1))
-    write(os.path.join(a.out, "SCORES.md"), T.markdown(res))
-    say("written", os.path.join(a.out, "results.json"), "and SCORES.md" + (f"; {len(faults)} faults: " + "; ".join(faults) if faults else ""), flush=True)
+           "weights": dict(T.WEIGHTS), "readings": R.READINGS, "repeat": a.repeat, "fresh": bool(a.fresh), "snapshots": R.SCHEMES[a.snapshots]["count"], "snapshotScheme": {**R.SCHEMES[a.snapshots], "note": SCHEME_NOTE[a.snapshots]}, "faults": faults, "originals": originals, "paintings": rows}
+    names = ("results.json", "SCORES.md") if a.repeat == 1 else (f"results-repeat-{a.repeat}.json", f"SCORES-repeat-{a.repeat}.md")
+    write(os.path.join(a.out, names[0]), json.dumps(res, indent=1))
+    write(os.path.join(a.out, names[1]), T.markdown(res))
+    say("written", os.path.join(a.out, names[0]), "and " + names[1] + (f"; {len(faults)} faults: " + "; ".join(faults) if faults else ""), flush=True)
     return 1 if faults else 0
 
 

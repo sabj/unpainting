@@ -102,7 +102,7 @@ def markdown(r):
     j, w = r["judge"], r["weights"]
     wash = (r.get("snapshotScheme") or {}).get("name") == "wash10"   # a results document from before the schemes is film13
     L = ["# 0.4 scores", "",
-         f"Written {r['written']} by `npm run bench:score04`. **{r['series']}**", "",
+         f"Written {r['written']} by `npm run bench:score04`" + (f", repeat {r['repeat']} of the same paintings (a further scoring, no reading shared with another repeat)" if (r.get("repeat") or 1) > 1 else "") + f". **{r['series']}**", "",
          f"Judge label **{j['label']}**, panel **{j.get('panelName') or 'not named'}**, route `{j['route']}` ({j['endpoint']}), reasoning {j.get('reasoning') or 'not recorded'}; judges " + ", ".join(f"`{m}`" + (f" (served as `{(j.get('sentAs') or {}).get(m)}`)" if (j.get('sentAs') or {}).get(m, m) != m else "") for m in j["panel"]) +
          f"; {r['readings']} readings a judge, a judge's figure the median of its three, the panel's the mean of the judges'. "
          f"Rubric `{r['rubric']['path']}` sha256 `{r['rubric']['sha256'][:12]}`; prompts sequence `{r['prompts']['sequence'][:12]}`, single `{r['prompts']['single'][:12]}`.", ""]
