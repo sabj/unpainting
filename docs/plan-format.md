@@ -1,60 +1,45 @@
 # Plan format
 
-A stroke plan is a JSON file that tells the simulator what to paint: one entry per brush stroke, in order. Each stroke names a brush, a paint concentration and amount of water, and the paper moisture it expects. Its path is in sheet coordinates, with pressure and radius at each point. A `dry` entry dries the whole sheet before the next stroke. Text fields are notes for people; the simulator ignores them.
-
-Run one with:
+A stroke plan is a JSON file of brush strokes in painting order. Each stroke names a brush, a paint concentration and amount of water, and the paper moisture it expects; its path is in sheet coordinates with pressure and radius at each point. A `dry` entry dries the sheet before the next stroke. Text fields are notes; the simulator ignores them.
 
 ```sh
 node tools/run-plan.mjs examples/plans/graded-wash.json --out work/plan-graded-wash
 ```
 
-It writes `result.png` (the dried sheet) and `run.json`. Stroke-size admission warns by default; `--stroke-gate reject` refuses tiny-dab plans before painting. See [stroke sizes and thresholds](stroke-stats.md) for configuration and the planner guide.
+This writes `result.png` (the dried sheet) and `run.json`. Stroke-size admission warns by default; `--stroke-gate reject` refuses tiny-dab plans before painting ([stroke sizes](judging.md#stroke-sizes)).
 
 ![The graded-wash plan's stroke paths over its dried result](img/graded-wash.webp)
 
-The full example is [examples/plans/graded-wash.json](../examples/plans/graded-wash.json); its saved output is [examples/output/graded-wash-result.png](../examples/output/graded-wash-result.png). The figure and the saved output were made with sim 100 (release 0.1.0).
+The example is [examples/plans/graded-wash.json](../examples/plans/graded-wash.json); its saved output is [examples/output/graded-wash-result.png](../examples/output/graded-wash-result.png).
 
-## Units and resolution
+## Units
 
-A plan describes a painting in physical and relative units, never in sheet cells, so the same plan paints at any
-resolution:
-
-```
-target image (px)          plan                                   sheet (cells)
-306 × 242   ──lines──▶     line files: target px + image size  ──┐
-                           positions, regions: 0 to 1           ─┼──▶  W × H cells, mmPerCell each
-                           brush widths, contact radii: mm      ──┘    (sheet width fixed in mm)
-```
+A plan uses physical and relative units, never cells, so it paints at any resolution.
 
 - Positions in `paths`, region `bounds` and reserve `bounds` are 0 to 1 of the sheet or target.
 - Brush widths (`widthMm`) and contact radii (`rMm`) are millimetres.
-- Line files are in target pixels and carry the image size they were drawn on (`image: {w, h}`); the painter maps them
-  onto the sheet.
-- The sheet's physical width is fixed (`grid` here, `sheet.widthMm` or `--sheetmm` for value plans). The painting width
-  in cells (`grid.w`, or `--width` for value plans) only sets `mmPerCell`.
+- Line files are in target pixels and carry the image size they were drawn on (`image: {w, h}`).
+- The sheet's width is fixed in mm (`grid` here; `sheet.widthMm` or `--sheetmm` for value plans). The width in cells (`grid.w`, or `--width`) only sets `mmPerCell`.
 
-Painting the same plan at a quarter of the cells (half the width) keeps every stroke in the same place at the same
-physical size; only fine detail below one cell is lost.
+A plan painted at half the width keeps every stroke in place at the same physical size; only detail under one cell is lost.
 
 ## Top level
 
-| field | type | meaning |
-|---|---|---|
-| `version` | integer | format version, currently `1` |
-| `id`, `title` | string | names for people and output folders |
-| `source` | object | optional notes on what the plan imitates (URL, author, timestamp, expected effect); ignored by the simulator |
-| `grid` | `{w, h, mmPerCell}` | sheet size in cells and the physical size of one cell. 384 × 160 cells at 0.125 mm is a 48 × 20 mm study |
-| `paperRGB` | `[r, g, b]` | color of bare paper in the rendered result |
-| `paper` | object | paper surface: `fibres` and `tooth` (surface texture, 0 to 1), optional `coldPress` (the physical cold-press relief, `src/media/paper-relief.mjs`) |
-| `paperSeed` | integer | seed for the paper texture and brush hairs; the same plan and seed give the same sheet on the same backend |
-| `palette` | string[] | pigment keys from `src/crop/box.mjs`, for example `ultramarine`, `ochre`, `sienna`, `sapgreen`, `lampblack` |
-| `budget` | object | limits a planner promised to respect (`maxGestures`, `maxWallSeconds`, `maxNativeSteps`); kept only in the input plan; ignored by `run-plan` and not copied into `run.json` |
-| `commands` | array | the strokes and drying steps, in painting order |
-| `criteria` | object | optional pass and fail notes for a judge; ignored by the simulator |
+| field | meaning |
+|---|---|
+| `version` | `1` |
+| `id`, `title` | names |
+| `source` | optional notes on what the plan imitates |
+| `grid` | `{w, h, mmPerCell}`; 384 × 160 cells at 0.125 mm is a 48 × 20 mm study |
+| `paperRGB` | `[r, g, b]` of bare paper |
+| `paper` | `fibres` and `tooth` (0 to 1), optional `coldPress` (`src/media/paper-relief.mjs`) |
+| `paperSeed` | seed for paper texture and brush hairs; same plan and seed, same sheet on the same backend |
+| `palette` | pigment keys from `src/crop/box.mjs`: `ultramarine`, `ochre`, `sienna`, `sapgreen`, `lampblack` |
+| `budget` | `maxGestures`, `maxWallSeconds`, `maxNativeSteps`; read by nothing in `run-plan`, not copied to `run.json` |
+| `commands` | strokes and drying steps, in order |
+| `criteria` | pass and fail notes for a judge; ignored |
 
 ## Commands
-
-A stroke:
 
 ```json
 {
@@ -71,102 +56,54 @@ A stroke:
 }
 ```
 
-Stroke fields:
+- `id`: unique; seeds the stroke's bristles.
+- `operation`: `stroke` or `dry`.
+- `requiredPaper`: `dry`, `wet` or `any`. `run-plan` measures the paper before the stroke and warns when it is not met.
+- `role`: `paint`, or `clean-water` to wet the paper with a clean brush.
+- `brush.kind`: `flat` or `round`. `brush.widthMm`: width in mm.
+- `brush.orientation`: `follow` turns the brush with every segment; `sweep` holds it square to the stroke's overall run.
+- `brush.free`, `feed`, `film`, `wetMix` (defaults 0.4, 0.4, 0.25, 0.85): passed to `createBrush` in `src/media/brush.mjs`. `free` is the liquid threshold for release, `feed` the flow from reservoir to bristles, `film` the liquid layer left on contact, `wetMix` the exchange with wet paint.
+- `load.capacityMm3`: what the brush holds. `load.waterQuantityMm3`: what it holds after dipping; the ratio is the water load.
+- `load.concentration`: pigment per palette key; empty for clean water.
+- `paths`: polylines of 0 to 1 sheet coordinates (`x` across, `y` down), pressure `p` (0 to 1) and contact radius `rMm`.
 
-- `id`: unique name; also seeds this stroke's bristles
-- `operation`: `stroke` or `dry`
-- `requiredPaper`: `dry`, `wet` or `any`: the paper state under the brush that the planner expects. `run-plan` measures it before the stroke and prints a warning when it is not met
-- `role`: `paint`, or `clean-water` to wet the paper with a clean brush (no pigment is laid)
-- `brush.kind`: `flat` or `round`
-- `brush.widthMm`: brush width in millimeters
-- `brush.orientation`: `follow` turns the brush with every segment of the path. `sweep` holds it square to the stroke's overall run, from first point to last
-- `brush.free`, `feed`, `film`, `wetMix`: optional brush controls passed to `createBrush` in `src/media/brush.mjs`. `free` sets the liquid threshold for release, and `feed` the flow from reservoir to bristles. `film` sets the liquid layer left on contact, and `wetMix` the exchange with wet paint. Defaults 0.4, 0.4, 0.25 and 0.85
-- `load.capacityMm3`: how much liquid the brush can hold
-- `load.waterQuantityMm3`: how much it holds after dipping; the ratio to capacity is the water load
-- `load.concentration`: pigment per palette key in the loaded water; keys must be in `palette`. Empty for clean water
-- `paths`: one or more polylines, paths of connected straight segments. Points are in 0 to 1 sheet coordinates (`x` across, `y` down), with pressure `p` (0 to 1) and contact radius `rMm`
+A drying step is `{ "id": "finish-dry", "operation": "dry" }`. It dries everything and sets the current wash as its own layer. If the last command is not `dry`, `run-plan` dries the sheet before rendering. While a stroke is laid, water and pigment step every 8 brush samples, so wet strokes run together.
 
-A drying step:
+`graded-wash.json` is a 48 × 20 mm graded sky: an 18 mm clean-water sweep, four 8 mm ultramarine strokes at concentrations 0.65, 0.43, 0.26 and 0.12, then `finish-dry`. `tools/run-plan.test.mjs` checks that the top band dries darker than the bottom.
 
-```json
-{ "id": "finish-dry", "operation": "dry" }
-```
-
-The sheet steps its water and pigment every 8 brush samples while a stroke is laid. So wet strokes run into each other the way they do on paper. `dry` dries everything and sets the current wash as a separate layer. If the last command is not `dry`, `run-plan` dries the sheet before it renders.
-
-## The example: a graded wash
-
-[examples/plans/graded-wash.json](../examples/plans/graded-wash.json) is a 48 × 20 mm study of a graded sky wash, based on the graded-wash demonstration it cites. It has six commands:
-
-1. `prepare-connected-field`: an 18 mm flat brush of clean water sweeps the paper so the next strokes land wet.
-2. `grade-1` to `grade-4`: four 8 mm flat strokes of ultramarine, top to bottom, each overlapping the last while it is wet. Their concentrations are 0.65, 0.43, 0.26 and 0.12.
-3. `finish-dry`: dry the sheet.
-
-The criteria ask for one connected wash that gets lighter from top to bottom, with no white stripes or dark drying edges between the strokes. `tools/run-plan.test.mjs` checks that the top band dries darker than the bottom band.
-
-## More examples
-
-- [examples/plans/glazes.json](../examples/plans/glazes.json): three bands, each dried before the next. See [pigments-and-paper.md](pigments-and-paper.md).
-- [examples/plans/drying-dry-between.json](../examples/plans/drying-dry-between.json) and [drying-too-wet.json](../examples/plans/drying-too-wet.json): the same two strokes with and without drying between them.
+Other plans: [glazes.json](../examples/plans/glazes.json) (three bands, each dried before the next; see [pigments-and-paper.md](pigments-and-paper.md)), [drying-dry-between.json](../examples/plans/drying-dry-between.json) and [drying-too-wet.json](../examples/plans/drying-too-wet.json) (the same two strokes with and without drying between).
 
 ## Line files
 
-A drawing file is a line file, `STEM-lines.json` or `STEM-lines.json.gz`, given to the painter as `--drawingfile STEM`. `tools/seg/trace-drawing.py` writes it from a clean line drawing and `tools/seg/order-strokes.mjs` orders it; [examples/drawings/](../examples/drawings/) holds one.
+A drawing file is `STEM-lines.json` or `STEM-lines.json.gz`, given to the painter as `--drawingfile STEM`. `tools/seg/trace-drawing.py` writes it from a clean line drawing and `tools/seg/order-strokes.mjs` orders it; [examples/drawings/](../examples/drawings/) holds one.
 
 | field | meaning |
 |---|---|
-| `inputKind` | `drawing` for a traced drawing |
+| `inputKind` | `drawing` |
 | `medium` | `ink` or `pencil` |
-| `image` | `{w, h}`: the pixel size the lines were traced on |
-| `targetSHA256` | the target the drawing belongs to; a file made for another image is refused |
-| `lines` | the strokes in drawing order, each with `points` (target pixels), `width`, `weight`, `role` and its place in the order (`seq`, `object`, `part`, `pass`) |
+| `image` | `{w, h}`: pixel size the lines were traced on |
+| `targetSHA256` | the target it belongs to; a file made for another image is refused |
+| `lines` | strokes in drawing order, each with `points` (target pixels), `width`, `weight`, `role`, `seq`, `object`, `part`, `pass` |
 
 The painter maps the image box onto the target (`src/paint/methods/drawing-registration.mjs`) and draws each line as it is.
 
-## The V6 draft plan
-
-`bench/v6/TASK.md` drafts a whole-painting plan for a planning model. It is not yet run. A plan is a folder with `plan.json`, an optional drawing line file and the studies:
-
-```json
-{
-  "subject": "camel",
-  "sheet": { "widthMm": 280, "seed": 0 },
-  "drawing": { "medium": "ink", "file": "drawing-lines.json" },
-  "washes": {
-    "layers": [ { "study": "studies/s1.png", "leastMm2": 150 }, { "study": "studies/s2.png", "leastMm2": 120, "glaze": true } ],
-    "paints": ["ochre", "ultramarine", "sienna"]
-  }
-}
-```
-
-| field | meaning | painter option |
-|---|---|---|
-| `sheet.widthMm`, `sheet.seed` | sheet width in mm, and the seed | `--sheetmm`, `--seed` |
-| `drawing.medium` | `ink`, `pencil` or `none` | `--inkrecipe wash`, `--outlinemedium graphite` or `--drawing none` |
-| `drawing.file` | the traced, ordered line file | `--drawingfile` |
-| `washes.layers` | studies coarse to fine; `leastMm2` is the least shape a layer lays, `glaze` makes it a glaze | `--washplan STUDY:MIN[:glaze],...` |
-| `washes.paints` | box keys from `src/crop/box.mjs` | `--paints` |
-
-The painter does not read this file yet. `bench/v6/plan-args.mjs` turns it into painter options. The model chooses the medium, the ink level it asks the drawing model for, the studies for each layer with their least size and glaze, the paints, and when to stop.
-
 ## Painting script
 
-`--washplan script:FILE.json` takes the washes from a painting script, a list of passages written by a planning model
-(what, where, paint, brush, move, mark, charges, what it goes into). See [painting-script.md](painting-script.md).
+`--washplan script:FILE.json` takes the washes from a painting script written by a planning model: [painting-script.md](painting-script.md).
 
 ## Value plan file
 
-`--valueplan FILE` reads a JSON object. It does not supply washes; the washes come from the studies. `src/paint/plan-keys.mjs` lists every key the painter reads, and a key nothing reads makes the run log `UNUSED PLAN KEYS`, write `unused-plan-keys.txt` and exit 3 after its outputs (`--allowunusedplan 1` keeps exit 0).
+`--valueplan FILE` reads a JSON object. The washes still come from the studies. `src/paint/plan-keys.mjs` lists every key the painter reads; a key nothing reads makes the run log `UNUSED PLAN KEYS`, write `unused-plan-keys.txt` and exit 3 after its outputs (`--allowunusedplan 1` keeps exit 0). The resolved plan and any command-line overrides are written to `pipeline-plan.json`.
 
 | field | meaning |
 |---|---|
 | `sheet` | `{ widthMm, seed, targetGuard }`; `widthMm` sets `--sheetmm` and must match it when both are given |
-| `drawing` | the drawing choices below |
-| `washes` | `paints` (box keys), `sessions` (`dry`, `passage`, `connected`), `inkAware`, `soften` and `physics` (`holeRimMm`, `marangoni`, `slope`) |
+| `drawing` | below |
+| `washes` | `paints` (box keys), `sessions` (`dry`, `passage`, `connected`), `inkAware`, `soften`, `physics` (`holeRimMm`, `marangoni`, `slope`) |
 | `order` | `subjects` (`{id, bounds}` or `{id, families}`) and `strength` 0 to 1 |
-| `families` | `{id, bounds, drawingRole}`: regions for `order.subjects`; `drawingRole` (`none`, `scaffold`, `structural`, `focal`) keeps or leaves out each line whole |
+| `families` | `{id, bounds, drawingRole}`; `drawingRole` is `none`, `scaffold`, `structural` or `focal` and keeps or leaves out each line whole |
 
-`rationale`, `drawingNote`, `run` and a subject's `reason` are notes for people.
+`rationale`, `drawingNote`, `run` and a subject's `reason` are notes. [examples/plans/white-ships.json](../examples/plans/white-ships.json) is a value plan.
 
 ### Value plans: the drawing section
 
@@ -177,16 +114,12 @@ The painter does not read this file yet. `bench/v6/plan-args.mjs` turns it into 
 | field | values | meaning |
 |---|---|---|
 | `medium` | `none`, `graphite`, `ink`, `auto` | `none` sets `--drawing none`; the others set `--outlinemedium` |
-| `reason` | a sentence | why this medium, logged |
-| `ink` | `{ "color": "sepia" or "black", "waterproof": true or false }` | the ink and whether it sets before the washes; waterproof defaults to true for black |
-| `amount`, `maxLines` | 0 to 1; a whole number | the share or count of the file's lines drawn, strongest first |
-| `lines` | `all`, `contours`, `subject`, `regions` | which lines of the file: `contours` leaves out dark fill, `subject` leaves out the setting, `regions` orders by the region a line lies in |
-| `weight` | 0 to 1 | how heavy the line is |
-| `closingLines` | 0 to 1 | how much the closing pen draws; 0 means none |
-| `stages` | `prep`, `prepInk`, `finishInk` | the linked stages, cut from the drawing file |
+| `reason` | text | logged |
+| `ink` | `{ "color": "sepia" or "black", "waterproof": bool }` | waterproof defaults to true for black |
+| `amount`, `maxLines` | 0 to 1; integer | share or count of lines drawn, strongest first |
+| `lines` | `all`, `contours`, `subject`, `regions` | `contours` leaves out dark fill, `subject` leaves out the setting, `regions` orders by region |
+| `weight` | 0 to 1 | line heaviness |
+| `closingLines` | 0 to 1 | how much the closing pen draws; 0 none |
+| `stages` | `prep`, `prepInk`, `finishInk` | linked stages cut from the drawing file |
 
-Stage fields: `prep.amount`, `prep.weight`, `prep.fade`, `prep.frames`; `prepInk.from` (`prep` or `lines`), `keep`, `add`, `amount`, `deviate`, `method` (`contour` or `scribble`); `finishInk.from`, `select` (`edges`, `darks`, `both`), `restate`, `deviate`, `method` (`accent` or `architecture`), `masses` (`none` or `scribble`). The finish runs after every wash. Code: `src/paint/drawing-plan.mjs`, `src/paint/methods/drawing-stages.mjs`.
-
-[examples/plans/white-ships.json](../examples/plans/white-ships.json) is a value plan.
-
-The painter records the resolved plan and any command-line overrides in `pipeline-plan.json`.
+Stage fields: `prep.amount`, `weight`, `fade`, `frames`; `prepInk.from` (`prep` or `lines`), `keep`, `add`, `amount`, `deviate`, `method` (`contour` or `scribble`); `finishInk.from`, `select` (`edges`, `darks`, `both`), `restate`, `deviate`, `method` (`accent` or `architecture`), `masses` (`none` or `scribble`). The finish runs after every wash. Code: `src/paint/drawing-plan.mjs`, `src/paint/methods/drawing-stages.mjs`.

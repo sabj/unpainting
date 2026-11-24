@@ -4,7 +4,7 @@
   python3 copy_band.py --target T.png --image P.png
 
 Prints {"copyHF": r}: the Pearson correlation of the 2-4 px band (Gaussian blur 1 minus blur 2) of painting and
-target luminance, at the target's size. Honest v2 paintings stayed under a per-crop ceiling (docs/anti-cheat.md).
+target luminance, at the target's size. Honest v2 paintings stayed under a per-crop ceiling (docs/rules.md, cheat risk).
 Runs offline and needs no key.
 """
 import argparse, json

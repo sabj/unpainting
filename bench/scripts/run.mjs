@@ -47,7 +47,7 @@ if (opt('judge')) {
 }
 if (opt('notargetlooks') && !['0', '1'].includes(opt('notargetlooks'))) fail('--notargetlooks must be 0 or 1');
 const mode = opt('mode', 'gentle');
-if (mode !== 'gentle') fail('only gentle mode is implemented; hard mode needs a look counter per runner (see docs/anti-cheat.md)');
+if (mode !== 'gentle') fail('only gentle mode is implemented; hard mode needs a look counter per runner (see docs/rules.md, target-read guard)');
 
 const models = loadModels();
 const dryKey = opt('dry-key', 'dry-run');

@@ -1,32 +1,20 @@
 # src/paint
 
-The painter's decisions: what to paint, in what order, with which brush and mix. The physics it calls lives in [src/media](../media/).
+The painter's decisions: what to paint, in what order, with which brush and mix. The physics lives in `src/media`. [How it paints](../../docs/how-it-paints.md) covers the stages and flags.
 
-## Inking
-
-The pen drawing, in `methods/` unless noted ([how it paints](../../docs/how-it-paints.md#8-lines)):
+Pen drawing, in `methods/` unless noted:
 
 - `line-source.mjs` (here): the one line source, the drawing file.
-- `ink-lines-file.mjs`, `ink-lines.mjs`, `ink-recipe.mjs`: the target's line darkness for the pen's load, and the `--inkrecipe` flags.
-- `drawing-stages.mjs`, `drawing-file.mjs`, `drawing-hand.mjs`: the opening and closing stages, and the hand plan.
-- `ink-match.mjs`, `ink-res.mjs`, `fine-erase.mjs`, `fine-material.mjs`, `material-profiles.mjs`: the ink load, the pen and the pencil on the fine sheet, and the eraser followed there.
+- `ink-lines-file.mjs`, `ink-lines.mjs`, `ink-recipe.mjs`: the target's line darkness for the pen's load, and `--inkrecipe`.
+- `drawing-stages.mjs`, `drawing-file.mjs`, `drawing-hand.mjs`: opening and closing stages, the hand plan.
+- `ink-match.mjs`, `ink-res.mjs`, `fine-erase.mjs`, `fine-material.mjs`, `material-profiles.mjs`: the ink load, pen and pencil on the fine sheet, the eraser.
 
-## Painting
+Painting: washes come from block-in studies (`methods/study-washes.mjs`). `methods/` holds generic methods that work on any subject; `techniques/` holds named techniques (passage moves, shaped marks, softening).
 
-The washes come from block-in studies (`methods/study-washes.mjs`):
-
-- [methods/](methods/): generic watercolor methods that work the same on any subject.
-- [techniques/](techniques/): named techniques: passage moves, shaped marks, softening.
-- `recipe.mjs`: the `--recipe` presets of painter settings. `default`, `general` and `combined` are one general process. Presets and the `v096` recipe were removed in 0.3.3 (settings fitted to one subject); naming one fails the run. `none` and unknown names add no recipe flags; drawing flags from a value plan still apply.
+- `recipe.mjs`: `--recipe` presets. `default`, `general` and `combined` are one general process. Presets and the `v096` recipe were removed in 0.3.3; naming one fails the run. `none` and unknown names add no flags; a value plan's drawing flags still apply.
 - `removed-options.mjs`: options the painter no longer has; naming one stops the run with the reason.
-- `run-cache.mjs`: a disk cache for slow steps whose results depend only on their inputs.
-- `film-timeline.mjs`: `--timeline`, which re-times a run's frames to follow a target sequence.
-- `output-directory.mjs`: refuses to erase an existing run's output folder.
+- `run-cache.mjs`: disk cache for slow steps that depend only on their inputs.
+- `film-timeline.mjs`: `--timeline` re-times a run's frames to a target sequence.
+- `output-directory.mjs`: refuses to erase an existing run's folder.
 
-`tools/paint-plate.mjs` is the entry point. Run the tests with:
-
-```sh
-node --test src/paint/*.test.mjs src/paint/*/*.test.mjs src/paint/*/*/*.test.mjs
-```
-
-[Methods, techniques and tuned settings](../../docs/techniques.md) lists every module and recipe flag. [How it paints](../../docs/how-it-paints.md) explains the stages.
+Entry point: `tools/paint-plate.mjs`. Tests: `node --test src/paint/*.test.mjs src/paint/*/*.test.mjs src/paint/*/*/*.test.mjs`.

@@ -1,6 +1,6 @@
 # Spore Studies
 
-Mushroom plates in ink and watercolour, painted live. **[Open it](https://sabj.github.io/unpainting/demos/fungi/)**
+Mushroom plates in ink and watercolour, painted live: [open it](https://sabj.github.io/unpainting/demos/fungi/).
 
 | Random paints a new plate | Drag to turn | Morph |
 | --- | --- | --- |

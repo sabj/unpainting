@@ -1,45 +1,41 @@
 # Judging
 
-A judge scores a finished painting and its saved stages. Judges are advisory. No vision judge's verdict is fed back into the painter. A few repeatable image measurements, such as color difference, are also used inside planning.
+Judges and measurements score a finished painting and its saved stages. They are advisory: no verdict is fed back into the painter. Per-pixel metrics such as `colour.mjs` are for post-run diagnosis only ([honesty.md](honesty.md)).
 
-## Classic measures
+## Classic measurements
 
-The repeatable image measurements are code in `src/eval/`. They give the same numbers every time for the same images.
+`src/eval/` returns the same numbers for the same images:
 
-| module | measures | compares at |
-|---|---|---|
-| `values.mjs` | how many tone levels, large areas of uniform darkness, paper left between marks | the painting alone |
-| `fidelity.mjs` | tone over cells about 16 px wide, and line recall within 2 cells | regions |
-| `colour.mjs` | color difference (CIEDE2000, a standard color-difference measure), mean and 90th percentile | pixels |
-| `stages.mjs` | the frames in order (see below) | stages |
+- `values.mjs`: tone levels, uniform dark areas, untouched paper between marks (painting alone).
+- `fidelity.mjs`: tone over about 16 px cells and line recall within 2 cells (regions).
+- `colour.mjs`: CIEDE2000 mean and 90th percentile (pixels).
+- `stages.mjs`: whether saved frames follow a human painting order.
 
-`score.mjs` scores seven dimensions from 0 to 10, such as line quality, value structure and tone agreement. Its scoring curves join fixed calibration points from a collection of real watercolors. They do not map every median or percentile to an exact score. `composite.mjs` keeps groups of related measures apart and never averages them. `tools/judge/judge-plate.mjs` runs the composite on one painting.
+`src/eval/score.mjs` maps seven dimensions to 0 to 10 against curves from real watercolours; `src/eval/composite.mjs` keeps related groups separate. Runners in `tools/judge/`:
 
-Some measures compare pixel by pixel, such as `colour.mjs` and the end-result group of measurements in `composite.mjs`. Under the [honesty rules](honesty.md), comparisons with the target are made at the shape level. Use per-pixel scores only for diagnosis.
+- `node tools/judge/judge-plate.mjs --image <target> --painted <painting.jpg>`: composite measurements on one plate.
+- `node tools/judge/stage-check.mjs <run-dir>`: stage progression flags.
+- `node tools/judge/concert-judge.mjs`: all metric groups across painter configurations.
+- `node tools/judge/judge.mjs`: calibrate and check discrimination against reference scans in `$JUDGE_REFS`.
 
 ## Stage checks
 
-`src/eval/stages.mjs` checks that the frames follow the order a person paints in. It reads them in order and flags:
+`src/eval/stages.mjs` flags: big shapes under half their final value a third of the way in; speckle in the first half; over 70% of final tone down a quarter of the way in; steps backward, colour drift, or too little line early in line-first work.
 
-- big shapes still under half their final level a third of the way in;
-- speckle in the first half;
-- more than 70% of the final tone already down a quarter of the way in, which is too dark too early;
-- steps backward, color that drifts, and, for line-first styles, too little line early.
+## Stroke sizes
 
-`tools/judge/stage-check.mjs` and `tools/judge/concert-judge.mjs` print these flags.
+`tools/stroke-stats.mjs` and `tools/stroke-gate.mjs` flag broad low-detail wash interiors filled with tiny dabs (median contact under 1 mm wide or path under 3 mm long) or narrow wiper sweeps (region over 4 brush widths, at least 6 aligned overlapping passes):
+
+```sh
+node tools/stroke-stats.mjs <run-dir> --out <panel>
+node tools/stroke-gate.mjs <run-dir> --mode reject
+node tools/run-plan.mjs plan.json --stroke-gate reject --out work/plan
+node tools/paint-plate.mjs --image target.jpg --marks 1 --strokegate reject --out work/plate
+```
+
+Each broad interior has a 30% ceiling on tiny-mark carried area (`maxBroadAreaTinyAreaShare`), tiny-mark visible paint (`maxBroadAreaTinyVisibleShare`) and wiper coverage (`maxBroadAreaWiperShare`). Detail passages, pen lines and 1 mm edge bands are exempt.
 
 ## Vision judges
 
-Vision judges, AI models that score images, are optional. `tools/judge/rounds/` runs a blind evaluation of saved stages:
-
-- It packs the stages of five runs: the candidate, a control (a comparison run with known settings), a duplicate of the control, a known good example and a known bad example.
-- Each judge sees its own shuffled letters, and scores each stage from 1 to 5 plus process and finish.
-- Claude judges are fresh agents you start by hand. GPT judges run through `codex exec`.
-- `tools/judge/rounds/tally.mjs` drops a judge that ranks the known bad example above the known good one, or scores the duplicates more than 1 point apart.
-- A candidate wins when at least 4 valid judges prefer it and those votes make up at least two thirds of all valid judges.
-
-The benchmark scores paintings with its own judges; [bench/docs/scoring.md](../bench/docs/scoring.md) describes them. In 0.4 the benchmark judges human-ness more than quality: they read the painting in progress by the [human-ness rubric](../bench/docs/human-ness-rubric.md), and quality and likeness is a second reading beside it. Judges run locally by default.
-
-## Why advisory
-
-Judges disagree with each other and with people. A judge gives a fast first read, and the person looking at the painting decides.
+- Benchmark: `npm run bench:score04` scores human-ness from the film under the [rubric](../bench/docs/human-ness-rubric.md) and quality against the original ([scoring](../bench/docs/scoring.md)).
+- Blind stage rounds (`tools/judge/rounds/`): `run.mjs` packs a candidate, a control, a duplicate control, a known good and a known bad run under shuffled letters for Claude or Codex judges; `tally.mjs` drops any judge that misranks the controls or scores the duplicates more than 1 point apart. A candidate wins with at least 4 valid judges and two thirds of valid votes.
