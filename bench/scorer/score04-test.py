@@ -1,6 +1,6 @@
 """0.4's scoring (score04.py and its s04_* modules) with a stub judge: no model is called.
    python3 bench/scorer/score04-test.py"""
-import io, json, os, sys, tempfile, unittest
+import io, json, os, sys, tempfile, threading, time, unittest
 from pathlib import Path
 from unittest import mock
 
@@ -617,11 +617,12 @@ class EndToEnd(unittest.TestCase):
 
     def stub(self, **k):
         j = StubJudge(**k)
-        post = j.post
+        post, lock = j.post, threading.Lock()
         def which_post(cfg, model, content, max_tokens, num_ctx):
             first = next(c for c in content if c["type"] == "image_url")["image_url"]["url"]
-            j.which = j.marks.get(first, "orig")
-            return post(cfg, model, content, max_tokens, num_ctx)
+            with lock:   # a hosted route reads several at once: `which` is the stub's one slot
+                j.which = j.marks.get(first, "orig")
+                return post(cfg, model, content, max_tokens, num_ctx)
         j.post = which_post
         return j
 
@@ -823,6 +824,164 @@ class EndToEnd(unittest.TestCase):
             rc = self.S.main([str(a), str(m), "--out", os.path.join(self.tmp.name, "out")], judge=j)
         self.assertEqual(rc, 2); self.assertEqual(j.calls, [])
         self.assertIn("model-run: no film", err.getvalue())
+
+
+class HostedJudge:
+    """A fake hosted panel (route openrouter): replies depend only on what is asked (so the order they come back in
+    cannot change a figure), each call takes a little while at random, and every call in flight is counted."""
+    RouteError = J.RouteError
+
+    def __init__(self, delay=0.02, fail_first=0):
+        self.lock, self.calls, self.flying, self.most, self.most_all, self.delay = threading.Lock(), [], {}, {}, 0, delay
+        self.fail_first, self.failed = fail_first, 0
+        import random
+        self.rng = random.Random(7)
+
+    def settings(self, env=None):
+        return {"route": "openrouter", "label": "open3-openrouter-3x", "panelName": "open3", "reasoning": "low", "panel": list(PANEL), "host": "stub"}
+
+    def record(self, cfg):
+        return {"route": "openrouter", "label": cfg["label"], "endpoint": "stub", "panelName": "open3", "reasoning": "low", "panel": cfg["panel"], "digests": None, "options": {"reasoning": "low", "temperature": 0}}
+
+    def wait_turn(self, cfg, model):
+        raise AssertionError("a hosted route never waits for a local model")
+
+    unload = wait_turn
+
+    def post(self, cfg, model, content, max_tokens, num_ctx):
+        with self.lock:
+            self.calls.append(model)
+            self.flying[model] = self.flying.get(model, 0) + 1
+            self.most[model] = max(self.most.get(model, 0), self.flying[model])
+            self.most_all = max(self.most_all, sum(self.flying.values()))
+            wait = self.delay * self.rng.random()
+            fail = self.failed < self.fail_first
+            self.failed += fail
+        try:
+            time.sleep(wait)
+            if fail:
+                raise RuntimeError("openrouter call failed: HTTP 429")
+            imgs = [c["image_url"]["url"] for c in content if c["type"] == "image_url"]
+            v = 1 + int(R.sha(model + "".join(imgs))[:4], 16) % 4   # 1 to 4, fixed by the judge and the pictures
+            if '"likeness"' in content[0]["text"]:
+                return json.dumps({"likeness": v, "why": "w"}), {}
+            if len(imgs) > 1:
+                return json.dumps({"sequence": {"human": v > 2, "why": "w"}, "snapshots": [{"score": v, "tells": []} for _ in imgs[1:]]}), {}
+            return json.dumps({k: v + 4 for k in R.CRITERIA + ("overall",)}), {}
+        finally:
+            with self.lock:
+                self.flying[model] -= 1
+
+
+class Parallel(unittest.TestCase):
+    """The hosted route reads every judge at once, several readings each, and the result is the sequential one."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        os.environ["BENCH_CLASSIC_CACHE"] = os.path.join(self.tmp.name, "cache")
+        import score04
+        self.S = score04
+        d = self.tmp.name
+        src, reg = fixtures(d)
+        self.runs = [str(make_run(d, "auto-run", "auto", reg, src)), str(make_run(d, "model-run", "astra", reg, src)), str(make_run(d, "third-run", "neon", reg, src))]
+
+    def tearDown(self):
+        os.environ.pop("BENCH_CLASSIC_CACHE", None)
+        self.tmp.cleanup()
+
+    def run_(self, j, out, *more):
+        return self.S.main([*self.runs, "--out", os.path.join(self.tmp.name, out), *more], judge=j, say=lambda *x, **k: None)
+
+    def readings(self, out):
+        """Every kept reading file, minus the time it took."""
+        base, got = Path(self.tmp.name, out, "readings"), {}
+        for f in sorted(base.rglob("*.json")):
+            r = json.loads(f.read_text()); r.pop("seconds")
+            got[str(f.relative_to(base))] = r
+        return got
+
+    def results(self, out):
+        r = json.loads(Path(self.tmp.name, out, "results.json").read_text()); r.pop("written")
+        return json.dumps(r, sort_keys=True).replace(os.path.join(self.tmp.name, out), "OUT")
+
+    def test_every_judge_at_once_and_no_more_than_the_bound_for_each(self):
+        j = HostedJudge()
+        self.assertEqual(self.run_(j, "out", "--concurrency", "4"), 0)
+        self.assertEqual(len(j.calls), 3 * (3 * 3 + 1) * 3, "3 judges x (3 paintings x 3 jobs + 1 original) x 3 readings")
+        self.assertEqual(max(j.most.values()), 4, f"each judge had up to 4 readings in flight, never more: {j.most}")
+        self.assertGreater(j.most_all, 4, "the judges read at the same time, not one after another")
+        one = HostedJudge()
+        self.assertEqual(self.run_(one, "out1", "--concurrency", "1"), 0)
+        self.assertEqual(set(one.most.values()), {1})
+
+    def test_the_same_results_and_the_same_files_as_one_at_a_time(self):
+        self.assertEqual(self.run_(HostedJudge(delay=0.03), "fast", "--concurrency", "8"), 0)
+        self.assertEqual(self.run_(HostedJudge(delay=0), "slow", "--concurrency", "1"), 0)
+        self.assertEqual(self.results("fast"), self.results("slow"))
+        self.assertEqual(self.readings("fast"), self.readings("slow"))
+        res = json.loads(Path(self.tmp.name, "fast", "results.json").read_text())
+        self.assertEqual([p["id"] for p in res["paintings"]], ["auto-run", "model-run", "third-run"], "rows in the order given, whatever finished first")
+        self.assertNotIn("inProgress", res)
+
+    def test_kept_readings_are_reused_under_the_same_keys(self):
+        j = HostedJudge()
+        self.assertEqual(self.run_(j, "out"), 0); n = len(j.calls)
+        again = HostedJudge()
+        self.assertEqual(self.run_(again, "out"), 0); self.assertEqual(again.calls, [], "every kept reading is reused")
+        for f in Path(self.tmp.name, "out", "readings", "model-run").glob("single-j2-*.json"):
+            f.unlink()
+        some = HostedJudge()
+        self.assertEqual(self.run_(some, "out"), 0); self.assertEqual(some.calls, ["j2"] * 3, "only the readings not kept are read")
+        fresh = HostedJudge()
+        self.assertEqual(self.run_(fresh, "out", "--fresh"), 0); self.assertEqual(len(fresh.calls), n)
+
+    def test_a_reading_that_fails_at_first_is_tried_again(self):
+        j = HostedJudge(fail_first=5)
+        self.assertEqual(self.run_(j, "out"), 0, "five early failures are retried and every figure is whole")
+        self.assertEqual(len(j.calls), 90 + 5)
+
+    def test_results_are_written_as_each_painting_completes(self):
+        seen, write = [], self.S.write
+        def watch(path, text):
+            write(path, text)
+            if path.endswith("results.json"):
+                r = json.loads(Path(path).read_text())   # what a page reading it now would see
+                seen.append(((r.get("inProgress") or {}).get("paintingsScored"), [p["id"] for p in r["paintings"]]))
+        with mock.patch.object(self.S, "write", watch):
+            self.assertEqual(self.run_(HostedJudge(), "out", "--concurrency", "2"), 0)
+        self.assertEqual(seen, [(1, ["auto-run"]), (2, ["auto-run", "model-run"]), (None, ["auto-run", "model-run", "third-run"])])
+        self.assertEqual([f.name for f in Path(self.tmp.name, "out").iterdir() if f.name.endswith(".tmp")], [], "written whole: no half file is left")
+
+    def test_the_local_route_still_reads_one_judge_at_a_time(self):
+        j = HostedJudge()
+        j.settings = lambda env=None: {"route": "local", "label": "open3-local-3x", "panelName": "open3", "reasoning": "low", "panel": list(PANEL), "host": "stub"}
+        events = []
+        j.wait_turn = lambda cfg, m: events.append(("load", m))
+        j.unload = lambda cfg, m: events.append(("unload", m))
+        self.assertEqual(self.run_(j, "out", "--concurrency", "8"), 0)
+        self.assertEqual(max(j.most.values()), 1); self.assertEqual(j.most_all, 1)
+        self.assertEqual(j.calls, sorted(j.calls, key=PANEL.index), "every reading of one judge before the next")
+        self.assertEqual(events, [(e, m) for m in PANEL for e in ("load", "unload")])
+
+    def test_a_busy_server_is_retried_with_backoff_and_its_wait_honoured(self):
+        cfg = J.settings({"JUDGE_ROUTE": "openrouter", "OPENROUTER_API_KEY": "k"})
+        import urllib.error
+        codes, slept = iter([429, 503, 429]), []
+        def opener(req, timeout=None):
+            c = next(codes, None)
+            if c:
+                raise urllib.error.HTTPError(req.full_url, c, "busy", {"Retry-After": "7"} if c == 503 else {}, None)
+            return io.BytesIO(json.dumps({"choices": [{"message": {"content": "ok"}}], "usage": {}}).encode())
+        self.assertEqual(J.post(cfg, "Qwen/Qwen3.8-27B", [], opener=opener, sleep=slept.append)[0], "ok")
+        self.assertEqual(len(slept), 3); self.assertEqual(slept[1], 7.0, "the server's Retry-After is waited")
+        self.assertTrue(2 <= slept[0] <= 2.5 and 8 <= slept[2] <= 10, slept)
+        bad, slept = [], []
+        def refuses(req, timeout=None):
+            bad.append(1); raise urllib.error.HTTPError(req.full_url, 400, "no", {}, None)
+        with self.assertRaisesRegex(RuntimeError, "HTTP 400"):
+            J.post(cfg, "Qwen/Qwen3.8-27B", [], opener=refuses, sleep=slept.append)
+        self.assertEqual((len(bad), slept), (1, []), "a refusal is not retried")
+        self.assertEqual(J.backoff(10, rand=lambda: 0), 60.0)
 
 
 if __name__ == "__main__":
