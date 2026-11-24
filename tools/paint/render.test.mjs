@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { execFileSync } from 'node:child_process';
 import { renderSetting, outOf, paintHere, renderer } from './render.mjs';
 import { namedPaths, jobInputs, workerArgs, homePaths, workerEnv } from './render-ship.mjs';
 import { claim, claims, release, markStarted, waitRank, places, podPlacesKept, costOf, paintOnPool, WorkerFailure, WorkersFailed, registerClient, podsDaemon, daemonProcessAlive, DAEMON_GONE_GRACE_S } from './render-pool.mjs';
@@ -43,10 +44,14 @@ test('a plan preview goes through the pool as a plan, kept off this Mac by UNPAI
   assert.equal((await pooled.plan({ ...cmd, args: ['--out', path.join(dir, 'p')] }, { cwd: dir, logFile: path.join(dir, 'p.log') })).exit, 0);
   assert.equal(seen.length, 2);
   assert.match(fs.readFileSync(path.join(dir, 'log.txt'), 'utf8'), /^\S+ plan p on this Mac/m);
-  // with this Mac left out and no other worker up, it waits rather than painting here
-  const off = renderer({ UNPAINT_RENDER: 'pool', UNPAINT_POOL_DIR: dir, UNPAINT_POOL_ONLY: 'mini,pod' }, { root: '/r', codeState: clean, run });
-  const waited = await Promise.race([off.plan({ ...cmd, args: ['--out', path.join(dir, 'q')] }, { cwd: dir, logFile: path.join(dir, 'q.log') }).then(() => 'ran'), new Promise(r => setTimeout(() => r('waiting'), 300))]);
-  assert.equal(waited, 'waiting'); assert.equal(seen.length, 2);
+  // with this Mac left out and no other worker up, it waits rather than painting here (in a process of its own: the
+  // waiting job polls for a place for as long as its process lives, which would keep this file's process from ending)
+  const code = `import { renderer } from ${JSON.stringify(new URL('./render.mjs', import.meta.url).href)};
+const seen = [], off = renderer({ UNPAINT_RENDER: 'pool', UNPAINT_POOL_DIR: ${JSON.stringify(dir)}, UNPAINT_POOL_ONLY: 'mini,pod' }, { root: '/r', codeState: () => ({ commit: 'a'.repeat(40), dirty: false }), run: async c => { seen.push(c); return { exit: 0 }; } });
+const waited = await Promise.race([off.plan({ cmd: 'node', args: ['--out', ${JSON.stringify(path.join(dir, 'q'))}] }, { cwd: ${JSON.stringify(dir)}, logFile: ${JSON.stringify(path.join(dir, 'q.log'))} }).then(() => 'ran'), new Promise(r => setTimeout(() => r('waiting'), 300))]);
+console.log(waited, seen.length); process.exit(0);`;
+  assert.equal(execFileSync(process.execPath, ['--input-type=module', '-e', code], { encoding: 'utf8' }).trim(), 'waiting 0');
+  assert.equal(seen.length, 2);
 });
 
 const ARGS = ['--max-old-space-size=18432', 'tools/paint-plate.mjs', '--gpu', 'on', '--planfile', '/m/run/plans/5/final-plan.bin', '--washplan', 'edit:/m/run/look.plan-edit.json,/s/studies/a.png:6,/s/studies/b.png:4',
