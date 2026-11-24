@@ -14,7 +14,7 @@ import { refuseExtraGpuPaint, gpuPaintCount, cacheDirFor, switchesOf, segEnvFor,
 import { renderer } from './render.mjs';
 import { WorkersFailed } from './render-pool.mjs';
 import { FINAL_WAIT_HOURS, FINAL_TRIES, EXIT_KEPT, waitTicker, paintWithRetries, keptNote } from './final-wait.mjs';
-import { expandRunSets } from './run-sets.mjs';
+import { expandRunSets, standardSheetOnly } from './run-sets.mjs';
 import { expandSubjects, pool, gpuPlace, throughput, jobsNow, DEFAULT_JOBS, PLAN_JOBS } from './queue.mjs';
 import { writeRunSheet, writeGridSheet, runPictures, formsImage, drawingSvg } from './sheet.mjs';
 import { toolsBase, resolveTools, writeTools, linesPictureDoc, allLinesDoc } from './session-tools.mjs';
@@ -129,7 +129,8 @@ try {
     try {
       const v = variant ? variants[id]?.[variant] : null;
       if (variant && !v) throw new Error(`subject ${id} has no variant "${variant}" in tools/paint/variants.json${variants[id] ? ` (it has: ${Object.keys(variants[id]).join(', ')})` : ''}`);
-      return [checkInputs(resolveSubject(registry, id, { sets: req.sets, variant: v, variantName: variant }))];
+      // a benchmark picture is painted on the standard sheet or not at all (run-sets.mjs)
+      return [checkInputs(standardSheetOnly(resolveSubject(registry, id, { sets: req.sets, variant: v, variantName: variant })))];
     } catch (e) {
       // in a queue of several subjects one whose inputs are wrong is recorded as not run and the rest go on
       if (asked.length === 1) throw e;

@@ -4,7 +4,7 @@ A submission is one or more try folders (one model session per folder) in the [r
 
 A try is one model session that paints the requested subject.
 
-0.4, 23 November 2026: the benchmark runs a ladder, L1 to L4 ([levels](levels.md)). Level 1 runs through `bench/scripts/run.mjs --round V3` (a model key in `models.json`); levels 2 to 4 through `npm run paint` (a model key in `tools/paint/authors.json`); scoring through `npm run bench:score04` ([scoring](scoring.md)). The commands are in [How to replicate 0.4](../README.md#how-to-replicate-04). The first 0.4 run uses Gemini 4 Argon, Neon and Hydrogen and Claude Sonnet 5.5, all at medium effort, on subscriptions with no API keys. The OpenAI models and a container for replication are not in it.
+0.4, 23 November 2026: the benchmark runs a ladder, L1 to L4 ([levels](levels.md)). Level 1 runs through `bench/scripts/run.mjs --round V3` (a model key in `models.json`); levels 2 to 4 through `npm run paint` (a model key in `tools/paint/authors.json`); scoring through `npm run bench:score04` ([scoring](scoring.md)). The commands are in [How to replicate 0.4](../README.md#how-to-replicate-04). The models run are listed with the results; a model has one key at every level (the `-m` keys, the same in both files). Level 1 runs closed like every session, so its runner must be one the network gate knows (`tools/paint/session-net.mjs` `PROVIDER_HOSTS`: today claude and agy); any other is refused.
 
 The numbered steps below are the V1 to V5 process, kept as a record: V4 and V5 run only from tag v0.3.2.
 

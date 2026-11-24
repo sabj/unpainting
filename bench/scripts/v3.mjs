@@ -7,17 +7,20 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import sharp from 'sharp';
-import { BENCH, RUN_SCHEMA, VERSION_STAMP, V2, BUDGET, readJson, writeJson, validateRun, posix, loadCrops, loadLevelOneCrops, auditScripts } from './lib.mjs';
+import { BENCH, RUN_SCHEMA, VERSION_STAMP, V2, readJson, writeJson, validateRun, posix, loadCrops, loadLevelOneCrops, auditScripts } from './lib.mjs';
 import { turnCommand, usage } from './runners.mjs';
 import { thumb, stageStrip } from './images.mjs';
 import { makeWorktree, keepScripts, runTurn, minutes } from './pipeline/harness.mjs';
+import { closeTurn, closable, probe } from './pipeline/closed.mjs';
 
 const V3 = path.join(BENCH, 'v3');
-// Each attempt is stopped after 32 minutes of wall time (the brief says 30): the old round's limit, set for its small
-// sheets. BENCH_V3_ATTEMPT_MIN states another ("time scaled to the sheet": a drying takes longer on a full-size sheet);
-// up to 360, the owner's 6-hour safety stop ("measure, do not limit"); the brief and the prompts then say that limit less two minutes, and the run record keeps it (settings.sessionCapMin).
-const ATTEMPT_MIN = Math.max(10, Math.min(360, Number(process.env.BENCH_V3_ATTEMPT_MIN) || 32)), SAID_MIN = ATTEMPT_MIN - 2;
-const sayLimit = t => (SAID_MIN === 30 ? t : t.replaceAll('About 30 minutes', `About ${SAID_MIN} minutes`).replaceAll('about 30 minutes', `about ${SAID_MIN} minutes`).replaceAll('after 30 minutes', `after ${SAID_MIN} minutes`).replaceAll('stopped at 30', `stopped at ${SAID_MIN}`));
+// The clock is a safety stop only, as at levels 2 to 4 (tools/paint/session.mjs DEFAULT_WALL_MINUTES): 360 minutes, the
+// owner's 6-hour stop ("measure, do not limit"). BENCH_V3_ATTEMPT_MIN states a shorter one (10 to 360) for a trial;
+// the brief says the limit in force and the run record keeps it (settings.sessionCapMin). Nothing is told two minutes
+// short any more: the stop is far, not a deadline to work towards.
+export const attemptMinutes = (env = process.env) => Math.max(10, Math.min(360, Number(env.BENCH_V3_ATTEMPT_MIN) || 360));
+const ATTEMPT_MIN = attemptMinutes(), SAID_MIN = ATTEMPT_MIN;
+const sayLimit = t => t.replaceAll('{LIMIT_MIN}', String(SAID_MIN));
 
 const fill = (t, vals) => Object.entries(vals).reduce((s, [k, v]) => s.replaceAll(`{${k}}`, String(v)), t);
 
@@ -103,11 +106,16 @@ async function session({ model, crop, spec, tries, rawTry, dry }) {
     images = [view, ...(['codex', 'muse', 'agy'].includes(model.runner) ? [path.join(raw, `a${from - 1}`, 'compare.png')] : [])].filter(f => fs.existsSync(f));
   }
   for (let n = from; n <= tries; n++) {
-    const { ws, cleanup } = makeWorktree();
+    const { ws, tmp, scratch, cleanup } = makeWorktree();
     const sessionId = ['claude', 'muse'].includes(model.runner) ? crypto.randomUUID() : null;
-    let stop = false;
+    let stop = false, closed = null;
     try {
-      seed({ ws, crop, spec, view, tries, dry });
+      // what the model is shown and what guards its scripts are copied into the attempt's own folder, beside the
+      // worktree: under the closed profile nothing of the repository can be read (pipeline/closed.mjs)
+      const mine = f => { const to = path.join(tmp, 'view', path.basename(f)); fs.mkdirSync(path.dirname(to), { recursive: true }); fs.copyFileSync(f, to); return to; };
+      const shown = mine(view), pictures = images.map(mine);
+      fs.cpSync(path.join(V2, 'kit', 'py'), path.join(tmp, 'pyguard'), { recursive: true });
+      seed({ ws, crop, spec, view: shown, tries, dry });
       // the attempt before, for reference only: its own folder as the round kept it, every file read-only
       const before = path.join(raw, `a${n - 1}`), ref = path.join(ws, 'bench', 'attempts', `a${n - 1}`);
       if (n > 1 && fs.existsSync(before)) {
@@ -115,18 +123,30 @@ async function session({ model, crop, spec, tries, rawTry, dry }) {
         for (const f of fs.readdirSync(ref, { recursive: true })) { const g = path.join(ref, f); if (fs.statSync(g).isFile()) fs.chmodSync(g, 0o444); }
       }
       const events = path.join(raw, `events-a${n}.jsonl`), stderr = path.join(raw, `stderr-a${n}.log`);
-      const env = { BENCH_SEED: '1', BENCH_VIOLATIONS: path.join(raw, `a${n}-violations.jsonl`), PYTHONPATH: path.join(V2, 'kit', 'py'), BENCH_PYGUARD: path.join(V2, 'kit', 'py') };
+      // the guard's log of blocked image reads is written by the model's own processes, so it lies in the attempt's
+      // folder (outside the worktree) and is copied to the raw folder when the turn ends
+      const violations = path.join(raw, `a${n}-violations.jsonl`), violationsNow = path.join(tmp, 'guard', 'violations.jsonl'); fs.mkdirSync(path.dirname(violationsNow), { recursive: true });
+      fs.rmSync(violations, { force: true });
+      const env = { BENCH_SEED: '1', BENCH_VIOLATIONS: violationsNow, PYTHONPATH: path.join(tmp, 'pyguard'), BENCH_PYGUARD: path.join(tmp, 'pyguard'), TMPDIR: scratch };
       const c = dry ? { cmd: process.execPath, args: ['bench/dry-v3.mjs', crop, String(n)] }
-        : turnCommand(model, { ws, raw, text: prompt, images, sessionId, resume: false, turn: n,
-          briefFile: path.join(ws, 'bench', 'BRIEF.md'), crops: [crop], logFile: events, minutes: ATTEMPT_MIN - 2 });
-      console.error(`bench:run: ${model.name}, V3, ${crop}, attempt ${n} of up to ${tries}${dry ? ' (dry run)' : ''}, in a fresh worktree and session`);
-      const turn = await runTurn(c, { cwd: ws, env, events, stderr, capMs: ATTEMPT_MIN * 60000 });
+        : turnCommand(model, { ws, raw, text: prompt, images: pictures, sessionId, resume: false, turn: n,
+          briefFile: path.join(ws, 'bench', 'BRIEF.md'), crops: [crop], logFile: events, minutes: ATTEMPT_MIN });
+      // closed as a level 2 to 4 session is: a seatbelt profile, a network gate, the fixed toolbox, a clean environment;
+      // the profile is tried before the model is started
+      closed = await closeTurn(c, { runner: model.runner, tmp, extraEnv: env });
+      probe(closed, { ownFile: path.join(ws, 'bench', 'BRIEF.md') });
+      console.error(`bench:run: ${model.name}, V3, ${crop}, attempt ${n} of up to ${tries}${dry ? ' (dry run)' : ''}, in a fresh worktree and session: ${closed.closed}`);
+      const turn = await runTurn(closed, { cwd: ws, env: closed.env, base: {}, piped: true, events, stderr, capMs: ATTEMPT_MIN * 60000 });
+      const network = await closed.done(); closed = null;
+      if (fs.existsSync(violationsNow)) fs.copyFileSync(violationsNow, violations);
       const u = dry ? { tokens: null, costUSD: null } : usage(model.runner, events);
       res.tokens += u.tokens || 0; res.costUSD += u.costUSD || 0;
       if (n > 1 && fs.existsSync(path.join(ws, 'bench', 'DONE'))) { res.done = { before: n, reason: fs.readFileSync(path.join(ws, 'bench', 'DONE'), 'utf8').trim().slice(0, 400), min: minutes(turn.seconds) }; stop = true; }
       else {
         const a = await collect({ ws, crop, n, raw, view, turn });
-        a.tokens = u.tokens; a.violations = fs.existsSync(env.BENCH_VIOLATIONS) ? fs.readFileSync(env.BENCH_VIOLATIONS, 'utf8').split('\n').filter(Boolean).length : 0;
+        a.tokens = u.tokens; a.violations = fs.existsSync(violations) ? fs.readFileSync(violations, 'utf8').split('\n').filter(Boolean).length : 0;
+        // the gate's record: the hosts passed (the model's own service) and every request refused, with the host asked for
+        a.network = { gated: true, passed: network.passed, refused: network.refused };
         a.rejections = 0;
         attempts.push(a); writeJson(path.join(raw, 'result-partial.json'), res);
         prompt = fill(sayLimit(p.next), { PREV: n, N: n + 1, OF: tries === 2 ? tries : `up to ${tries}`, STROKES: a.stats?.strokes ?? 'no', MIN: a.min }) + (tries === 2 ? '' : p.done);
@@ -134,6 +154,7 @@ async function session({ model, crop, spec, tries, rawTry, dry }) {
         images = [view, ...(['codex', 'muse', 'agy'].includes(model.runner) ? [path.join(raw, `a${n}`, 'compare.png')] : [])].filter(f => fs.existsSync(f));
       }
     } finally {
+      if (closed) await closed.done();
       keepScripts(ws, path.join(raw, `scripts-a${n}`), SKIP);
       cleanup();
     }
@@ -143,8 +164,19 @@ async function session({ model, crop, spec, tries, rawTry, dry }) {
   return res;
 }
 
+/**
+ * Level 1 has no stroke limit, so its one guard must be there: a target without its rendering unit (bench/v3/crops.json
+ * `unit`: the water steps of the automatic painting of the subject) has no runaway stop, and is refused by name.
+ */
+export function guarded(crops, specs) {
+  const none = crops.filter(c => !(specs.find(s => s.task === c)?.unit?.waterSteps > 0));
+  if (none.length) throw new Error(`level 1 target${none.length > 1 ? 's' : ''} ${none.join(', ')}: no rendering unit (bench/v3/crops.json "unit", the water steps of the automatic painting of the subject), so a runaway painting would never be stopped; level 1 has no other limit on how it paints. Not started`);
+}
+
 /** Run V3 for one model and write try folders 1..tries. */
 export async function runV3({ round, model, tries, crops, dry, outRoot, force }) {
+  closable(model.runner);   // a runner the gate does not know is refused here, before any worktree or session
+  if (!dry) guarded(crops, allCrops());
   const specs = Object.fromEntries(allCrops().map(c => [c.task, c]));
   for (let n = 1; n <= tries; n++) {
     const f = path.join(outRoot, round.dir, model.key, String(n), 'run.json');
@@ -177,7 +209,7 @@ export async function runV3({ round, model, tries, crops, dry, outRoot, force })
         shortStrokes: s.shortStrokes ?? null, dotStrokes: s.dotStrokes ?? null, copyHF: null, images: { final: `${r.crop}.webp`, stages },
         // measured work (the kit's kit.work()), recorded beside the score and never charged; the paintings run are the charge (budget 3)
         work: s.work ?? null, paintingsRun: a.paintingsRun ?? null, runawayStop: a.runaway ? a.runaway.msg : null,
-        painterNote: n > 1 ? a.changed : null, score: null, progression: null, attempt: { n, minutes: a.min, killedAtCap: a.killed, exitCode: a.exit },
+        network: a.network ?? null, painterNote: n > 1 ? a.changed : null, score: null, progression: null, attempt: { n, minutes: a.min, killedAtCap: a.killed, exitCode: a.exit },
       };
     }
     const { hits, targetHits } = auditScripts(texts);
@@ -186,9 +218,10 @@ export async function runV3({ round, model, tries, crops, dry, outRoot, force })
       schema: RUN_SCHEMA, benchmark: 'unpaint-bench', protocol: 'v2', round: round.id, ...VERSION_STAMP,
       painter: { key: model.key, name: model.name, id: model.id, effort: model.effort, runner: model.runner },
       planner: null, evaluators: { scoreJudges: [], progressionJudges: [] }, try: n,
-      settings: { mode: 'gentle', strokeBudget: BUDGET.strokes, minutesPerCrop: SAID_MIN, sessionCapMin: ATTEMPT_MIN, lookBudget: null, paintingsPerAttempt: 3, crops, learnsBetweenTries: tries > 1, attemptsPerSession: tries },
+      settings: { mode: 'gentle', strokeBudget: null, minutesPerCrop: null, sessionCapMin: ATTEMPT_MIN, lookBudget: null, paintingsPerAttempt: 3, crops, learnsBetweenTries: tries > 1, attemptsPerSession: tries },
       session: { minutes: +min.toFixed(1), tokens: tokens || null, costUSD: null, exitCode: null, killedAtCap: killed },
       guard: { blockedImageReads: violations, kitRejections: 0, auditHits: hits },
+      isolation: { closed: true, how: 'seatbelt profile, network gate and fixed toolbox, as a level 2 to 4 session (bench/scripts/pipeline/closed.mjs)', refusedRequests: results.reduce((k, r) => k + (r.attempts.find(x => x.n === n)?.network?.refused.length ?? 0), 0) },
       crops: cropsOut, ...(Object.keys(notes).length ? { notPainted: notes } : {}),
       score: { status: dry ? 'dry-run' : 'unscored', composite: null, complete: false },
       cheat: { disqualified: dq, readTargetPixels: dq, reason: dq ? (violations ? `${violations} blocked target read(s) at paint time` : `scripts refer to the target files: ${targetHits.join(', ')}`) : null, risk: null, progressionRisk: null, review: null },

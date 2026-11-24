@@ -23,7 +23,8 @@
   ],
   "ignoreBinaries": [
     "codex",
-    "ffmpeg"
+    "ffmpeg",
+    "sandbox-exec"
   ],
   "ignoreIssues": {
     "src/media/sheet-size.mjs": [

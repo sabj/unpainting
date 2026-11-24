@@ -33,20 +33,24 @@ Every level is one try that hands in the model's own script, with a budget of 3.
 
 Nothing of Auto is given at any level: no plan, planner, painting, film or stroke map. A hand-in of planner settings, or of the code's plan, is refused.
 
+Each step of the ladder changes several things at once, and level 1 paints in a different way from levels 2 to 4 (its own code driving the brush, against a painting script the painter lays). A gain between two levels is the effect of the whole step and cannot be assigned to one kind of help: [what changes from one level to the next](docs/levels.md#what-changes-from-one-level-to-the-next) lists all of it.
+
 Details: [levels](docs/levels.md), [rules](docs/rules.md) and [scoring](docs/scoring.md).
 
 - Drawing is the model's choice: pencil, pen or none; no drawing is a normal choice. The prepared drawing is offered, not required, and its lines may go down before the washes, with a stage of them, or after. Pen ink is waterproof or soluble. It gets warnings, not refusals, where a choice only risks the painting.
 - Retries are self-study. The model sees its own painting, replay and stroke map and writes its own assessment. It never gets a score or a critique.
 - Budget for one try: 3.0 look units. A look's price is fixed by size: a half-size whole look 0.3, full size 1.0, a partial look its share, never under 0.2 (at L2 to L4 looks are half size; at L1 each run is a full-size painting, 1.0). At L2 to L4 the full-size final is painted after the session and not charged; at L1 the painting is its last completed run. How a model paints (water, strokes, waits, dryings) is free and measured beside the score: simulation work, sweeps, dryings, seconds, tokens (fresh, cached, output), steps. One runaway guard: water steps over ten times Auto's for the subject stop the painting (reported as a stop, not scored). Steps and the six-hour clock are runaway guards only.
-- Scores: the judges score human-ness first, from the film (the judges see the opening, the untouched paper the painter chose, as context; then the drawing as it stood before the first wash, scored and reported beside the result; then ten frames evenly spaced from the first wash to the finished sheet, whose mean is human-ness; scores from before rc7 used another set of frames and are not comparable), plus quality and likeness, plus a combined number. The original is scored for quality too, and a painting's quality is its share of the original's. Auto sets the difficulty.
+- Scores: three readings by one judge panel, kept apart. Human-ness, the main one, from the film: the judges see the opening (the untouched paper, as context), the drawing as it stood before the first wash (scored, reported beside), ten stills of the painting in progress from the first wash to just before the finish, whose mean is human-ness, and the finished sheet (scored, reported beside). The ten are placed by measured progress, the share of the finished picture on the sheet, not by frame number, and the judges never see the original here. Quality: the painting alone, as a share of its original read alone. Likeness: the original and the painting together, in its own column. Combined: two parts human-ness to one part quality; likeness is not in it. Auto sets the difficulty. A run that failed is counted as a failure, never dropped. See [scoring](docs/scoring.md).
 - Every picture is painted on the same area of paper: a quarter sheet (27.9 x 38.1 cm, about 1,063 cm2), in the
   picture's own proportions, whatever the file's pixel size or orientation. A cell is 0.26 mm, so every sheet holds
-  about 1.57 million cells (`tools/paint/sheet-rule.mjs`; run it to list every registered subject's sheet). A subject
-  registered before this rule keeps the sheet it was registered with, so earlier results keep their inputs. The
-  original's real size is recorded and told to the model as a fact;
+  about 1.57 million cells (`tools/paint/sheet-rule.mjs`; run it to list every registered subject's sheet). The
+  benchmark's fifteen run only from registrations made under this rule (ids ending `-qs`, `bench/run-sets.json`); a
+  benchmark run on one that is not is refused, and `node tools/paint/run-sets.mjs check` says which are registered
+  and prepared. A subject registered before the rule stays under its old id with its old sheet, for earlier results
+  only. The original's real size is recorded and told to the model as a fact;
   it is not reproduced. Each picture is the whole sheet, never a crop, with one exception chosen by the owner (Manet's
   Morisot with a Fan, its head, shoulders and hand).
-- Judges: an open-weight panel (GLM-5.3-Flash, Qwen3.8-27B, Gemma-4-31B), hosted on OpenRouter with zero data retention (`JUDGE_ROUTE=openrouter JUDGE_HOSTED_PANEL=open3`), or run locally through Ollama with those models named in `JUDGE_LOCAL_PANEL`. See [scoring](docs/scoring.md#judges).
+- Judges: one named panel on every route, `open3` (GLM-5.3-Flash, Qwen3.8-27B, Gemma-4-31B, reasoning off): hosted on OpenRouter with zero data retention (`JUDGE_ROUTE=openrouter`), or locally through Ollama (the default route; GLM-5.3-Flash's local tag is named in `JUDGE_LOCAL_TAGS`). Any other panel must be asked for by name (`JUDGE_PANEL`). Panel and settings are written into every results file. See [scoring](docs/scoring.md#judges).
 
 ## Real sizes of the originals (told to the model as a fact)
 
@@ -65,7 +69,7 @@ until that is explained). The museums' own size lines are in [PICTURES.md](PICTU
 
 RESULTS: to be filled from the frozen run.
 
-The first run uses Gemini 4 Argon, Neon and Hydrogen and Claude Sonnet 5.5, all at medium effort, on subscriptions only. Not in it: a container for replication, and the OpenAI models (gpt-6-astra, gpt-6.1-sol, gpt-6.1-terra).
+The models run are listed with the results. Not in 0.4's first run: a container for replication.
 
 ## Running a set
 
@@ -75,8 +79,9 @@ The runners read the file. A set's name stands for its pictures wherever a subje
 that run at the level asked for are painted: `npm run paint -- extended paint` paints Auto for all fifteen,
 `npm run paint -- extended paint --author neon-m --level L2` runs level 2 on all fifteen, and at L3 or L4 the set is
 its core five (each run from its own previous folder, one picture at a time). Level 1:
-`node bench/scripts/run.mjs --round V3 --crops core`, which stops, naming them, while a core picture has no level 1
-target prepared. `node tools/paint/run-sets.mjs core` (or `extended`) lists every painting a set asks for and starts
+`node bench/scripts/run.mjs --round V3 --model neon-m --crops core`. Each core picture has a level 1 target
+(`v3/crops.json`, made by `scripts/add-level-one-target.mjs`); the run stops before any session, naming them, while a
+target has no rendering unit, which it gets from its prepared Auto (today: Prout and White Ships). `node tools/paint/run-sets.mjs core` (or `extended`) lists every painting a set asks for and starts
 nothing.
 
 ## How to replicate 0.4
@@ -84,13 +89,12 @@ nothing.
 Machines: sessions run on a Mac (Apple silicon). Painting runs on the GPU: on that Mac, on a Mac mini over ssh, or on rented GPU pods, through the render pool (`tools/paint/render-pool.mjs`). Scoring runs locally or hosted.
 
 ```sh
-# level 1: one attempt with the freehand kit (the runner keeps its old round name, V3; model keys in models.json;
-# subjects in v3/crops.json; 360 sets the six-hour stop, which the brief then states)
-BENCH_V3_ATTEMPT_MIN=360 node bench/scripts/run.mjs --round V3 --model neonmed --crops SUBJECT --out DIR
+# level 1: one attempt with the freehand kit, closed like every session (the runner keeps its old round name, V3;
+# targets in v3/crops.json, or a run set's name; the clock is the six-hour safety stop)
+node bench/scripts/run.mjs --round V3 --model neon-m --crops TARGET --out DIR
 
-# (level 1 keys: argonmed, neonmed, sonnetmed; models.json has no Hydrogen key yet)
-
-# levels 2 to 4 (model keys in tools/paint/authors.json: argon-m, neon-m, hydrogen-m, sonnet-m)
+# levels 2 to 4 (the same model keys at every level: argon-m, neon-m, hydrogen-m, carbon-m, sonnet-m;
+# bench/models.json for level 1, tools/paint/authors.json for levels 2 to 4)
 npm run paint -- SUBJECT prepare                                   # once per subject: the inputs every level gets
 npm run paint -- SUBJECT paint --out AUTODIR                       # Auto, the reference (--author auto is the default)
 npm run paint -- SUBJECT paint --author neon-m --level L2 --out L2DIR
@@ -99,8 +103,10 @@ npm run paint -- SUBJECT paint --author neon-m --level L4 --previous L3DIR --out
 npm run paint -- SUBJECT paint --author neon-m --level L2 --dry-run   # what would run; paints nothing
 npm run paint -- core paint --author neon-m --level L2 --dry-run      # the same for a run set (core, extended)
 
-# score with the 0.4 panel, hosted (or locally: docs/scoring.md#judges)
-JUDGE_ROUTE=openrouter JUDGE_HOSTED_PANEL=open3 OPENROUTER_API_KEY=... npm run bench:score04 -- AUTODIR RUN_FOLDER... --out DIR   # Auto's painting of the subject sets the difficulty
+# score with the 0.4 panel, hosted (or locally: docs/scoring.md#judges); every level's output goes in together
+JUDGE_ROUTE=openrouter OPENROUTER_API_KEY=... npm run bench:score04 -- AUTODIR L1_TRY_FOLDER RUN_FOLDER... --out DIR   # Auto's painting of the subject sets the difficulty
+npm run bench:score04 -- ... --out DIR --repeat 2                  # the same paintings scored again, kept apart: the judges' noise
+npm run bench:summary04 -- DIR/results.json --set core             # every model's levels against Auto; failed and missing runs count as 0
 ```
 
 `UNPAINT_RENDER=pool` paints a session's looks and final through the render pool (committed code only); the default, `local`, paints on this Mac. The pool folder's `mini.json` adds the Mac mini; `tools/cloud/render-pool-pods.py POOL_DIR` rents and returns the pods. More in [running](../docs/running.md).

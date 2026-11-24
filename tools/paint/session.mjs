@@ -430,10 +430,14 @@ export function seatbelt({ deny, write, cwd, local = false, gated = false, reada
   // them: its own folder, `readable` (the toolbox, the model command's own program and settings) and `write`
   // gated: nothing goes out but to this machine's loopback, where the session's gate (session-net.mjs) passes the
   // model's own service only; readable: folders read again after the denials (the toolbox's Python)
+  // other sessions' folders, by name: a working session's (unpaint-session-) and a level 1 attempt's (unpaint-bench-)
+  const closedOff = `(deny file-read* file-write* ${deny.map(d => `(subpath ${q(d)})`).join(' ')} (regex #"/unpaint-session-") (regex #"/unpaint-bench-"))`;
   return ['(version 1)', '(allow default)',
     '(deny file-write*)', `(allow file-write* ${write.map(d => `(subpath ${q(d)})`).join(' ')} (literal "/dev/null") (literal "/dev/dtracehelper") (regex #"^/dev/tty"))`,
-    `(deny file-read* file-write* ${deny.map(d => `(subpath ${q(d)})`).join(' ')} (regex #"/unpaint-session-"))`,
-    ...(hidden.length ? [`(deny file-read* ${hidden.map(d => `(subpath ${q(d)})`).join(' ')})`, `(allow file-read* ${write.map(d => `(subpath ${q(d)})`).join(' ')})`] : []),
+    closedOff,
+    // (the temporary folders are read again after the hidden ones, and other sessions live in them: the denials are said
+    // again after that, or a later rule would open what an earlier one closed)
+    ...(hidden.length ? [`(deny file-read* ${hidden.map(d => `(subpath ${q(d)})`).join(' ')})`, `(allow file-read* ${write.map(d => `(subpath ${q(d)})`).join(' ')})`, closedOff] : []),
     `(allow file-read* file-write* (subpath ${q(cwd)}))`, ...readable.map(d => `(allow file-read* (subpath ${q(d)}))`), ...metadata.map(d => `(allow file-read-metadata (literal ${q(d)}))`),
     '(deny network*)', ...(gated ? ['(allow network-outbound (remote ip "localhost:*"))'] : ['(allow network-outbound (remote tcp "*:443") (remote udp "*:53") (remote tcp "*:53") (literal "/private/var/run/mDNSResponder"))', '(allow network-inbound (local udp "*:*"))']), '(allow system-socket)',
     ...(local ? ['(allow network-bind (local ip "localhost:*"))', '(allow network-inbound (local ip "localhost:*"))', '(allow network-outbound (remote ip "localhost:*"))', '(allow pseudo-tty)', '(allow file-read* file-write* file-ioctl (literal "/dev/ptmx") (regex #"^/dev/ttys[0-9]+$"))'] : []),

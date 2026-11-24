@@ -56,13 +56,23 @@ export function keepScripts(ws, dest, skip) {
 /**
  * Run one model turn. c: {cmd, args, stdinFile?, env?} (runners.turnCommand). capMs: wall-clock limit. tick(ctl) runs
  * every tickMs while the turn lasts; ctl.stop(reason) ends it. Resolves to {code, killed, reason, seconds}.
+ * base: the environment the turn starts from (this process's; a closed turn gives its own whole environment and {}).
+ * piped: see below; a closed turn is always piped.
  */
-export function runTurn(c, { cwd, env = {}, events, stderr, capMs, tick = null, tickMs = 500, killGraceMs = 20000, cleanupGroup = false }) {
+export function runTurn(c, { cwd, env = {}, base = process.env, piped = false, events, stderr, capMs, tick = null, tickMs = 500, killGraceMs = 20000, cleanupGroup = false }) {
   return new Promise(resolve => {
     const out = fs.openSync(events, 'a'), err = fs.openSync(stderr, 'a');
-    const stdin = c.stdinFile ? fs.openSync(c.stdinFile, 'r') : 'ignore';
+    const stdin = c.stdinFile && !piped ? fs.openSync(c.stdinFile, 'r') : 'ignore';
     const t0 = Date.now();
-    const child = spawn(c.cmd, c.args, { cwd, env: { ...process.env, ...env, ...(c.env || {}) }, stdio: [stdin, out, err], detached: true });
+    // piped: the turn's output comes to this process and is written to the files here, and its input is fed from
+    // here. A closed turn cannot be handed the files themselves: they lie where its profile lets nothing be read, and
+    // a program that checks its own output at start (node does) stops on a file it may not look at.
+    const child = spawn(c.cmd, c.args, { cwd, env: { ...base, ...env, ...(c.env || {}) }, stdio: piped ? [c.stdinFile ? 'pipe' : 'ignore', 'pipe', 'pipe'] : [stdin, out, err], detached: true });
+    if (piped) {
+      const to = fd => d => { try { fs.writeSync(fd, d); } catch { /* the file was closed: the turn is over */ } };
+      child.stdout.on('data', to(out)); child.stderr.on('data', to(err));
+      if (c.stdinFile) { child.stdin.on('error', () => {}); fs.createReadStream(c.stdinFile).pipe(child.stdin); }
+    }
     trap(); LIVE.turns.add(child.pid);
     let reason = null, done = false, exited = false, cleaning = false, cleaned = false, exitCode = null, exitAt = null;
     const finish = () => {
@@ -94,7 +104,9 @@ export function runTurn(c, { cwd, env = {}, events, stderr, capMs, tick = null, 
       if (cleanupGroup && child.pid) clean();
       finish();
     };
-    child.on('exit', code => end(code));
+    // piped: what the turn wrote last is still on its way when it exits; wait for its output to close (a moment at most:
+    // a process it left behind may hold the pipe open)
+    child.on('exit', code => { if (!piped) { end(code); return; } const late = setTimeout(() => end(code), 3000); child.on('close', () => { clearTimeout(late); end(code); }); });
     child.on('error', e => { fs.appendFileSync(stderr, String(e) + '\n'); end(-1); });
   });
 }

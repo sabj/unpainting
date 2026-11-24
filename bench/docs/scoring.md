@@ -9,11 +9,15 @@ npm run bench:score04 -- RUN_FOLDER... --out DIR
 npm run bench:score04 -- runs.json --out DIR
 ```
 
-`bench/scripts/score04.mjs` runs `bench/scorer/score04.py` under `BENCH_SCORE_PYTHON` (else `python3`), which needs `bench/scorer/requirements.txt`. It writes `DIR/results.json` (every figure, every setting) and `DIR/SCORES.md` (the readable table, faults first), and keeps each judge reply in `DIR/readings/`. A reply is reused only for the same judge, prompt and pictures.
+`bench/scripts/score04.mjs` runs `bench/scorer/score04.py` under `BENCH_SCORE_PYTHON` (else `python3`), which needs `bench/scorer/requirements.txt`. It writes `DIR/results.json` (every figure, every setting) and `DIR/SCORES.md` (the readable table, faults first), and keeps each judge reply in `DIR/readings/`. A reply is reused only when everything that could change it is the same: panel, route, endpoint, the judge and the name it is served under, its digest, the options sent, the rubric, the prompt, the pictures and their sizes. `--fresh` reads everything again. `--repeat N` scores the same paintings a further time and shares no reading with another repeat (`results-repeat-N.json`, `SCORES-repeat-N.md`): two repeats give the judges' noise on the same painting.
 
-- A run folder holds `run.json` and the painting (`plate/painting.png` or `painting.png`) with its film, `frames.json`, beside it. The original is `run.json`'s `subject.sourceAbs`. The style the judges are told comes from the subject registry.
-- A manifest is JSON: a list, or `{"runs": [...]}`, of folders or of `{folder, label?, subject?, target?, style?}`. Relative paths are read from the manifest's folder.
-- It refuses before any judge call, naming every bad input: no painting, no original on disk, a failed run, no film or one with under 14 frames, missing frame files or no untouched-paper first frame (the opening), a missing rubric, an unknown route, or a hosted route without its key.
+- Every level's output goes in as its runner leaves it, in one scoring:
+  - Auto and levels 2 to 4: a painter run folder (`npm run paint`), holding `run.json`, the painting (`plate/painting.png` or `painting.png`) with its film, `frames.json`, beside it, and `usage.json` (its level). The original is `run.json`'s `subject.sourceAbs`. The style the judges are told comes from the subject registry.
+  - Level 1: a try folder (`bench/scripts/run.mjs --round V3`), holding the try's `run.json`. Each target the try was asked to paint is one painting, read from the try's raw folder (`out/<target>/final.png`, its film in `film/`). The target of a benchmark picture is scored under that picture's id, so all levels of a picture stand in one table. Level 1's target is its own file of the picture, so it is read as an original of its own.
+- A manifest is JSON: a list, or `{"runs": [...]}`, of folders or of `{folder, label?, subject?, level?, author?, target?, style?}`. Relative paths are read from the manifest's folder. It is also the schedule: `{subject, level, author, failed: "why"}` with no folder stands for a scheduled run that left nothing.
+- A run that failed is never refused and never dropped: a painter run with a `failure`, a level 1 target with no painting (or stopped as a runaway, or disqualified), a scheduled run with no folder. It is a row marked FAILED with its reason, listed under "Failed runs", and counted as the bottom of the scale by the summary.
+- `npm run bench:summary04 -- DIR/results.json --set core|extended` then writes `DIR/SUMMARY.md`: every model's levels against Auto on the run set's schedule. See [levels](levels.md#the-summary).
+- It refuses before any judge call, naming every bad input: a folder that is not a run, no original on disk, no film, a film that does not say where its first wash is or has under ten frames from it to just before the finish, missing frame files or no untouched-paper first frame (the opening), a missing rubric, an unknown route, or a hosted route without its key.
 - Exit 0: complete. Exit 1: written, but a reading is short of a judge; the figure is left empty and named under "Faults first". A smaller panel is never used. Exit 2: refused.
 - `npm run bench:test` runs its tests with a stub judge (`bench/scorer/score04-test.py`); no model is needed.
 
@@ -22,7 +26,8 @@ npm run bench:score04 -- runs.json --out DIR
 Each painting gets several readings. They are kept apart and shown together.
 
 - Human-ness: does the painting, and its film stopped anywhere, look made by a person? This is the main reading.
-- Quality and likeness: a second reading, beside it.
+- Quality: a second reading, beside it.
+- Likeness: a third reading, in its own column: is the painting a painting of its original? It is not part of the combined figure (its weight is the owner's to set). A painting at the bottom of the likeness scale is flagged in the table.
 - Combined: two parts human-ness to one part quality. The weights are a setting (`WEIGHTS` in `bench/scorer/s04_table.py`), written into the results. Both parts stay visible next to it.
 - The original is scored for quality too (it has no film, so no human-ness). A painting's quality is its share of the original's score. If the original gets 9 and Auto gets 4.5, Auto gets 50%. A model can go over 100%.
 - Difficulty: the subject's Auto painting is scored the same way. Each model painting's figures are shown raw and adjusted for Auto side by side: (painting - Auto) / max(top - Auto, top / 5), so 0 is level with Auto. The adjustment needs exactly one Auto painting of the subject among the inputs; otherwise the table says so.
@@ -34,30 +39,51 @@ RESULTS: to be filled from the frozen run.
 
 - First the opening: the untouched paper the painter chose, the film's first frame, in its own colour (a toned sheet shows toned). The prompt says it is context only and not scored. Auto's films and models' films (the painter's and the level 1 kit's) all start with that frame; a film that does not is refused.
 - Then the drawing frame: the last frame before the first wash. It is scored and reported beside the result, and it is not part of the human-ness figure. When nothing was drawn before the first wash there is no drawing frame.
-- Then ten frames evenly spaced from the first wash to the finished sheet: the first is the first wash, the tenth is the finished sheet. All are shown in order, each labelled only with its percentage complete. The judge does not know the method.
+- Then ten stills of the painting in progress, from the first wash to just before the finish. Human-ness is about the painting being made, so these ten are the figure.
+- Then the finished sheet, shown last. It is scored and reported beside the result, and it is not part of the human-ness figure (it feeds quality and likeness).
+- The ten are placed by progress, never by the film's frame numbers. A frame's progress is the share of the finished picture that is on the sheet, measured from the frames themselves: 1 - |frame - finished| / |paper - finished|, never below an earlier frame's. The ten are at equal steps of it, starting from the sheet as it stood before the first wash: the first is the first wash's own frame, the tenth is nine tenths of the way to the finished sheet. So how densely a film was recorded, and strokes that leave no mark, cannot move which moments are judged (`bench/scorer/s04_readings.py`: `progress`, `stills`; tested with one painting filmed at two densities and with padded films).
+- All are shown in order, each labelled only with that progress ("N% of the finished picture on the sheet"). The judge does not know the method, and is never shown the original: human-ness is blind to it on purpose.
 - Where the first wash is comes from the film's own record (`frames.json`: each frame's stage in the painter's film, the count of brush strokes in the level 1 kit's film). It is never guessed: a film that does not say is refused.
 - It first says whether this is the order and the kind of mark a person would use (yes or no). Then it scores each snapshot 1 to 5 by the [rubric](human-ness-rubric.md): 5 is unmistakably a person's painting in progress, 1 is a finished image uncovered by a filter or wipe. Tells are named by letter (a to j).
-- The figure is the mean of the ten, as a percentage of 5 (mean ÷ 5). Also shown: the drawing frame's score, the means of frames 1 to 3, 4 to 7 and 8 to 10, the tally of tells (each judge's first reading, every snapshot shown), and how many readings said yes.
+- The figure is the mean of the ten, as a percentage of 5 (mean ÷ 5). Also shown: the drawing frame's score, the finished sheet's score, the means of stills 1 to 3, 4 to 7 and 8 to 10, the tally of tells (each judge's first reading, every snapshot shown), and how many readings said yes.
 - The rubric file is `bench/docs/human-ness-rubric.md`. Its sha256 is written into the results; editing it starts a new series.
 - A painting with no film is refused, not scored from its finished sheet.
-- This scheme is named `wash10` and is the default from 0.4 rc7. The scheme before it is kept under the name `film13` (`npm run bench:score04 -- ... --snapshots film13`): the opening, twelve snapshots evenly through the whole film, then the finished sheet, with the mean of the twelve as the figure. Use it to score an old film the old way. **Scores under `wash10` are not comparable with scores under `film13`**: the frames differ, and the finished sheet now counts. Every results file and scores table names its scheme. The same pictures go to every judge route, local or hosted.
+- This scheme is named `progress10` and is the default. The first scheme is kept under the name `film13` (`npm run bench:score04 -- ... --snapshots film13`): the opening, twelve snapshots evenly through the whole film by frame number, then the finished sheet, with the mean of the twelve as the figure. Use it to score an old film the old way. **Scores under `progress10` are not comparable with scores under `film13`**, nor with the scheme that stood for a few hours on 23 November (`wash10`: ten frames by frame number, the finished sheet counted), which is gone and refused by name. Every results file and scores table names its scheme. The same pictures go to every judge route, local or hosted.
 
-## Quality and likeness
+## Quality
 
 - The judge sees one picture alone, at most 768 px on the long side, and scores it as a watercolour from 0 to 10. It is not told whether the picture is an original or a painting.
 - The original and the painting are read the same way, independently, so the original does not score 10 by construction.
 - A painting's figure is its share of its original's score.
+- The judge of a painting's quality never sees its original: quality says how good a watercolour it is, not whether it is the right picture. That is likeness.
+
+## Likeness
+
+- The judge sees the original and then the finished painting, each at most 768 px on the long side, and scores from 1 to 5 how well the second is a painting of the first: subject, composition, the pattern of light and dark, colour. It is told the painting is not a copy and need not match mark for mark, and not to judge how well it is painted. It gives one short reason.
+- 5: unmistakably this picture. 3: subject and composition are there, tones or colour plainly differ, or a main part is missing. 1: a different picture, or the subject cannot be recognised.
+- The same panel, three readings a judge; the figure is the mean of the judges' medians.
+- It has its own column beside human-ness and quality. It is not in the combined figure. A figure of 1.5 or under is flagged: the painting may not be a painting of this picture at all, whatever its other scores.
+
+## What the judges are shown, and how large
+
+| Reading | Pictures | Long side | The original shown? |
+|---|---|---|---|
+| Human-ness | the opening paper, the drawing frame, ten stills in progress, the finished sheet | 640 px each | never, on purpose |
+| Quality | the finished painting alone; the original alone, as a separate reading | 768 px | not beside the painting |
+| Likeness | the original, then the finished painting | 768 px each | yes |
+
+A picture larger than its limit is brought down (Lanczos, then JPEG quality 88); one under 384 px is brought up to 384. A full-size sheet is about 1,450 by 1,100 cells, so the judges see it at about half size: fine detail at native resolution is not judged.
 
 ## Judges
 
-- The 0.4 panel is three open-weight models: GLM-5.3-Flash, Qwen3.8-27B and Gemma-4-31B. The defaults of the routes are not this panel: name it as below.
-- `JUDGE_ROUTE` picks where: `local` (the default), `openrouter` or `together`.
-- Hosted, the 0.4 panel: `JUDGE_ROUTE=openrouter JUDGE_HOSTED_PANEL=open3` (`z-ai/glm-5.3-flash`, `qwen/qwen3.8-27b`, `google/gemma-4-31b-it`), zero-data-retention providers only. Judge label `J3-open-3x-hosted`. Needs `OPENROUTER_API_KEY`.
-- `local`: Ollama (`bench/scorer/local_route.py`; `JUDGE_LOCAL_URL`, `JUDGE_LOCAL_PANEL`). Its default panel is `qwen3.8-flash-next:125b-mlx`, `qwen3.8:27b-mlx`, `gemma4:31b-mlx`; for the 0.4 panel, name its three models' Ollama tags in `JUDGE_LOCAL_PANEL`. One model in memory at a time: every picture for one judge, then it is unloaded. The run waits while the server holds another job's model. Judge label `J3-local-3x`.
-- `openrouter` without `JUDGE_HOSTED_PANEL`, or `together`: the J1 panel (Kimi-K3, GLM-5.3-Flash, Qwen3.5-9B), labels `J4-openrouter-3x`, `J4-together-3x`. `together` needs `TOGETHER_API_KEY`.
+- ONE panel is the default on every route: `open3`, three open-weight models, GLM-5.3-Flash, Qwen3.8-27B and Gemma-4-31B, read with one reasoning setting, off, wherever they are served (`bench/scorer/s04_judge.py`: `PANELS`, `REASONING`).
+- `JUDGE_ROUTE` picks where: `local` (the default), `openrouter` or `together`. The judge label names panel and route: `open3-local-3x`, `open3-openrouter-3x`.
+- `openrouter`: `z-ai/glm-5.3-flash`, `qwen/qwen3.8-27b`, `google/gemma-4-31b-it`, zero-data-retention providers only, reasoning effort `none`. Needs `OPENROUTER_API_KEY`. A judge that reasons all the same is named under "Faults first".
+- `local`: Ollama (`bench/scorer/local_route.py`; `JUDGE_LOCAL_URL`), thinking off: `qwen3.8:27b-mlx`, `gemma4:31b-mlx`, and GLM-5.3-Flash under the tag named in `JUDGE_LOCAL_TAGS` (`zai-org/GLM-5.3-Flash=<tag>`). Without that tag the local route refuses the panel by name; nothing stands in. One model in memory at a time: every picture for one judge, then it is unloaded. The run waits while the server holds another job's model.
+- Any other panel is asked for by name, `JUDGE_PANEL`: `j1` (Kimi-K3, GLM-5.3-Flash, Qwen3.5-9B; hosted, the only panel `together` serves; needs `TOGETHER_API_KEY`), `local3` (the local panel used before 0.4 named one: Qwen3.8-Flash-Next in GLM-5.3-Flash's place), or `custom` with `JUDGE_LOCAL_PANEL` (local tags of your own). Its name is in the label and in the results.
 - A hosted route without its key stops with a plain message before any work. The key is never written into a result.
 - Three readings a judge, temperature 0. A judge's figure is the median of its three and needs all three. The panel's figure is the mean of the judges'.
-- The results record the route, endpoint, panel, model digests (local), the judge label, the rubric hash and the prompt hashes. Results with different labels are not compared.
+- Every results file records the panel by name, its models and what each was served as, the reasoning setting, the route, endpoint, model digests (local), the judge label, the rubric hash and the prompt hashes. Results with different labels are not compared.
 - A judge never sees a painter's name or level.
 
 ## Beside the score

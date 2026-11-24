@@ -1,5 +1,5 @@
 {
- "_about": "The real size of each original, height x width in cm, told to the model as a fact at levels 2 to 4 (tools/paint/real-size.mjs). It never sizes the sheet: every picture is painted on the standard area (tools/paint/sheet-rule.mjs). nominal: a generated picture, which has no real size; part: the picture painted is a part of the original, whose whole size this is. A subject's record in the registry may carry its own realSize, which is read first. A subject not listed is told nothing about the original's size.",
+ "_about": "The real size of each original, height x width in cm, told to the model as a fact at levels 2 to 4 (tools/paint/real-size.mjs). It never sizes the sheet: every picture is painted on the standard area (tools/paint/sheet-rule.mjs). nominal: a generated picture, which has no real size; part: the picture painted is a part of the original, whose whole size this is. sheet: the museum's figure for the sheet, where the picture's file has other proportions (told as the museum's figure). A subject's record in the registry may carry its own realSize, which is read first. A subject not listed is told nothing about the original's size.",
  "sizes": {
   "tiepolo-bacchus": { "heightCm": 31.2, "widthCm": 24.3 },
   "guardi": { "heightCm": 45.4, "widthCm": 30.1 },
@@ -10,6 +10,7 @@
   "sargent-tyrol": { "heightCm": 29.9, "widthCm": 45.2 },
   "turner-esseillon": { "heightCm": 19.7, "widthCm": 28 },
   "ender-mountain-valley": { "heightCm": 21, "widthCm": 28.5 },
+  "morisot-avenue-du-bois": { "heightCm": 20, "widthCm": 28, "sheet": true },
   "cezanne-bathers-bridge": { "heightCm": 21, "widthCm": 27.2 },
   "bonington-french-town": { "heightCm": 18.1, "widthCm": 14.3 },
   "prout-laundresses": { "heightCm": 30.2, "widthCm": 21.6 },

@@ -16,6 +16,7 @@
     "example:plan": "node tools/run-plan.mjs examples/plans/graded-wash.json",
     "bench:score": "node bench/scripts/score.mjs",
     "bench:score04": "node bench/scripts/score04.mjs",
+    "bench:summary04": "node bench/scripts/summary04.mjs",
     "bench:build": "node bench/scripts/build-results.mjs && node bench/scripts/build-leaderboard.mjs && node bench/scripts/build-findings.mjs && node bench/scripts/build-chart.mjs && node bench/scripts/build-overview.mjs && node bench/scripts/build-rounds-table.mjs",
     "bench:test": "node --test bench/scripts/*.test.mjs bench/v6/*.test.mjs",
     "bench:render": "node tools/render-bench/render-bench.mjs",
