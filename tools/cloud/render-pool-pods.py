@@ -48,6 +48,7 @@ SLOTS_OTHER = 2
 VCPU_A_PAINTING = 2
 LOOK_WAIT_S = 30  # a look that has waited this long for this Mac and the mini wants a pod's place
 lock = threading.Lock()
+tree_lock = threading.Lock()
 st = {"pods": [], "adding": 0, "spentUSD": 0.0}
 
 
@@ -146,10 +147,13 @@ def tree_of(commit):
     if r.returncode:
         raise RuntimeError(f"commit {commit} is not in this Mac's repository")
     sha = r.stdout.strip(); t = REPO / "work/cloud-trees" / sha[:8]
-    if not t.exists():
-        r = subprocess.run(["git", "-C", str(REPO), "worktree", "add", "--detach", str(t), sha], capture_output=True, text=True)
-        if r.returncode:
-            raise RuntimeError("git worktree add: " + r.stderr.strip()[-200:])
+    # one at a time: several pods rented at once for a new commit each asked for its checkout, and git refused all
+    # but one (23 Nov: three starts of this daemon lost every rental to that)
+    with tree_lock:
+        if not t.exists():
+            r = subprocess.run(["git", "-C", str(REPO), "worktree", "add", "--detach", str(t), sha], capture_output=True, text=True)
+            if r.returncode:
+                raise RuntimeError("git worktree add: " + r.stderr.strip()[-200:])
     return sha, t
 
 
@@ -300,10 +304,13 @@ def main():
                 with lock: st["adding"] += 1
                 n += 1; threading.Thread(target=add_pod, args=(commits[0], n), daemon=True).start()
                 log("adding a pod:", said)
+            # the pods are published before any checkout is copied and again after each one: a copy takes minutes, and
+            # a pod that is ready for one commit is not kept from its jobs while another commit reaches every pod
+            save()
             for p in [p for p in st["pods"] if p["ready"]]:
                 for c in commits:
                     if c[:8] not in p["trees"]:
-                        try: add_tree(p, c)
+                        try: add_tree(p, c); save()
                         except Exception as e: log("tree FAILED", c[:8], "on", p["name"], str(e)[:200])
             # more pods than the jobs and sessions need, or near its limit: an idle pod goes (never one painting)
             for name, why in go:
