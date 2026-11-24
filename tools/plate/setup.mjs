@@ -6,6 +6,7 @@ import {setStrict, writeContinuedChecks} from '../../src/media/checks.mjs';
 import {scaleBrushForDensity} from '../../src/media/brush-density.mjs';
 import {painterBrushOptions, isSection} from './painter-brush.mjs';
 import {framePolicy} from '../speed/frame-policy.mjs';
+import {recordingPolicy} from './recording.mjs';
 import {startSpeedProfile} from '../speed/profile.mjs';
 import {runSpeedSequence} from '../speed/sequence.mjs';
 import {estimatePaper} from '../../src/paint/methods/value-shared.mjs';
@@ -146,6 +147,9 @@ process.env.GPU_SKIP_ZERO_LAYER = String(num('speedemptylayers', 1));
 const SPEED_RENDER_THREADS = Math.max(1, Math.min(16, Math.floor(num('speedrenderthreads', opt('gpu', 'auto') === 'off' || num('width', 700) > 540 ? 1 : Math.min(4, availableParallelism())))));
 process.env.KM_PARALLEL_CELLS = SPEED_RENDER_THREADS > 1 ? '1' : '0';
 const FRAME_POLICY = framePolicy({ video: OUTPUT_VIDEO, keepAll: num('keepallframes', 0) > 0 });
+// --recording full|medium|light: native frames after every stroke, at the film's frames (default), or at the ends only
+// with a film of at most 40 frames (tools/plate/recording.mjs)
+const RECORDING = recordingPolicy(opt('recording', 'medium'));
 const SPEED_PROFILE = startSpeedProfile(num('speedprofile', 0) > 0);
 const CPU_PROFILE = num('speedcpu', 0) > 0 ? await import('../speed/cpu-profile.mjs').then(m => m.startCpuProfile()) : null;
 void opt('downtrace', '0'); // tracing is selected from argv while GPU modules load
@@ -369,7 +373,7 @@ const paletteFitStarted = performance.now();
 Object.assign(ctx, { LINE_SOURCE, RUN_METHODS, MEDIUM_DECISION, SUBJECT_MEDIUM, argv0, argv, PIPELINE, OPTS_READ, optIdx, NAN_GIVEN, TEXT_READ, WORD_GIVEN, WORD_OK, opt, num, 
   DRAWING_STAGE_INTENT, optTrack, NATIVE_PAINT_MODE, SPEED_TRANSFERS, SPEED_PAPER, 
   SPEED_CONTACT, SPEED_VALUE_CACHE, SPEED_COVERAGE, SPEED_UNIFORM_PAPER, measurePaper, liftResist, 
-  VALUE_CONTACT_WORK, SPEED_GPU_OPTICS, OUTPUT_VIDEO, FRAME_POLICY, SPEED_PROFILE, CPU_PROFILE, PAINTER, root, out, 
+  VALUE_CONTACT_WORK, SPEED_GPU_OPTICS, OUTPUT_VIDEO, FRAME_POLICY, RECORDING, SPEED_PROFILE, CPU_PROFILE, PAINTER, root, out, 
   CODE_STATE, INK_RECIPE, DRAWING_REGISTRATION, RUN_CACHE, holdInk, FAST_BODY_ENABLED, 
   FAST_BODY_SPACING, BODY_CADENCE_RECORD, VALUE_CONFIG, VALUE_COUNTS, 
   SOFT_WET_MM, WASH_SESSION, WALL_PHASES, 

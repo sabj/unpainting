@@ -88,8 +88,8 @@ const shoot = async () => {
   }
   const name = frameName(ctx.frame, FRAME_FORMAT);
   const F = framer();
-  if (F) F.name(F.capture(), name);
-  else await writeFrame(INKRES ? INKRES.compose(view()) : view(), name);
+  if (F) { F.name(F.capture(), name); ctx.NATIVE_FILM_CAPTURE?.(); }
+  else { const rgb = INKRES ? INKRES.compose(view()) : view(); await writeFrame(rgb, name); ctx.NATIVE_FILM_CAPTURE?.(rgb); }
   FRAMES.push({ src: name, ...ctx.STAGE });
   ctx.frame++;
 };

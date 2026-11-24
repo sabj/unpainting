@@ -73,7 +73,7 @@ One reply (`--work reply`): one read-only call with `tools/paint/AUTHOR-BRIEF.md
 
 - Lines: `--drawingfile STEM`, `--drawinglast STEM` (closing pen), `--drawing first|last|both|none` (`first`), `--outlinemedium graphite|ink|auto` (`graphite`), `--inkrecipe none|wash|v2` (`none`), `--inkprofile sepia-ink|black-ink` (`sepia-ink`).
 - Size: `--width` cells (`700`, at most source width × `--sourcescale`), `--sourcescale` (`1`), `--sheetmm` (postcard fit).
-- Run: `--out` (`work/plate`), `--seed` (`0`), `--mode fast|full` (`fast`), `--gpu auto|on|off` (`auto`), `--runcache`, `--video`, `--marks` (all `1`), `--canarystop N` (save `canary-pass-N.png` and stop), `--notargetlooks 1` (no target reads after planning), `--paints` box keys (`src/crop/box.mjs`; auto-picked), `--valueplan` ([plan-format.md](plan-format.md#value-plan-file)).
+- Run: `--out` (`work/plate`), `--seed` (`0`), `--mode fast|full` (`fast`), `--gpu auto|on|off` (`auto`), `--runcache`, `--video`, `--marks` (all `1`), `--recording full|medium|light` (`medium`: native frames only at the film's frames; `full` a frame after every stroke; `light` a film of at most 40 frames), `--canarystop N` (save `canary-pass-N.png` and stop), `--notargetlooks 1` (no target reads after planning), `--paints` box keys (`src/crop/box.mjs`; auto-picked), `--valueplan` ([plan-format.md](plan-format.md#value-plan-file)).
 
 ## Versions
 

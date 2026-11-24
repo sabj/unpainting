@@ -84,7 +84,8 @@ const brushMask = sh => (SMALL && opt('lightfill', '1') !== '0' ? (sh._brushMask
 for (const L2 of ctx.layers) for (const sh of L2.shapes) ctx.plannedMass += sh.amount * sh.area;
 // each passage's booking as planned, before the finish field clips it, so the film's shares add up to the plan's mass
 const FILM_MASS = new WeakMap(); for (const L2 of ctx.layers) for (const sh of L2.shapes) FILM_MASS.set(sh, sh.amount * sh.area);
-const FILM_FRAMES = Math.max(1, Math.round(num('frames', 40)));
+// --recording light: the film is capped (tools/plate/recording.mjs)
+const FILM_FRAMES = ctx.RECORDING.filmFrames(Math.max(1, Math.round(num('frames', 40))));
 const DRAWING_FILM_FRAMES = Math.max(1, Math.round(num('drawingfilm', 0.2) * FILM_FRAMES));
 // --drawingorder forms|file (default forms): the order the drawing's strokes are laid in on film. forms: big forms first,
 // detail last, over the whole sheet (drawing-film.mjs bigFormsFirst); file: the file's own order (form by form).

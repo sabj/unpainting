@@ -902,11 +902,16 @@ Object.assign(ctx, { dry, dip, dipLoad, productionDip, stroke, pencilDraw, SC, H
   washBridge, CAL, instrumentOf });
 if(opt('marks','0')!=='0'){
  ctx.NATIVE_UNOBSERVED_ROUTES=[];
- ctx.NATIVE_RECORDER=createNativeOperationRecorder({directory:path.join(out,'native-operations'),width:OUT_W,height:OUT_H,provenance:{code:CODE_HASH,backend:GPU_INFO},resumeFrom:opt('resumestate','')?path.join(opt('resumestate',''),'native-operations'):null});
+ ctx.NATIVE_RECORDER=createNativeOperationRecorder({directory:path.join(out,'native-operations'),width:OUT_W,height:OUT_H,provenance:{code:CODE_HASH,backend:GPU_INFO,recording:ctx.RECORDING.level},resumeFrom:opt('resumestate','')?path.join(opt('resumestate',''),'native-operations'):null});
  ctx.NATIVE_MARK_COUNTS={brush:0,ink:0,graphite:0};
+ const recordingFailed=error=>{ctx.NATIVE_RECORDING_FAILURE=error.message;console.error('NATIVE RECORDING FAILED: '+error.message+'; capture stopped, painting continues to retain its final image, and this run will fail.');};
  // the recorder copies the frame into its own slot before capture returns, so the pen sheet's kept composition is handed
- // over as it is (composeKept), not a copy of it
- ctx.NATIVE_CAPTURE=operation=>{if(ctx.NATIVE_RECORDING_FAILURE)return;try{ctx.NATIVE_RECORDER.capture(INKRES?INKRES.composeKept(view()):view(),{operation,stage:ctx.STAGE??{stage:'paper'}});if(Object.hasOwn(ctx.NATIVE_MARK_COUNTS,operation))ctx.NATIVE_MARK_COUNTS[operation]++;}catch(error){ctx.NATIVE_RECORDING_FAILURE=error.message;console.error('NATIVE RECORDING FAILED: '+error.message+'; capture stopped, painting continues to retain its final image, and this run will fail.');}};
+ // over as it is (composeKept), not a copy of it. Every operation is counted; under --recording full each is also
+ // photographed, otherwise only the first (and the film's frames under medium, NATIVE_FILM_CAPTURE). Each event names
+ // the marks laid so far, so a sparse record still accounts for every mark.
+ ctx.NATIVE_CAPTURE=operation=>{if(ctx.NATIVE_RECORDING_FAILURE)return;try{if(Object.hasOwn(ctx.NATIVE_MARK_COUNTS,operation))ctx.NATIVE_MARK_COUNTS[operation]++;if(!ctx.RECORDING.everyOperation&&operation!=='initial')return;ctx.NATIVE_RECORDER.capture(INKRES?INKRES.composeKept(view()):view(),{operation,stage:ctx.STAGE??{stage:'paper'},marks:{...ctx.NATIVE_MARK_COUNTS}});}catch(error){recordingFailed(error);}};
+ // a film frame already rendered (rgb), or rendered here when the film's frame worker drew it
+ ctx.NATIVE_FILM_CAPTURE=rgb=>{if(ctx.NATIVE_RECORDING_FAILURE||!ctx.RECORDING.onFilm)return;try{ctx.NATIVE_RECORDER.capture(rgb??(INKRES?INKRES.composeKept(view()):view()),{operation:'film',stage:ctx.STAGE??{stage:'paper'},marks:{...ctx.NATIVE_MARK_COUNTS}});}catch(error){recordingFailed(error);}};
  if(INKRES)for(const name of ['wet','carry','settle']){const original=INKRES[name];INKRES[name]=(...args)=>{const value=original(...args);ctx.NATIVE_CAPTURE('ink-'+name);return value;};}
  if(!opt('resumestate',''))ctx.NATIVE_CAPTURE('initial');
 }
