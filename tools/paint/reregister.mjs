@@ -1,8 +1,10 @@
 // A subject registered again under the one-area sheet rule (sheet-rule.mjs), as a NEW record with a new id: the record
 // registered before the rule stays as it is, under its own id, so results painted from it keep their inputs.
-// The convention: the new record's id (and its input id, the name its re-made files carry) is the old id + "-qs"
+// The convention: the new record's id (the name its refitted drawing carries) is the old id + "-qs"
 // (quarter sheet). bench/run-sets.json names only such records. What carries over unchanged, with its checksum: the
-// source, the studies and the lay-in picture (all made from the source at its own pixel size), the labels. What must
+// source, the studies and the lay-in picture (all made from the source at its own pixel size), the labels. (The
+// registry of record is written by tools/prepare/register.py, which makes the same -qs records from its table; this
+// command is for a subject list that is not written from that table, and to see what a record under the rule holds.) What must
 // be made again at the new sheet width: the drawing's vectors (fitted in millimetres of the sheet) and their tags;
 // the named forms are copied to the new id's folder (they are in the source's pixels). Pure but for the command.
 //   node tools/paint/reregister.mjs ID [--as NEWID] [--from SUBJECTS.json] --registry FILE
@@ -30,7 +32,8 @@ export function reRegistered(rec, { newId = ruleIdOf(rec.id), realSize = realSiz
   const [pw, ph] = rec.source?.px ?? [];
   const s = standardSheet([pw, ph]), oldInput = rec.inputId ?? rec.id, redo = [];
   const out = structuredClone(rec);
-  out.id = newId; out.name = `${rec.name ?? rec.id}${RULE_SUFFIX}`; out.inputId = newId; out.registeredFrom = rec.id;
+  // the inputs made from the source keep their name (the earlier input id); only a refitted drawing carries the new id
+  out.id = newId; out.name = `${rec.name ?? rec.id}${RULE_SUFFIX}`; out.inputId = oldInput; out.registeredFrom = rec.id;
   out.sheet = {
     widthMm: s.widthMm, heightMm: s.heightMm,
     cellsAcross: { full: s.cells, half: Math.round(s.cells / 2), line: s.cells * 2 },
@@ -39,8 +42,10 @@ export function reRegistered(rec, { newId = ruleIdOf(rec.id), realSize = realSiz
     rule: SHEET_RULE,
   };
   if (realSize && !out.realSize) out.realSize = { heightCm: realSize.heightCm, widthCm: realSize.widthCm, ...(realSize.nominal ? { nominal: true } : {}), ...(realSize.part ? { part: true } : {}), ...(realSize.sheet ? { sheet: true } : {}) };
+  // the rule may give a picture the very sheet it had (Mittens close-up): its fit stands, pins and all
+  const sameSheet = Math.abs(s.widthMm - rec.sheet.widthMm) <= 0.005;
   for (const [key, v] of Object.entries(out.inputs ?? {})) {
-    if (!v || Array.isArray(v) || !v.stem) continue;
+    if (!v || Array.isArray(v) || !v.stem || sameSheet) continue;
     const base = path.basename(v.stem), rest = base.startsWith(oldInput) ? base.slice(oldInput.length) : base.startsWith(rec.id) ? base.slice(rec.id.length) : `-${base}`;
     const stem = path.posix.join(path.posix.dirname(v.stem), `${newId}${rest}`), wasMm = v.sheetMm ?? v.fittedSheetMm ?? rec.sheet.widthMm;
     const how = typeof v.how === 'string' && v.how.includes(base) ? v.how.replace(base, path.basename(stem)).replace(new RegExp(`(\\s)${String(wasMm).replace('.', '\\.')}(\\s)`), `$1${s.widthMm}$2`) : null;

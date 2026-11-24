@@ -62,10 +62,10 @@ test('a fault in the file stops whatever reads it', () => {
   assert.throws(() => loadRunSets({ ...ok(), pictures: [{ id: 'a' }] }), /needs id, title, group and core/);
 });
 
-// a registry record as the preparation writes it, before the rule: 1086 x 1448 px at 1086 cells
-const earlier = () => ({ id: 'mittens-closeup', name: 'mittens-closeup', inputId: 'mittens-closeup-v2', source: { path: 'src.png', px: [1086, 1448], sha256: 'a'.repeat(64) },
-  sheet: { widthMm: 282.36, cellsAcross: { full: 1086 }, rule: '0.26 mm a cell at full; long-side cells = min(source long side px, 1462)' }, studySeed: { chosen: 11, final: true },
-  inputs: { drawingVectors: { stem: 'replay/vectors/mittens-closeup-v2-std-layin', sheetMm: 282.36, fittedSheetMm: 282.36, how: 'replay/vectors/make.sh mittens-closeup-v2-std-layin guides/l.png src.png 282.36 pencil', files: [{ path: 'replay/vectors/mittens-closeup-v2-std-layin-lines.json', sha256: 'b'.repeat(64) }, { path: 'replay/vectors/mittens-closeup-v2-std-layin-vectors.json', sha256: 'c'.repeat(64) }] },
+// a registry record as the preparation writes it, before the rule: 1536 x 1024 px at 1462 cells (the rule gives it 1536)
+const earlier = () => ({ id: 'mittens-closeup', name: 'mittens-closeup', inputId: 'mittens-closeup-v2', source: { path: 'src.png', px: [1536, 1024], sha256: 'a'.repeat(64) },
+  sheet: { widthMm: 380.12, cellsAcross: { full: 1462 }, rule: '0.26 mm a cell at full; long-side cells = min(source long side px, 1462)' }, studySeed: { chosen: 11, final: true },
+  inputs: { drawingVectors: { stem: 'replay/vectors/mittens-closeup-v2-std-layin', sheetMm: 380.12, fittedSheetMm: 380.12, how: 'replay/vectors/make.sh mittens-closeup-v2-std-layin guides/l.png src.png 380.12 pencil', files: [{ path: 'replay/vectors/mittens-closeup-v2-std-layin-lines.json', sha256: 'b'.repeat(64) }, { path: 'replay/vectors/mittens-closeup-v2-std-layin-vectors.json', sha256: 'c'.repeat(64) }] },
     studies: [{ path: 'studies/s3.png', sha256: 'd'.repeat(64), minArea: 6 }] }, options: { common: [] } });
 
 test('every picture the file names is a registration under the sheet rule, by its id', () => {
@@ -76,24 +76,27 @@ test('every picture the file names is a registration under the sheet rule, by it
 test('a benchmark picture not registered under the sheet rule is refused in plain words; an earlier registration by its own id still runs', () => {
   const doc = { depths: { d: { levels: ['Auto'] } }, sets: { s: { pictures: 'all', depth: 'd' } }, pictures: [{ id: 'mittens-closeup', title: 'M', group: 'g', core: true }] }, sets = loadRunSets(doc);
   const old = resolveSubject({ file: 'R', base: '/r', subjects: [earlier()] }, 'mittens-closeup');
-  assert.throws(() => standardSheetOnly(old, sets), /mittens-closeup is a benchmark picture, and its registration is not under the one-area sheet rule.*27\.9 x 38\.1 cm.*1086 cells.*It is not run/s);
+  assert.throws(() => standardSheetOnly(old, sets), /mittens-closeup is a benchmark picture, and its registration is not under the one-area sheet rule.*27\.9 x 38\.1 cm.*1462 cells.*It is not run/s);
   assert.equal(standardSheetOnly(old), old, 'not one of the benchmark\'s pictures: it runs on the sheet it was registered with');
   const { record } = reRegistered(earlier()), now = resolveSubject({ file: 'R', base: '/r', subjects: [earlier(), record] }, 'mittens-closeup-qs');
   assert.equal(standardSheetOnly(now), now); assert.equal(now.sheet.rule, SHEET_RULE);
 });
 
 test('registering again under the rule: a new record with a new id, the earlier one untouched, and what must be made again', () => {
-  const was = earlier(), { record, redo } = reRegistered(was), std = standardSheet([1086, 1448]);
+  const was = earlier(), { record, redo } = reRegistered(was), std = standardSheet([1536, 1024]);
   assert.deepEqual(was, earlier(), 'the earlier record is not changed');
-  assert.equal(record.id, 'mittens-closeup-qs'); assert.equal(record.inputId, 'mittens-closeup-qs'); assert.equal(record.registeredFrom, 'mittens-closeup'); assert.equal(ruleIdOf('h36-qs'), 'h36-qs');
+  assert.equal(record.id, 'mittens-closeup-qs'); assert.equal(record.inputId, 'mittens-closeup-v2', 'the inputs made from the source keep their name'); assert.equal(record.registeredFrom, 'mittens-closeup'); assert.equal(ruleIdOf('h36-qs'), 'h36-qs');
   assert.equal(record.sheet.rule, SHEET_RULE); assert.equal(record.sheet.cellsAcross.full, std.cells); assert.equal(record.sheet.widthMm, std.widthMm);
   assert.deepEqual(record.source, was.source, 'the same source, by its checksum'); assert.deepEqual(record.inputs.studies, was.inputs.studies, 'the studies carry over');
   const v = record.inputs.drawingVectors;
   assert.equal(v.stem, 'replay/vectors/mittens-closeup-qs-std-layin'); assert.equal(v.sheetMm, std.widthMm); assert.ok(v.files.every(f => f.sha256 === null && f.path.startsWith(v.stem)), 'the drawing is fitted again: nothing of the old fit is pinned');
   assert.equal(v.how, `replay/vectors/make.sh mittens-closeup-qs-std-layin guides/l.png src.png ${std.widthMm} pencil`);
   assert.deepEqual(record.realSize, { heightCm: 30.5, widthCm: 23, nominal: true }, 'the real size goes with the record');
-  assert.match(redo.join('\n'), /drawingVectors: fit again at .* mm across \(it was fitted at 282\.36 mm\)/); assert.match(redo.join('\n'), /named-forms\/mittens-closeup\/ to named-forms\/mittens-closeup-qs\//);
+  assert.match(redo.join('\n'), /drawingVectors: fit again at .* mm across \(it was fitted at 380\.12 mm\)/); assert.match(redo.join('\n'), /named-forms\/mittens-closeup\/ to named-forms\/mittens-closeup-qs\//);
   assert.throws(() => reRegistered(record), /already registered under the one-area rule/);
+  // the rule gives Mittens close-up (1086 x 1448 px, 1086 cells) the sheet it had: its fit stands, pins and all
+  const mittens = { ...earlier(), source: { path: 's', px: [1086, 1448], sha256: 'a' }, sheet: { widthMm: 282.36, cellsAcross: { full: 1086 } } }, same = reRegistered(mittens);
+  assert.deepEqual(same.record.inputs.drawingVectors, mittens.inputs.drawingVectors); assert.equal(same.record.sheet.rule, SHEET_RULE); assert.doesNotMatch(same.redo.join('\n'), /fit again/);
   const small = reRegistered({ ...earlier(), id: 'kasha-portrait', source: { path: 's', px: [896, 1200], sha256: 'a' } });
   assert.match(small.redo.join('\n'), /painted enlarged 1\.21 times/);
 });
@@ -102,14 +105,14 @@ test('the check says, picture by picture, what is not under the rule or not prep
   const doc = { depths: { d: { levels: ['Auto', 'L1'] } }, sets: { s: { pictures: 'all', depth: 'd' } }, pictures: [
     { id: 'mittens-closeup-qs', title: 'M', group: 'g', core: true, levelOne: 'm-full' }, { id: 'mittens-closeup', title: 'old', group: 'g', core: true, levelOne: null }, { id: 'nowhere-qs', title: 'N', group: 'g', core: true, levelOne: 'n' }] };
   const before = readiness('s', { record: id => (id === 'mittens-closeup' ? earlier() : null), resolve: () => { throw new Error('unused'); }, check: x => x }, loadRunSets(doc))[0];
-  assert.match(before.faults[0], /^not registered under the sheet rule yet: make it from mittens-closeup \(node tools\/paint\/reregister\.mjs mittens-closeup --registry .*1086 cells, its study seed final \(11\)$/);
+  assert.match(before.faults[0], /^not registered under the sheet rule yet: make it from mittens-closeup \(node tools\/paint\/reregister\.mjs mittens-closeup --registry .*1462 cells, its study seed final \(11\)$/);
   const { record } = reRegistered(earlier()), reg = { file: 'R', base: '/r', subjects: [earlier(), record] };
   const on = new Map(), pin = () => { for (const f of record.inputs.drawingVectors.files) f.sha256 = 'e'.repeat(64); };
   const io = { exists: f => on.has(f) || f.endsWith('receipt.json') || f.endsWith('named-sam.png'), hash: f => on.get(f) ?? 'm', readJson: () => ({ schema: 'named-sam-v1', mask: { path: 'named-sam.png', sha256: 'm' }, forms: [] }) };
   const run = () => readiness('s', { record: id => reg.subjects.find(x => x.id === id) ?? null, resolve: id => resolveSubject(reg, id, { formsDir: '/r/named-forms' }), check: spec => checkInputs(spec, io) }, loadRunSets(doc));
   let [m, old, none] = run();
   assert.equal(m.ok, false); assert.match(m.faults.join('; '), /not pinned by a checksum: drawing file replay\/vectors\/mittens-closeup-qs-std-layin-lines\.json/); assert.match(m.faults.join('; '), /missing source: \/r\/src\.png/);
-  assert.match(old.faults.join('; '), /not under the one-area sheet rule \(registered at 1086 cells/); assert.match(old.faults.join('; '), /no level 1 target/);
+  assert.match(old.faults.join('; '), /not under the one-area sheet rule \(registered at 1462 cells/); assert.match(old.faults.join('; '), /no level 1 target/);
   assert.deepEqual(none.faults, ['not registered: no such subject in the subject list']);
   pin(); for (const f of [['/r/src.png', 'a'], ['/r/studies/s3.png', 'd'], ...record.inputs.drawingVectors.files.map(f => [`/r/${f.path}`, 'e'])]) on.set(f[0], f[1].repeat(64));
   [m] = run(); assert.deepEqual(m.faults, []); assert.equal(m.ok, true);
