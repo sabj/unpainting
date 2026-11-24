@@ -1,6 +1,8 @@
 // What the later levels add to round 0 of fixed rounds (rounds-run.mjs). Each level is a fresh conversation:
 //   L3  everything L2 gets, and the model's own L2 result: its finished painting to look at, and its script as text,
 //       to reuse or ignore. Its own work, never its reasoning or its looks. No critique and no score.
+//       (L4 may also be run straight from an L2 result, with no L3 between: the run's record then says "L4 after L2",
+//       and the brief names the level the previous painting is from. A named choice of the run, never a silent one.)
 //   L4  the same from L3, and the studies' traced shapes: a picture of them numbered and a list (number, colour, area,
 //       box, named forms). A passage names a shape by number and the harness lays its outline, so the geometry never
 //       has to be sent as text (shapes.json is about a megabyte). Offered, never required, and possibly wrong.
@@ -34,7 +36,7 @@ from it, change it, or write a new one${beside ? ` (beside it you chose: ${besid
 first answer is a WHOLE script.
 
 ${script.length > PREVIOUS_SCRIPT_MOST ? `(Your previous script is ${script.length} characters, too long to send; write this one from the pictures.)` : `YOUR PREVIOUS SCRIPT:\n${script}`}`;
-  return { painting, text, sha256: crypto.createHash('sha256').update(script).digest('hex') };
+  return { painting, text, level, sha256: crypto.createHash('sha256').update(script).digest('hex') };
 }
 
 const hex = c => `#${(c ?? [200, 200, 200]).map(v => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, '0')).join('')}`;

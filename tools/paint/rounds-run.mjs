@@ -70,7 +70,9 @@ export async function roundsRun(r, x) {
   if (x.terms?.previous) {
     const prev = previousHanded(x.previous, { subject: spec.id, author: author.key });
     images.push(await sent(await gridImage(prev.painting, W), path.join(dir, 'sent', 'your-previous-painting.jpg'))); names.push(['', 'your-previous-painting.jpg']);
-    extra.push(prev.text); record.author.previousTry = { from: x.previous, painting: prev.painting, scriptSha256: prev.sha256 };
+    // which level the previous result is from is the run's named choice (the ladder: L3 after L2, L4 after L3; or L4 after L2)
+    extra.push(prev.text); record.author.previousTry = { from: x.previous, level: prev.level, painting: prev.painting, scriptSha256: prev.sha256 };
+    record.author.ladder = `${x.level} after ${prev.level}`; x.say(r, `this is ${record.author.ladder}: a fresh conversation handed its own ${prev.level} painting and script`);
   }
   if (x.terms?.shapes) {
     numbered = JSON.parse(fs.readFileSync(x.shapesFile(r), 'utf8'));
@@ -113,7 +115,7 @@ export async function roundsRun(r, x) {
   const t = res.tokens, reported = t.fresh != null || t.cached != null || t.output != null, total = res.rounds.reduce((a, q) => a + (q.tokensTotal ?? 0), 0);
   Object.assign(record.author, { seconds: res.seconds, tokensIn: reported ? (t.fresh ?? 0) + (t.cached ?? 0) : null, tokensOut: reported ? t.output ?? 0 : null, tokens: reported ? (t.fresh ?? 0) + (t.cached ?? 0) + (t.output ?? 0) : total || null, costUSD: res.costUSD,
     tokenSplit: reported ? { reported: true, freshIn: t.fresh ?? 0, cachedIn: t.cached ?? 0, out: t.output ?? 0, from: 'each round\'s own report, added up (rounds.json has them a round)' } : undefined });
-  record.author.session = { work: 'rounds', ended: res.ended, level: x.level, tryNumber: r.record.author.tryNumber ?? 1, budget: record.author.budget ?? null, budgetReached: null, looksMost: x.looksMost,
+  record.author.session = { work: 'rounds', ended: res.ended, level: x.level, ladder: record.author.ladder ?? null, previousLevel: record.author.previousTry?.level ?? null, tryNumber: r.record.author.tryNumber ?? 1, budget: record.author.budget ?? null, budgetReached: null, looksMost: x.looksMost,
     ownMinutes: +(res.seconds / 60).toFixed(1), wallMinutes: +((Date.now() - t0) / 60000).toFixed(1), waitMinutes: null,
     lookUnits: res.lookUnits, steps: { taken: res.rounds.length, budget: null, what: 'rounds (model replies)' }, looks: res.looks.filter(l => !l.failed), looksNotPainted: res.looks.filter(l => l.failed).length,
     plans: res.rounds.filter(q => q.kind && q.kind !== 'done' && q.kind !== 'look').map(q => ({ ok: !q.refused, round: q.round })), turns: res.rounds.length, rounds: res.rounds.map(q => ({ round: q.round, kind: q.kind ?? null, hash: q.hash, seconds: q.seconds, tokens: q.tokens, lookUnits: q.lookUnits, refused: q.refused ?? null, change: q.change ?? null, continuedBy: q.continuedBy ?? null })),
