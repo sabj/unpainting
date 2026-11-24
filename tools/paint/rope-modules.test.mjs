@@ -60,16 +60,20 @@ test('usage: what a session cost, measured; the budget and whether it was reache
   const shown = usageOf({ subject: 's', author: { key: 'opus', name: 'Opus' }, level: 'L2', tryNumber: 1, budget: {}, session: { ...session, eyesOnly: { showings: [{ shown: 'inputs/source.png', cost: 0, atStart: true, at: 'T0' }, { shown: 'inputs/source.png', cost: 0.05, at: 'T1' }, { shown: 'inputs/study-2.png', cost: 0, at: 'T2' }] }, guard: { blockedImageReads: 1 }, cheat: { disqualified: true, readTargetPixels: true, reason: '1 blocked picture read(s) by code' } } });
   assert.deepEqual(shown.session.showings, { count: 3, ofTheOriginal: 2, units: 0.05, each: [{ picture: 'inputs/source.png', at: 'T0', cost: 0, atStart: true }, { picture: 'inputs/source.png', at: 'T1', cost: 0.05, atStart: false }, { picture: 'inputs/study-2.png', at: 'T2', cost: 0, atStart: false }] });
   assert.equal(shown.cheat.disqualified, true); assert.equal(shown.guard.blockedImageReads, 1); assert.deepEqual([u.pricing.showingTheOriginal, u.pricing.showingAnyOtherPicture, u.guard, u.cheat], [0.05, 0, null, null]);
-  assert.deepEqual(u.model, { tokensIn: 1200, tokensOut: 300, tokens: 1500, costUSD: 4.25, costFrom: 'reported by the command', tokenSplit: { reported: false, note: 'this command\'s transcript does not report its tokens split into fresh input, cached input and output' } });
+  assert.deepEqual(u.model, { tokensIn: 1200, tokensOut: 300, tokens: 1500, costUSD: 4.25, costFrom: 'reported by the command', costEstimate: null, tokenSplit: { reported: false, note: 'this command\'s transcript does not report its tokens split into fresh input, cached input and output' } });
   assert.deepEqual([u.pricing.halfSizeWholeLook, u.pricing.fullSizeWholeLook, u.pricing.leastLook, u.pricing.finalCharged], [0.3, 1, 0.2, false]); assert.ok(u.pricing.recordedNeverCharged.includes('water steps'));
   assert.deepEqual([u.machine.lookGpuMinutes, u.machine.lookPaintings, u.machine.planCpuMinutes, u.machine.finalGpuMinutes], [20, 3, 1.5, 40]); assert.deepEqual(u.work, { washes: 40, strokes: 900, dryings: 6, passages: 31 });
   assert.equal(u.budget.reached.what, '60 minutes of wall time'); assert.match(u.budget.note, /Recorded, not a failure/); assert.equal(u.prepared.plan, true); assert.deepEqual([u.level, u.try], ['L4', 2]);
   assert.match(usageLine(u), /4 looks for 2\.3 of 5 rendering units, \? of \? steps \(20 GPU min\), 2 plans, 70.2 wall min \(18.5 its own\), 81 tool calls, 1500 tokens, \$4.25, 2 returns to an earlier choice; final 40 GPU min; REACHED THE BENCHMARK'S RESOURCE BUDGET/);
   const quiet = usageOf({ subject: 's', author: { key: 'astra', name: 'Astra' }, level: 'L2', tryNumber: 1, budget: {}, session: { ended: 'done' } });
-  assert.equal(quiet.budget.reached, null); assert.equal(quiet.model.costFrom, 'not reported by this command'); assert.equal(quiet.machine.finalGpuMinutes, null);
+  assert.equal(quiet.budget.reached, null); assert.match(quiet.model.costFrom, /^not reported by this command, and no list price for this model/); assert.match(usageLine(quiet), /\? tokens, cost not known,/); assert.equal(quiet.machine.finalGpuMinutes, null);
   // a plan with erase passages counts them in its work, beside its washes and strokes
   const erased = usageOf({ subject: 's', author: { key: 'astra', name: 'Astra' }, level: 'L2', tryNumber: 1, budget: {}, session: { ended: 'done' }, plan: { washes: 3, strokes: 20, dryings: 2, passages: 5, erases: { passages: 2, strokes: 4, said: 'x' } } });
   assert.deepEqual(erased.work.erases, { passages: 2, strokes: 4 });
+  // a command that reports tokens but no money: the cost is estimated from list prices, marked so, in the record and the line
+  const codex = usageOf({ subject: 's', author: { key: 'sol-m', name: 'Sol', id: 'gpt-6.1-sol', tokens: 3_000_000, tokenSplit: { reported: true, freshIn: 1_000_000, cachedIn: 1_000_000, out: 1_000_000 } }, level: 'L2', tryNumber: 1, budget: {}, session: { ended: 'done' }, day: '2026-11-24' });
+  assert.deepEqual([codex.model.costUSD, codex.model.costFrom, codex.model.costEstimate.perMillion], [12.1, 'estimated from list prices', { input: 2, cachedInput: 0.1, output: 10 }]);
+  assert.match(usageLine(codex), /3000000 tokens, ~\$12\.10 estimated,/);
 });
 
 test('parity: what was handed over is written down with the hash of each file, and a kept folder that differs is refused', () => {

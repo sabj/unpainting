@@ -2,18 +2,20 @@
 // The benchmark's resource budget (rendering units, steps, returns to an earlier choice; the wall clock a safety stop only) is recorded with what was used
 // of it, and whether it was reached. Looks are charged a fixed price by size and share (look-cost.mjs); how a model
 // paints is recorded beside the charge (sweeps, dryings, water steps, cell-steps, seconds, tokens, steps), never
-// charged. Pure: nothing is read or written here.
+// charged. The model's cost is the command's own, or estimated from list prices (prices.mjs, which reads its table);
+// nothing else is read here, and nothing is written.
 import { LOOK_PRICE, LEAST_LOOK_COST, SHOW_ORIGINAL_COST } from './look-cost.mjs';
+import { modelCost } from './prices.mjs';
 
 const minutes = s => (s == null ? null : +(s / 60).toFixed(1));
 
 /**
  * `session`: the session's record (cli.mjs), `author`: the run's author record, `final`: {seconds, backend, failure}
  * of the full-size painting (outside the session's clock), `plan`: the handed-over plan's summary, `prepared`: what
- * was taken prepared, `level`, `tryNumber`, `budget`.
+ * was taken prepared, `level`, `tryNumber`, `budget`; `day` ('YYYY-MM-DD', today by default) the day the list prices are read for.
  */
-export function usageOf({ subject, author, level, tryNumber, budget, session, final = null, plan = null, prepared = null, commit = null, waterGuard = null }) {
-  const looks = session.looks ?? [], plans = session.plans ?? [];
+export function usageOf({ subject, author, level, tryNumber, budget, session, final = null, plan = null, prepared = null, commit = null, waterGuard = null, day = new Date().toISOString().slice(0, 10) }) {
+  const cost = modelCost(author, day), looks = session.looks ?? [], plans = session.plans ?? [];
   const lookSeconds = looks.reduce((a, l) => a + (l.painted?.seconds ?? 0), 0), planSeconds = plans.reduce((a, p) => a + (p.seconds ?? 0), 0);
   return {
     schema: 'unpaint-paint/usage@2',
@@ -37,7 +39,9 @@ export function usageOf({ subject, author, level, tryNumber, budget, session, fi
     guard: session.guard ?? null, cheat: session.cheat ?? null,
     // what of the network it asked for, from the session's gate (session-net.mjs): the hosts passed, and every refusal with its host
     network: session.network ?? null,
-    model: { tokensIn: author.tokensIn ?? null, tokensOut: author.tokensOut ?? null, tokens: author.tokens ?? null, costUSD: author.costUSD ?? null, costFrom: author.costUSD != null ? 'reported by the command' : 'not reported by this command',
+    model: { tokensIn: author.tokensIn ?? null, tokensOut: author.tokensOut ?? null, tokens: author.tokens ?? null, costUSD: cost.costUSD, costFrom: cost.costFrom,
+      // how an estimated cost was reckoned: the prices per million tokens, their source and day, and from which counts
+      costEstimate: cost.estimate,
       // fresh input, cached input and output, as the command reported them, so the run can be priced
       tokenSplit: author.tokenSplit ?? { reported: false, note: 'this command\'s transcript does not report its tokens split into fresh input, cached input and output' } },
     machine: {
@@ -62,8 +66,10 @@ export function renderTotals(looks, final) {
   return { mode: all[0].mode, workers: [...new Set(all.map(r => r.worker))], waitSeconds: sum('waitSeconds'), paintSeconds: sum('paintSeconds'), copySeconds: sum('copySeconds'), costUSD: sum('costUSD'), retried: all.filter(r => (r.tries?.length ?? 1) > 1).length, final };
 }
 
+/** The model's cost in a few words: "$1.23", "~$1.23 estimated", or "cost not known". */
+const costWords = m => (m.costUSD == null ? 'cost not known' : `${m.costEstimate ? '~' : ''}$${Number(m.costUSD).toFixed(2)}${m.costEstimate ? ' estimated' : ''}`);
 /** One line of a usage record, for the log. */
 export function usageLine(u) {
   const s = u.session, m = u.model, g = u.machine;
-  return `${s.looks} looks for ${s.lookUnits?.spent ?? '?'} of ${s.lookUnits?.budget ?? '?'} rendering units, ${s.steps?.taken ?? '?'} of ${s.steps?.budget ?? '?'} steps (${g.lookGpuMinutes ?? '?'} GPU min), ${s.plans} plans, ${s.wallMinutes ?? '?'} wall min (${s.ownMinutes ?? '?'} its own), ${s.toolCalls ?? '?'} tool calls, ${m.tokens ?? '?'} tokens${m.costUSD != null ? `, $${Number(m.costUSD).toFixed(2)}` : ''}, ${s.reverts?.count ?? 0} returns to an earlier choice; final ${g.finalGpuMinutes ?? '?'} GPU min${u.budget.reached ? `; REACHED THE BENCHMARK'S RESOURCE BUDGET (${u.budget.reached.what})` : ''}`;
+  return `${s.looks} looks for ${s.lookUnits?.spent ?? '?'} of ${s.lookUnits?.budget ?? '?'} rendering units, ${s.steps?.taken ?? '?'} of ${s.steps?.budget ?? '?'} steps (${g.lookGpuMinutes ?? '?'} GPU min), ${s.plans} plans, ${s.wallMinutes ?? '?'} wall min (${s.ownMinutes ?? '?'} its own), ${s.toolCalls ?? '?'} tool calls, ${m.tokens ?? '?'} tokens, ${costWords(m)}, ${s.reverts?.count ?? 0} returns to an earlier choice; final ${g.finalGpuMinutes ?? '?'} GPU min${u.budget.reached ? `; REACHED THE BENCHMARK'S RESOURCE BUDGET (${u.budget.reached.what})` : ''}`;
 }
