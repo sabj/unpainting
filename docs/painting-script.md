@@ -74,7 +74,7 @@ the passages.
 
 ## A real passage
 
-Passage "crown" from a model's script for Mittens (gpt-6-astra at level 2, 22 Nov 2026, commit `66690c4f`). Its two
+Passage "crown" from a model's script for Mittens (gpt-6-astra, 22 Nov 2026, commit `66690c4f`). Its two
 outlines are cut short here.
 
 ```json
@@ -99,7 +99,7 @@ outlines are cut short here.
 
 <img src="img/auto-vs-model-model-zoom.webp" width="60%" alt="The passage crown as painted: 17 clean-water strokes, then 14 numbered paint strokes along the stripes and brow">
 
-As painted: 17 clean-water strokes, then 14 paint strokes. More of this script: [Auto against a model](auto-vs-model.md).
+As painted: 17 clean-water strokes, then 14 paint strokes. How Auto fills a wash, for comparison: [How Auto paints](auto-vs-model.md#3-a-wash-is-filled-with-strokes).
 
 ## What it adds to the plan format
 

@@ -122,6 +122,8 @@ Everything runs on a basic machine. A GPU, including a local one through WebGPU,
 
 **0.4 is a new series.** Its scores are not comparable with the rounds before it.
 
+The pictures: fifteen, in four groups of three museum works (figural, architectural, landscape, abstract or loose) and a bonus group of three generated pictures. Five are the core, one from each group, and run levels 1 to 4; the other ten run Auto and level 2. [The pictures and their credits](bench/PICTURES.md).
+
 The ladder. Every level is one try that hands in the model's own script, with a budget of 3.0 look units:
 
 - L1: the freehand kit and its tips (technique guides and worked examples). Paper colour is its choice. One attempt; budget 3 runs of its script.
@@ -133,22 +135,18 @@ The ladder. Every level is one try that hands in the model's own script, with a 
 How it is run and scored:
 
 - Drawing is the model's choice: pencil, pen or none. The prepared drawing is offered, not required.
-- Every picture is painted on one standard sheet; the original's real size is told to the model as a fact.
+- Every picture is painted on the same area of paper, a quarter sheet, in its own proportions; the original's real size is told to the model as a fact.
 - A look's price is fixed by size: a half-size whole look 0.3, full size 1.0, a partial look its share, never under 0.2. The final is not charged. How a model paints is free and measured beside the score. Steps and a six-hour clock are runaway guards only.
 - Judges read how human the making looks from the film (an opening of the bare paper, the drawing before the first wash scored beside, then ten scored frames from the first wash to the finished sheet), and how good and how like the original the painting is. The original is scored for quality as well, and a painting's quality is its share of the original's.
 - Judges: an open-weight panel (GLM-5.3-Flash, Qwen3.8-27B, Gemma-4-31B), hosted with zero data retention or run locally ([scoring](bench/docs/scoring.md#judges)).
 - The first run: Gemini 4 Argon, Neon and Hydrogen and Claude Sonnet 5.5, all at medium effort, on subscriptions. Not in it: a container for replication and the OpenAI models.
 - How to replicate: [bench/README](bench/README.md#how-to-replicate-04).
 
-<p align="center"><a href="docs/auto-vs-model.md"><img src="docs/img/auto-vs-model-banner.webp" width="720" alt="Mittens: the picture, Auto's painting, and a model's painting at level 2"></a></p>
+<p align="center"><a href="docs/auto-vs-model.md"><img src="docs/img/auto-vs-model-auto-cut.webp" width="720" alt="Mittens: a study, the outline of every wash Auto cuts from it, and a close up of the head"></a></p>
 
-<p align="center">Mittens: the picture, Auto, a model at L2.</p>
+<p align="center">How Auto starts: a study cut into washes.</p>
 
-<p align="center"><a href="docs/auto-vs-model.md#the-forehead-stripes"><img src="docs/img/auto-vs-model-place-stripes.webp" width="720" alt="The forehead stripes: the model's long wet strokes against Auto's jigsaw shapes of short dry strokes"></a></p>
-
-<p align="center">Forehead stripes: the model on top, Auto below.</p>
-
-- [Auto against a model](docs/auto-vs-model.md): one cat, step by step, and what a model may change at each level.
+- [How Auto paints, and how a model's script differs](docs/auto-vs-model.md): Auto's method on one cat, step by step.
 - [Painting script](docs/painting-script.md): how a model writes its passages.
 - [Levels](bench/docs/levels.md): what each level is given.
 - [Rules](bench/docs/rules.md): the workspace and the budgets.

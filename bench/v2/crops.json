@@ -103,11 +103,11 @@
    },
    "style": "loose ink-and-watercolor field sketch, ink led",
    "medium": "pen",
-   "source": "Yale photograph, public domain",
+   "source": "ink-and-watercolour picture made by the image generator in Codex (OpenAI) from Carol M. Highsmith's photograph of Yale University (Library of Congress, LC-DIG-highsm-19255)",
    "distributed": true,
    "file": "targets/h36a.png",
    "coarseFile": "targets/h36a-coarse.json",
-   "licence": "public domain",
+   "licence": "follows its source: Carol M. Highsmith's photograph, Library of Congress (LC-DIG-highsm-19255), \"No known restrictions on publication\"; modified with the image generator in Codex (OpenAI); see NOTICE",
    "selfScore": 9.23
   },
   {

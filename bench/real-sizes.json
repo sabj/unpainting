@@ -12,6 +12,9 @@
   "ender-mountain-valley": { "heightCm": 21, "widthCm": 28.5 },
   "cezanne-bathers-bridge": { "heightCm": 21, "widthCm": 27.2 },
   "bonington-french-town": { "heightCm": 18.1, "widthCm": 14.3 },
+  "prout-laundresses": { "heightCm": 30.2, "widthCm": 21.6 },
+  "white-ships-1488": { "heightCm": 35.2, "widthCm": 49.2 },
+  "white-ships": { "heightCm": 35.2, "widthCm": 49.2 },
   "mittens-closeup": { "heightCm": 30.5, "widthCm": 23, "nominal": true },
   "kasha-portrait": { "heightCm": 30.5, "widthCm": 23, "nominal": true },
   "h36": { "heightCm": 28, "widthCm": 38, "nominal": true }

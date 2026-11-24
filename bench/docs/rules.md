@@ -22,7 +22,7 @@ More freedom than before, and mistakes are allowed.
 
 ## What is fixed
 
-- One standard sheet for every picture; the original's real size is told to the model as a fact, not reproduced. The simulator, the paint box and the brush physics.
+- The same area of paper for every picture (a quarter sheet, in the picture's proportions); the original's real size is told to the model as a fact, not reproduced. The simulator, the paint box and the brush physics.
 - The subject and, at each level, the inputs listed in [levels](levels.md).
 - The judges and the scoring.
 - A model is never given a score, a verdict or an outside critique.

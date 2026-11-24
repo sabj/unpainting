@@ -2,6 +2,24 @@
 
 AI models paint a subject with the simulator's brush and pen, and judges score how human the making looks and how good the painting is. The code planner alone, "Auto", is the reference. 0.4 is a new series: its scores are not comparable with the rounds V1 to V5.
 
+## The pictures
+
+Fifteen pictures: four groups of three museum works, and a bonus group of three pictures made with an image generator.
+
+| Group | Pictures (core in bold) |
+|---|---|
+| Figural | **Manet, Morisot with a Fan** · Tiepolo, Bacchus and Ariadne · Homer, The Water Fan |
+| Architectural | **Prout, Laundresses before the Wasserturm** · Guardi, A Colonnade · Bonington, French Town |
+| Landscape | **Turner, The Fort of L'Esseillon** · Sargent, In Austrian Tyrol · Ender, Mountain Valley |
+| Abstract or loose | **Sargent, White Ships** · Morisot, Avenue du Bois · Cezanne, Bathers Under a Bridge |
+| Bonus (generated) | **Mittens** · Kasha portrait · Yale Rosewalk |
+
+- Core: five pictures, one from each group. They run levels 1 to 4.
+- Extended: all fifteen. The other ten run Auto and level 2.
+
+[PICTURES.md](PICTURES.md) has each picture's museum, medium, real size, rights and credit line, and the optional and
+private pictures that are not scored.
+
 ## The ladder, in 0.4
 
 Every level is one try that hands in the model's own script, with a budget of 3.0 look units.
@@ -20,7 +38,7 @@ Details: [levels](docs/levels.md), [rules](docs/rules.md) and [scoring](docs/sco
 - Drawing is the model's choice: pencil, pen or none; no drawing is a normal choice. The prepared drawing is offered, not required, and its lines may go down before the washes, with a stage of them, or after. Pen ink is waterproof or soluble. It gets warnings, not refusals, where a choice only risks the painting.
 - Retries are self-study. The model sees its own painting, replay and stroke map and writes its own assessment. It never gets a score or a critique.
 - Budget for one try: 3.0 look units. A look's price is fixed by size: a half-size whole look 0.3, full size 1.0, a partial look its share, never under 0.2 (at L2 to L4 looks are half size; at L1 each run is a full-size painting, 1.0). At L2 to L4 the full-size final is painted after the session and not charged; at L1 the painting is its last completed run. How a model paints (water, strokes, waits, dryings) is free and measured beside the score: simulation work, sweeps, dryings, seconds, tokens (fresh, cached, output), steps. One runaway guard: water steps over ten times Auto's for the subject stop the painting (reported as a stop, not scored). Steps and the six-hour clock are runaway guards only.
-- Scores: human-ness from the film (the judges see the opening, the untouched paper the painter chose, as context; then the drawing as it stood before the first wash, scored and reported beside the result; then ten frames evenly spaced from the first wash to the finished sheet, whose mean is human-ness; scores from before rc7 used another set of frames and are not comparable), plus quality and likeness, plus a combined number. The original is scored for quality too, and a painting's quality is its share of the original's. Auto sets the difficulty.
+- Scores: the judges score human-ness first, from the film (the judges see the opening, the untouched paper the painter chose, as context; then the drawing as it stood before the first wash, scored and reported beside the result; then ten frames evenly spaced from the first wash to the finished sheet, whose mean is human-ness; scores from before rc7 used another set of frames and are not comparable), plus quality and likeness, plus a combined number. The original is scored for quality too, and a painting's quality is its share of the original's. Auto sets the difficulty.
 - Every picture is painted on the same area of paper: a quarter sheet (27.9 x 38.1 cm, about 1,063 cm2), in the
   picture's own proportions, whatever the file's pixel size or orientation. A cell is 0.26 mm, so every sheet holds
   about 1.57 million cells (`tools/paint/sheet-rule.mjs`; run it to list every registered subject's sheet). A subject
@@ -38,26 +56,21 @@ mark was on the original); it never sizes the sheet. A generated picture has no 
 said as such. The sizes are in [`real-sizes.json`](real-sizes.json), height x width in cm; a subject's record may
 carry its own. A picture with no recorded size is told nothing.
 
-Tiepolo 31.2 x 24.3 cm · Guardi 45.4 x 30.1 · Homer, The Water Fan 37.4 x 53.4 · Homer, Adirondacks Guide 32.9 x 54.5 ·
-Homer, Two Ladies 17.6 x 20.2 · Manet, Morisot with a Fan 20.9 x 16.8 (the whole sheet; the picture painted is a part
-of it) · Sargent, In Austrian Tyrol 29.9 x 45.2 · Turner 19.7 x 28 · Ender 21 x 28.5 · Cezanne 21 x 27.2 · Bonington
-18.1 x 14.3. Nominal, generated: Mittens and Kasha portrait 30.5 x 23 · Yale Rosewalk 28 x 38. Not yet recorded:
-Sargent, White Ships; Prout, Laundresses; Morisot, Avenue du Bois.
+Tiepolo 31.2 x 24.3 cm · Homer, The Water Fan 37.4 x 53.4 · Manet, Morisot with a Fan 20.9 x 16.8 (the whole sheet; the
+picture painted is a part of it) · Guardi 45.4 x 30.1 · Prout 30.2 x 21.6 · Bonington 18.1 x 14.3 · Sargent, In
+Austrian Tyrol 29.9 x 45.2 · Turner 19.7 x 28 · Ender 21 x 28.5 · Sargent, White Ships 35.2 x 49.2 · Cezanne
+21 x 27.2. Nominal, generated: Mittens and Kasha portrait 30.5 x 23 · Yale Rosewalk 28 x 38. Not told yet: Morisot,
+Avenue du Bois (the Met gives its sheet as 20 x 28 cm, which is not the shape of our file, so the size is held back
+until that is explained). The museums' own size lines are in [PICTURES.md](PICTURES.md).
 
 RESULTS: to be filled from the frozen run.
 
 The first run uses Gemini 4 Argon, Neon and Hydrogen and Claude Sonnet 5.5, all at medium effort, on subscriptions only. Not in it: a container for replication, and the OpenAI models (gpt-6-astra, gpt-6.1-sol, gpt-6.1-terra).
 
-## The pictures and how deep each is run
+## Running a set
 
-[`run-sets.json`](run-sets.json) names the benchmark's pictures by their subject ids, with their groups, and what
-each runs.
-
-- **core**: five pictures, one of each group: Manet's Morisot with a Fan (figural; the approved crop), Prout's
-  Laundresses (architectural), Turner's Fort of L'Esseillon (landscape), Sargent's White Ships (loose), Mittens
-  close-up (generated). Each runs the whole ladder: levels 1 to 4, and Auto, which every score is measured against.
-- **extended**: all fifteen. The core five as above; the other ten run Auto and level 2 only.
-
+[`run-sets.json`](run-sets.json) names the pictures above by their subject ids, with their groups and the depth each
+runs (core: levels 1 to 4, and Auto, which every score is measured against; the other ten: Auto and level 2).
 The runners read the file. A set's name stands for its pictures wherever a subject is named, and only the pictures
 that run at the level asked for are painted: `npm run paint -- extended paint` paints Auto for all fifteen,
 `npm run paint -- extended paint --author neon-m --level L2` runs level 2 on all fifteen, and at L3 or L4 the set is
@@ -112,7 +125,10 @@ The benchmark has five rounds, V1 to V5, each with different tools or feedback. 
 
 V1 to V5 are published. V3 ran the Claude, Codex, Gemini 4 Argon and Muse models. V4 and V5 ran the Claude, Codex and Gemini 4 Argon models. Not every model ran every round. The [leaderboard](results/leaderboard.md) lists the tries each model ran. In V4 and V5 the first try is shared: V5 try 1 has no feedback yet, so it is also V4 try 1.
 
-## Subjects
+## Subjects of rounds V1 to V5
+
+These five small targets belong to the earlier rounds, not to the 0.4 set. Their files, paintings and scores are kept.
+Ships is Sargent's White Ships, which 0.4 paints at a larger size; the 0.4 Mittens is a different picture.
 
 | Subject | Style | Target in the repo |
 |---|---|---|

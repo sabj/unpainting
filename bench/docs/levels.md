@@ -22,7 +22,7 @@ Notes:
 - L1 tips never come from a benchmark subject. The examples are random shapes, only to show technique ([TIPS.md](../v3/TIPS.md)).
 - A model has a shell in its own workspace at every level and may write any script it wants.
 - Drawing is the model's choice at every level: pencil, pen or none. No drawing is a normal choice. At L2 to L4 the prepared drawing is offered, not required, and its lines may be drawn before the washes, with a stage of the washes, or after them.
-- Every picture is painted on one standard sheet. The original's real size is told to the model as a fact, not reproduced ([real sizes](../README.md#real-sizes-of-the-originals-told-to-the-model-as-a-fact)).
+- Every picture is painted on the same area of paper, a quarter sheet (27.9 x 38.1 cm), in its own proportions, whatever the file's size. The original's real size is told to the model as a fact, not reproduced ([real sizes](../README.md#real-sizes-of-the-originals-told-to-the-model-as-a-fact)).
 - L0 (the kit with no tips) is defined, not run.
 
 ## Budget

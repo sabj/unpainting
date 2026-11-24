@@ -12,11 +12,11 @@
    },
    "style": "watercolor sketch over faint pencil, no ink: an orange cat's face, close up",
    "medium": "pencil",
-   "source": "watercolour sketch made by an image generator from the owner's photograph",
+   "source": "a photograph by Sam Jackson, modified with an image generator (Nano Banana, Google, or the image generator in Codex, OpenAI; which one was not recorded for this picture)",
    "distributed": true,
    "file": "targets/mittens-closeup.png",
    "coarseFile": "targets/mittens-closeup-coarse.json",
-   "licence": "noncommercial project use; local branch only, not distributed",
+   "licence": "noncommercial use; (c) Sam Jackson; see NOTICE",
    "unit": {
     "sweeps": 952,
     "dryings": 3,
@@ -36,11 +36,11 @@
    },
    "style": "watercolor sketch over faint pencil, no ink: an orange cat's face, close up",
    "medium": "pencil",
-   "source": "watercolour sketch made by an image generator from the owner's photograph",
+   "source": "a photograph by Sam Jackson, modified with an image generator (Nano Banana, Google, or the image generator in Codex, OpenAI; which one was not recorded for this picture)",
    "distributed": true,
    "file": "targets/mittens-closeup-full.png",
    "coarseFile": "targets/mittens-closeup-full-coarse.json",
-   "licence": "noncommercial project use; local branch only, not distributed",
+   "licence": "noncommercial use; (c) Sam Jackson; see NOTICE",
    "unit": {
     "sweeps": 952,
     "dryings": 3,
@@ -84,11 +84,11 @@
    },
    "style": "loose ink-and-watercolor field sketch, ink led: a college walk with a gate and dappled shade",
    "medium": "pen",
-   "source": "the owner's own artwork (h36)",
+   "source": "ink-and-watercolour picture made by the image generator in Codex (OpenAI) from Carol M. Highsmith's photograph of Yale University (Library of Congress, LC-DIG-highsm-19255)",
    "distributed": true,
    "file": "targets/h36-full.png",
    "coarseFile": "targets/h36-full-coarse.json",
-   "licence": "noncommercial project use; local branch only, not distributed"
+   "licence": "follows its source: Carol M. Highsmith's photograph, Library of Congress (LC-DIG-highsm-19255), \"No known restrictions on publication\"; modified with the image generator in Codex (OpenAI); see NOTICE"
   },
   {
    "task": "homer-daughter",

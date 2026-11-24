@@ -1,4 +1,7 @@
-# Benchmark targets
+# Benchmark targets of rounds V1 to V5
+
+These are the five targets of the earlier rounds, kept as a record. The 0.4 benchmark paints fifteen other pictures on
+one standard sheet: see [PICTURES.md](../PICTURES.md).
 
 Each target is a whole image, not a section of a larger one (the folder's name, `crops`, is historical). Sheet cells
 are the simulation grid squares.
@@ -44,4 +47,5 @@ scores; without it the target's paintings are scored but not indexed. `--private
 repository: it is written to `<dir>`, marked not distributed, and scoring then needs `BENCH_PRIVATE_CROPS=<dir>`.
 
 Then credit the image in [NOTICE](../../NOTICE) and add a row to the table above. Runs paint every target by default;
-`--crops a,b` narrows a run. V3 stays on its three published targets.
+`--crops a,b` narrows a run. V3 stays on its three published targets. This adds a target to the earlier rounds' suite,
+not to the 0.4 set.
