@@ -84,7 +84,8 @@ def usage_text(u):
     s, m = u.get("session") or {}, u.get("model") or {}
     lu, st = s.get("lookUnits") or {}, s.get("steps") or {}
     tu = u.get("toolUse") or {}
-    bits = [f"rendering units {lu.get('spent', '?')} of {lu.get('budget', '?')}", f"steps {st.get('taken', '?')} of {st.get('budget', '?')}",
+    # which earlier level a retry was handed (a run's named choice: "L4 after L2" has no level 3 between), said first
+    bits = ([s["ladder"]] if s.get("ladder") else []) + [f"rendering units {lu.get('spent', '?')} of {lu.get('budget', '?')}", f"steps {st.get('taken', '?')} of {st.get('budget', '?')}",
             f"tool calls {s.get('toolCalls') if s.get('toolCalls') is not None else '?'}",
             f"tokens {m.get('tokens') if m.get('tokens') is not None else 'not reported'}",
             "cost " + (f"${float(m['costUSD']):.2f}" if m.get("costUSD") is not None else "not reported"),

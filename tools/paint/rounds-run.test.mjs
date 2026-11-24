@@ -62,7 +62,7 @@ test('the ladder in fixed rounds with the stand-in: L2, L3 from it, L4 from that
     const k3 = JSON.parse(read(out('L3'), 'rounds.json')), p3 = read(out('L3'), 'rounds-prompt.txt');
     assert.equal(k3.picturesGiven.at(-1), 'your-previous-painting.jpg'); assert.match(p3, /Your own previous painting of this subject \(level L2\)/); assert.match(p3, /YOUR PREVIOUS SCRIPT:\n\{"format":"painting-script 2"/); assert.match(p3, /"id":"p4"/);
     assert.doesNotMatch(p3, /LOOK 1 of your script|traced-shapes/); assert.equal(k3.lookUnits.budget, 3); assert.equal(k3.rounds.length, 4);
-    assert.equal(r3.record.author.previousTry.from, out('L2')); assert.equal(r3.record.author.session.shapeReuse.reuse, 0);
+    assert.equal(r3.record.author.previousTry.from, out('L2')); assert.deepEqual([r3.record.author.ladder, r3.record.author.session.ladder, r3.record.author.previousTry.level], ['L3 after L2', 'L3 after L2', 'L2']); assert.equal(r3.record.author.session.shapeReuse.reuse, 0);
     // level 4: the same from level 3, and the traced shapes as a picture and a list; a passage names one by number
     const r4 = w.run('L4', out('L4')), x4 = w.lent('L4', out('L3')); await roundsRun(r4, x4);
     const k4 = JSON.parse(read(out('L4'), 'rounds.json')), p4 = read(out('L4'), 'rounds-prompt.txt');
@@ -71,6 +71,9 @@ test('the ladder in fixed rounds with the stand-in: L2, L3 from it, L4 from that
     // the shape named by number reaches the painter as its outline, and the share of washes that reuse a shape is recorded
     assert.deepEqual(x4.seen.final.script.passages.find(p => p.id === 's1').regions, [[[30, 40], [60, 40], [60, 70], [30, 70]]]);
     assert.deepEqual(r4.record.author.session.shapeReuse, { passages: 5, reuse: 1, share: 0.2 }); assert.deepEqual(JSON.parse(read(out('L4'), 'folder/script.json')).passages.find(p => p.id === 's1').shapes, [1]);
+    // level 4 straight from a level 2 result (no level 3 between) is allowed, and the record names it
+    const r42 = w.run('L4', out('L4-after-L2')), x42 = w.lent('L4', out('L2')); await roundsRun(r42, x42);
+    assert.deepEqual([r42.record.author.ladder, r42.record.author.session.previousLevel], ['L4 after L2', 'L2']); assert.match(read(out('L4-after-L2'), 'rounds-prompt.txt'), /Your own previous painting of this subject \(level L2\)/);
     // level 1: the subject alone; no drawing, study or form is sent or named, and the prepared drawing is never laid
     const r1 = w.run('L1', out('L1')), x1 = w.lent('L1'); await roundsRun(r1, x1);
     const k1 = JSON.parse(read(out('L1'), 'rounds.json')), p1 = read(out('L1'), 'rounds-prompt.txt');
