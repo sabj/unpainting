@@ -63,6 +63,9 @@ def settings(env=None):
         raise RouteError(f"JUDGE_ROUTE must be one of {', '.join(ROUTES)}, not {route!r}")
     if env.get("JUDGE_HOSTED_PANEL"):
         raise RouteError("JUDGE_HOSTED_PANEL is gone: the panel is named by JUDGE_PANEL on every route (open3 is the default)")
+    # a hosted route without its key stops here, before anything else is read
+    if route != "local" and not env.get(HOSTED[route][1]):
+        raise RouteError(f"JUDGE_ROUTE={route} needs {HOSTED[route][1]}, and it is not set. Set it in the environment, or use JUDGE_ROUTE=local.")
     name = env.get("JUDGE_PANEL") or DEFAULT_PANEL
     if name == "custom":
         # a panel of one's own, local only, by its tags: never the default, and labelled as what it is
@@ -92,8 +95,6 @@ def settings(env=None):
             models, names = list(cfg["panel"]), {m: m for m in cfg["panel"]}
         return {**cfg, "panel": models, "names": names, "panelName": name, "reasoning": REASONING, "route": "local", "label": label}
     url, key_name = HOSTED[route]
-    if not env.get(key_name):
-        raise RouteError(f"JUDGE_ROUTE={route} needs {key_name}, and it is not set. Set it in the environment, or use JUDGE_ROUTE=local.")
     return {"route": route, "label": label, "url": url, "host": url.split("/")[2], "panel": models, "names": names, "panelName": name,
             "reasoning": REASONING, "keyName": key_name, "env": env}
 
