@@ -1,5 +1,5 @@
 // The drawing harness inside `npm test`: the whole matrix of small CPU paintings (harness.mjs), every cell to pass, and a
-// named test for each fault the drawing has had. About a minute on a laptop.
+// named test for each fault the drawing has had. About a minute on a laptop, five on a busy one (limit: 15 minutes).
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -12,7 +12,7 @@ const cell = id => { const r = H.results.find(q => q.cell.id === id); assert.ok(
 const check = (id, name) => { const c = cell(id).checks.find(k => k.check.startsWith(name)); assert.ok(c, `${id}: no check "${name}"`); return c; };
 const laid = (id, closing = false) => { const f = path.join(cell(id).out, closing ? 'drawing-laid-closing.json' : 'drawing-laid.json'); return fs.existsSync(f) ? JSON.parse(fs.readFileSync(f, 'utf8')) : null; };
 
-before(async () => { dir = fs.mkdtempSync(path.join(os.tmpdir(), 'drawing-harness-')); H = await runHarness(dir); }, { timeout: 280000 });
+before(async () => { dir = fs.mkdtempSync(path.join(os.tmpdir(), 'drawing-harness-')); H = await runHarness(dir); }, { timeout: 900000 });
 after(() => { if (dir) fs.rmSync(dir, { recursive: true, force: true }); });
 
 test('every cell of the matrix passes, and every cell that does not exist says why', () => {

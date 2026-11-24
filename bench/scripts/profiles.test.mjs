@@ -58,7 +58,7 @@ test('wall watchdog terminates a local model process that ignores SIGTERM', asyn
   try {
     const r = await runTurn({ cmd: process.execPath, args: ['-e', "process.on('SIGTERM',()=>{}); setInterval(()=>{},100);"] },
       { cwd: root, events: path.join(root, 'events'), stderr: path.join(root, 'stderr'), capMs: 150, killGraceMs: 50 });
-    assert.equal(r.killed, true); assert.equal(r.reason, 'the wall-clock limit'); assert.ok(r.seconds < 3);
+    assert.equal(r.killed, true); assert.equal(r.reason, 'the wall-clock limit'); assert.ok(r.seconds < 30);   // (0.2 s idle; a busy machine is slow to start node)
   } finally { fs.rmSync(root, { recursive: true, force: true }); }
 });
 
@@ -68,7 +68,7 @@ test('lite waits for descendant cleanup even after a normal model CLI exit', asy
     const descendant = "const fs=require('fs');process.on('SIGTERM',()=>{});fs.writeFileSync('ready','1');setTimeout(()=>fs.writeFileSync('late','1'),500);setInterval(()=>{},100);";
     const parent = `const fs=require('fs');require('child_process').spawn(process.execPath,['-e',${JSON.stringify(descendant)}],{stdio:'ignore'});const t=setInterval(()=>{if(fs.existsSync('ready')){clearInterval(t);process.exit(0)}},10);`;
     const r = await runTurn({ cmd: process.execPath, args: ['-e', parent] },
-      { cwd: root, events: path.join(root, 'events'), stderr: path.join(root, 'stderr'), capMs: 3000, killGraceMs: 50, cleanupGroup: true });
+      { cwd: root, events: path.join(root, 'events'), stderr: path.join(root, 'stderr'), capMs: 30000, killGraceMs: 50, cleanupGroup: true });   // (the cap is not under test: on a busy machine node took over 3 s to start twice)
     assert.equal(r.killed, false); assert.equal(r.code, 0); assert.ok(r.cleanupSeconds >= .04);
     await new Promise(resolve => setTimeout(resolve, 550));
     assert.equal(fs.existsSync(path.join(root, 'late')), false, 'a tool cannot continue during the renderer phase');
