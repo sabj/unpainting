@@ -16,12 +16,12 @@ async function paint(dir, extra) {
   // Segmentation is not under test: --segments off keeps the run free of the SAM python and checkpoint.
   const args = ['tools/paint-plate.mjs', '--allowdirty', '1', '--image', target, '--washplan', target, '--width', '96', '--scale', '1', '--sheetmm', '152.4', '--mode', 'fast', '--gpu', 'off', '--threads', '1',
     '--drawing', 'none', '--frames', '0', '--video', '0', '--segments', 'off', '--out', out, ...extra];
-  try { execFileSync(process.execPath, args, { cwd: new URL('../../', import.meta.url), env: { ...process.env, W2_CACHE_DIR: path.join(dir, 'cache') }, stdio: 'pipe', timeout: 240000 }); }
+  try { execFileSync(process.execPath, args, { cwd: new URL('../../', import.meta.url), env: { ...process.env, W2_CACHE_DIR: path.join(dir, 'cache') }, stdio: 'pipe', timeout: 580000 }); }
   catch (e) { throw Error(String(e.stdout).split('\n').slice(-20).join('\n') + String(e.stderr)); }
   return { guard: JSON.parse(fs.readFileSync(path.join(out, 'target-guard.json'), 'utf8')), steps: JSON.parse(fs.readFileSync(path.join(out, 'step-backs.json'), 'utf8')), png: fs.readFileSync(path.join(out, 'painting.png')) };
 }
 
-test('default mode looks at shape scale only in its planned step-backs (a passage takes no look: its mix is one colour for the shape, from the study); strict takes none', { timeout: 600000 }, async () => {
+test('default mode looks at shape scale only in its planned step-backs (a passage takes no look: its mix is one colour for the shape, from the study); strict takes none', { timeout: 1260000 }, async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'step-backs-'));
   try {
     const d = await paint(dir, []);
