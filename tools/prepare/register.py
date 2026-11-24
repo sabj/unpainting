@@ -14,7 +14,7 @@
 # The table here is the only hand-written part: roles, sources, crops, the artist-line rule. Classes come from
 # classify/<id>.json (the classifier, step 0), study seeds from segaudit/seed-choice.json (the segmentation auditor), hashes,
 # sizes and generation records from the files and the run records. Nothing is inferred from a file name.
-import json, os, re, sys, time, subprocess
+import copy, json, os, re, sys, time, subprocess
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from subjects_lib import R, MANIFEST, sha256, image_size, sheet_for, standard_sheet, RULE_NAME, RULE_SUFFIX, CELL_MM, MAX_LONG
 from prep_root import prep_python, REPO
@@ -303,6 +303,25 @@ def add_citations(man):
         else: ch.append("drawing medium: decided by the classifier (classify/%s.json), not by hand" % (s.get("registeredFrom") or s["id"]))
         s["checks"] = ch
 
+def own_class(kept, now, by_hand=False):
+    """The class record of ONE subject record: the kept one (a frozen class holds only for its own class file) or the one
+    read now, always as a copy of its own. A record under the rule is built from the earlier record's name, so both are
+    handed the same kept class; build() then writes summary and laysInk into it, and without the copy the second record's
+    values landed in the first."""
+    c = kept
+    if not c or c.get("value") == "pending" or c.get("file") != now.get("file") or (by_hand and not c.get("setByHand")): c = now
+    return copy.deepcopy(c)
+
+def lays_ink(own_line, fit_here, fit_before=None):
+    """Whether the drawing is laid as ink: the artist's own line, or a tagged ink fit with any ink stroke. fit_here: the
+    stroke fates of the ink fit at this record's sheet (None when there is none); fit_before: those of the earlier
+    record's ink fit, for a record under the rule whose own fit is not made yet. Which strokes are ink is read against
+    the source, not the sheet, so the earlier fit decides until the new one exists; the new record then asks for its
+    ink fit at its own sheet (the vectors entry says "to fit" with the command) instead of falling to the lay-in."""
+    if own_line: return True
+    fa = fit_here or fit_before
+    return bool(fa and fa["tagged"] and fa["strokes"]["ink"] > 0)
+
 def build(frozen=None):
     """frozen: {name: class record} kept from the current manifest (a selective repin never changes a class)."""
     subs = []
@@ -332,8 +351,7 @@ def build(frozen=None):
         rec["sheet"] = dict(widthMm=wmm, heightMm=hmm, cellsAcross=cells, cellMm={k: round(wmm / v, 4) for k, v in cells.items()},
                             sourcePxPerCell={k: round(ppx[0] / v, 3) for k, v in cells.items()},
                             rule=RULE_NAME if qs else "0.26 mm a cell at full; long-side cells = min(source long side px, %d), never enlarged; half = half the cells (0.52 mm); line = twice the cells (0.13 mm)" % MAX_LONG)
-        c = (frozen or {}).get(name); kc = klass(iid)
-        if not c or c.get("value") == "pending" or c.get("file") != kc.get("file") or (iid in MEDIUM_BY_HAND and not c.get("setByHand")): c = kc   # a frozen class holds only for its own class file
+        c = own_class((frozen or {}).get(name), klass(iid), iid in MEDIUM_BY_HAND)
         rec["class"] = c
         cls = c["value"]
         toned = (c.get("paper") == "toned" and (c.get("paperL") or 100) < 90)
@@ -353,7 +371,8 @@ def build(frozen=None):
         # tagged ink fit with any ink stroke, is laid as an ink drawing (its lay-in strokes in graphite first); otherwise the lay-in
         ink_stem = latest_stem("replay/vectors/%s-std-ink" % vid)
         fa_ink = fates(ink_stem)
-        route = "ink" if (fid in OWN_LINE or (fa_ink and fa_ink["tagged"] and fa_ink["strokes"]["ink"] > 0)) else "layin"
+        fa_before = fates(latest_stem("replay/vectors/%s-std-ink" % iid)) if vid != iid else None   # the earlier record's ink fit
+        route = "ink" if lays_ink(fid in OWN_LINE, fa_ink, fa_before) else "layin"
         if route == "ink":
             if fid in OWN_LINE:
                 line_png = "guides/%s-orig-line.png" % fid; draw_how = "the artist's own pen line, extracted from his sheet (replay/r10/master-line.py, fourth attempt)"

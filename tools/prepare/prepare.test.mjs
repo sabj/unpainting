@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import sharp from 'sharp';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -96,4 +97,55 @@ test('the committed manifest names all fifteen, prepared or not', () => {
   const doc = JSON.parse(fs.readFileSync(path.join(ROOT, 'bench', 'inputs-manifest.json'), 'utf8'));
   assert.deepEqual(doc.pictures.map(p => p.id), picturesAt('extended').map(p => p.id));
   for (const p of doc.pictures) { assert.equal(typeof p.prepared, 'boolean', p.id); assert.equal(p.prepared, p.absent.length === 0, p.id); for (const f of p.files) assert.ok(f.absent || /^[0-9a-f]{64}$/.test(f.sha256), `${p.id} ${f.path}`); }
+});
+
+// One ink picture (the line is not the artist's own) in a made-up preparation folder: its record and its record under
+// the rule, built by the registry writer itself from one kept class, as a repin that freezes classes does.
+async function twoRecords(dir) {
+  for (const d of ['src', 'replay/vectors', 'classify', 'guides', 'studies', 'labels', 'segaudit', 'named-forms']) fs.mkdirSync(path.join(dir, d), { recursive: true });
+  await sharp({ create: { width: 1600, height: 1200, channels: 3, background: '#faf9f4' } }).png().toFile(path.join(dir, 'src', 'pic.png'));
+  fs.writeFileSync(path.join(dir, 'classify', 'pic.json'), JSON.stringify({ line: 'ink', line_strength: 'visible', paper: 'white', measurements: { paperL: 96 }, plain: 'pen and wash', image: 'src/pic.png' }));
+  const strokes = [{ medium: 'ink', path: [[0, 0], [100, 0]] }, { medium: 'pencil', path: [[0, 0], [0, 5]] }];
+  for (const k of ['ink', 'layin', 'pencil']) {   // the earlier record's fits, at its own sheet (1600 px wide: 380.12 mm)
+    fs.writeFileSync(path.join(dir, 'replay', 'vectors', `pic-std-${k}-vectors.json`), JSON.stringify({ sheetMm: 380.12, medium: 'ink', strokes }));
+    fs.writeFileSync(path.join(dir, 'replay', 'vectors', `pic-std-${k}-lines.json`), '{}');
+  }
+  const r = py(`import json, register as r
+r.SPEC = [('pic', 'pic', 'core', 'src/pic.png', r.GEN, 'n'), ('pic-qs', 'pic-qs', 'core', 'src/pic.png', r.GEN, 'n')]
+kept = dict(r.klass('pic'), summary='ink', laysInk=True)
+m = r.build({'pic': kept})
+print(json.dumps(dict(kept=kept, subjects=m['subjects'])))`, { UNPAINT_PREP: dir, UNPAINT_PREP_PYTHON: process.env.UNPAINT_PREP_PYTHON ?? '/usr/bin/python3' });
+  assert.equal(r.status, 0, r.stderr);
+  const { kept, subjects: [before, under] } = JSON.parse(r.stdout);
+  return { kept, before, under };
+}
+
+test('writing a record under the rule leaves the earlier record\'s class as it was: each record has a class of its own', async () => {
+  const dir = tmp();
+  try {
+    const { kept, before, under } = await twoRecords(dir);
+    assert.deepEqual([before.id, under.id, under.registeredFrom], ['pic', 'pic-qs', 'pic']);
+    // the earlier record: an ink drawing, summed up from its own fit; the new record's fit is not made yet, so ITS summary waits
+    assert.deepEqual([before.class.summary, before.class.laysInk], ['ink', true]);
+    assert.equal(under.class.summary, 'pending');
+    assert.deepEqual([kept.summary, kept.laysInk], ['ink', true], 'the class kept from the list before is not written into either');
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('an ink picture whose line is not the artist\'s own asks for its ink fit at the new sheet, not for a lay-in', async () => {
+  const dir = tmp();
+  try {
+    const { before, under } = await twoRecords(dir);
+    assert.notEqual(under.sheet.widthMm, before.sheet.widthMm);
+    assert.equal(before.inputs.drawingVectors.stem, 'replay/vectors/pic-std-ink'); assert.equal(before.inputs.drawingVectors.status, undefined);
+    const v = under.inputs.drawingVectors;
+    assert.equal(v.stem, 'replay/vectors/pic-qs-std-ink'); assert.equal(v.status, 'to fit'); assert.equal(v.sheetMm, under.sheet.widthMm);
+    assert.match(v.how, new RegExp(`^tools/prepare/vectors\\.sh pic-qs-std-ink .* ${under.sheet.widthMm} ink$`), 'the command that makes it, at the new width, as ink');
+    assert.equal(under.class.laysInk, true); assert.deepEqual(under.inputs.inkLine, { sameAs: 'drawing' });
+    // the rule itself: the fit at this sheet decides when there is one; before that, the earlier record's
+    const r = py(`import json, register as r
+ink = dict(tagged=True, strokes=dict(ink=3, layin=1, dropped=0)); none = dict(tagged=True, strokes=dict(ink=0, layin=4, dropped=0))
+print(json.dumps([r.lays_ink(True, None), r.lays_ink(False, None, None), r.lays_ink(False, None, ink), r.lays_ink(False, none, ink), r.lays_ink(False, ink, None), r.lays_ink(False, None, dict(ink, tagged=False))]))`, { UNPAINT_PREP: dir, UNPAINT_PREP_PYTHON: process.env.UNPAINT_PREP_PYTHON ?? '/usr/bin/python3' });
+    assert.deepEqual(JSON.parse(r.stdout), [true, false, true, false, true, false], r.stderr);
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });
