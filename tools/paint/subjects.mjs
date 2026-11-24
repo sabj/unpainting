@@ -6,6 +6,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { SHEET_RULE, standardSheet } from './sheet-rule.mjs';
 
 /** Roles of the studies of a wash plan, coarse to fine, in plain words. */
 const ROLES = ['block-in (the broad shapes)', 'middle study (later washes)', 'fine study (details and accents)'];
@@ -58,6 +59,13 @@ export function resolveSubject(registry, id, { sets = [], variant = null, varian
   const cells = rec.sheet?.cellsAcross?.full, mm = rec.sheet?.widthMm, vec = rec.inputs?.drawingVectors;
   if (!(cells > 0) || !(mm > 0) || !rec.source?.path || !vec?.stem || !rec.inputs?.studies?.length) throw new Error(`subject ${rec.id}: the record lacks a source, sheet, drawing vectors or studies`);
 
+  // the sheet: a record registered under the one-area rule (sheet-rule.mjs) must carry that rule's numbers for its
+  // picture; a record registered before it keeps the sheet it was registered with, and the run's block says so
+  const underRule = rec.sheet.rule === SHEET_RULE;
+  if (underRule) {
+    const std = standardSheet(rec.source.px ?? []);
+    if (std.cells !== cells || Math.abs(std.widthMm - mm) > 0.005) throw new Error(`subject ${rec.id}: the record says its sheet follows the one-area rule (${SHEET_RULE}) but holds ${cells} cells, ${mm} mm across; the rule gives ${std.cells} cells, ${std.widthMm} mm for a ${rec.source.px.join(' x ')} px picture. Register it again`);
+  }
   const sheet = { widthMm: mm, cells };
   if (all.has('width')) { const v = Number(all.get('width')); if (!Number.isInteger(v) || v < 16) throw new Error('--set width: whole cells across'); if (v !== cells) say('cells across', v, cells); sheet.cells = v; }
   if (all.has('sheetmm')) { const v = Number(all.get('sheetmm')); if (!(v > 0)) throw new Error('--set sheetmm: millimetres across'); if (v !== mm) say('sheet width (mm)', v, mm); sheet.widthMm = v; }
@@ -65,6 +73,7 @@ export function resolveSubject(registry, id, { sets = [], variant = null, varian
   sheet.rows = pw > 0 && ph > 0 ? Math.round(sheet.cells * ph / pw) : null;
   sheet.heightMm = sheet.rows ? +(sheet.widthMm * ph / pw).toFixed(2) : null;
   sheet.cellMm = +(sheet.widthMm / sheet.cells).toFixed(4);
+  sheet.rule = underRule ? SHEET_RULE : 'as registered, before the one-area rule';
 
   const stem = all.get('drawing') ?? vec.stem, own = stem === vec.stem;
   if (!own) say('opening drawing', stem, vec.stem);

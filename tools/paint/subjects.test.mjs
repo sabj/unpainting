@@ -26,7 +26,7 @@ test('the subject list is found from the environment, else under the home folder
 
 test('a record becomes the run inputs, with roles and floors, and nothing differs', () => {
   const s = resolveSubject(registry(), 'dune');
-  assert.deepEqual(s.sheet, { widthMm: 390, cells: 1500, rows: 1000, heightMm: 260, cellMm: 0.26 });
+  assert.deepEqual(s.sheet, { widthMm: 390, cells: 1500, rows: 1000, heightMm: 260, cellMm: 0.26, rule: 'as registered, before the one-area rule' });
   assert.equal(s.drawing.abs, path.join(BASE, 'vec/dune'));
   assert.deepEqual(s.studies.map(x => x.floorMm2), [6, 4, 2]);
   assert.match(s.studies[0].role, /block-in/); assert.match(s.studies[2].role, /fine/);
@@ -94,4 +94,15 @@ test('a study setting for one named form, and when the drawing is laid, are sett
   assert.equal(resolveSubject(registry(), 'dune').options.some(([k]) => k === 'drawing'), false, 'nothing asked: the record\'s options as they are');
   assert.throws(() => resolveSubject(registry(), 'dune', { sets: [['drawingorder', 'sometimes']] }), /one of first, both, last, none/);
   assert.throws(() => resolveSubject(registry(), 'dune', { sets: [['form3.study9.clusters', '4']] }), /the subject has 3 studies/);
+});
+
+test('a record registered under the one-area rule is held to it; an earlier record keeps its own sheet', () => {
+  const reg = registry(), r = reg.subjects[0];
+  r.sheet = { rule: 'quarter-sheet-area', widthMm: 399.36, cellsAcross: { full: 1536 } }; r.source.px = [3000, 2000];
+  const s = resolveSubject(reg, 'dune');
+  assert.deepEqual(s.sheet, { widthMm: 399.36, cells: 1536, rows: 1024, heightMm: 266.24, cellMm: 0.26, rule: 'quarter-sheet-area' });
+  assert.deepEqual(s.deviations, []);
+  r.sheet.cellsAcross.full = 1462; r.sheet.widthMm = 380.12;
+  assert.throws(() => resolveSubject(reg, 'dune'), /one-area rule.*holds 1462 cells.*gives 1536 cells.*Register it again/s);
+  assert.equal(resolveSubject(registry(), 'dune').sheet.cells, 1500, 'registered before the rule: its own sheet');
 });

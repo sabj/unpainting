@@ -95,3 +95,14 @@ test('the pen\'s ink is chosen by name: waterproof sets it before the washes, so
   assert.ok(!ink('waterproof').argv.includes('--ink'));
   assert.throws(() => ink('indian'), /--set ink: waterproof, soluble, default/);
 });
+
+test('under the one-area rule a file smaller than the sheet is painted enlarged, and the run says by how much', () => {
+  const small = spec({ source: { abs: '/r/src/ships.jpg', px: [768, 548] }, sheet: { widthMm: 386.1, cells: 1485, rule: 'quarter-sheet-area' } });
+  const c = buildCommand(small, { mode: 'paint', out: '/o', known });
+  assert.equal(value(c, 'sourcescale'), '1.94'); assert.equal(value(c, 'width'), '1485');
+  assert.match(c.settings.find(s => s.name === 'sourcescale').why, /1485 cells across and the file 768 px/);
+  const large = buildCommand(spec({ source: { abs: '/r/s.jpg', px: [3451, 2363] }, sheet: { widthMm: 393.9, cells: 1515, rule: 'quarter-sheet-area' } }), { mode: 'paint', out: '/o', known });
+  assert.ok(!large.argv.includes('--sourcescale'), 'a larger file is reduced: nothing to state');
+  const earlier = () => buildCommand(spec({ source: { abs: '/r/s.jpg', px: [768, 548] }, sheet: { widthMm: 390, cells: 1500, rule: 'as registered, before the one-area rule' } }), { mode: 'paint', out: '/o', known });
+  assert.ok(!earlier().argv.includes('--sourcescale'), 'an earlier registration is never enlarged in silence: the painter stops it as before');
+});

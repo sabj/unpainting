@@ -94,6 +94,13 @@ least shape of each study, mm2), `study2.clusters=20` (a wash-plan setting of on
 `masks=none`, `heapmb=<MB>`, or any `paint-plate` option by its name (`threads=2`; `outlinemedium=default` leaves an
 option of the record out). A run that differs from the record says so in its printed block and on its sheet.
 
+The sheet comes from the subject's record. A subject registered under the one-area rule is painted on a quarter
+sheet's area (27.9 x 38.1 cm) in the picture's own proportions, at 0.26 mm a cell, whatever the file's size in pixels;
+a file with fewer pixels across than the sheet has cells is enlarged, and the run's block states by how much
+(`--sourcescale`). A subject registered earlier keeps its own sheet (cells across = the file's pixels, at most 1,462
+on the long side). `node tools/paint/sheet-rule.mjs` lists both sizes for every registered subject;
+`node tools/paint/sheet-rule.mjs W H` prints the rule's sheet for a W x H px picture.
+
 Named forms (a reviewed SAM id map with its receipt) are found in this order: `--set masks=`, then
 `<forms folder>/<subject id>/receipt.json`, then none. The forms folder is `UNPAINT_FORMS`, else `named-forms` beside
 `SUBJECTS.json`. The receipt must name the subject's source by its sha256. The code planner reads the forms; an author

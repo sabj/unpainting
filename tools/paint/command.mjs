@@ -1,6 +1,8 @@
 // The one paint-plate command of a run, built from a resolved subject (subjects.mjs), the mode and this run's
 // settings, and the plain block printed before it starts. Pure: no file is read or written here.
 
+import { SHEET_RULE } from './sheet-rule.mjs';
+
 /** Options the harness sets itself; --set may not change them. */
 const OWNED = new Set(['image', 'width', 'sheetmm', 'drawingfile', 'washplan', 'out', 'gpu', 'valuepreviewonly', 'allowdirty', 'thingmasks', 'things', 'planfile']);
 /** Heap for the painter (MB): a full sheet's plan does not fit node's default. */
@@ -38,6 +40,10 @@ export function buildCommand(spec, { mode, out, known, script = null, edit = nul
     if (known && !known.has(k)) throw new Error(`--set ${k}: neither a setting of this command nor a paint-plate option`);
     set(k, v === 'default' ? null : v);
   }
+  // the one-area rule sizes the sheet by paper, not by the file: a file with fewer pixels across than the sheet has
+  // cells is painted enlarged, and the run states by how much (the painter stops on an unstated enlargement)
+  const enlarged = spec.sheet.rule === SHEET_RULE && spec.source.px?.[0] > 0 ? spec.sheet.cells / spec.source.px[0] : 0;
+  if (enlarged > 1 && !opts.has('sourcescale')) set('sourcescale', String(Math.ceil(enlarged * 100) / 100), `the standard sheet is ${spec.sheet.cells} cells across and the file ${spec.source.px[0]} px: the file is enlarged, as the one-area rule allows`);
   if (mode === 'plan') { opts.set('gpu', 'off'); opts.set('valuepreviewonly', '1'); } else opts.set('gpu', 'on');
   if (script) { opts.set('paints', script.paints.join(',')); opts.set('paintsextend', '0'); }
   // a script's first washes are broad and wet: over a pen drawing they lift ink that still rewets (the painter stops: "the
@@ -70,7 +76,7 @@ export function describeRun(run) {
   const row = (k, v) => L.push(`${(k + ':').padEnd(10)}${v}`);
   row('subject', `${s.id} (${s.name})${s.variant ? `, variant "${s.variant}": ${s.variantWhy ?? ''}` : ''}`);
   row('source', `${s.source}${s.sourcePx ? `, ${s.sourcePx.join(' x ')} px` : ''}`);
-  row('sheet', `${sheet.widthMm}${sheet.heightMm ? ` x ${sheet.heightMm}` : ''} mm, ${sheet.cells}${sheet.rows ? ` x ${sheet.rows}` : ''} cells, ${sheet.cellMm} mm a cell`);
+  row('sheet', `${sheet.widthMm}${sheet.heightMm ? ` x ${sheet.heightMm}` : ''} mm, ${sheet.cells}${sheet.rows ? ` x ${sheet.rows}` : ''} cells, ${sheet.cellMm} mm a cell${sheet.rule ? `; ${sheet.rule === SHEET_RULE ? 'the standard area (a quarter sheet) in the picture\'s proportions' : sheet.rule}` : ''}`);
   row('drawing', `${drawing.stem}, ${drawing.medium}${drawing.pinned ? '' : ' (not the record\'s drawing; unpinned)'}`);
   studies.forEach((st, i) => row(`study ${i + 1}`, `${st.path}, ${st.role}, shapes from ${st.floorMm2 ?? '?'} mm2${Object.entries(st.read).map(([k, v]) => `, ${k} ${v}`).join('')}`));
   row('masks', masks.receipt ? `${masks.forms.length} named forms (${masks.forms.map(f => f.name).join(', ')}) from ${masks.receipt} (${masks.from === 'set' ? '--set masks' : 'the named-forms folder'}); ${masks.read ? 'given to the planner' : 'shown to the author and on the sheet: ' + masks.whyNotRead}` : `none (${masks.none})`);

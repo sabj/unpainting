@@ -21,7 +21,11 @@ Details: [levels](docs/levels.md), [rules](docs/rules.md) and [scoring](docs/sco
 - Retries are self-study. The model sees its own painting, replay and stroke map and writes its own assessment. It never gets a score or a critique.
 - Budget for one try: 3.0 look units. A look's price is fixed by size: a half-size whole look 0.3, full size 1.0, a partial look its share, never under 0.2 (at L2 to L4 looks are half size; at L1 each run is a full-size painting, 1.0). At L2 to L4 the full-size final is painted after the session and not charged; at L1 the painting is its last completed run. How a model paints (water, strokes, waits, dryings) is free and measured beside the score: simulation work, sweeps, dryings, seconds, tokens (fresh, cached, output), steps. One runaway guard: water steps over ten times Auto's for the subject stop the painting (reported as a stop, not scored). Steps and the six-hour clock are runaway guards only.
 - Scores: human-ness from the film (the judges see the opening, the untouched paper the painter chose, as context; then twelve snapshots evenly through the film, scored; then the finished sheet), plus quality and likeness, plus a combined number. The original is scored for quality too, and a painting's quality is its share of the original's. Auto sets the difficulty.
-- Every picture is painted on one standard sheet. The original's real size is recorded and told to the model as a fact;
+- Every picture is painted on the same area of paper: a quarter sheet (27.9 x 38.1 cm, about 1,063 cm2), in the
+  picture's own proportions, whatever the file's pixel size or orientation. A cell is 0.26 mm, so every sheet holds
+  about 1.57 million cells (`tools/paint/sheet-rule.mjs`; run it to list every registered subject's sheet). A subject
+  registered before this rule keeps the sheet it was registered with, so earlier results keep their inputs. The
+  original's real size is recorded and told to the model as a fact;
   it is not reproduced. Each picture is the whole sheet, never a crop, with one exception chosen by the owner (Manet's
   Morisot with a Fan, its head, shoulders and hand).
 - Judges: an open-weight panel (GLM-5.3-Flash, Qwen3.8-27B, Gemma-4-31B), hosted on OpenRouter with zero data retention (`JUDGE_ROUTE=openrouter JUDGE_HOSTED_PANEL=open3`), or run locally through Ollama with those models named in `JUDGE_LOCAL_PANEL`. See [scoring](docs/scoring.md#judges).
