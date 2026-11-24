@@ -74,17 +74,22 @@ def size(jobs, sessions, pods, adding, now):
     jobs: paintings and looks that want a pod's place (those on one included). sessions: sessions in flight.
     pods: [{name, slots, limit, claimed}]. Returns (pods to add, [(name, why)] to delete, what is wanted in words)."""
     warm = math.ceil(sessions / A.warm_sessions) if A.warm_sessions > 0 else 0
+    # only a pod with over 45 minutes left takes a new job, so only such pods are places; the jobs finishing on the
+    # others need none. (Counted against every pod, a fresh pod was deleted as one too many while two old ones that
+    # could take nothing made up the number, and more were rented for jobs that already had a place.)
     usable = [p for p in pods if p["limit"] - now > 45 * 60]
+    jobs = max(0, jobs - sum(int(p["claimed"]) for p in pods if p not in usable))
     places = sum(p["slots"] for p in usable) + adding * slots_of(LADDER[0][0])
     add = 0
     while len(usable) + adding + add < A.cap and (places < jobs or len(usable) + adding + add < warm):
         add += 1; places += slots_of(LADDER[0][0])
-    go, kept, room = [], len(pods), sum(p["slots"] for p in pods)
+    go, kept, room = [], len(usable), sum(p["slots"] for p in usable)
     for p in sorted(pods, key=lambda p: p["created"]):
         if p["claimed"]: continue
-        if p["limit"] - now <= 45 * 60: go.append((p["name"], "near its limit")); kept -= 1; room -= p["slots"]
-        elif room - p["slots"] >= jobs and kept - 1 >= warm: go.append((p["name"], "more pods than the jobs and sessions need")); kept -= 1; room -= p["slots"]
-    return add, go, f"jobs wanting a pod's place {jobs}, sessions in flight {sessions} (warm pods {warm}), places up {sum(p['slots'] for p in usable)} on {len(usable)} pods, being set up {adding}"
+        if p not in usable: go.append((p["name"], "near its limit"))
+        # a pod is not given back in its first 20 minutes: its setup was paid for and the jobs come in waves
+        elif now - p["created"] > 20 * 60 and room - p["slots"] >= jobs and kept - 1 >= warm: go.append((p["name"], "more pods than the jobs and sessions need")); kept -= 1; room -= p["slots"]
+    return add, go, f"jobs wanting a place on a pod that can take one {jobs}, sessions in flight {sessions} (warm pods {warm}), places up {sum(p['slots'] for p in usable)} on {len(usable)} pods, being set up {adding}"
 
 
 def log(*a):
@@ -138,14 +143,15 @@ def in_order(wanted, clients):
 
 
 def claimed(name):
-    """A place of this pod is held by a live job (pod-<name>.json, pod-<name>-<k>.json)."""
+    """How many places of this pod are held by live jobs (pod-<name>.json, pod-<name>-<k>.json)."""
+    held = 0
     for f in (POOL / "claims").glob(f"pod-{name}*.json"):
         if f.stem != f"pod-{name}" and not f.stem[len(name) + 5:].isdigit(): continue
         try:
-            if alive(int(json.loads(f.read_text())["pid"])): return True
+            if alive(int(json.loads(f.read_text())["pid"])): held += 1
         except Exception:
             pass
-    return False
+    return held
 
 
 def save():
