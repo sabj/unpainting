@@ -1,0 +1,10 @@
+{
+ "about": "The waves of the run. A wave's sessions start once the wave before it has started all of its own (or reached its cap); sessions of two waves may run side by side. capUSD: the model cost (usage.json model.costUSD, estimates included) at which a wave starts no more sessions; diskFloorGB (optional): this wave's own disk floor. perSessionUSD: what a session is reckoned to cost until one of that model has ended.",
+ "waves": {
+  "1": { "models": ["neon-m", "carbon-m", "argon-m", "sonnet-m"], "pictures": "core", "levels": ["L1", "L2", "L3", "L4"], "capUSD": 90 },
+  "2": { "models": ["opus-m", "wonderfull-m", "sol-m", "terra-m"], "pictures": "core", "levels": ["L1", "L2", "L3", "L4"], "capUSD": 160 },
+  "3": { "models": ["sonnet-m"], "pictures": ["tiepolo-bacchus-qs", "homer-water-fan-qs", "guardi-qs", "bonington-french-town-qs", "sargent-tyrol-qs", "ender-mountain-valley-qs", "morisot-avenue-du-bois-qs", "cezanne-bathers-bridge-qs", "kasha-portrait-qs", "h36-qs"], "optional": ["homer-guide-whole-qs", "homer-two-ladies-qs", "prout-turret-qs", "bennett-south-street-qs", "randal-resegone-qs", "varley-hammersmith-qs", "sargent-murren-qs", "sterling-qs", "homer-trout-qs", "sargent-pilatus-qs", "marlow-grotto-qs", "hunt-snowdon-qs", "cezanne-bathers-qs", "rembrandt-qs", "fragonard-qs", "kasha-portrait-wash-qs", "trumbull-qs", "mittens-qs"], "levels": ["L4"], "capUSD": 40 },
+  "test": { "models": ["dry-rounds"], "pictures": ["mittens-closeup-qs", "turner-esseillon-qs"], "levels": ["L2"], "capUSD": 1, "render": "local", "diskFloorGB": 12 }
+ },
+ "perSessionUSD": { "opus-m": 1.7, "sonnet-m": 0.7, "fable-m": 2.7, "neon-m": 1.0, "carbon-m": 1.0, "argon-m": 1.0, "wonderfull-m": 1.5, "sol-m": 1.5, "terra-m": 1.5, "dry-rounds": 0 }
+}
