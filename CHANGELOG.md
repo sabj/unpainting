@@ -2,9 +2,9 @@
 
 Tags carry the detail: `git show v0.3.2`, `git log v0.3.0..v0.3.2`.
 
-## 0.4.0 (release candidate)
+## 0.4.0 (2026-11-24)
 
-A new benchmark: Auto, then levels 1 to 4, each one fresh session, each model scored against Auto. A model's painting script is painted as written, on a quarter sheet. `npm run unpaint` is one command for painting, benchmark runs and scoring. V4 and V5 are retired and replay only from tag `v0.3.2`.
+Wash physics (paper cockle, back-runs, damp levelling), form-following brushwork with organic edges and uneven brush load, varying centimetre-scale paper grain relief (with optional scanned paper height maps), unified `npm run unpaint` CLI, and the new 0.4 benchmark (Auto plus independent levels 1 to 4 on a quarter sheet, scored against Auto). V4 and V5 are retired and replay only from tag `v0.3.2`.
 
 ## 0.3.2 (2026-11-09)
 
