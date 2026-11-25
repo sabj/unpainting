@@ -1,5 +1,6 @@
 import { invalidatePaperCertificate, beginWetOperation } from './paper-certificate.mjs';
 import { censusMark } from './census.mjs';
+import { laneFactors, loadFactor } from './brush-load-variance.mjs';
 // A brush as a row of bristles across the stroke, based on "Hairy Brushes", with a belly
 // reservoir as in DAB. Water and pigment move as separate masses. One contact model covers every load:
 // paint reaches a cell when the hair's liquid spans the depth from the hair to the paper's tooth there.
@@ -44,15 +45,17 @@ export function dip(brush, { water = 1, conc }) {
   brush.K = conc.length; brush.load = water; brush.carry = 0; brush.travel = 0;
   brush.dips = (brush.dips ?? 0) + 1; brush.sinceDip = 0; brush._onPaper = false;
   if (varietyOf(brush)) reclump(brush);
-  brush.resW = water * brush.capacity * brush.hairs.length * brush.belly; brush.resP = conc.map(v => v * brush.resW);
-  for (const hr of brush.hairs) { hr.water = water * brush.capacity * hr.len; hr.pig = conc.map(v => v * hr.water); }
+  // Uneven load: one seeded factor for this load, and a smooth seeded factor per bristle lane (see brush-load-variance.mjs).
+  const lf = loadFactor(brush.seed, brush.dips - 1), lane = laneFactors(brush.seed, brush.dips - 1, brush.hairs.map(hr => hr.len));
+  brush.resW = water * brush.capacity * brush.hairs.length * brush.belly; brush.resP = conc.map(v => v * lf * brush.resW);
+  brush.hairs.forEach((hr, j) => { hr.water = water * brush.capacity * hr.len; hr.pig = conc.map(v => v * lf * lane[j] * hr.water); });
   if (brush.loadWater > 0) {
     const total = water * brush.loadWater;
     const tipCap = brush.capacity * brush.hairs.reduce((a, hr) => a + hr.len, 0);
     // A blotted brush remains dry; a loaded belly keeps the tips saturated.
     const tip = Math.min(total, tipCap * (water < brush.free ? water : 1));
-    for (const hr of brush.hairs) { hr.water = tip * hr.len * brush.capacity / tipCap; hr.pig = conc.map(v => v * hr.water); }
-    brush.resW = total - tip; brush.resP = conc.map(v => v * brush.resW);
+    brush.hairs.forEach((hr, j) => { hr.water = tip * hr.len * brush.capacity / tipCap; hr.pig = conc.map(v => v * lf * lane[j] * hr.water); });
+    brush.resW = total - tip; brush.resP = conc.map(v => v * lf * brush.resW);
   }
   // the belly's capacity, for the section brush's capillary feed: what a dip at 1 puts there, or what this metered load did
   brush._capB = Math.max(brush.capacity * brush.hairs.length * brush.belly, brush.resW);

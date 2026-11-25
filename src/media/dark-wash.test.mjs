@@ -14,7 +14,8 @@ const O = { ...DEFAULTS, fixedBed: 1, granFill: 0, slideCap: 1 };
 const lin = v => { v /= 255; return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; };
 function wash(conc, CELL = 0.25) {
   const w = Math.round(60 / CELL), h = Math.round(40 / CELL), n = w * h;
-  const paper = makePaper(w, h, { seed: 9, scale: 1, toothScale: 0.2, fibres: 0.5, tooth: 0.7, proudBlur: 1, mmPerCell: CELL, coldPress: { mmPerCell: CELL, bumpMm: [0.8, 3], cover: 2.4, swell: 0.45, swellMm: [4, 8] } });
+  // a sheet without cockle (paper.mjs): what this measures is the lanes, the levelling or the grain, not the pooling
+  const paper = makePaper(w, h, { cockle: { rmsMm: 0 }, seed: 9, scale: 1, toothScale: 0.2, fibres: 0.5, tooth: 0.7, proudBlur: 1, mmPerCell: CELL, coldPress: { mmPerCell: CELL, bumpMm: [0.8, 3], cover: 2.4, swell: 0.45, swellMm: [4, 8] } });
   const sheet = createSheet(paper, pigments), r = 12.5 / CELL;
   for (let y = 10, k = 0; y <= 30; y += 5, k++) {
     const b = B.createBrush({ model: 'section', radius: r, seed: 101 + k, flat: true, bristles: Math.max(12, Math.ceil(r * 2)), capacity: 100, belly: 12, feed: 0.4, give: 0.9, free: 0.4, film: 0.25, splay: 0.03, stiffness: 8, wetMix: 0.3, bridge: 0.9, bridgeSoft: 3 });
@@ -57,7 +58,7 @@ test('a mixed wash dries its edge in its own hue, a little darker: the edge flow
   // the fine ones stayed suspended while ultramarine settled, and the edge flow drew only them into the outermost cell.
   const keys = ['hansa', 'cadred', 'ultramarine'], pig = keys.map(k => physicalPigment(BOX.find(p => p.key === k))), CELL = 0.25;
   const w = Math.round(50 / CELL), h = Math.round(40 / CELL), n = w * h;
-  const sheet = createSheet(makePaper(w, h, { seed: 9, scale: 1, toothScale: 0.2, fibres: 0.5, tooth: 0.5, proudBlur: 1, mmPerCell: CELL, coldPress: { mmPerCell: CELL, bumpMm: [0.5, 2], cover: 2.2, swell: 0.3 } }), pig);
+  const sheet = createSheet(makePaper(w, h, { cockle: { rmsMm: 0 }, seed: 9, scale: 1, toothScale: 0.2, fibres: 0.5, tooth: 0.5, proudBlur: 1, mmPerCell: CELL, coldPress: { mmPerCell: CELL, bumpMm: [0.5, 2], cover: 2.2, swell: 0.3 } }), pig);
   for (let y = 12, k = 0; y <= 28; y += 8, k++) {
     const r = 6 / CELL, b = B.createBrush({ model: 'section', radius: r, seed: 101 + k, flat: true, bristles: Math.max(12, Math.ceil(r * 2)), capacity: 100, belly: 12, feed: 0.4, give: 0.9, free: 0.4, film: 0.25, splay: 0.03, stiffness: 8, wetMix: 0.3 });
     B.dip(b, { water: 0.5, conc: [0.3, 0.15, 0.25] });

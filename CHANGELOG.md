@@ -1,10 +1,10 @@
 # Changelog
 
-Tags carry the detail: `git show v0.3.2`, `git log v0.3.0..v0.3.2`. Versions are explained in [docs/running.md](docs/running.md#versions).
+Tags carry the detail: `git show v0.3.2`, `git log v0.3.0..v0.3.2`.
 
 ## 0.4.0 (release candidate)
 
-A benchmark ladder: Auto, then levels 1 to 4, each model scored against Auto. A model's painting script is painted as written. Washes are whole shapes laid light to dark, each loaded with one mix; no stroke is clipped to cells. A look has a fixed price and a try has a budget of 3.0; how a model paints is recorded, never charged. Every picture is painted on a quarter sheet. Pen and pencil drawing are the model's choice. Level 1 runs in a closed session. V4 and V5 are retired from the CLI and replay only from tag `v0.3.2`.
+A new benchmark: Auto, then levels 1 to 4, each one fresh session, each model scored against Auto. A model's painting script is painted as written, on a quarter sheet. `npm run unpaint` is one command for painting, benchmark runs and scoring. V4 and V5 are retired and replay only from tag `v0.3.2`.
 
 ## 0.3.2 (2026-11-09)
 

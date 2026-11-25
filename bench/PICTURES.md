@@ -72,4 +72,4 @@ Beach and Overlook: photographs by Sam Jackson, modified with an image generator
 
 ## Earlier benchmarks
 
-Rounds V1 to V5 painted Hills, France, Ships, Mittens and Trumbull ([sizes](crops/README.md)). Ships is Sargent's *White Ships*, in 0.4 at full size. Trumbull and the first Mittens are optional; Hills and France are in no 0.4 set.
+Rounds V1 to V5 painted Hills, France, Ships, Mittens and Trumbull ([sizes](v2/crops.json)). Ships is Sargent's *White Ships*, in 0.4 at full size. Trumbull and the first Mittens are optional; Hills and France are in no 0.4 set.

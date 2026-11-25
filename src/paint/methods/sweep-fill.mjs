@@ -9,6 +9,7 @@
 // Every path is a smooth line in millimetres: nothing follows a grid's steps.
 // Plan time only.
 import { traceOutlines } from '../../crop/outline.mjs';
+import { cellsBend } from './wash-form.mjs';
 
 /** Neighbouring sweeps overlap by this share of the brush's width, so the bead is carried. */
 const SWEEP_OVERLAP = 0.3;
@@ -437,10 +438,14 @@ export function laneFill(loops, { kitMm, growMm = 0, keepOut = null, spine = tru
     const tx = Math.cos(th), ty = Math.sin(th);
     // the lanes' normal points down the sheet (or right, for an upright shape), so the lanes go top down
     let nx = -ty, ny = tx; if (ny < -1e-6 || (Math.abs(ny) <= 1e-6 && nx < 0)) { nx = -nx; ny = -ny; }
-    let v0 = Infinity, v1 = -Infinity, u0 = Infinity, u1 = -Infinity;
-    for (const [x, y] of P) { const v = x * nx + y * ny, u = x * tx + y * ty; if (v < v0) v0 = v; if (v > v1) v1 = v; if (u < u0) u0 = u; if (u > u1) u1 = u; }
-    v0 -= pitch / 2; v1 += pitch / 2; u0 -= pitch; u1 += pitch;
     const D = distance(part, gw, gh); let deep = 0, meanD = 0; for (const i of cells) { if (D[i] > deep) deep = D[i]; meanD += D[i] / cells.length; }
+    // the part's own flow (the main part of a wash, not a bare corner laid again): its lanes bent along its middle line
+    // (wash-form.mjs cellsBend), so they run round a curving shape instead of straight across it, each with its own waver
+    const bend = depth ? null : cellsBend(P, tx, ty, nx, ny, pitch, Math.min(2 * deep, 4 * meanD) * pitch);
+    const bend_ = bend ? bend.c : () => 0;
+    let v0 = Infinity, v1 = -Infinity, u0 = Infinity, u1 = -Infinity;
+    for (const [x, y] of P) { const u = x * tx + y * ty, v = x * nx + y * ny - bend_(u); if (v < v0) v0 = v; if (v > v1) v1 = v; if (u < u0) u0 = u; if (u > u1) u1 = u; }
+    v0 -= pitch / 2; v1 += pitch / 2; u0 -= pitch; u1 += pitch;
     // the brush is held to the part's typical width (four times its mean depth: a strip's width), not its widest: a mass of
     // shadow streaks with lit stone between them is laid streak by streak, not blotted over with a mop
     const across = v1 - v0, fat = Math.min(2 * deep, 4 * meanD) * pitch * FATTEST;
@@ -459,14 +464,16 @@ export function laneFill(loops, { kitMm, growMm = 0, keepOut = null, spine = tru
     else { for (let g = Math.ceil(a0 / step) * step; g <= a1 + 1e-9; g += step) vs.push(g); if (vs[0] - a0 > 0.5 * step) vs.unshift(a0); if (a1 - vs[vs.length - 1] > 0.5 * step) vs.push(a1); }
     // `open`: the strokes that ended in the lane before, each of which the next lane may carry on
     let k = 0, open = [], off = null;
-    vs.forEach(v => {
+    vs.forEach((v, li) => {
+      // a bent lane's own small waver about the shape's flow, seeded by the part, so no two lie exactly alike
+      const own = bend ? bend.own(li, r) : () => 0, wv = u => v + bend_(u) + own(u);
       const next = [];
       // along the lane's centre line the hand presses as wide as the part allows there (half-width no more than the
       // distance to the outline), so where the outline slants or narrows the lane narrows and ends on its tip: the lane
       // never runs past the outline and its end follows the slant. Where not even the tip fits, the lane lifts.
       const samples = [];
       for (let u = u0; u <= u1 + 1e-9; u += pitch / 2) {
-        const x = u * tx + v * nx, y = u * ty + v * ny, i = at(x, y), dmm = i >= 0 && part[i] ? D[i] * pitch : 0;
+        const vu = wv(u), x = u * tx + vu * nx, y = u * ty + vu * ny, i = at(x, y), dmm = i >= 0 && part[i] ? D[i] * pitch : 0;
         samples.push({ u, dmm: dmm > 0 ? dmm + spill : 0, in: dmm >= END_REACH * halfAt(r, TIP) });
       }
       const runs = []; let cur = null;
@@ -484,8 +491,9 @@ export function laneFill(loops, { kitMm, growMm = 0, keepOut = null, spine = tru
           if (q % every && q !== run.length - 1) return;
           const p = Math.max(TIP, Math.min(1, (sm.dmm / r - 0.25) / 0.75));
           // drop a point between two of the same pressure on a straight run
-          if (fwd.length >= 2 && Math.abs(fwd[fwd.length - 1][2] - p) < 0.04 && Math.abs(fwd[fwd.length - 2][2] - p) < 0.04 && q !== run.length - 1) fwd.pop();
-          fwd.push([+(sm.u * tx + v * nx).toFixed(3), +(sm.u * ty + v * ny).toFixed(3), +p.toFixed(3)]);
+          if (!bend && fwd.length >= 2 && Math.abs(fwd[fwd.length - 1][2] - p) < 0.04 && Math.abs(fwd[fwd.length - 2][2] - p) < 0.04 && q !== run.length - 1) fwd.pop();
+          const vu = wv(sm.u);
+          fwd.push([+(sm.u * tx + vu * nx).toFixed(3), +(sm.u * ty + vu * ny).toFixed(3), +p.toFixed(3)]);
         });
         if (fwd.length < 2) continue;
         // The next lane goes on without lifting, turning at the outline where a stroke of the lane before ended (a

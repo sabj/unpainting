@@ -8,7 +8,10 @@ import { createSheet, step, dry, thickness, totals, DEFAULTS as SHEET_DEFAULTS, 
 // calls (stepfull.mjs efSteps); the flows inside a GPU stroke's plan keep the geometry from before the stroke, which
 // parts from the CPU by more than float noise. The feed's own parity: gpu/gpu-edge-feed.test.mjs and
 // tools/lab/gpu-wash-cases.test.mjs.
-const DEFAULTS = { ...SHEET_DEFAULTS, edgeEvap: 0 };
+// The back-runs are off too: whether a cell is damp paint or a puddle is a threshold on its depth (backrun.mjs), and the
+// GPU's float32 levelling puts a few cells on the other side of it (mean 1.0e-5 against a bound of 3.2e-6 here, the
+// largest 0.1% of the peak). Their own parity, cell by cell: gpu/gpu-film-level.test.mjs (a puddle run into damp paint).
+const DEFAULTS = { ...SHEET_DEFAULTS, edgeEvap: 0, invade: 0 };
 import { createBrush, dip, stroke } from './brush.mjs';
 import { attachGpu, gpuStats } from './gpu/link.mjs';
 

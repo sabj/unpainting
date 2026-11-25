@@ -39,9 +39,8 @@ INPUT_LIST
   every line is laid, the `drop` ones too, since there the lines carry the modelling.
 - `mine/`: after a plan or a look of a choice that names lines of your own: `mine/drawing.png` (your lines: grey
   before the washes, black after them).
-- `own-script-brief.md`: the brief for writing your own painting script (the format, the kit, the paints).
 - `choice.json`: your choice. What it holds when you stop is painted.
-- `self-review.md`: yours to write before you stop if you wish (`TASK.md`, "Before you stop"): the five worst
+- `self-review.md`: yours to write before you stop if you wish: the five worst
   differences between your last look's dried sheet and the subject, and whether a major fault remains. It is kept
   with the session; nothing depends on it.
 - `seen.md`: only when you were handed pictures beside the inputs (Auto's painting in `auto-result/`, or your previous
@@ -71,7 +70,7 @@ plan's minutes and a look's painting are on it.
 | `./unpaint wait` | waits for the answer of the command that said "still working" | that answer | none |
 
 A choice that is refused costs no look. A choice that is exactly one you planned before and then left is a
-return to an earlier choice: it is counted, and past REVERTS_MOST of them it is refused (`TASK.md` says why). A painting that fails on this side costs no look either: the answer
+return to an earlier choice: it is counted, and past REVERTS_MOST of them it is refused. A painting that fails on this side costs no look either: the answer
 says NOT PAINTED, and you may ask again. The same look of a choice you have already looked at renders nothing and
 costs nothing. A look's price is fixed: 0.3 units for your whole plan at half size, its share when stopped at a stage
 or cut to a region, and never under 0.05, whatever the look holds. The final, painted at full size after you stop,
@@ -89,12 +88,12 @@ What a look's painting is, exactly:
 
 | Tool | How you reach it | What is yours to decide |
 |---|---|---|
-| The paint box | `palette` in your own script | which paints the picture is mixed from (`own-script-brief.md` lists the box) |
+| The paint box | `palette` in your own script | which paints the picture is mixed from (`TASK.md` lists the box) |
 | The drawing's medium | `"medium": "pencil"`, `"pen"` or `"none"` beside your script (below) | what the drawing is drawn in, whatever the subject seems to be drawn in: pencil, pen (its ink in the next row), or no drawing |
 | The pen's ink | `"ink": "waterproof"` or `"soluble"` beside your script | waterproof: set before the washes, a wash over it moves none. soluble: it rewets and bleeds into a wash laid over it; the painter stops a painting whose first wash would move more than 2% of it. Left unsaid, your script is laid over waterproof ink |
 | The drawing's lines | `"lines": "my-lines.json"` beside any kind of choice (below) | when each prepared line is drawn (before the first wash, with a stage of the washes, after them over the dry paint) or not at all, and how dark each is: by named form, by kind of line, by length, width or darkness, or one by one |
 | Lines of your own | `"own"` in that same file (below) | new lines, drawn where you put them point by point: pen or pencil, their width and darkness, before or after the washes |
-| The painter itself | your own script (`own-script-brief.md`) | every passage: its shape, paint and dilution, brush and width, paper wet, damp or dry, what it is laid into, how long the sheet dries first, stroke paths, pressure and hold, the order, the lights kept as paper. Write strokes in the order a hand would travel: finish one area before the next, neighbours after each other, long strokes before short; the replay is watched |
+| The painter itself | your own script (`TASK.md`) | every passage: its shape, paint and dilution, brush and width, paper wet, damp or dry, what it is laid into, how long the sheet dries first, stroke paths, pressure and hold, the order, the lights kept as paper |
 | The preview | `./unpaint look` | the painter run for real, small: the dried sheet, the stages, each form measured on the dried sheet |
 | The compile check | `./unpaint plan` | whether your choice compiles, and its counts |
 | Your shell | any command in this folder | read the data (above), compute positions, measure your own dried sheet (`looks/N/sheet.png`), write and check your files, keep notes; never a picture |

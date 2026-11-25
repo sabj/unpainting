@@ -280,7 +280,8 @@ test('two flat-brush lanes at twice the edge half-width dry as evenly across the
   // (src/media/grain-field.mjs) moves the row profile by as much as the two pitches differ
   const r = 40, W = 10 * r, H = 5 * r, mm = 280 / 1200;
   const lay = halfPitch => {
-    const sheet = createSheet(makePaper(W, H, { seed: 9, mmPerCell: mm, toothScale: .2, coldPress: { mmPerCell: mm, bumpMm: [.5, 2], cover: 2.2, swell: .3 } }), [{ K: [.06, .26, .48], S: [.02, .02, .02], rho: .05, omega: 1.4, gamma: 0 }]);
+    // a sheet without cockle (paper.mjs): what this measures is the lanes, the levelling or the grain, not the pooling
+    const sheet = createSheet(makePaper(W, H, { cockle: { rmsMm: 0 }, seed: 9, mmPerCell: mm, toothScale: .2, coldPress: { mmPerCell: mm, bumpMm: [.5, 2], cover: 2.2, swell: .3 } }), [{ K: [.06, .26, .48], S: [.02, .02, .02], rho: .05, omega: 1.4, gamma: 0 }]);
     const lanes = [H / 2 - halfPitch, H / 2 + halfPitch];
     lanes.forEach((y, k) => {
       const b = createBrush({ flat: true, radius: r, bristles: 2 * r, capacity: 100, belly: 12, feed: .4, give: .9, free: .4, film: .25, splay: .03, stiffness: 8, seed: 31 + k });

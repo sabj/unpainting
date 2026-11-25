@@ -41,78 +41,34 @@ ${script.length > PREVIOUS_SCRIPT_MOST ? `(Your previous script is ${script.leng
 
 const hex = c => `#${(c ?? [200, 200, 200]).map(v => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, '0')).join('')}`;
 
+/** The least area (mm2) of a shape numbered on the traced-shapes picture: the shapes the list names. */
+export const NUMBERED_FROM_MM2 = 40;
+const mm = v => Math.round(v);
+/** The numbered traced shapes, one compact row each: `n, #hex, area mm², box x0-x1,y0-y1` (whole mm), in number order. */
+export function shapeRows(data, { numberFromMm2 = NUMBERED_FROM_MM2 } = {}) {
+  return data.shapes.filter(s => (s.areaMm2 ?? 0) >= numberFromMm2 && s.boxMm).map(s => `${s.n}, ${hex(s.colour)}, ${mm(s.areaMm2)} mm², box ${mm(s.boxMm[0])}-${mm(s.boxMm[2])},${mm(s.boxMm[1])}-${mm(s.boxMm[3])}`);
+}
+/** Every traced shape as CSV (a session's resources/shapes.csv): n,hex,area_mm2,x0,x1,y0,y1,paper,inside. */
+export function shapesCsv(data) {
+  return ['n,hex,area_mm2,x0,x1,y0,y1,paper,inside', ...data.shapes.map(s => [s.n, hex(s.colour), mm(s.areaMm2 ?? 0), ...(s.boxMm ? [s.boxMm[0], s.boxMm[2], s.boxMm[1], s.boxMm[3]].map(mm) : ['', '', '', '']), s.paper ? 1 : 0, s.inside ?? ''].join(','))].join('\n') + '\n';
+}
+
 /**
  * The traced shapes for round 0 of level 4: {picture (a PNG buffer: every shape in its colour, outlined, the larger
- * ones numbered), text (the list and how a script names a shape)}. `data`: the prepared shapes.json; `sheet` {widthMm, heightMm}.
+ * ones numbered), list (shapeRows: a row a numbered shape)}. `data`: the prepared shapes.json; `sheet` {widthMm, heightMm}.
  */
-export async function shapesHandedRounds(data, sheet, { width = 1400, numberFromMm2 = 40 } = {}) {
+export async function shapesHandedRounds(data, sheet, { width = 1400, numberFromMm2 = NUMBERED_FROM_MM2 } = {}) {
   const k = width / sheet.widthMm, height = Math.round(sheet.heightMm * k), pts = P => P.map(([x, y]) => `${(x * k).toFixed(1)},${(y * k).toFixed(1)}`).join(' ');
   const shapes = [...data.shapes].sort((a, b) => (b.areaMm2 ?? 0) - (a.areaMm2 ?? 0));
   const polys = shapes.map(s => (s.polygons ?? []).map(P => `<polygon points="${pts(P)}" fill="${hex(s.colour)}" stroke="#333" stroke-width="0.6"/>`).join('')).join('');
   const labels = shapes.filter(s => (s.areaMm2 ?? 0) >= numberFromMm2 && s.boxMm).map(s => { const x = (s.boxMm[0] + s.boxMm[2]) / 2 * k, y = (s.boxMm[1] + s.boxMm[3]) / 2 * k; return `<text x="${x.toFixed(0)}" y="${y.toFixed(0)}" font-family="Helvetica" font-size="13" font-weight="bold" text-anchor="middle" fill="#000" stroke="#fff" stroke-width="2.5" paint-order="stroke">${s.n}</text>`; }).join('');
   const picture = await sharp(Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}"><rect width="100%" height="100%" fill="#fff"/>${polys}${labels}</svg>`)).png().toBuffer();
-  const list = data.shapes.map(s => `${s.n} | rgb ${(s.colour ?? []).join('/')} | ${s.areaMm2} mm2${s.paper ? ' | read as paper' : ''}${s.inside != null ? ` | inside ${s.inside}` : ''} | box ${s.boxMm ? `x ${Math.round(s.boxMm[0])}-${Math.round(s.boxMm[2])}, y ${Math.round(s.boxMm[1])}-${Math.round(s.boxMm[3])}` : '?'}${s.forms?.length ? ` | in ${s.forms.map(f => f.name ?? f).slice(0, 3).join(', ')}` : ''}`);
-  const text = `## The studies' traced shapes, offered as regions
-
-\`traced-shapes.jpg\` shows the block-in study's flat shapes traced into outlines, each in its colour, the larger ones
-numbered. They are offered, not required, and they may be wrong: a traced edge can cut across a form or miss one. Use
-them, change them, or ignore them and write your own regions. A passage of your script MAY name shapes
-by number in place of writing a polygon: \`"shapes": [12, 13]\` (its region is those shapes), \`"reserve": [40]\`
-(paper it is laid round), and in a stroke \`"along": 12\` (the stroke runs down that shape's long axis). The paint,
-the brush, the order and the handling are yours as always. The shapes (number | colour | area | box in mm | the named forms it lies in):
-
-${list.join('\n')}`;
-  return { picture, text };
+  const list = shapeRows(data, { numberFromMm2 });
+  return { picture, list };
 }
 
-const L1_GIVEN = `## What you are given
-
-The sheet is \`SHEET_W\` by \`SHEET_H\` mm. All positions you write are sheet millimetres, x to the right, y down. The
-picture carries the same millimetre grid (red numbers across, x; blue numbers down, y).
-
-INPUT_LIST
-
-That is all: the subject, a blank sheet, the paint box, the brushes, a pen and a pencil, and the advice in this
-brief. There is no prepared drawing, no study and no list of forms at this level; nothing is on the sheet before you
-start. If you want a drawing, draw it yourself: put \`"lines"\` beside your script in your first answer, or change it
-later with the \`drawing\` edit (\`{"format": "lines-edit 1", "own": [{"points": [[x, y], ...], "medium": "pen" or
-"pencil", "widthMm": 0.4, "dark": 0.8, "when": "before" or "after"}]}\`). You place everything by eye from the grid.
-
-`;
-/** What the level 1 brief says in place of the lines that speak of the prepared inputs: [the line as it stands, the line for level 1]. */
-const L1_LINES = [
-  ['- [ ] Record the drawing given (ink or pencil) and what it carries', '- [ ] Decide the drawing: none, or lines of your own (pen or pencil), and what they carry'],
-  ['"form": "<its name from the FORMS list, or \'background\', \'sky\'>"', '"form": "<a name you give it, or \'background\', \'sky\'>"'],
-];
-
-/**
- * The author's brief as level 1 gets it in fixed rounds: the toolkit (the script, the paints, the brushes) and the
- * tips (the advice on the brush, the skills), with nothing of the prepared inputs: the sections on what is given,
- * on painting a named form from the studies and the list of forms are taken out, and the few lines that name the
- * studies say the subject. Throws when the brief no longer has a part this expects: nothing is left in by accident.
- */
-export function levelOneTemplate(template) {
-  const cut = (text, from, to, put = '') => { const a = text.indexOf(from), b = text.indexOf(to, a + from.length); if (a < 0 || b < 0) throw new Error(`the level 1 brief is made from the author's brief, which no longer has its section "${from.trim()}" before "${to.trim()}"`); return text.slice(0, a) + put + text.slice(b); };
-  let t = cut(template, '## What you are given', '## The brushes', L1_GIVEN);
-  t = cut(t, '## One way to paint a named form', '## Shaping a form with the brush');
-  t = cut(t, '## FORMS', '## The project\'s skills');
-  for (const [from, to] of L1_LINES) { if (!t.includes(from)) throw new Error(`the level 1 brief is made from the author's brief, which no longer has the line "${from}"`); t = t.replace(from, to); }
-  return t.replace(/\bin the studies\b/g, 'in the subject').replace(/at the studies' value/g, 'at the subject\'s value').replace(/- \[ \] Read the studies, coarse to fine:/, '- [ ] Read the subject:').replace(/of each named form/g, 'of each form you name');
-}
-
-/**
- * Auto's plan and finished painting for round 0 of level 3: the text that goes with the picture `auto-painting.jpg`.
- * `washes`: Auto's plan in numbers (plan-data.mjs washesText). Facts only: what each is, and that the hand-in is the
- * model's own script.
- */
+/** Auto's plan in numbers for level 3's data (plan-data.mjs washesText), or a throw when there is none. */
 export function autoHandedRounds(washes) {
   if (!washes) throw new Error('level 3 hands over Auto\'s plan, and there is none for this run');
-  return `## Auto's plan and Auto's finished painting
-
-Auto is this project's automatic painter. \`auto-painting.jpg\` is Auto's finished painting of this subject, as
-it dried at full size, on the millimetre grid. Auto's plan follows: its washes in painting order, in numbers. Both are
-given to read, as a result to improve on. What you hand in is your own script, as at every level: Auto's plan is not a
-script and cannot be handed in.
-
-${washes}`;
+  return washes;
 }

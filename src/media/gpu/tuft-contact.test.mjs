@@ -10,9 +10,10 @@ const sheet=()=>createSheet(makePaper(160,128,{mmPerCell:.125,seed:17,fibres:.32
 const total=s=>[s.W,...s.G,...s.P,...s.D].map(a=>a.reduce((v,x)=>v+x,0));
 const water=b=>b.resW+b.hairs.reduce((s,h)=>s+h.water,0);
 const pigment=b=>b.resP[0]+b.hairs.reduce((s,h)=>s+h.pig[0],0);
+// pigment totals re-measured when the brush load became uneven (brush-load-variance.mjs); water is unchanged
 // measured on the paper's relief in micrometres (paper-relief.mjs, 2026-11), with the tooth read in the height's own
 // units under the hairs (brush.mjs groundAt): a nearly dry tuft touches the crests of the coarse hills it rides
-const expected={0.75:[723.7001354230633,723.7001354230633,0,601.4226234525104],0.18:[0.21588481636717916,0.21588481636717916,0,157.8306951290646]};
+const expected={0.75:[723.7001354230633,711.2941154789914,0,590.748102172849],0.18:[0.21588481636717916,0.20811272703576833,0,155.65001605761861]};
 for(const load of [.75,.18]) test('native tuft matches measured contact contract with load '+load,()=>{
  const a=sheet(),ba=createBrush(options);dip(ba,{water:load,conc:[1]});
  const beforeW=water(ba),beforeP=pigment(ba);

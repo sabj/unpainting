@@ -4,6 +4,7 @@ import { censusDry } from './census.mjs';
 import { SIZING } from './sizing.mjs';
 import { edgeFeed, resetEdgeFeed } from './edge-feed.mjs';
 import { levelFilm } from './film-level.mjs';
+import { backRun } from './backrun.mjs';
 export { setTilt } from './film-level.mjs';
 import { flowTime, poreTime } from './flow-time.mjs';
 import { timeChunks, DRY_TAIL_CHUNK_DT, levelEvery } from './time-chunks.mjs';
@@ -40,12 +41,23 @@ export const DEFAULTS = {
   // (rho g / 3 mu) h^3; the board's tilt (setTilt) runs it downhill. At 0.1 a five-sweep 40 mm square still dried 3%
   // darker in its middle than its first and last sweeps (40 mm took a minute to level); at 1 it is flat to its grain.
   level: 1, meniscus: 0.05, meniscusMm: 0.5,
+  // levelFloor (mm): a film no deeper than this has lost its sheen; it is damp paint held in the tooth and does not level.
+  // At 0.03 (the film the pores leave) half of a just-damp wash still levelled, and a puddle dropped on it spread out
+  // through that half before it could run
+  // (film-level.mjs). Water standing deeper than `puddle` beside damp paint invades it at about `invade` mm/s and pushes
+  // `push` of the loose paint it meets on to its front: a back-run (backrun.mjs). At levelFloor 0 every film levelled, a
+  // puddle of clean water spread through the whole damp wash in moments and no back-run ever formed (physics check, 24
+  // Nov). With the puddle at the floor, a flat phthalo wash on flat paper dried mottled as it thinned (grain 0.058 where
+  // it was 0.008): a film a hair above the floor is not a puddle.
+  levelFloor: 0.05, puddle: 0.06, invade: 1, push: 0.8,
   diffuse: 0.02,                                  // pigment particles barely diffuse; water carries them (< 0.25)
   // Paint charged into a standing film mixes out into it (convection and the binder's pull, here as an effective
   // diffusion, cells^2 per flow iteration), with a mobility that grows with the film: full at a glossy film of
   // filmDepth, a fraction on a sheen, almost none on damp paper, none on dry (no wet face). With carryDepth alone a
   // glossy film (0.03 deep) let paint travel 0.5 mm (glaze-timing findings).
-  filmDiffuse: 0.2, filmDepth: 0.03,
+  // At 0.2 a wet-in-wet drop mixed out through the whole wash (physics check, 24 Nov: rose dropped into a glossy wash
+  // left a tint 3.8 a* over 8 mm2 where its stroke covered 42); at 0.05 it stays a soft blot.
+  filmDiffuse: 0.05, filmDepth: 0.03,
   // drying: evenly at evap, and faster by edgeEvap (mean over a band edgeMm deep) at a pinned edge, fed by a flow
   // from the connected film through a finite-volume pressure solve (edge-feed.mjs).
   // edgeWidth is retained for the legacy GPU path, which refuses edgeEvap > 0.
@@ -629,6 +641,8 @@ function stepCpu(sheet, o, reduction) {
   }
   // the glossy film levels as one film, carrying its pigment (film-level.mjs)
   for (const box of boxes) levelFilm(sheet, o, box, mm);
+  // water standing above the floor runs into the damp paint beside it, pushing the loose paint on (backrun.mjs)
+  for (const box of boxes) backRun(sheet, o, box, mm);
   const oBox0 = o.edgeEvap ? { ...o, edgeEvap: 0 } : o;
   // each box's hollow fill, from its load at the start of the step, the same for the serial and the banded step
   const oOf = box => { const f = slideFillFor(sheet, o, box); return f === undefined ? oBox0 : { ...oBox0, slideFillNow: f }; };
@@ -666,7 +680,7 @@ function boxWater(sheet, [x0, y0, x1, y1]) {
 }
 
 function stepBox(sheet, o, box, reduce = false) {
-  const [x0, y0, x1, y1] = box, { w, h, W, s, M, G, D, P, K, paper, pigments, edge, resist, ever } = sheet, { capacity, fdx, fdy, grain } = paper, height = paper.valley || paper.height, dt = o.dt ?? 1;
+  const [x0, y0, x1, y1] = box, { w, h, W, s, M, G, D, P, K, paper, pigments, edge, resist, ever } = sheet, { capacity, fdx, fdy, grain } = paper, height = paper.surface || paper.valley || paper.height, dt = o.dt ?? 1;
   // fine pigment (dyes, small particles) travels with water into and through the fibres; coarse, granulating pigment stays on top
   const sc = scratch(sheet), { mobility } = sc;
   for (let k = 0; k < K; k++) mobility[k] = pigments[k].wick ?? Math.max(0.05, Math.min(0.9, 1 - pigments[k].gamma));
@@ -1143,7 +1157,7 @@ function stepBox(sheet, o, box, reduce = false) {
 // Parallel steps do not expose their wet lists; reduce their disjoint active
 // rectangles once, rather than scanning the entire water plane twice.
 function boxDryStats(sheet, [x0, y0, x1, y1], slope = 0) {
-  const {w, h, W, M} = sheet, height = sheet.paper.valley || sheet.paper.height; let maxW = 0, surfaceLevel = 0;
+  const {w, h, W, M} = sheet, height = sheet.paper.surface || sheet.paper.valley || sheet.paper.height; let maxW = 0, surfaceLevel = 0;
   for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
     const i = y * w + x; maxW = Math.max(maxW, W[i]);
     if (!M[i]) continue;
@@ -1229,7 +1243,7 @@ function dryCpu(sheet, max, o, { level, levelMax, levelTol, dt, onStep, analytic
 /** The largest difference in water level (depth plus `slope` times the paper's height) across any face between two
  *  wet cells: the water is level when its surface is, not its depth. */
 function surfaceLevel(sheet, slope = 0) {
-  const { w, h, W, M } = sheet, height = sheet.paper.valley || sheet.paper.height; let most = 0;
+  const { w, h, W, M } = sheet, height = sheet.paper.surface || sheet.paper.valley || sheet.paper.height; let most = 0;
   for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
     const i = y * w + x; if (!M[i]) continue;
     if (x < w - 1 && M[i + 1]) most = Math.max(most, Math.abs((W[i] + slope * height[i]) - (W[i + 1] + slope * height[i + 1])));

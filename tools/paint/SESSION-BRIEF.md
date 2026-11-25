@@ -48,8 +48,8 @@ Where and when you look is yours to choose. How you paint costs nothing: water, 
 strokes, waits and dryings are yours, and the final painting is not charged. Each price is told before anything is
 painted (`./unpaint plan` lists it; `./unpaint cost ...` prices any look and paints nothing); a look is refused only
 when its price is more than you have left. Steps: `STEPS_MOST` of your tool calls (shell commands,
-`./unpaint` among them, and file reads and writes). Time is not budgeted: waiting for a look or for the machine costs
-you nothing (a far safety stop ends a session after `WALL_MINUTES` minutes). `./unpaint status` shows what is used,
+`./unpaint` among them, and file reads and writes). Time: WALL_MINUTES minutes on the clock for the whole try, replies
+and looks included. When they are up, the script as it then stands is painted. `./unpaint status` shows what is used,
 and every answer of the tools says it too. When the budget is reached you are asked to hand in what you have: no
 further look is painted, `./unpaint plan` still checks that your final choice compiles, and soon after the session is
 ended. So keep

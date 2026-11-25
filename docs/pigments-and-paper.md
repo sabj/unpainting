@@ -2,19 +2,24 @@
 
 ## Kubelka-Munk layers
 
-`src/media/km.mjs` gives each paint two numbers per red, green and blue channel: K, the light it absorbs, and S, the light it scatters back. There is no spectral model. `fromColours` derives K and S from a paint's colour over white and over black (Curtis et al. 1997).
+`src/media/km.mjs` gives each paint two numbers for each of red, green and blue. K is the light the paint absorbs. S is the light it scatters back. There is no full spectrum model. `fromColours` works out K and S from the paint's colour over white and over black (Curtis et al. 1997).
 
-Paints mixed in one wash average their K and S, weighted by thickness. A dried wash is its own layer. Layers stack oldest first over the paper with `R = R1 + T1² R2 / (1 − R1 R2)`: light passes through the top layer, reflects off what is under it, and comes back through. So a glaze, a transparent wash over dried paint, differs from the same paints stirred together.
+Paints mixed in one wash have their K and S averaged, weighted by thickness. A dried wash is its own layer. Layers stack over the paper, oldest first, with `R = R1 + T1² R2 / (1 − R1 R2)`. Light passes through the top layer, reflects off what is under it and comes back through. So a glaze differs from the same paints stirred together. A glaze is a transparent wash over dried paint.
 
 ![Three dried glazes of hansa yellow, cerulean blue and quinacridone rose](img/glazes.webp)
 
-`node tools/run-plan.mjs examples/plans/glazes.json` paints glazes from the command line ([examples/plans/glazes.json](../examples/plans/glazes.json)).
+[examples/plans/glazes.json](../examples/plans/glazes.json) paints glazes with `node tools/run-plan.mjs`.
 
 ## The box
 
-The painter mixes from 16 paints in `src/crop/box.mjs`: eleven measured (French ultramarine, phthalo blue, cerulean blue, phthalo green, hansa yellow, cadmium yellow, yellow ochre, burnt sienna, burnt umber, quinacridone rose, cadmium red; published masstones), raw sienna (estimated), lamp black (flat absorption), and three mixes of the base paints (sap green, Payne's gray, sepia).
+The painter mixes from the 16 paints in `src/crop/box.mjs`:
 
-The palette is picked on one set of reference constants for every paint (scattering 0.02, staining 1.4, granulation 0.25, density 0.05), so physics cannot change which paints a picture gets. On the sheet each paint then settles by its published granulation, flocculation, staining and density (`src/paint/methods/pigment-physics.mjs`, from the table in `src/media/pigment-physical.mjs`, which lists sources). Its colour and scattering stay as picked.
+- Eleven are measured, using published colours: French ultramarine, phthalo blue, cerulean blue, phthalo green, hansa yellow, cadmium yellow, yellow ochre, burnt sienna, burnt umber, quinacridone rose and cadmium red.
+- Raw sienna is estimated.
+- Lamp black absorbs light evenly.
+- Sap green, Payne's gray and sepia are mixes of the other paints.
+
+On the sheet, each paint behaves by its published granulation, flocculation, staining and density (`src/media/pigment-physical.mjs` lists the sources). Granulation is how much the pigment settles into the paper's texture. Flocculation is how much it clumps. Staining is how hard it is to lift off. The paints for a picture are chosen with one fixed set of constants, so the physics cannot change which paints a picture gets.
 
 | pigment | granulation (gamma) | flocculation | staining (omega) |
 |---|---|---|---|
@@ -25,26 +30,24 @@ The palette is picked on one set of reference constants for every paint (scatter
 | cadmium yellow and red, lamp black | none | none | non-staining |
 | sap green, Payne's grey, sepia | their parents' shares | | |
 
-White gouache is a pigment on the sheet (`src/media/gouache.mjs`): almost no absorption, an opaque paint's scatter, laid dry in the top layer thick enough to hide, so the same composite draws it. The finish lays it with a rigger, tinted by up to three palette paints, for thin lights no wash can reserve ([How it paints](how-it-paints.md#9-finish)).
+White gouache is a paint on the sheet too (`src/media/gouache.mjs`). It absorbs almost no light and scatters it as an opaque paint does. The finish lays it with a thin brush for fine lights that no wash could have left bare.
 
 ## Paper
 
-`src/media/paper.mjs` builds a height map of curved fibres and fine tooth. By default (`--paper coldpress --paperphysical 1`) the height is the cold-press relief of `src/media/paper-relief.mjs`: one seeded field in micrometres, structure from 0.1 to a few millimetres, fitted to the grain of real washes and averaged over each cell, so one sheet at any cell size is the same paper. Fibre lengths, density and brush relief are in millimetres. Pigment settles at its Stokes speed through the film, faster into hollows (`src/media/settling.mjs`), so ultramarine, cerulean and the earths granulate and the staining organics dry smooth. `--paper flat` and `--paperphysical 0` turn this off. Hollows hold more water.
-
-Granulating pigment settles faster in hollows and rolls downhill while the wash is wet; flocculating pigment gathers in broader hollows; a wetter or slower-drying wash granulates more; staining pigment dries smooth. The pigment's rating is the number the sheet uses. Grains stop rolling when the slope is gone. A render-time pass (`microAmps`, `--micro`) adds the effect below one cell.
+`src/media/paper.mjs` builds a height map of curved fibres and fine tooth. By default the height is the cold-press relief from `src/media/paper-relief.mjs`. That is one fixed pattern, measured in micrometres and fitted to the grain of real washes. It is averaged over each cell, so a sheet at any cell size is the same paper. `--paper flat --paperphysical 0` turns it off. Pigment settles through the water at its Stokes speed, and faster into hollows (`src/media/settling.mjs`). So ultramarine, cerulean and the earth colours granulate, and the staining organic paints dry smooth. A wetter or slower-drying wash granulates more.
 
 ## Water and drying
 
-`src/media/sheet.mjs` tracks per cell: surface water, pore water, floating pigment, settled-but-unfixed pigment and pore pigment.
+`src/media/sheet.mjs` tracks five things in each cell: surface water, pore water, floating pigment, settled pigment that is not yet fixed, and pigment in the pores.
 
-Water evaporates faster at the pinned edge of a wash. Water flows out to replace it and carries pigment, so the edge dries darker. Damp pores can rewet the surface beside standing water, which makes backruns and blooms.
+Water evaporates faster at the edge of a wash. More water flows out to replace it and carries pigment with it, so the edge dries darker. Damp pores can wet the surface again beside standing water. That makes backruns and blooms, which are the cauliflower shapes that form where water runs back into a drying wash.
 
-`dry()` steps the sheet until it is dry, then fixes the settled pigment as a new layer. New water lifts a little of the top layer, and more of unfixed pigment. Sepia ink is the default and rewettable; black ink resists lifting better; pencil does not lift.
+`dry()` steps the sheet forward until it is dry. Then it fixes the settled pigment as a new layer. New water lifts a little of the top layer, and more of the pigment that is not yet fixed.
 
-On dry paper the next wash keeps its shape and glazes over what is there; on wet paper it spreads and mixes. The painter uses wet into wet on purpose for soft edges; a painting that never dries turns every glaze to a blur.
+On dry paper the next wash keeps its shape and glazes over what is there. On wet paper it spreads and mixes. The painter paints wet into wet on purpose for soft edges. A painting that never dries turns every glaze to a blur.
 
 ![The same two strokes, dried between and flooded](img/drying.webp)
 
-Same blue and sienna strokes in both. Dried between, the sienna band dries 7.5 mm wide, about the 8 mm brush. Flooded first and not dried between, the sienna spreads over the patch and dries at about a third of the darkness. Run them with `node tools/run-plan.mjs examples/plans/drying-dry-between.json` and `drying-too-wet.json`.
+Both pictures use the same blue and sienna strokes. When the paper dries in between, the sienna band stays about as wide as the brush. When it is flooded and not dried in between, the band spreads and dries at about a third of the darkness (`examples/plans/drying-dry-between.json`, `drying-too-wet.json`).
 
-The plan decides when to dry. `src/paint/methods/wetdry.mjs` measures surface water and pore saturation and waits for dry-layer or wet-blend conditions; it stops execution if its readiness checks fail. The stroke-plan runner warns when `requiredPaper` is unmet and continues; each `dry` command dries the sheet.
+The plan decides when to dry. `src/paint/methods/wetdry.mjs` measures the surface water and how full the pores are. It waits until the paper is dry enough to glaze, or wet enough to blend.

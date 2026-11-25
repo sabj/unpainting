@@ -1,41 +1,17 @@
 # Judging
 
-Judges and measurements score a finished painting and its saved stages. They are advisory: no verdict is fed back into the painter. Per-pixel metrics such as `colour.mjs` are for post-run diagnosis only ([honesty.md](honesty.md)).
+Measurements and judges score a finished painting and the frames saved on the way. Nothing they say is fed back to the painter ([honesty](honesty.md)). The benchmark's judges are in [scoring](../bench/docs/scoring.md).
 
-## Classic measurements
-
-`src/eval/` returns the same numbers for the same images:
-
-- `values.mjs`: tone levels, uniform dark areas, untouched paper between marks (painting alone).
-- `fidelity.mjs`: tone over about 16 px cells and line recall within 2 cells (regions).
-- `colour.mjs`: CIEDE2000 mean and 90th percentile (pixels).
-- `stages.mjs`: whether saved frames follow a human painting order.
-
-`src/eval/score.mjs` maps seven dimensions to 0 to 10 against curves from real watercolours; `src/eval/composite.mjs` keeps related groups separate. Runners in `tools/judge/`:
-
-- `node tools/judge/judge-plate.mjs --image <target> --painted <painting.jpg>`: composite measurements on one plate.
-- `node tools/judge/stage-check.mjs <run-dir>`: stage progression flags.
-- `node tools/judge/concert-judge.mjs`: all metric groups across painter configurations.
-- `node tools/judge/judge.mjs`: calibrate and check discrimination against reference scans in `$JUDGE_REFS`.
-
-## Stage checks
-
-`src/eval/stages.mjs` flags: big shapes under half their final value a third of the way in; speckle in the first half; over 70% of final tone down a quarter of the way in; steps backward, colour drift, or too little line early in line-first work.
+- `node tools/judge/judge-plate.mjs --image TARGET --painted PAINTING.jpg`: measures one painting with the code in `src/eval/`. It checks tone levels and how much paper is left bare (`values.mjs`), how well tones and lines match by region (`fidelity.mjs`) and colour difference (`colour.mjs`).
+- `node tools/judge/stage-check.mjs RUN_DIR`: checks whether the saved frames follow the order a painter would use (`src/eval/stages.mjs`). It flags three things. One is big shapes that are under half their final darkness a third of the way in. Another is speckle in the first half. The last is more than 70% of the final tone already down a quarter of the way in.
+- `tools/judge/rounds/`: blind comparisons of stages. `run.mjs` mixes a new run with a control, a copy of the control, a known good run and a known bad run, under shuffled letters. `tally.mjs` drops any judge that ranks the controls wrongly.
 
 ## Stroke sizes
 
-`tools/stroke-stats.mjs` and `tools/stroke-gate.mjs` flag broad low-detail wash interiors filled with tiny dabs (median contact under 1 mm wide or path under 3 mm long) or narrow wiper sweeps (region over 4 brush widths, at least 6 aligned overlapping passes):
+`tools/stroke-stats.mjs` and `tools/stroke-gate.mjs` flag large plain areas filled with tiny dabs or narrow sweeps. A dab is tiny if it is under 1 mm wide or 3 mm long. Tiny dabs or narrow sweeps may cover at most 30% of such an area. Detail work, pen lines and the 1 mm band along an edge are exempt.
 
 ```sh
-node tools/stroke-stats.mjs <run-dir> --out <panel>
-node tools/stroke-gate.mjs <run-dir> --mode reject
+node tools/stroke-stats.mjs RUN_DIR --out PANEL
+node tools/stroke-gate.mjs RUN_DIR --mode reject
 node tools/run-plan.mjs plan.json --stroke-gate reject --out work/plan
-node tools/paint-plate.mjs --image target.jpg --marks 1 --strokegate reject --out work/plate
 ```
-
-Each broad interior has a 30% ceiling on tiny-mark carried area (`maxBroadAreaTinyAreaShare`), tiny-mark visible paint (`maxBroadAreaTinyVisibleShare`) and wiper coverage (`maxBroadAreaWiperShare`). Detail passages, pen lines and 1 mm edge bands are exempt.
-
-## Vision judges
-
-- Benchmark: `npm run bench:score04` scores human-ness from the film under the [rubric](../bench/docs/human-ness-rubric.md) and quality against the original ([scoring](../bench/docs/scoring.md)).
-- Blind stage rounds (`tools/judge/rounds/`): `run.mjs` packs a candidate, a control, a duplicate control, a known good and a known bad run under shuffled letters for Claude or Codex judges; `tally.mjs` drops any judge that misranks the controls or scores the duplicates more than 1 point apart. A candidate wins with at least 4 valid judges and two thirds of valid votes.

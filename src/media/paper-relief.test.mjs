@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { paperRelief, RELIEF_PRESETS } from './paper-relief.mjs';
+import { paperRelief, RELIEF_PRESETS, scanRelief } from './paper-relief.mjs';
 import { makePaper } from './paper.mjs';
 import { bandSpectrum } from '../../tools/lab/wash-measure.mjs';
 
@@ -49,4 +49,27 @@ test('cold press: structure from 0.1 mm up, about even per octave from 0.2 to 1 
   const hol = mm => { const n = Math.round(25 / mm), p = makePaper(n, n, { seed: 5, mmPerCell: mm, coldPress: { mmPerCell: mm } }); let pos = 0, m = 0; for (const v of p.hollow) { m += v; if (v > 0) pos++; } return { m: m / p.n, pos: pos / p.n }; };
   const h05 = hol(0.05), h25 = hol(0.25);
   assert.ok(h05.m > 0.45 && h05.m < 0.8 && h05.pos < 0.65 && Math.abs(h25.m / h05.m - 1) < 0.1, JSON.stringify({ h05, h25 }));
+});
+
+test('grain strength varies across the sheet at centimetre scale, seeded: some patches grainier, same seed same sheet', () => {
+  const mm = 0.1, w = 600, h = 400, r = paperRelief(w, h, mm, { seed: 3 }), B = 50, rms = [];
+  for (let by = 0; by + B <= h; by += B) for (let bx = 0; bx + B <= w; bx += B) {
+    let v = 0; for (let y = by; y < by + B; y++) for (let x = bx; x < bx + B; x++) v += r.zUm[y * w + x] ** 2;
+    rms.push(Math.sqrt(v / (B * B)));
+  }
+  const s = stats(rms), lo = Math.min(...rms), hi = Math.max(...rms);
+  assert.ok(s.sd / s.m > 0.15 && hi / lo > 1.8 && hi / lo < 4, `5 mm block RMS over 60 x 40 mm: cv ${(s.sd / s.m).toFixed(2)}, ${lo.toFixed(1)} to ${hi.toFixed(1)} um`);
+  const again = paperRelief(w, h, mm, { seed: 3 }); for (let i = 0; i < w * h; i += 997) assert.equal(again.zUm[i], r.zUm[i]);
+});
+
+test('a scanned relief: scaled to the base preset RMS, keyed by its id, read by every grid as the same paper', () => {
+  const W = 1100, H = 1030, data = new Uint8Array(W * H);
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) data[y * W + x] = Math.round(128 + 60 * Math.sin(x * 0.05) * Math.cos(y * 0.043));
+  const relief = scanRelief({ data, width: W, height: H }, { id: 'test-waves', mmPerPx: 0.01 });
+  assert.ok(JSON.stringify(relief).length < 400, 'its key carries the id, not the pixels');
+  const r = paperRelief(200, 200, 0.05, { relief }), sd = stats(r.zUm).sd;
+  assert.ok(Math.abs(sd / RELIEF_PRESETS.cold.rmsUm - 1) < 0.15, `scan relief RMS ${sd} um`);
+  const r2 = paperRelief(100, 100, 0.1, { relief }); let d = 0, c = 0;
+  for (let y = 0; y < 100; y++) for (let x = 0; x < 100; x++) { const up = (r.zUm[2 * y * 200 + 2 * x] + r.zUm[2 * y * 200 + 2 * x + 1] + r.zUm[(2 * y + 1) * 200 + 2 * x] + r.zUm[(2 * y + 1) * 200 + 2 * x + 1]) / 4; d += (up - r2.zUm[y * 100 + x]) ** 2; c += r2.zUm[y * 100 + x] ** 2; }
+  assert.ok(Math.sqrt(d / c) < 0.05, `fine vs coarse ${Math.sqrt(d / c)}`);
 });

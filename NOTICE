@@ -482,3 +482,6 @@ credits: THIRD_PARTY_NOTICES.md.
 
    Hills and France are in no 0.4 set. Their targets, paintings and scores
    stay in the repository (section 1).
+
+Paper001 (ambientCG, https://ambientcg.com/a/Paper001), CC0 1.0 Universal: a scanned paper height map, read by
+src/media/paper-relief.mjs scanRelief when a caller loads it. The scan itself is not in this repository.

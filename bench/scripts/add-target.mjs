@@ -119,6 +119,6 @@ if (import.meta.url === `file://${process.argv[1]}`) {
       writeJson(f, { ...spec, crops: spec.crops.map(c => (c.task === entry.task ? { ...c, selfScore: s } : c)) });
       console.log(`bench:add-target: self score ${s}`);
     } else console.log('bench:add-target: no self score yet (run again with --self-score, or add selfScore to crops.json); indexed scores need it');
-    console.log('bench:add-target: credit the image in NOTICE and add a row to bench/crops/README.md');
+    console.log('bench:add-target: credit the image in NOTICE');
   } catch (e) { console.error(`bench:add-target: ${e.message}`); process.exit(2); }
 }

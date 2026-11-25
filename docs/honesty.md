@@ -1,27 +1,28 @@
 # Honesty
 
-A guard blocks target-pixel reads during painting, on by default. Planning may read the target; painting may not.
+Planning may read the target. Painting may not. A guard blocks reads of the target's pixels while the painter paints. It is on by default.
 
-- While planning, read the target and choose stroke paths and mixtures.
-- While painting, compare only whole shapes (64 cells or more). Never read target pixels, set a stroke's load from per-cell errors, or hill-climb strokes against pixel error.
-- Mix brush colours from the 16 palette paints in `src/crop/box.mjs`.
-- Keep guard and stage records beside the painting.
+- While painting, the painter may only compare whole shapes with the target. It never reads the target's pixels. It never sets a stroke's paint from the error at a single cell. It never nudges strokes to shrink the pixel error, which is called hill climbing.
+- Brush colours are mixed from the 16 paints in `src/crop/box.mjs`.
+- The guard's records are kept beside the painting.
 
-| Mode | Target-pixel reads | Gallery |
-|---|---|---|
-| `gentle` (default, alias `strict`) | blocked; whole-shape looks (64 cells or more) allowed | eligible |
-| `hard` | as `gentle`, capped at `--lookbudget N` looks (default 100) | eligible |
-| `warn` | recorded, not blocked | excluded |
-| `off` | no guard | excluded |
+| `--targetguard` | Reads of the target's pixels while painting |
+|---|---|
+| `gentle` (default) | blocked; looks at a whole shape are allowed |
+| `hard` (also `strict`) | as `gentle`, with a limit of `--lookbudget N` looks at a shape (default 2,500) |
+| `warn` | recorded, not blocked; for diagnosis |
+| `off` | no guard |
 
-When painting starts (`TARGET_GUARD.beginPaint()` in `tools/plate/drawing.mjs`) the painter seals the target and every per-cell map derived from it (`tools/guard/seal-maps.mjs`, `tools/guard/no-target.mjs`). A cell-level read is recorded and stops the run.
+When painting starts, the painter seals the target and every map made from it (`tools/guard/no-target.mjs`, `tools/guard/seal-maps.mjs`). A read of a single cell is recorded and stops the run.
 
-Records: `target-guard.json` (mode, shape looks, refusals, blocked reads, a `painted`, `copied` or `unguarded` verdict), `cheat-risk.json` (stage progression, fine-detail copy correlation `hfCorr`, small-stroke share, audit result), `stages/strip.jpg`.
+The guard writes two files. `target-guard.json` holds the mode, the looks at shapes, the refusals, the blocked reads and a verdict of `painted`, `copied` or `unguarded`. `cheat-risk.json` holds the [cheat risk](../bench/docs/rules.md#cheat-risk).
 
 ```sh
-node tools/guard/promote-check.mjs work/my-picture   # a guarded run has zero target reads and a recorded risk
-node tools/guard/cheat-test.mjs                      # four deliberate image-read routes are blocked
-node tools/guard/lint-target-use.mjs                 # static check for hill-climbing and paint-step reads (in npm test; exceptions in tools/guard/target-use-allow.json)
+node tools/guard/promote-check.mjs work/my-picture   # a guarded run has no reads of the target and a recorded risk
+node tools/guard/cheat-test.mjs                      # four deliberate ways to read the image are blocked
+node tools/guard/lint-target-use.mjs                 # looks in the code for hill climbing and for reads while painting; runs in npm test
 ```
 
-The benchmark's runtime guard and cheat-risk formula: [rules](../bench/docs/rules.md) and [scoring](../bench/docs/scoring.md).
+The benchmark has its own guard for a model's code. It is in the [rules](../bench/docs/rules.md#the-open-session-l4).
+
+Measurements of a finished painting: [judging](judging.md).

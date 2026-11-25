@@ -49,13 +49,19 @@ export function setTilt(sheet, deg, toward = 'bottom') {
 export function levelFilm(sheet, o, box, mm) {
   const level = o.level ?? 0, dt = o.dt ?? 0;
   if (!(level > 0) || !(dt > 0)) return null;
-  const { w, W, M, G, K, paper } = sheet, [x0, y0, x1, y1] = box, height = paper.valley || paper.height, slope = o.slope ?? 0;
+  const { w, W, M, G, K, paper } = sheet, [x0, y0, x1, y1] = box, height = paper.surface || paper.valley || paper.height, slope = o.slope ?? 0;
   const tx = sheet.tilt ? sheet.tilt.x * mm : 0, ty = sheet.tilt ? sheet.tilt.y * mm : 0;   // how far the board falls a cell, mm (the surface is lower downhill)
   const b = bufs(sheet), { at, cells, cw, cn, west, north, east, south, diag, H } = b;
   const ff = o.fibreFlow ?? 0.6, perm = ff ? permeability(paper) : null, k0 = level * KAPPA * dt / (mm * mm);
   // the wet cells in raster order, and each one's surface
   let n = 0;
-  for (let y = y0; y <= y1; y++) for (let x = x0, i = y * w + x0; x <= x1; x++, i++) if (M[i] && W[i] > 0) { at[i] = n; cells[n] = i; H[n] = W[i] + slope * height[i] - tx * x - ty * y; n++; }
+  // A film thinner than levelFloor (mm) is damp paint, not a pool: water held in the tooth and the pores, with no free
+  // surface joining it to its neighbours, so it takes no part in the levelling (o.levelFloor; 0: any water levels).
+  // Water run onto it does not level across the whole wash in a moment: it stands where it lands and invades the damp
+  // paint by the explicit flow and the wet fronts, slowly, scouring as it goes: a back-run (Computer-Generated
+  // Watercolor, section 4.7), where a levelled film spread a puddle of clean water through the whole damp wash.
+  const floor = o.levelFloor ?? 0;
+  for (let y = y0; y <= y1; y++) for (let x = x0, i = y * w + x0; x <= x1; x++, i++) if (M[i] && W[i] > floor) { at[i] = n; cells[n] = i; H[n] = W[i] + slope * height[i] - tx * x - ty * y; n++; }
   if (n < 2) { for (let k = 0; k < n; k++) at[cells[k]] = -1; return null; }
   // faces to the west and north neighbours, conductance from the mean depth cubed (lubrication) and the fibres
   let most = 0;

@@ -13,9 +13,12 @@ import { passage } from '../../crop/blockin.mjs';
 import { labOf } from '../../eval/colour.mjs';
 import { filmLab } from './puddles.mjs';
 import { renderLayers } from '../../media/km.mjs';
-import { handOf, PRESSURES, sweeps, scattered, lines, written, handled, chargeDab } from './script-marks.mjs';
+import { handOf, PRESSURES, sweeps, scattered, lines, written, handled, chargeDab, areaOf } from './script-marks.mjs';
+import { formAxis, laneCharacter } from './wash-form.mjs';
 import { makeMark, MARK_KINDS } from '../marks/index.mjs';
 import { checkErase, eraseStrokes, eraseLayer } from './erase-passage.mjs';
+import { expandPassage } from './script-short.mjs';
+import { organicOutline } from './wash-edge.mjs';
 
 /** Swatch lightness (L* on white paper) for each dilution word. */
 export const DILUTION_L = Object.freeze({ 'very pale': 88, pale: 79, medium: 66, strong: 52, rich: 40, dark: 30 });
@@ -125,10 +128,20 @@ export function checkScript(script, { keys, sheetWidthMm }) {
 const regionsOf = p => (p.regions?.length ? p.regions : p.region?.length ? [p.region] : []).filter(P => P?.length >= 3);
 const lightsOf = script => (script.lights ?? []).map(l => l.region ?? l).filter(P => P?.length >= 3);
 
+/** The way a wash's lanes run: degrees when the script gives a number; 'form' (along the shape's own flow, wash-form.mjs)
+ *  when it says so or gives none. */
+function washDirection(p) {
+  const d = p.handling?.direction;
+  if (d == null || d === 'form') return 'form';
+  return Number(d) || 0;
+}
+
 /** The brush that lays a wash: the script's, or the kit's nearest to a third of the wash's width across its direction. */
 function washBrush(p, brushes) {
   if (p.brush) return brushes[p.brush].widthMm;
-  const deg = Number(p.handling?.direction ?? 0) || 0, a = deg * Math.PI / 180, vx = -Math.sin(a), vy = Math.cos(a);
+  // laid with the form, the brush is a third of the shape's width across its own axis (the largest outline's)
+  const big = regionsOf(p).reduce((b, P) => (!b || areaOf([P]) > areaOf([b]) ? P : b), null);
+  const deg = washDirection(p) === 'form' ? (big ? formAxis(big) : 0) : washDirection(p), a = deg * Math.PI / 180, vx = -Math.sin(a), vy = Math.cos(a);
   let lo = Infinity, hi = -Infinity; for (const P of regionsOf(p)) for (const [x, y] of P) { const v = x * vx + y * vy; lo = Math.min(lo, v); hi = Math.max(hi, v); }
   const want = Math.max(2, (hi - lo) * WASH_BRUSH_SHARE), kit = Object.values(brushes).map(b => b.widthMm).sort((x, y) => x - y);
   return kit.filter(v => v <= want).at(-1) ?? kit[0];
@@ -155,6 +168,8 @@ function asLibraryMark(kind, st, widthMm, { seed, bend = 0, load = 0.75, rng = n
 
 /** The strokes of one passage (mm), from its kind, brush and handling; no picture read. */
 export function passageStrokes(p, brushes, seed = 0, sheetLights = [], { hand = 1 } = {}) {
+  // the short forms written out (script-short.mjs): a stroke's pressure word, a wash's pressure word along its lanes
+  p = expandPassage(p);
   const st = placedStrokes(p, brushes, seed, sheetLights, hand), kind = p.handling?.mark;
   // a named mark from the shared library, unless the author wrote the pressure out (then the author's handling is laid)
   if (!kind || !MARK_KINDS[kind] || p.kind === 'wash' || Array.isArray(p.handling?.pressure)) return st;
@@ -180,7 +195,17 @@ function placedStrokes(p, brushes, seed = 0, sheetLights = [], hand = 1) {
   });
   const n = Math.max(1, Math.round(p.count ?? 1)), lengthMm = Number(h.lengthMm) || (MARK_LEN[h.mark] ? MARK_LEN[h.mark] * widthMm : p.kind === 'touches' ? 2.6 * widthMm : 4 * widthMm);
   switch (p.kind) {
-    case 'wash': return sweeps(polys, { widthMm, deg, pressure: Math.max(0.6, Math.max(...pressure)), lights, rng, hand });
+    // a wash: its lanes along its direction or its form, bent along its path, each lane's width following a written
+    // pressure list (a word or none is one pressure), and a named mark laid as each lane's character unless the author
+    // wrote the pressure out
+    case 'wash': {
+      const written = Array.isArray(h.pressure), mark = !written && h.mark ? laneCharacter(h.mark, { widthMm, seed: `${seed}/${p.id}` }) : null;
+      // the lanes follow the region as a hand does (wash-edge.mjs): round at its corners, wandering in and out of it,
+      // more for a wetter wash; the region itself is the script's, unchanged
+      const wetness = p.paper === 'wet' || p.edges === 'lost' || h.load === 'flooded' ? 'wet' : h.load === 'dry' || h.load === 'damp' ? 'dry' : 'plain';
+      const guide = polys.map((P, q) => organicOutline(P, { seed: `${seed}/${p.id}/${q}`, wetness }));
+      return sweeps(guide, { widthMm, deg: washDirection(p), pressure: written ? pressure : Math.max(0.6, Math.max(...pressure)), path: h.path, character: mark, lights, rng, hand });
+    }
     case 'strokes': return scattered(polys, { ...style, n, widthMm, deg, lengthMm, size: ch.size, spread: ch.spread ?? 'scattered', denser: ch.denser, lights, rng });
     case 'touches': return scattered(polys, { ...style, n, widthMm, deg, lengthMm, size: ch.size ?? 'varied', spread: ch.spread ?? 'clustered', denser: ch.denser, touches: true, lights, rng });
     case 'lines': return lines(p.paths, { widthMm, pressure, hold: h.hold, rng });

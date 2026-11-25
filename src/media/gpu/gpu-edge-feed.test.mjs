@@ -10,7 +10,9 @@ import { GpuSheet, openGpu } from './stepfull.mjs';
 const PIGMENTS = [{ K: [0.4625, 0.2934, 0.0496], S: [0.02, 0.02, 0.02], rho: 0.047, omega: 0.5, gamma: 0.85, floc: 0.3 }];
 const N = 96, MM = 0.25;
 function wash(shape) {
-  const sheet = createSheet(makePaper(N, N, { seed: 9, mmPerCell: MM }), PIGMENTS);
+  // a flat sheet (no cockle, paper.mjs): the cockle keeps the film moving, and its pigment's float32 trades on the GPU
+  // then part from the CPU's by 6e-4, more than the feed's own 1e-4 measures (gpu-film-level.test.mjs covers the cockle)
+  const sheet = createSheet(makePaper(N, N, { seed: 9, mmPerCell: MM, cockle: { rmsMm: 0 } }), PIGMENTS);
   for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
     const disc = Math.hypot(x - 48, y - 48) < 30, square = x > 16 && x < 80 && y > 16 && y < 80 && !(x > 48 && Math.abs(y - 48) < 8);
     if (shape === 'disc' ? disc : square) deposit(sheet, y * N + x, 0.3, [0.45]);

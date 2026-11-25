@@ -1,5 +1,8 @@
 import { paperRelief, HEIGHT_SPAN_UM } from './paper-relief.mjs';
 import { grainSurface } from './grain-field.mjs';
+import { cockleField } from './cockle.mjs';
+// a unit of the paper's height is this many mm of the water's surface (sheet.mjs DEFAULTS.slope)
+export const SURFACE_MM = 0.1;
 // Paper: a surface height made of fibres and tooth, and the capacity of its pores. Rough watercolour paper is a
 // felt of cotton fibres pressed together, lightly sized (Computer-Generated Watercolor, section 2.1); the height steers water
 // and granulating pigment, the capacity (c = h (cmax - cmin) + cmin) sets how much water it can absorb.
@@ -27,7 +30,7 @@ export function makePaper(w, h, options = {}) {
   MADE.set(key, paper);
   return structuredClone(paper);
 }
-function buildPaper(w, h, { seed = 1, fibres = 0.5, tooth = 0.5, fibreLength = 14, cmin = 0.2, cmax = 0.55, scale = 1, toothScale = 1, patternScale = 1, proudBlur = 1, coldPress = null, mmPerCell = 0, relief = 'cold', grainMm = 0 } = {}) {
+function buildPaper(w, h, { seed = 1, fibres = 0.5, tooth = 0.5, fibreLength = 14, cmin = 0.2, cmax = 0.55, scale = 1, toothScale = 1, patternScale = 1, proudBlur = 1, coldPress = null, mmPerCell = 0, relief = 'cold', grainMm = 0, cockle = {} } = {}) {
   // Opt-in physical fibres: fibre size and count follow physical area.
   const fs = mmPerCell > 0 ? (280 / 1086) / mmPerCell : scale;
   const n = w * h, fib = new Float32Array(n), c2 = new Float32Array(n), s2 = new Float32Array(n); // fibre amount, and orientation as doubled angles (a fibre has no head or tail)
@@ -102,7 +105,12 @@ function buildPaper(w, h, { seed = 1, fibres = 0.5, tooth = 0.5, fibreLength = 1
   // grainH: the surface granulating pigment settles and rolls on. A physical sheet's is its relief low-passed at a
   // length in millimetres (grain-field.mjs), its hollows measured in that field's own RMS; a sheet without units uses its height.
   const G = RF ? grainSurface(height, w, h, physMm, { seed, relief }, grainMm > 0 ? { grainMm } : {}) : { grainH: height, unit: 0 };
-  return { w, h, n, height, grainH: G.grainH, capacity, valley, proud, tooth: toothH, toothLo, toothSpan, fdx, fdy, grain, relief: reliefSpread, subRelief, mmPerCell: physMm, ...toothHollow(G.grainH, toothH, toothLo, toothSpan, G.unit), ...(RF ? { zUm: RF.zUm, reliefUm: RF.rmsUm, reliefOf: { seed, relief } } : {}) };
+  // surface: the height the water levels over, the valley plus the wet sheet's cockle (cockle.mjs) in height units. A
+  // physical sheet buckles by default (cockle.rmsMm 0.03 mm, 0 for a flat sheet; at 0.05 Mittens' mid-tones dried 2.5 L* darker); a sheet without units stays flat.
+  const ck = physMm > 0 ? cockleField(w, h, physMm, { seed, rmsMm: 0.03, ...cockle }) : null;
+  let surface = null;
+  if (ck && ck.some(v => v !== 0)) { surface = new Float32Array(n); for (let i = 0; i < n; i++) surface[i] = valley[i] + ck[i] / SURFACE_MM; }
+  return { w, h, n, height, grainH: G.grainH, capacity, valley, ...(surface ? { surface } : {}), proud, tooth: toothH, toothLo, toothSpan, fdx, fdy, grain, relief: reliefSpread, subRelief, mmPerCell: physMm, ...toothHollow(G.grainH, toothH, toothLo, toothSpan, G.unit), ...(RF ? { zUm: RF.zUm, reliefUm: RF.rmsUm, reliefOf: { seed, relief } } : {}) };
 }
 
 /**

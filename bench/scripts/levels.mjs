@@ -1,4 +1,4 @@
-// The 0.4 benchmark levels: Auto and L1 to L4, and each model's score measured against Auto. See ../docs/levels.md.
+// The 0.4 benchmark levels: Auto and L1 to L4, and each model's score measured against Auto. See ../docs/rules.md.
 // Pure functions over flat painting records. Nothing here reads a file or a run folder (summary04.mjs does that).
 //
 // A record is one painting:

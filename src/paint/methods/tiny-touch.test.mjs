@@ -51,6 +51,8 @@ for (const c of fixture.cases) {
   test(`${c.name}: the stroke that stopped the painting is told by the plan and given no wet bed`, () => {
     const { got, lines } = plan(c.script);
     const tiny = got.summary.tinyTouches ?? [];
+    // a case whose lanes now make no tiny touch (`stroke` null): none listed, none laid apart
+    if (c.stroke == null) { assert.equal(got.summary.tinyTouches, undefined); assert.ok(!got.instructions.some(q => q.script?.passage === `${id}-small`)); return; }
     assert.ok(tiny.length >= 1, 'the plan lists its tiny touches');
     // the stroke too small for a wet bed that this passage has under the lanes as they are laid now (the fixture's
     // `stroke`; the strokes of the paintings that stopped are no longer made, see the fixture's `about`)

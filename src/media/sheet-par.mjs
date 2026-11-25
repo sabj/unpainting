@@ -114,7 +114,7 @@ function ctxFor(sheet, H) {
 const PAPERS = new WeakMap(), PERMS = new WeakMap();
 function paperShared(paper) {
   if (PAPERS.has(paper)) return PAPERS.get(paper);
-  const h = paper.valley || paper.height;
+  const h = paper.surface || paper.valley || paper.height;
   if (!paper.grainH) throw new Error('sheet threads: the paper has no grainH (make it with makePaper or scanPaper)');
   const out = { capacity: sharedCopy(paper.capacity), fdx: sharedCopy(paper.fdx), fdy: sharedCopy(paper.fdy), grain: sharedCopy(paper.grain), height: sharedCopy(h), fibreH: sharedCopy(paper.grainH), tooth: paper.tooth ? sharedCopy(paper.tooth) : null, hollow: sharedCopy(paper.hollow) };
   PAPERS.set(paper, out); return out;

@@ -28,7 +28,7 @@ test('the routine suite fixes seven targets and six models; all remains opt-in',
   assert.ok(suitePlan({ selection: 'all' }).models.length > 6);
 });
 
-// V4 and V5 were retired in 0.4: the CLI refuses them before preflight, with the way to replay them (bench/v4v5/README.md)
+// V4 and V5 were retired in 0.4: the CLI refuses them before preflight, with the way to replay them (bench/docs/older-rounds.md)
 test('the run CLI refuses the retired V4 round before starting a model, and says how to replay it', () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'lite-no-plan-'));
   let raw;

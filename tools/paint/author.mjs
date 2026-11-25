@@ -23,7 +23,7 @@ const NOT_WASH = new Set(['pen', 'dry']), NOT_OFFERED = new Set(['lampblack']);
 /** The most paints a script may name. The painter's sheet holds 16 pigments (src/media/gpu/stepfull.mjs: 'GpuSheet: at most 16
  * pigments'); the drawing's ink takes one and its graphite another, so 14 are left for paint. A plan compiles with more
  * (it is made on the CPU); the painting would then stop on the GPU, so the check refuses it before anything is made. */
-const SCRIPT_PAINTS_MOST = 14;
+export const SCRIPT_PAINTS_MOST = 14;
 /** The runner names of bench/models.json and the command each is called with here. */
 const CLI_OF_RUNNER = { claude: 'claude', codex: 'codex', agy: 'agy', muse: 'muse' };
 /** What each command needs before it can be called, by name only. */
@@ -168,6 +168,8 @@ export async function preparePacket({ dir, root, run, drawingPng, briefFile, for
     // in fixed rounds the named forms are names and boxes only (FORMS): the picture of them is a mask, and is not sent
     if (formsPicture) await put('forms.png', 'the NAMED FORMS: each named form of the subject as one flat colour (the FORMS list names them)', run.masks.formsPng);
   }
+  // fixed rounds and the open session write their brief themselves (brief.mjs): the packet is then its pictures and forms
+  if (!briefFile) return { dir, prompt: null, brief: null, forms, images: inputs.map(i => path.join(dir, i.file)), files: inputs.map(i => i.file), inputs };
   const brushes = JSON.parse(fs.readFileSync(path.join(root, 'src/paint/brushes.json'), 'utf8')).brushes;
   const template = fs.readFileSync(briefFile, 'utf8');
   const brief = fillBrief(template, { sheet: run.sheet, inputs, brushes, paints: BOX, forms, medium: run.drawing.medium, skills: template.includes('SKILLS_TEXT') ? skillsText(root) : '' });

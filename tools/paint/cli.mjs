@@ -19,7 +19,8 @@ import { expandSubjects, pool, gpuPlace, throughput, jobsNow, DEFAULT_JOBS, PLAN
 import { writeRunSheet, writeGridSheet, keepsRunSheet, runPictures, formsImage, drawingSvg } from './sheet.mjs';
 import { toolsBase, resolveTools, writeTools, linesPictureDoc, allLinesDoc } from './session-tools.mjs';
 import sharp from 'sharp';
-import { authorOf, authorLabel, briefName, readScript, checkAuthored, preparePacket, formBoxes, gridImage, askAuthor, retryPrompt } from './author.mjs';
+import { authorOf, authorLabel, briefName, readScript, checkAuthored, preparePacket, formBoxes, gridImage, askAuthor, retryPrompt, SCRIPT_PAINTS_MOST } from './author.mjs';
+import { BOX } from '../../src/crop/box.mjs';
 import { readChoice, choiceKey, choiceKind, withChoice, settingsList } from './choice.mjs';
 import { checkPlanEdit, editLine } from '../../src/paint/methods/plan-edit.mjs';
 import { planNumbers, planSummary, numbersText, washesText, planPicture, lookPicture, stagesPicture } from './plan-data.mjs';
@@ -27,16 +28,16 @@ import { lookSets, lookCells, lookFromPlan, lookFault, stoppedLookFault, lookSiz
 import { readPlanNote, PLAN_FILE } from '../../src/paint/methods/plan-file.mjs';
 import { toolUseOf, listFiles } from './tool-use.mjs';
 import { PROVIDER_HOSTS, startGate as startNetGate, makeToolbox, toolsText } from './session-net.mjs';
-import { DEFAULT_LOOKS, DEFAULT_WALL_MINUTES, DEFAULT_GRACE_MINUTES, DEFAULT_STEPS, safeRead, writeSession, sessionServer, SIGN_IN_EXPOSURE, finalChoice, sessionCall, readTranscript, transcriptFile, reachedOutside, ownFolderOf, ownPictures, runSession } from './session.mjs';
+import { DEFAULT_LOOKS, DEFAULT_GRACE_MINUTES, DEFAULT_STEPS, safeRead, writeSession, sessionServer, SIGN_IN_EXPOSURE, finalChoice, sessionCall, readTranscript, transcriptFile, reachedOutside, ownFolderOf, ownPictures, runSession } from './session.mjs';
 import { DEFAULT_REVERTS } from './reverts.mjs';
 import { roundsRun } from './rounds-run.mjs';
 import { ROUNDS_CLIS, ROUNDS_AT_ONCE } from './rounds-call.mjs';
-import { levelOf, handedAt, OWN_SCRIPT_ONLY } from './levels.mjs';
-import { shapesHanded, checkWithheld, autoHanded, AUTO_GIVEN_FOLDER } from './level4.mjs';
+import { levelOf, handedAt, OWN_SCRIPT_ONLY, LEVEL_MINUTES } from './levels.mjs';
+import { shapesHanded, checkWithheld, autoHanded, AUTO_GIVEN_FOLDER, SHAPES_FOLDER } from './level4.mjs';
 import { usageOf, usageLine } from './usage.mjs';
 import { shapesData, namesShapes, resolveNumbered } from './study-shapes.mjs';
 import { stoppedText } from './stage-look.mjs';
-import { lookCost, regionBox, scriptInRegion, paintedWork, planWork, sweepsInLog, lookSizeOf } from './look-cost.mjs';
+import { lookCost, regionBox, scriptInRegion, paintedWork, planWork, sweepsInLog, lookSizeOf, LOOK_PRICE, SHOW_ORIGINAL_COST } from './look-cost.mjs';
 import { preparedRoot, preparedKey, prepareCommand, readPrepared, writePrepared, preparedFilm, SHAPES_FILE, WASHES_FILE } from './prepared.mjs';
 import crypto from 'node:crypto';
 import { writeWorkSheets } from './work-sheets.mjs';
@@ -47,6 +48,7 @@ import { handedOverRecord, checkHandedOver, checkChoice } from './parity.mjs';
 import { qwenRoute, studyRequestPrompt, parseStudyRequests, writeStudyRequest, makeStudies, withAuthorStudies } from './studies.mjs';
 import { readSelfReview } from './self-review.mjs';
 import { checkSessionFolder, drawingOfKept } from './kept-session.mjs';
+import { sessionBrief, briefRecord } from './brief.mjs';
 import { keepSessionFiles } from './kept-files.mjs';
 import { backendWork, cellsOf, autoWaterSteps, guardStopOf, WATER_GUARD_TIMES } from './paint-work.mjs';
 import { codeState } from '../../src/paint/code-state.mjs';
@@ -66,7 +68,7 @@ const ownAuthors = JSON.parse(fs.readFileSync(path.join(HERE, 'authors.json'), '
 const known = new Set(scanOptions(ROOT).keys());
 const code = codeState(ROOT), switches = switchesOf(), jobs = req.jobs ?? DEFAULT_JOBS;
 // the benchmark's resource budget for one try, the same for every model and told to it at the start (session.mjs)
-const looksMost = req.looks ?? DEFAULT_LOOKS, wallMost = req.wallMinutes ?? DEFAULT_WALL_MINUTES, graceMost = req.graceMinutes ?? DEFAULT_GRACE_MINUTES, revertsMost = req.reverts ?? DEFAULT_REVERTS, stepsMost = req.steps ?? DEFAULT_STEPS;
+const looksMost = req.looks ?? DEFAULT_LOOKS, wallMost = req.wallMinutes ?? LEVEL_MINUTES, graceMost = req.graceMinutes ?? DEFAULT_GRACE_MINUTES, revertsMost = req.reverts ?? DEFAULT_REVERTS, stepsMost = req.steps ?? DEFAULT_STEPS;
 // the terms of a try: rendering units and steps are its budget; the wall clock is a safety stop only
 const budget = { looks: looksMost, steps: stepsMost, safetyMinutes: wallMost, graceMinutes: graceMost, reverts: revertsMost };
 /** The model's steps so far, counted from its transcript as it is written (each tool call once); read again only when the file grew. */
@@ -409,7 +411,7 @@ async function paintLookOnce(r, choice, script, plate, at, edit, compiled, ask =
 async function handedTo(r, prepared, made, auto) {
   const { spec, authorFull: author } = r, handed = [];
   // level 4 (level4.mjs): the studies' traced shapes offered as regions, and Auto's plan to read and its finished painting
-  if (terms.shapes) handed.push(shapesHanded(prepared.shapes));
+  if (terms.shapes) handed.push(shapesHanded(prepared.shapes, path.join(made, SHAPES_FOLDER)));
   if (terms.autoPlan || terms.auto) handed.push(await autoHanded({ auto, prepared, made: path.join(made, AUTO_GIVEN_FOLDER), widthMm: spec.sheet.widthMm }));
   if (terms.previous) {
     const from = path.resolve(req.previous); let earlier; try { earlier = JSON.parse(fs.readFileSync(path.join(from, 'run.json'), 'utf8')); } catch { throw new Error(`--previous ${from}: no finished run there (run.json)`); }
@@ -525,7 +527,14 @@ async function sessionRun(r) {
       if (terms.previous) record.author.previousTry = { tryNumber: req.tryNumber, retries: req.retries, from: path.resolve(req.previous) };
       routes = await closedRoutes(author);
       // the code's plan and its settings are handed at no level (levels.mjs): the folder holds no auto/
-      const { prompt, pictures: handedPictures, eyesOnly } = writeSession({ dir: cwd, tools: routes.toolbox ? toolsText(routes.toolbox.said) : undefined, packet, sheet: spec.sheet, realSize: spec.realSize, medium: record.drawing.medium, codePlan: terms.plan, ...(terms.plan ? { auto: { picture: await planPicture({ planPreview: auto.planPreview, run: record }), washesText: washesText(auto), plan: { summary: auto.summary, washes: auto.rows }, toEdit: listing }, settings: settingsList(spec) } : {}),
+      // the brief every level gets (brief.mjs), its level block naming this folder's files
+      const formsGiven = Boolean(record.masks.mask), task = await sessionBrief({ level: level.name, packet, handed, medium: record.drawing.medium.split(',')[0], studies: record.studies ?? [], sheet: spec.sheet,
+        brushes: JSON.parse(fs.readFileSync(path.join(ROOT, 'src/paint/brushes.json'), 'utf8')).brushes, paints: BOX, paintsMost: SCRIPT_PAINTS_MOST, looksMost, lookWhole: LOOK_PRICE.half, wallMinutes: wallMost,
+        data: [...(formsGiven ? [{ name: 'inputs/forms.json', what: 'the named forms as data: number, name, kind and box in mm' }, { name: 'inputs/forms-ids.png', what: 'the named forms as data: a grey image whose pixel value is the form\'s number (0: none)' }] : []),
+          ...(base.listing ? [{ name: 'drawing/lines.json', what: 'every line of the drawing as a row (README.md: choosing the drawing\'s lines)' }, { name: 'drawing/all-lines.png', what: 'every line the painter lays' }] : [])],
+        v: { steps: stepsMost, reverts: revertsMost, showCost: SHOW_ORIGINAL_COST } });
+      record.author.brief = { ...briefRecord(task), sent: 'author/session-prompt.txt' };
+      const { prompt, pictures: handedPictures, eyesOnly } = writeSession({ dir: cwd, task: task.text, tools: routes.toolbox ? toolsText(routes.toolbox.said) : undefined, packet, sheet: spec.sheet, realSize: spec.realSize, medium: record.drawing.medium, codePlan: terms.plan, ...(terms.plan ? { auto: { picture: await planPicture({ planPreview: auto.planPreview, run: record }), washesText: washesText(auto), plan: { summary: auto.summary, washes: auto.rows }, toEdit: listing }, settings: settingsList(spec) } : {}),
         forms: record.masks.mask ? await formBoxes(record.masks.mask, record.masks.forms, W) : null, formsIds: record.masks.mask ?? null, looks: looksMost, wallMinutes: wallMost, graceMinutes: graceMost, steps: stepsMost, reverts: revertsMost, briefFile: path.join(HERE, 'SESSION-BRIEF.md'), readmeFile: path.join(HERE, 'SESSION-README.md'), handed,
         drawing: base.listing ? { listing: base.listing, picture: await drawingPicture(allLinesDoc(base.vectors, base.lines, base.mask ? { ...base.mask, list: base.forms } : null), W) } : null });
       // nothing withheld is in the folder: the code's plan, its washes, anything of Auto's painting (level4.mjs)
@@ -690,7 +699,7 @@ async function lookOfChoice(r, fin) {
 // replies at once, a provider (rounds-call.mjs): the runs themselves all go on together
 const roundsSlots = Object.fromEntries(Object.entries(ROUNDS_AT_ONCE).map(([cli, n]) => [cli, pool(n)]));
 const roundsLent = {
-  root: ROOT, briefFile: BRIEF_FILE, looksMost, get wallMinutes() { return req.wallMinutes ?? null; }, get level() { return level.name; }, get terms() { return terms; }, get previous() { return req.previous ? path.resolve(req.previous) : null; }, say,
+  root: ROOT, briefFile: BRIEF_FILE, looksMost, get wallMinutes() { return wallMost; }, get level() { return level.name; }, get terms() { return terms; }, get previous() { return req.previous ? path.resolve(req.previous) : null; }, say,
   // the traced shapes (levels 2 and 3): a prepared input, from the prepared folder of this code, else the newest of the subject that holds them (said)
   shapesFile(r) {
     const mine = preparedAt(r.spec), root = path.dirname(mine), all = [mine, ...(fs.existsSync(root) ? fs.readdirSync(root).map(d => path.join(root, d)).filter(d => d !== mine).sort((a, b) => (fs.existsSync(path.join(b, 'prepared.json')) ? fs.statSync(path.join(b, 'prepared.json')).mtimeMs : 0) - (fs.existsSync(path.join(a, 'prepared.json')) ? fs.statSync(path.join(a, 'prepared.json')).mtimeMs : 0)) : [])];

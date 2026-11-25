@@ -57,7 +57,11 @@ fn lvRM() -> u32 { return 16u + 11u * lvNt32() + 16u * LV_BMAX; }
 fn lvLT() -> u32 { return lvRM() + LV_BMAX; }
 fn lvT32(i: u32) -> u32 { return ((i / u.w) / 32u) * lvTw32() + (i % u.w) / 32u; }
 fn lvBoxOf(i: u32) -> u32 { return LVX[lvTR(lvT32(i)) + 7u]; }
-fn lvLevel(i: u32) -> bool { return M[i] == 1u && W[i] > 0.0; }
+fn lvLevel(i: u32) -> bool { return M[i] == 1u && W[i] > u.lvFloor; }   // film-level.mjs levelFloor: damp paint does not level
+// a cell whose water moves in this step's transport rounds: lv_flux marks it (LVF w -1) from the water at the step's
+// start, as the CPU lists its cells once; the rounds change W, and a cell they took below the floor still trades.
+// lv_br_a clears the mark on every wet tile after the rounds.
+fn lvRound(i: u32) -> bool { return M[i] == 1u && LVF[i].w < 0.0; }
 // the hollow fill of a wet cell's box (sheet.mjs slideFillFor)
 fn fillAt(i: u32) -> f32 {
   if (u.fillRef <= 0.0) { return u.slideFill; }
@@ -96,7 +100,7 @@ fn lv_tiles(@builtin(workgroup_id) wid: vec3<u32>, @builtin(num_workgroups) nw: 
       }
       if (M[i] == 1u) {
         atomicAdd(&lvAt[5], 1u);
-        if (W[i] > 0.0) { atomicStore(&lvAt[6], 1u); }
+        if (lvLevel(i)) { atomicStore(&lvAt[6], 1u); }
         if (wantFill) {
           for (var ka = 0u; ka < ${count}; ka++) { s += D[${channel}(ka) * u.n + i]; }
           if (FIXED_BED) { s += DEP[2u * u.n + i]; if (u.hasTop != 0u) { for (var k = 0u; k < u.K; k++) { s += TOP[k * u.n + i]; } } }
@@ -506,12 +510,12 @@ fn lv_flux(@builtin(workgroup_id) wid: vec3<u32>, @builtin(num_workgroups) nw: v
   let count = LVX[1];
   for (var j = wid.x; j < count; j += nw.x) {
     let c = lvCellOf(LVX[lvLT() + j], lid); if (c.z == 0u) { continue; }
-    let i = c.y * u.w + c.x; if (!lvLevel(i) || lvState(lvBoxOf(i)) == 0u) { continue; }
+    let i = c.y * u.w + c.x; if (!lvLevel(i) || lvState(lvBoxOf(i)) == 0u) { continue; }   // (W as at the step's start)
     let a = LVA[i]; let di = LVB[i].x;
     var fw = 0.0; var fn_ = 0.0;
     if (a.y != 0.0) { fw = a.y * (lvDh(i - 1u, i) + (LVA[i - 1u].x - a.x) + u.lvTx + (LVB[i - 1u].x - di)); }
     if (a.z != 0.0) { fn_ = a.z * (lvDh(i - u.w, i) + (LVA[i - u.w].x - a.x) + u.lvTy + (LVB[i - u.w].x - di)); }
-    LVF[i] = vec4<f32>(fw, fn_, 1.0, 0.0);
+    LVF[i] = vec4<f32>(fw, fn_, 1.0, -1.0);   // w -1: this cell's water moves in this step's rounds (lvRound)
   }
 }
 // what a cell gives over the step: x, the faces to the west, north, east and south (signed out of the cell)
@@ -519,8 +523,8 @@ fn lvOut(i: u32, x: u32, y: u32) -> vec4<f32> {
   var o = vec4<f32>(-LVF[i].x, -LVF[i].y, 0.0, 0.0);
   if (LVA[i].y == 0.0) { o.x = 0.0; }
   if (LVA[i].z == 0.0) { o.y = 0.0; }
-  if (x + 1u < u.w && lvLevel(i + 1u) && LVA[i + 1u].y != 0.0) { o.z = LVF[i + 1u].x; }
-  if (y + 1u < u.h && lvLevel(i + u.w) && LVA[i + u.w].z != 0.0) { o.w = LVF[i + u.w].y; }
+  if (x + 1u < u.w && lvRound(i + 1u) && LVA[i + 1u].y != 0.0) { o.z = LVF[i + 1u].x; }
+  if (y + 1u < u.h && lvRound(i + u.w) && LVA[i + u.w].z != 0.0) { o.w = LVF[i + u.w].y; }
   return o;
 }
 fn lvPos(v: vec4<f32>) -> f32 { return max(0.0, v.x) + max(0.0, v.y) + max(0.0, v.z) + max(0.0, v.w); }
@@ -529,7 +533,7 @@ fn lv_out(@builtin(workgroup_id) wid: vec3<u32>, @builtin(num_workgroups) nw: ve
   let count = LVX[1];
   for (var j = wid.x; j < count; j += nw.x) {
     let c = lvCellOf(LVX[lvLT() + j], lid); if (c.z == 0u) { continue; }
-    let i = c.y * u.w + c.x; if (!lvLevel(i)) { continue; }
+    let i = c.y * u.w + c.x; if (!lvRound(i)) { continue; }
     let b = lvBoxOf(i); if (lvState(b) == 0u) { continue; }
     let out = lvPos(lvOut(i, c.x, c.y)); let wk = W[i];
     if (out > 0.0 && wk > u.wetEps) { atomicMax(&LVS[17u + 2u * b], bitcast<u32>(out / wk)); }
@@ -552,7 +556,7 @@ fn lv_s1(@builtin(workgroup_id) wid: vec3<u32>, @builtin(num_workgroups) nw: vec
   let count = LVX[1];
   for (var j = wid.x; j < count; j += nw.x) {
     let c = lvCellOf(LVX[lvLT() + j], lid); if (c.z == 0u) { continue; }
-    let i = c.y * u.w + c.x; if (!lvLevel(i)) { continue; }
+    let i = c.y * u.w + c.x; if (!lvRound(i)) { continue; }
     let B = lvBX(lvBoxOf(i)); let subs = LVX[B + 15u];
     if (LVX[B + 14u] == 0u || LVROUND >= subs) { continue; }
     let wk = W[i]; let out = lvPos(lvOut(i, c.x, c.y)) / f32(subs);
@@ -570,7 +574,7 @@ fn lv_s2(@builtin(workgroup_id) wid: vec3<u32>, @builtin(num_workgroups) nw: vec
   let count = LVX[1];
   for (var j = wid.x; j < count; j += nw.x) {
     let c = lvCellOf(LVX[lvLT() + j], lid); if (c.z == 0u) { continue; }
-    let i = c.y * u.w + c.x; if (!lvLevel(i)) { continue; }
+    let i = c.y * u.w + c.x; if (!lvRound(i)) { continue; }
     let B = lvBX(lvBoxOf(i)); let subs = LVX[B + 15u];
     if (LVX[B + 14u] == 0u || LVROUND >= subs) { continue; }
     // each face's water out of the cell this substep (signed), from its donor's scale
@@ -588,6 +592,90 @@ fn lv_s2(@builtin(workgroup_id) wid: vec3<u32>, @builtin(num_workgroups) nw: vec
       if (dG != 0.0) { G[base + i] = max(0.0, G[base + i] + dG); }
     }
     if (dW != 0.0) { W[i] = max(0.0, W[i] + dW); }
+  }
+}
+// ---- back-runs (backrun.mjs), on the wet tiles after the levelling: lv_br_a each damp cell's intake from the puddles
+// beside it (LVB, by direction: 0 +x, 1 -x, 2 +y, 3 -y, as backrun.mjs DX, DY) and its push (LVF: x the push share s,
+// y the share of its loose paint that leaves it, z 1 for a damp cell); lv_br_b each pigment's push per unit of intake
+// (OUT4 x) and a puddle's concentration (OUT4 y); lv_br_c applies the water and the paint. Every read of a neighbour is of state written in an earlier
+// kernel, so the cells' order does not matter, as on the CPU. A neighbour is read only where M is set: a cell without
+// water lies in no wet tile, and its LVB and LVF are stale.
+fn brIn(x: u32, y: u32, e: u32) -> bool {
+  if (e == 0u) { return x + 1u < u.w; } if (e == 1u) { return x > 0u; } if (e == 2u) { return y + 1u < u.h; } return y > 0u;
+}
+fn brNb(i: u32, e: u32) -> u32 { if (e == 0u) { return i + 1u; } if (e == 1u) { return i - 1u; } if (e == 2u) { return i + u.w; } return i - u.w; }
+fn brOpp(e: u32) -> u32 { return e ^ 1u; }
+fn brDamp(i: u32) -> bool { return M[i] == 1u && W[i] > 0.0 && W[i] <= u.lvFloor && (RESIST[i] & 1u) == 0u; }
+@compute @workgroup_size(16, 16)
+fn lv_br_a(@builtin(workgroup_id) wid: vec3<u32>, @builtin(num_workgroups) nw: vec3<u32>, @builtin(local_invocation_id) lid: vec3<u32>) {
+  let count = TL[u.ntiles];
+  for (var j = wid.x; j < count; j += nw.x) {
+    let c = lvCellOf(TL[j], lid); if (c.z == 0u) { continue; }
+    let i = c.y * u.w + c.x;
+    var q = vec4<f32>(0.0); var s = 0.0; var go = 0.0; var damp = 0.0;
+    if (brDamp(i)) {
+      damp = 1.0;
+      let share = 0.25 * min(1.0, u.brC * clamp(1.5 - PAPER3[i].z, 0.5, 1.5));
+      for (var e = 0u; e < 4u; e++) {
+        if (!brIn(c.x, c.y, e)) { continue; }
+        let k = brNb(i, e); if (M[k] == 1u && W[k] > u.brHead) { q[e] = share * (W[k] - u.brHead); }
+      }
+      let Q = q.x + q.y + q.z + q.w;
+      if (Q > 0.0) {
+        s = u.brPush * Q / (Q + W[i]);
+        var moved = 0.0;
+        for (var e = 0u; e < 4u; e++) { let o = brOpp(e); if (q[e] > 0.0 && brIn(c.x, c.y, o) && brDamp(brNb(i, o))) { moved += q[e] / Q; } }
+        go = s * moved;
+      }
+    }
+    LVB[i] = q; LVF[i] = vec4<f32>(s, go, damp, 0.0);
+  }
+}
+@compute @workgroup_size(16, 16)
+fn lv_br_b(@builtin(workgroup_id) wid: vec3<u32>, @builtin(num_workgroups) nw: vec3<u32>, @builtin(local_invocation_id) lid: vec3<u32>) {
+  let count = TL[u.ntiles];
+  for (var j = wid.x; j < count; j += nw.x) {
+    let c = lvCellOf(TL[j], lid); if (c.z == 0u) { continue; }
+    let i = c.y * u.w + c.x; if (M[i] != 1u) { continue; }
+    let q = LVB[i]; let Q = q.x + q.y + q.z + q.w; let s = LVF[i].x;
+    for (var ka = 0u; ka < u.nAct; ka++) {
+      let qq = klAt(ka) * u.n + i;
+      // x: the paint it pushes on per unit of intake; y: a puddle's concentration, carried with the water it gives
+      o4set(qq, vec4<f32>(select(0.0, s * (G[qq] + D[qq]) / Q, Q > 0.0), select(0.0, (G[qq] + u.brPush * D[qq]) / W[i], W[i] > u.lvFloor), 0.0, 0.0));
+    }
+  }
+}
+@compute @workgroup_size(16, 16)
+fn lv_br_c(@builtin(workgroup_id) wid: vec3<u32>, @builtin(num_workgroups) nw: vec3<u32>, @builtin(local_invocation_id) lid: vec3<u32>) {
+  let count = TL[u.ntiles];
+  for (var j = wid.x; j < count; j += nw.x) {
+    let c = lvCellOf(TL[j], lid); if (c.z == 0u) { continue; }
+    let i = c.y * u.w + c.x; if (M[i] != 1u) { continue; }
+    let q = LVB[i]; let f = LVF[i]; let Q = q.x + q.y + q.z + q.w;
+    // water: a damp cell takes its intake; a puddle gives what its damp neighbours took from it
+    var dw = 0.0;
+    if (Q > 0.0) { dw = Q; }
+    else if (W[i] > u.lvFloor) {
+      for (var e = 0u; e < 4u; e++) { if (!brIn(c.x, c.y, e)) { continue; } let k = brNb(i, e); if (M[k] == 1u) { dw -= LVB[k][brOpp(e)]; } }
+    }
+    // paint: what leaves, and what the invaded neighbours push on into a damp cell
+    for (var ka = 0u; ka < u.nAct; ka++) {
+      let base = klAt(ka) * u.n; var inc = 0.0;
+      if (f.z > 0.0) {
+        for (var e = 0u; e < 4u; e++) {
+          if (!brIn(c.x, c.y, e)) { continue; }
+          let k = brNb(i, e); if (M[k] != 1u) { continue; }
+          let ok = o4get(base + k);
+          if (q[e] > 0.0) { inc += q[e] * ok.y; }   // the puddle's paint, carried in with its water
+          let v = LVB[k][e]; if (v > 0.0) { inc += v * ok.x; }
+        }
+      }
+      if (dw < 0.0) { let fr = dw / W[i]; G[base + i] = max(0.0, G[base + i] * (1.0 + fr)); D[base + i] = max(0.0, D[base + i] * (1.0 + u.brPush * fr)); }   // a puddle: its water left with its paint
+      else if (f.y > 0.0 || inc > 0.0) {
+        G[base + i] = max(0.0, G[base + i] * (1.0 - f.y) + inc); D[base + i] = max(0.0, D[base + i] * (1.0 - f.y));
+      }
+    }
+    if (dw != 0.0) { W[i] = max(0.0, W[i] + dw); }
   }
 }
 `.replaceAll('klAt(', `${channel}(`).replaceAll('u.nAct', count);

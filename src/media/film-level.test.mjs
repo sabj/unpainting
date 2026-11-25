@@ -11,7 +11,8 @@ import { sweptSquare } from '../../tools/lab/wash-acceptance.mjs';
 const ultramarine = { K: [0.4625, 0.2934, 0.0496], S: [0.02, 0.02, 0.02], rho: 0.047, omega: 0.5, gamma: 0.85, floc: 0.3 };
 const phthalo = { K: [0.4861, 0.2344, 0.1063], S: [0.02, 0.02, 0.02], rho: 0.032, omega: 20, gamma: 0 };
 const O = { ...DEFAULTS, fixedBed: 1, edgeEvap: 0.0012, granFill: 0, slideCap: 1 };
-const flatPaper = (w, h, mm) => { const p = makePaper(w, h, { seed: 9, mmPerCell: mm }); for (const f of ['height', 'valley', 'tooth']) p[f].fill(0.5); return p; };
+// a sheet without cockle (paper.mjs): what this measures is the lanes, the levelling or the grain, not the pooling
+const flatPaper = (w, h, mm) => { const p = makePaper(w, h, { cockle: { rmsMm: 0 }, seed: 9, mmPerCell: mm }); for (const f of ['height', 'valley', 'tooth']) p[f].fill(0.5); return p; };
 
 test('a film standing deeper in one half levels across 20 mm in seconds, keeping its water and pigment', () => {
   const mm = 0.25, w = 60, s = createSheet(flatPaper(w, 40, mm), [ultramarine]);
@@ -46,7 +47,7 @@ test('on a tilted board the film runs downhill and stands as a bead at its lower
 // Five sweeps of the painter's 12 mm flat, 8 mm apart, laid on the hand's clock (tools/lab/wash-cases.mjs `sweeps`).
 function fiveSweeps(mm, dryOpts) {
   const w = Math.round(50 / mm), n = w * w, pigments = [ultramarine, phthalo];
-  const s = createSheet(makePaper(w, w, { seed: 9, scale: 1, toothScale: 0.2, fibres: 0.5, tooth: 0.5, proudBlur: 1, mmPerCell: mm, coldPress: { mmPerCell: mm, bumpMm: [0.5, 2], cover: 2.2, swell: 0.3 } }), pigments);
+  const s = createSheet(makePaper(w, w, { cockle: { rmsMm: 0 }, seed: 9, scale: 1, toothScale: 0.2, fibres: 0.5, tooth: 0.5, proudBlur: 1, mmPerCell: mm, coldPress: { mmPerCell: mm, bumpMm: [0.5, 2], cover: 2.2, swell: 0.3 } }), pigments);
   const before = { ...totals(s) };
   for (let k = 0; k < 5; k++) {
     const r = 6 / mm, b = B.createBrush({ model: 'section', flat: true, radius: r, bristles: Math.max(12, Math.ceil(r * 2)), capacity: 100, belly: 12, feed: 0.4, give: 0.9, free: 0.4, film: 0.25, splay: 0.03, stiffness: 8, wetMix: 0.3, seed: 60 + k });
@@ -63,7 +64,7 @@ function fiveSweeps(mm, dryOpts) {
 // the same measure. It has no sweeps, so whatever bands and seams it shows are the paint's own grain in the rows.
 function pouredSquare(mm, dryOpts) {
   const w = Math.round(50 / mm), n = w * w, pigments = [ultramarine, phthalo];
-  const s = createSheet(makePaper(w, w, { seed: 9, scale: 1, toothScale: 0.2, fibres: 0.5, tooth: 0.5, proudBlur: 1, mmPerCell: mm, coldPress: { mmPerCell: mm, bumpMm: [0.5, 2], cover: 2.2, swell: 0.3 } }), pigments);
+  const s = createSheet(makePaper(w, w, { cockle: { rmsMm: 0 }, seed: 9, scale: 1, toothScale: 0.2, fibres: 0.5, tooth: 0.5, proudBlur: 1, mmPerCell: mm, coldPress: { mmPerCell: mm, bumpMm: [0.5, 2], cover: 2.2, swell: 0.3 } }), pigments);
   for (let y = Math.round(5 / mm); y < Math.round(45 / mm); y++) for (let x = Math.round(5 / mm); x < Math.round(45 / mm); x++) deposit(s, y * w + x, 0.3, [0.12, 0]);
   dry(s, 200000, O, dryOpts);
   const base = new Uint8Array(n * 3); for (let i = 0; i < n; i++) base.set([246, 245, 239], i * 3);
@@ -81,19 +82,24 @@ for (const mm of [0.25, 0.1]) for (const [mode, dryOpts] of [['exact', { levelMa
     // 0.006 OD and the sweeps 0.026-0.028 and 0.008 (bounds were 0.03 and 0.01; sweeps over poured: bands 1.06-1.17,
     // seam 1.34-1.41). On the millimetre grain field (src/media/grain-field.mjs) the poured square reads 0.046-0.049 and
     // 0.009-0.010, the sweeps 0.033-0.037 and 0.013-0.015 (bands 0.72-0.77, seam 1.48-1.52). Held to 1.25 and 1.6.
+    // With paint mixing out into the film less (sheet.mjs filmDiffuse 0.05) and damp paint not levelling (levelFloor), a
+    // lap keeps a little more of its step: seam 0.0114-0.0130 against 0.0071-0.0075 (1.53-1.73), and the rims along the
+    // sides read 1.19-1.57. Held to 1.8 and 1.05-1.6.
     assert.ok(Math.abs(c.mean / r.mean - 1) < 0.25, `the poured square's density ${c.mean} against the sweeps' ${r.mean}`);
     assert.ok(r.bands < 1.25 * c.bands, `bands ${r.bands} against the poured square's ${c.bands}`);
-    assert.ok(r.seam < 1.6 * c.seam, `seam step ${r.seam} OD against the poured square's ${c.seam}`);
-    for (const v of r.rims) assert.ok(v >= 1.05 && v <= 1.4, `rims ${r.rims}`);
+    assert.ok(r.seam < 1.8 * c.seam, `seam step ${r.seam} OD against the poured square's ${c.seam}`);
+    for (const v of r.rims) assert.ok(v >= 1.05 && v <= 1.6, `rims ${r.rims}`);
   });
 }
 
-test('the five-sweep square dries the same rim at 0.25 and 0.1 mm cells, each side within 6%', () => {
+test('the five-sweep square dries the same rim at 0.25 and 0.1 mm cells, each side within 15%', () => {
+  // (6% until the levelling floor: a rim dries where the film stops levelling, which falls a cell or two differently on
+  // the two grids; the bottom and right sides now part by 11-13.4%)
   // (wash-measure rimContrast reads 1.21 at 0.25 mm and 1.05 at 0.1 mm on the same squares: it measures the outer 1 mm
   // from every unpainted cell, and the few tooth pits a sweep skips at 0.1 mm (0.4% of the square) each make a
   // millimetre of interior around them count as rim. Along the square's own sides the rims agree.)
   for (const mode of ['exact', 'fast']) {
     const a = squares[`0.25 ${mode}`], b = squares[`0.1 ${mode}`]; if (!a || !b) continue;
-    a.rims.forEach((v, i) => assert.ok(Math.abs(b.rims[i] / v - 1) < 0.06, `${mode} side ${i}: ${v} at 0.25 mm, ${b.rims[i]} at 0.1 mm`));
+    a.rims.forEach((v, i) => assert.ok(Math.abs(b.rims[i] / v - 1) < 0.15, `${mode} side ${i}: ${v} at 0.25 mm, ${b.rims[i]} at 0.1 mm`));
   }
 });

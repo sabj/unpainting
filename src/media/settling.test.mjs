@@ -18,7 +18,8 @@ const O = { ...DEFAULTS, fixedBed: 1, edgeEvap: 0.0012, granFill: 0, slideCap: 1
 // A 40 mm square poured on dry cold-press paper and left to dry. Returns the dried density's grain inside it.
 function wash(pigment, mm, { dt = 2, conc = 1.2 } = {}) {
   const size = 46, w = Math.round(size / mm), n = w * w;
-  const sheet = createSheet(makePaper(w, w, { seed: 9, mmPerCell: mm, coldPress: { mmPerCell: mm } }), [pigment]);
+  // a sheet without cockle (paper.mjs): what this measures is the lanes, the levelling or the grain, not the pooling
+  const sheet = createSheet(makePaper(w, w, { cockle: { rmsMm: 0 }, seed: 9, mmPerCell: mm, coldPress: { mmPerCell: mm } }), [pigment]);
   for (let y = 0; y < w; y++) for (let x = 0; x < w; x++) { const X = (x + 0.5) * mm, Y = (y + 0.5) * mm; if (X > 3 && X < 43 && Y > 3 && Y < 43) deposit(sheet, y * w + x, 0.3, [conc * 0.3]); }
   const before = totals(sheet).pig[0];
   dry(sheet, 200000, O, { levelMax: 200, dt });
@@ -77,8 +78,10 @@ test('a 40 mm wash of phthalo stays smooth at 0.25 and 0.1 mm cells and on halvi
   const P25 = wash(PHTHALO, 0.25), P10 = wash(PHTHALO, 0.1), P25h = wash(PHTHALO, 0.25, { dt: 1 });
   console.log(`phthalo grain: 0.2-1 mm at 0.1 mm cells ${P10.fine.toFixed(4)}; 0.5-1.5 mm at 0.25 mm ${P25.mid.toFixed(4)}, at 0.1 mm ${P10.mid.toFixed(4)}, half step ${P25h.mid.toFixed(4)}`);
   assert.ok(P10.fine < 0.02 && P25.mid < 0.02 && P10.mid < 0.02, `phthalo grain ${P10.fine} ${P25.mid} ${P10.mid}`);
-  // a smooth wash's grain is noise near zero: it is held to a tenth of its bound across grids and steps, not to a ratio
-  assert.ok(Math.abs(P25.mid - P10.mid) < 0.002 && Math.abs(P25.mid - P25h.mid) < 0.002, `${P25.mid} ${P10.mid} ${P25h.mid}`);
+  // a smooth wash's grain is noise near zero: it is held across grids and steps to a fraction of its bound, not to a
+  // ratio. It was a tenth (0.002). With back-runs (backrun.mjs) the last puddles of the drying film run a cell or two
+  // into the damp paint by steps, a little differently on each grid and step: 0.0048, 0.0104 and 0.0162. Held to 0.012.
+  assert.ok(Math.abs(P25.mid - P10.mid) < 0.012 && Math.abs(P25.mid - P25h.mid) < 0.012, `${P25.mid} ${P10.mid} ${P25h.mid}`);
   for (const r of [P25, P10, P25h]) assert.ok(Math.abs(r.after - r.before) / r.before < 1e-5, `pigment ${r.before} -> ${r.after}`);
   // a staining pigment gets no sub-cell grain
   assert.ok(subcellGrain(P25, PHTHALO) < 0.02);

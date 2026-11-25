@@ -64,7 +64,7 @@ const lb = ['# Leaderboard', '',
   + 'Raw score is the same mean out of 10. Models are ranked by Score. '
   + 'Best trial gives the indexed score and trial number. Strokes, minutes, tokens and cost are medians per trial. '
   + 'Every trial the cheat-risk score flagged was reviewed by hand, and none of them cheated. One trial was disqualified for a blocked target read ([findings](FINDINGS.md#target-reads-and-cheat-risk)). '
-  + `${R.scoring.advisory} Method: [scoring](../docs/scoring.md) and [statistics](../docs/statistics.md).`, '',
+  + `${R.scoring.advisory} Method: [older rounds](../docs/older-rounds.md).`, '',
   COST_NOTE, ''];
 for (const round of published) {
   lb.push(`## ${round.label}: ${round.title}`, '');

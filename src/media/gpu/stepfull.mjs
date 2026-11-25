@@ -62,12 +62,12 @@ const UF = [['w', 'u'], ['h', 'u'], ['n', 'u'], ['tw', 'u'], ['th', 'u'], ['ntil
   // follows on a 16-byte boundary
   'enclose', 'slideCap', 'holeFill', 'padB', 'filmDiff', 'filmDepth', 'holeSpan', 'mar', 'slope', 'padC', 'mmPerCell', 'edgeFlowDepth',
   // the paper's tooth range and the unit its hollows are measured in (paper.mjs toothHollow), for settling
-  'toothLo', 'toothSpan', 'hollowUnit', 'groundPhys', 'poreHalo', 'poreReach', 'padTime2', 'padTime3',
+  'toothLo', 'toothSpan', 'hollowUnit', 'groundPhys', 'poreHalo', 'poreReach', 'padTime2', 'lvFloor',
   // the film branch's sheet (sheet.mjs DEFAULTS): stranding only in a film thinner than holdDepth, a mix settling at its
   // mean speed (coSettle), and the film's levelling (film-level-wgsl.mjs: lvK0 the face conductance per h^3, lvTx and
   // lvTy the board's fall a cell, lvTan and lvDm the meniscus, lvR its reach in cells, lvIt and lvSubs the CG iterations
   // and transport substeps encoded a step, fillRef the hollow fill's reference load)
-  'holdDepth', 'coSettle', 'fillRef', 'lvK0', 'lvTx', 'lvTy', 'lvTan', 'lvDm', 'lvR', 'lvIt', 'lvSubs', 'lvBoxes'].map(k => [k, 'f'])];
+  'holdDepth', 'coSettle', 'fillRef', 'lvK0', 'lvTx', 'lvTy', 'lvTan', 'lvDm', 'lvR', 'lvIt', 'lvSubs', 'lvBoxes', 'brC', 'brPush', 'brHead', 'brPad2'].map(k => [k, 'f'])];
 export { UF, UBYTES_EXPORT as UBYTES, SRC_EXPORT as SRC, analyse, HASH };
 // settling needs the paper's hollow unit (paper.mjs toothHollow): a paper made without it cannot settle on the GPU
 const hollowUnitOf = paper => { if (!(paper?.hollowUnit > 0)) throw new Error('GPU sheet: the paper has no hollowUnit (make it with makePaper or scanPaper)'); return paper.hollowUnit; };
@@ -154,7 +154,7 @@ export class GpuSheet {
     if (process.env.GPU_DEMAND_READBACK === '1') B.UPLOAD_META = mk(8);
     const put = (buf, arr, off = 0) => d.queue.writeBuffer(buf, off, arr);
     // paper: constant for a sheet
-    const { px, py } = permeability(paper), P4 = new Float32Array(n * 4), P2 = new Float32Array(n * 4), P3 = new Float32Array(n * 4), hv = paper.valley || paper.height;
+    const { px, py } = permeability(paper), P4 = new Float32Array(n * 4), P2 = new Float32Array(n * 4), P3 = new Float32Array(n * 4), hv = paper.surface || paper.valley || paper.height;
     if (!paper.grainH) throw new Error('GPU sheet: the paper has no grainH (make it with makePaper or scanPaper)');
     for (let i = 0; i < n; i++) {
       P4.set([paper.capacity[i], paper.grain[i], paper.fdx[i], paper.fdy[i]], i * 4); P2.set([px[i], py[i], 0, 0], i * 4);
@@ -163,7 +163,8 @@ export class GpuSheet {
     put(B.PAPER, P4); put(B.PAPER2, P2); put(B.PAPER3, P3);
     // what a brush reads of the paper: height, tooth, valley and how proud the fibres stand (brush.mjs)
     const PB = new Float32Array(n * 4);
-    for (let i = 0; i < n; i++) PB.set([paper.height[i], paper.tooth[i], hv[i], paper.proud ? paper.proud[i] : paper.height[i] - hv[i]], i * 4);
+    const bv = paper.valley || paper.height;   // the brush meets the valley, not the water's cockled surface (brush.mjs)
+    for (let i = 0; i < n; i++) PB.set([paper.height[i], paper.tooth[i], bv[i], paper.proud ? paper.proud[i] : paper.height[i] - bv[i]], i * 4);
     put(B.BPAP, PB); put(B.BSTR, paper.capacity, this.SB * 4);
     this.cap = this.ntiles; this.hold = 0; this.epoch = 0; this.knownDry = false; this.lastCount = this.ntiles; this.pending = false;
     this.efAlloc(o.edgeEvap > 0); this.lvAlloc(levelOn(o));

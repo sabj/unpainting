@@ -69,8 +69,9 @@ test('nesting: a darker shape of like hue nests on the lighter one it borders; a
 test('lanes: a wide band is laid in a few lanes along its length, back and forth without lifting, landing and lifting on the tip, nothing round its outline', () => {
   const band = { points: [[0, 0], [120, 10], [120, 40], [0, 30]] }, f = laneFill([band], { kitMm: [38, 25.4, 7, 5], spine: false });
   const big = f.strokes.filter(s => 2 * s.radiusMm === f.brushMm);
-  // a lane is a long segment; the lanes of one stroke are joined by short turns at the outline
-  const lanes = s => s.points.slice(1).map((q, j) => [q[0] - s.points[j][0], q[1] - s.points[j][1]]).filter(([dx, dy]) => Math.hypot(dx, dy) > 30);
+  // a lane is a long run of points going one way (each lane wavers a little, so it is a run, not one segment); the lanes
+  // of one stroke are joined by short turns at the outline
+  const lanes = s => { const out = []; let a = s.points[0], b = a; for (const q of s.points.slice(1)) { const dx = q[0] - b[0], dy = q[1] - b[1], gx = b[0] - a[0], gy = b[1] - a[1], g = Math.hypot(gx, gy), d = Math.hypot(dx, dy); if (d < 1e-9) continue; if (g > 1e-9 && (gx * dx + gy * dy) / (g * d) < 0.85) { out.push([gx, gy]); a = b; } b = q; } out.push([b[0] - a[0], b[1] - a[1]]); return out.filter(([dx, dy]) => Math.hypot(dx, dy) > 30); };
   const n = big.reduce((a, s) => a + lanes(s).length, 0);
   assert.ok(n >= 2 && n <= 4, `${n} lanes of the ${f.brushMm} mm brush`);
   assert.equal(big.length, 1, 'one stroke: the brush turns at the outline instead of lifting');

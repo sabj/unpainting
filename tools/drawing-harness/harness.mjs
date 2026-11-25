@@ -277,7 +277,8 @@ function phaseChecks(out, laid) {
 
 /**
  * The drawing laid in phases with a two-stage painting (drawing-phases.mjs): a script washes the lower part in stage 1
- * and the band round line 2 in stage 2. Auto's pencil lays line 2 with stage 2, the rest first; a pen drawing is inked
+ * and the band round line 2 in stage 2 (its top 5 mm below line 1: a wash's organic edge wanders up to 3 mm, and a line
+ * within 1.5 mm of a wash's edge places that wash). Auto's pencil lays line 2 with stage 2, the rest first; a pen drawing is inked
  * whole first; a model's "stage 2" lays its line with stage 2 in pencil or in waterproof ink. Each phase on dry paper,
  * filmed after paint, and the washes over it move it no more than the stated limits.
  */
@@ -286,7 +287,7 @@ export async function phasesCells(dir, { gpu = false } = {}) {
   fs.writeFileSync(script, JSON.stringify({ format: 'painting-script 2', author: 'drawing harness', sheet: { widthMm: MM, heightMm: H }, palette: ['ochre', 'ultramarine'],
     brushes: { mop: { shape: 'round', widthMm: 8 } }, passages: [
       { id: 'ground', what: 'the lower part', stage: 1, kind: 'wash', region: [[4, 21], [44, 21], [44, 34], [4, 34]], paint: { pigments: { ochre: 1 }, dilution: 'pale' }, brush: 'mop', paper: 'dry', handling: { direction: 0 } },
-      { id: 'band', what: 'the band round line 2', stage: 2, kind: 'wash', region: [[4, 9], [44, 9], [44, 18], [4, 18]], paint: { pigments: { ultramarine: 1 }, dilution: 'pale' }, brush: 'mop', paper: 'dry', handling: { direction: 0 } }] }));
+      { id: 'band', what: 'the band round line 2', stage: 2, kind: 'wash', region: [[4, 11], [44, 11], [44, 18], [4, 18]], paint: { pigments: { ultramarine: 1 }, dilution: 'pale' }, brush: 'mop', paper: 'dry', handling: { direction: 0 } }] }));
   const base = ['--image', subject.target, '--washplan', `script:${script}`, '--drawing', 'first', '--stages', 'none', '--paints', 'ochre,ultramarine', '--paintsextend', '0', '--width', String(W)];
   const choose = (name, rules, medium, own) => {
     const got = writeLinesEdit({ dir: path.join(dir, name, 'choice'), stem: subject.stems.pencil, edit: { format: LINES_EDIT_FORMAT, rules, ...(own ? { own } : {}) }, listing: linesListing(drawingDoc('pencil')), medium });

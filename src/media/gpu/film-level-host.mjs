@@ -10,6 +10,7 @@ const MEN = [{ LVMEN: 0 }, { LVMEN: 1 }], PAR = [{ LVPAR: 0, LVK0: 1 }, { LVPAR:
 const LIGHT = { LVLIGHT: 1 };
 const ROUNDS = Array.from({ length: 64 }, (_, r) => ({ LVROUND: r }));
 export const levelOn = o => (o.level ?? 1) > 0;
+const backRunOn = o => (o.levelFloor ?? 0) > 0 && (o.invade ?? 0) > 0;
 const fillOn = o => (o.slide ?? 0) > 0 && (o.fillRef ?? 0.4) > 0;
 
 /** The budgets a sheet starts with: CG iterations and substep rounds encoded a step, workgroups for the per-box kernels. */
@@ -27,7 +28,7 @@ export function levelUniforms(o, dt, mm, lv) {
   return {
     holdDepth: o.holdDepth ?? 0.01, coSettle: o.coSettle ?? 0.8, fillRef: o.fillRef ?? 0.4,   // (as sheet.mjs DEFAULTS)
     lvBoxes: lv.boxes, lvK0: (o.level ?? 1) * KAPPA * dt / (mm * mm), lvTx: (o.tiltX ?? 0) * mm, lvTy: (o.tiltY ?? 0) * mm,
-    lvTan: o.meniscus ?? 0.05, lvDm: dm, lvR: Math.ceil(dm / mm), lvIt: lv.iters, lvSubs: lv.subs,
+    lvFloor: o.levelFloor ?? 0, brC: (o.invade ?? 0) * dt / mm, brPush: o.push ?? 0, brHead: Math.max(o.levelFloor ?? 0, o.puddle ?? 0), lvTan: o.meniscus ?? 0.05, lvDm: dm, lvR: Math.ceil(dm / mm), lvIt: lv.iters, lvSubs: lv.subs,
   };
 }
 
@@ -57,6 +58,9 @@ export function encodeLevel(run, o, mm, lv, tiles) {
   if (lv.iters > 0) run('lv_cg_d', boxes, PAR[1 + ((lv.iters - 1) & 1)]);
   run('lv_flux', tiles); run('lv_out', tiles); run('lv_subs', boxes);
   for (let r = 0; r < lv.subs; r++) { run('lv_s1', tiles, ROUNDS[r]); run('lv_s2', tiles, ROUNDS[r]); }
+  // the back-runs (backrun.mjs), after the levelling, as the CPU runs backRun after levelFilm
+  // (lv_br_a runs whenever the film levelled: it also clears the rounds' marks, film-level-wgsl.mjs lvRound)
+  run('lv_br_a', tiles); if (backRunOn(o)) { run('lv_br_b', tiles); run('lv_br_c', tiles); }
 }
 
 /**

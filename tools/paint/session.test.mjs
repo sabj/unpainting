@@ -35,13 +35,13 @@ test('the preflight\'s folder holds the task, the tools, the code planner\'s pla
   try {
     for (const f of ['TASK.md', 'README.md', 'choice.json', 'unpaint', 'own-script-brief.md', 'auto/plan.png', 'auto/washes.txt', 'auto/plan.json', 'auto/settings.json', 'inputs/forms-ids.png', 'inputs/forms.json']) assert.ok(fs.existsSync(path.join(dir, f)), f);
     assert.deepEqual(JSON.parse(fs.readFileSync(path.join(dir, 'choice.json'), 'utf8')), { kind: 'settings', settings: {}, why: '' });
-    assert.match(prompt, /`280` by `186.7` mm/); assert.match(prompt, /Steps: `1000` of your tool calls/); assert.match(prompt, /Time is not budgeted: waiting for a look or for the machine costs\s+you nothing \(a far safety stop ends a session after `85` minutes\)/); assert.match(prompt, /you are allowed to make mistakes/); assert.match(prompt, /you may do it `20` times/); assert.doesNotMatch(prompt, /\bmust\b|\bnever\b|ROUNDS ONLY|sent back/); assert.match(prompt, /No score is ever shown/); assert.match(prompt, /light pencil/);
+    assert.match(prompt, /`280` by `186.7` mm/); assert.match(prompt, /Steps: `1000` of your tool calls/); assert.match(prompt, /Time: 85 minutes on the clock for the whole try, replies\s+and looks included/); assert.match(prompt, /you are allowed to make mistakes/); assert.match(prompt, /you may do it `20` times/); assert.doesNotMatch(prompt, /\bmust\b|\bnever\b|ROUNDS ONLY|sent back/); assert.match(prompt, /No score is ever shown/); assert.match(prompt, /light pencil/);
     assert.doesNotMatch(prompt, /REAL_SIZE_LINE|SHEET_W|LOOKS_MOST|WALL_MINUTES|GRACE_MINUTES|REVERTS_MOST|STEPS_MOST|DRAWING_NOTE/);
     const readme = fs.readFileSync(path.join(dir, 'README.md'), 'utf8');
     assert.match(readme, /`inputs\/source.png`: the SUBJECT/); assert.match(readme, /`inputs\/study-2.png`: block-in STUDY 2/); assert.match(readme, /\| `\.\/unpaint look` \|.*\| its cost in look units, of 4 for this try \(the benchmark's budget\) \|/); assert.doesNotMatch(readme, /INPUT_LIST|SHEET_W|LOOKS_MOST|REVERTS_MOST/); assert.match(readme, /"own": \[/); assert.match(readme, /`"medium": "pencil"`, `"pen"` or `"none"` beside your script/); assert.match(readme, /`"ink": "waterproof"` or `"soluble"` beside your script/);
     assert.ok(fs.statSync(path.join(dir, 'unpaint')).mode & 0o100, 'the command can be run');
     assert.ok(!fs.existsSync(path.join(dir, 'auto/beside.png')) && !fs.existsSync(path.join(dir, 'auto/numbers.txt')), 'nothing at the start sets a plan against the subject: that is a look');
-    assert.equal(DEFAULT_LOOKS, 3, 'three full looks\' worth of rendering, ten half-size whole looks'); assert.equal(DEFAULT_WALL_MINUTES, 360, 'the wall clock is a far safety stop, not a budget');
+    assert.equal(DEFAULT_LOOKS, 3, 'three full looks\' worth of rendering, ten half-size whole looks'); assert.equal(DEFAULT_WALL_MINUTES, 360, 'the most a session may run');
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });
 
@@ -49,7 +49,7 @@ test('a plan answers with counts only and looks are counted: after the last look
   const { dir, ledger } = folder({ looks: 2 }); let n = 0;
   try {
     const server = sessionServer({ lookSize: 'full', dir, ledger, look: looked, looks: 2, wallMinutes: 85, checkScript: s => { if (!s.passages) throw new Error('painting script: no passages'); return s; }, compile: async (choice) => (choice.sets.some(([k]) => k === 'bogus') ? { ok: false, error: '--set bogus: not an option' } : compiled(++n)) });
-    assert.match(await ask(dir, server, 'status'), /0 of 2 rendering units spent on 0 looks, 0 of 1000 steps \(your tool calls\) taken, 0 of 20 returns to an earlier choice\. Plans made: 0\. Time is not budgeted\./);
+    assert.match(await ask(dir, server, 'status'), /0 of 2 rendering units spent on 0 looks, 0 of 1000 steps \(your tool calls\) taken, 0 of 20 returns to an earlier choice\. Plans made: 0\. Time: 0 of \d+ minutes on the clock\./);
     const free = await ask(dir, server, 'plan');
     assert.match(free, /^It compiles \(nothing changed\): 10 shapes, 21 washes, 100 strokes, widest wash brush 17 mm\. A look of this plan costs 1 of your [\d.]+ units left; a look of a region of your own script, the share of its passages that touch it; never under 0\.05\. The price is fixed by size and share: how you paint costs nothing\. Nothing else is shown without a look\./);
     assert.deepEqual(fs.readdirSync(path.join(dir, 'plans')), [], 'a free plan leaves no data and no picture in the folder'); assert.doesNotMatch(free, /rgb|box|covers|plan\.json/);
@@ -136,7 +136,7 @@ test('time is not a budget: a look that waits an hour costs nothing of it; the f
     const server = sessionServer({ lookSize: 'full', dir, ledger, looks: 5, wallMinutes: 360, graceMinutes: 10, now: () => clock, checkScript: s => s, compile: async () => compiled(1), look: async () => { clock += 60 * 60000; return looked(); } });
     server.begin();
     assert.match(await ask(dir, server, 'look'), /^LOOK 1 \(/); assert.equal(server.over(), false);
-    assert.match(await ask(dir, server, 'status'), /1 of 5 rendering units spent on 1 look, 0 of 1000 steps[\s\S]*Time is not budgeted\./);
+    assert.match(await ask(dir, server, 'status'), /1 of 5 rendering units spent on 1 look, 0 of 1000 steps[\s\S]*Time: \d+ of 360 minutes on the clock\./);
     clock += 300 * 60000; put(dir, { kind: 'settings', settings: { 'study1.shapes': 70 } });
     assert.equal(server.wallSeconds(), 21600); assert.equal(server.over(), false, 'the safety stop is reached, and the session has its minutes to hand in');
     const refused = await ask(dir, server, 'look');
@@ -500,7 +500,7 @@ test('at every level the folder holds the code planner\'s inputs and no code pla
   fs.mkdirSync(path.join(prev, 'painting', 'plate'), { recursive: true }); await sharp({ create: { width: 56, height: 37, channels: 3, background: '#a09080' } }).png().toFile(path.join(prev, 'painting', 'plate', 'painting.png'));
   const fromAuto = await autoHanded({ prepared: { painting: { run: path.join(prev, 'painting') } }, made: path.join(prev, 'made'), widthMm: 280, washes: 'THE PLAN IN NUMBERS\n3 washes' });
   await assert.rejects(autoHanded({ prepared: { painting: null }, made: path.join(prev, 'm2'), widthMm: 280, washes: 'x' }), /Auto's finished painting, and it is not prepared/);
-  for (const [level, handed] of [['L2', []], ['L4-retry', [previous, shapesHanded(path.join(prev, 'shapes.json'))]], ['L4', [shapesHanded(path.join(prev, 'shapes.json')), fromAuto]]]) {
+  for (const [level, handed] of [['L2', []], ['L4-retry', [previous, shapesHanded(path.join(prev, 'shapes.json'), path.join(prev, 'made-shapes'))]], ['L4', [shapesHanded(path.join(prev, 'shapes.json'), path.join(prev, 'made-shapes')), fromAuto]]]) {
     const { dir, prompt, eyesOnly } = folder({ level, handed });
     try {
       assert.ok(!fs.existsSync(path.join(dir, 'auto')), `${level}: no auto/ folder`);

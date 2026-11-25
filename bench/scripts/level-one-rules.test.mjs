@@ -28,7 +28,7 @@ test('the session has 60 minutes; the six-hour stop of levels 2 to 4 is the most
   assert.match(brief, /The session has \{LIMIT_MIN\} minutes on the clock/); assert.doesNotMatch(brief, /no deadline|far safety stop/);
   assert.match(read(BENCH, 'v3', 'README.md'), /The session has 60 minutes on the clock/);
   assert.match(read(BENCH, 'README.md'), /the session has 60 minutes on the clock/);
-  assert.match(read(BENCH, 'docs', 'rules.md'), /Its session has 60 minutes on the clock/);
+  assert.match(read(BENCH, 'docs', 'rules.md'), /60 minutes on the clock \(`--wallminutes 60`/);
 });
 
 test('a target without its rendering unit has no runaway guard and is refused by name', () => {

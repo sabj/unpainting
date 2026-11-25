@@ -7,7 +7,9 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import sharp from 'sharp';
-import { checkAuthored, preparePacket, gridImage } from './author.mjs';
+import { checkAuthored, preparePacket, gridImage, SCRIPT_PAINTS_MOST } from './author.mjs';
+import { BOX } from '../../src/crop/box.mjs';
+import { briefFor, levelBlock, levelData, briefRecord, pictureOf } from './brief.mjs';
 import { readChoice, choiceKind } from './choice.mjs';
 import { runPictures } from './sheet.mjs';
 import { tinyTouchWarning } from './plan-data.mjs';
@@ -17,13 +19,16 @@ import { sheetNumbers, sheetLine } from './rounds-sheet.mjs';
 import { LOOK_PRICE } from './look-cost.mjs';
 import { standInReplies } from './rounds-standin.mjs';
 import { namesShapes, resolveNumbered } from './study-shapes.mjs';
-import { previousHanded, shapesHandedRounds, levelOneTemplate, autoHandedRounds } from './rounds-levels.mjs';
+import { previousHanded, shapesHandedRounds, autoHandedRounds } from './rounds-levels.mjs';
 
-/** The long side, in pixels, of every picture sent in a round, and its JPEG quality: what the models read at full detail. */
-const SENT_PX = 1568, SENT_QUALITY = 88;
-const HERE = path.dirname(new URL(import.meta.url).pathname);
-const sent = async (image, file) => { fs.mkdirSync(path.dirname(file), { recursive: true }); await sharp(image).resize({ width: SENT_PX, height: SENT_PX, fit: 'inside', withoutEnlargement: true }).flatten({ background: '#ffffff' }).jpeg({ quality: SENT_QUALITY }).toFile(file); return file; };
-
+/** The long side, in pixels, of a picture sent in a round, and its JPEG quality: the subject, the traced shapes (their
+ * numbers read) and each look's sheet at the most a model reads at full detail; the drawing, the studies and a handed
+ * painting, read for place, value and colour, smaller. */
+const SENT_PX = 1568, SENT_PX_REFERENCE = 1280, SENT_QUALITY = 88;
+const FULL_DETAIL = new Set(['source.jpg', 'traced-shapes.jpg', 'sheet.jpg']);
+const sent = async (image, file) => { fs.mkdirSync(path.dirname(file), { recursive: true }); const px = FULL_DETAIL.has(path.basename(file)) ? SENT_PX : SENT_PX_REFERENCE; await sharp(image).resize({ width: px, height: px, fit: 'inside', withoutEnlargement: true }).flatten({ background: '#ffffff' }).jpeg({ quality: SENT_QUALITY }).toFile(file); return file; };
+/** A sent picture's size and scale: gridImage lays the sheet 1400 px across inside a 40 px margin each side. */
+const sizeOf = async (file, widthMm) => { const m = await sharp(file).metadata(); return { px: [m.width, m.height], pxPerMm: +((1400 * m.width / 1480) / widthMm).toFixed(1) }; };
 /** The choice a rounds state stands for (its script, and the drawing beside it), as cli.mjs paints choices. */
 export function choiceOf(state) {
   const given = state.drawing ?? {};
@@ -50,46 +55,48 @@ export async function roundsRun(r, x) {
   // the one guard, resource management only: the water-step ceiling of the subject (ten times Auto's)
   x.guard(r);
   const pics = await runPictures(record);
-  // level 1: the subject, the toolkit and the tips; nothing prepared is sent, named or laid on the sheet
-  const bare = Boolean(x.terms?.noInputs); let briefFile = x.briefFile;
-  if (bare) { briefFile = path.join(dir, 'level-1-brief-template.md'); fs.writeFileSync(briefFile, levelOneTemplate(fs.readFileSync(x.briefFile, 'utf8'))); }
-  const packet = await preparePacket({ dir, root: x.root, run: { ...record, masks: record.masks.receipt && !bare ? { ...record.masks } : null }, drawingPng: pics.drawing, briefFile, formsPicture: false, only: bare ? ['source.png'] : null });
+  // level 1: the subject alone; nothing prepared is sent, named or laid on the sheet
+  const bare = Boolean(x.terms?.noInputs);
+  const packet = await preparePacket({ dir, root: x.root, run: { ...record, masks: record.masks.receipt && !bare ? { ...record.masks } : null }, drawingPng: pics.drawing, briefFile: null, formsPicture: false, only: bare ? ['source.png'] : null });
   // at level 1 the prepared drawing is never laid: only lines of the model's own, whatever medium its answer names for them
   const laid = state => (bare ? { ...state, drawing: { ...(state.drawing ?? {}), medium: 'none' } } : state);
   // every picture goes out once, in round 0, and stays in the conversation: recorded as given, never priced
   const images = [], names = [];
   for (const f of packet.files) { const name = `${path.basename(f, '.png')}.jpg`; images.push(await sent(path.join(dir, f), path.join(dir, 'sent', name))); names.push([f, name]); }
-  let brief = packet.brief.replace(/each form is one flat colour in the forms picture, and the\s+`FORMS` list at the end gives/, 'the `FORMS` list at the end gives');
-  for (const [from, to] of names) brief = brief.replaceAll(from, to);
-  // levels 2 and 3 may name the traced shapes by number: the brief's line against it gives way to the level's own section
-  if (x.terms?.shapes) brief = brief.replace(/Do not use `shapes`, `reserve` or `along`: this\s+[^\n]*\n?/, 'At this level `shapes`, `reserve` and `along` may name the traced shapes by number (see the section on them below).\n');
-  const roundsBrief = fs.readFileSync(path.join(HERE, 'ROUNDS-BRIEF.md'), 'utf8').replaceAll('LOOKS_MOST', String(x.looksMost)).replaceAll('LOOKS_WHOLE', String(Math.floor(x.looksMost / LOOK_PRICE.half + 1e-9)));
   // what the level adds (levels.mjs), each handed once in round 0. No level is handed another level's result; the
   // replay level L4-retry alone is handed the model's own earlier painting to look at and its script as text.
-  const extra = []; let numbered = null;
+  const data = [], shapesData = [], notes = []; let numbered = null;
+  const forms = bare ? [] : packet.forms ?? [];
+  if (bare) notes.push('Nothing else is given: no drawing, study or list of forms, and nothing is on the sheet before you start. Lines of your own (`lines`) are drawn where you put them.');
+  if (forms.length) data.push({ title: 'The named forms (number. name (kind): box in sheet mm)', text: forms.map(f => `- ${f.id}. ${f.name} (${f.kind})${f.boxMm ? `: box x ${f.boxMm[0]} to ${f.boxMm[2]}, y ${f.boxMm[1]} to ${f.boxMm[3]} mm` : ''}`).join('\n') });
   if (x.terms?.previous) {
     const prev = previousHanded(x.previous, { subject: spec.id, author: author.key });
     images.push(await sent(await gridImage(prev.painting, W), path.join(dir, 'sent', 'your-previous-painting.jpg'))); names.push(['', 'your-previous-painting.jpg']);
     // which level the previous result is from is the run's named choice ("L4-retry after L2"): replaying old runs only
-    extra.push(prev.text); record.author.previousTry = { from: x.previous, level: prev.level, painting: prev.painting, scriptSha256: prev.sha256 };
+    data.push({ title: `Your own previous painting of this subject (level ${prev.level})`, text: prev.text }); record.author.previousTry = { from: x.previous, level: prev.level, painting: prev.painting, scriptSha256: prev.sha256 };
     record.author.ladder = `${x.level} after ${prev.level}`; x.say(r, `this is ${record.author.ladder} (a replay of the old ladder): a fresh conversation handed its own ${prev.level} painting and script`);
   }
   if (x.terms?.shapes) {
     numbered = JSON.parse(fs.readFileSync(x.shapesFile(r), 'utf8'));
     const handed = await shapesHandedRounds(numbered, sheet);
     images.push(await sent(await gridImage(handed.picture, W), path.join(dir, 'sent', 'traced-shapes.jpg'))); names.push(['', 'traced-shapes.jpg']);
-    extra.push(handed.text); record.author.shapesHanded = { shapes: numbered.shapes.length, colour: true, geometry: 'by number: a passage names a shape and the harness lays its outline' };
+    shapesData.push({ title: `The traced shapes numbered on the picture (n, colour, area, box x0-x1,y0-y1 in whole mm; ${handed.list.length} of ${numbered.shapes.length}, the smaller ones unnumbered)`, text: handed.list.join('\n') }); record.author.shapesHanded = { shapes: numbered.shapes.length, colour: true, geometry: 'by number: a passage names a shape and the harness lays its outline' };
   }
   // level 3: Auto's plan in numbers and Auto's finished painting as it dried at full size, prepared for this code
   if (x.terms?.autoPlan || x.terms?.auto) {
     const auto = await x.autoOf(r);
     if (!auto?.painting || !auto?.washes) throw new Error(`level ${x.level} hands over Auto's plan and finished painting, and ${!auto?.painting ? 'the painting' : 'the plan'} is not there`);
     images.push(await sent(await gridImage(auto.painting, W), path.join(dir, 'sent', 'auto-painting.jpg'))); names.push(['', 'auto-painting.jpg']);
-    extra.push(autoHandedRounds(auto.washes)); record.author.autoHanded = { plan: true, painting: true, from: auto.from ?? null, paintingSha256: auto.paintingSha256 ?? null, planSha256: auto.planSha256 ?? null };
+    notes.push('Auto\'s plan (its washes in numbers, in Level data) and Auto\'s painting are given to read. What you hand in is your own script: Auto\'s plan is not a script and cannot be handed in.');
+    data.push({ title: 'Auto\'s plan', text: autoHandedRounds(auto.washes) }); record.author.autoHanded = { plan: true, painting: true, from: auto.from ?? null, paintingSha256: auto.paintingSha256 ?? null, planSha256: auto.planSha256 ?? null };
   }
-  const text = `${brief}\n\n${roundsBrief}${extra.map(e => `\n\n${e}`).join('')}\n\nThe pictures attached, in this order: ${names.map(([, n], i) => `${i + 1}. \`${n}\``).join(', ')}. Look at each before answering. Write your plan and script now. Answer with the JSON object only.`;
+  const pictures = [];
+  for (const [, n] of names) { const [label, what] = pictureOf(n, { medium: record.drawing.medium.split(',')[0], studies: record.studies ?? [] }); pictures.push({ name: n, label, what, ...(await sizeOf(path.join(dir, 'sent', n), W)) }); }
+  const brief = briefFor({ sheet, brushes: JSON.parse(fs.readFileSync(path.join(x.root, 'src/paint/brushes.json'), 'utf8')).brushes, paints: BOX, paintsMost: SCRIPT_PAINTS_MOST, looksMost: x.looksMost, lookWhole: LOOK_PRICE.half, wallMinutes: x.wallMinutes ?? null,
+    given: levelBlock({ level: x.level, pictures, data: [...data, ...shapesData].map(d => d.title.replace(/ \(.*$/, '').toLowerCase()), notes, forms: forms.length > 0 }), data: levelData(data) + levelData(shapesData, 'Data: traced shapes') });
+  const text = `${brief.text}\nAnswer now with your script: one JSON object.`;
+  record.author.brief = { ...briefRecord(brief), sent: 'author/rounds-prompt.txt' };
   fs.writeFileSync(path.join(dir, 'rounds-prompt.txt'), text);
-  const forms = bare ? [] : packet.forms ?? [];
   const ask = roundsAsker(author.cli === 'dry' ? { ...author, replies: standInReplies(sheet, { shapes: Boolean(numbered) }) } : author, { dir, slot: x.slot(author.cli) });
   const t0 = Date.now(); let res;
   x.say(r, `${author.name} starts fixed rounds (${author.cli}; level ${x.level}; no shell, no tools; look budget ${x.looksMost} units; ${images.length} pictures sent once)`);

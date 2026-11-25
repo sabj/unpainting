@@ -48,12 +48,16 @@ for (const tilt of [0, 5]) {
     const dW = worst(cpu.W, gs.W), dG = Math.max(worst(cpu.G[0], gs.G[0]), worst(cpu.G[1], gs.G[1]));
     t.diagnostic(JSON.stringify({ dW, dG, stats }));
     // the levelling moved water: a level film would leave the deep half 0.2 mm deeper
-    assert.ok(Math.abs(cpu.W[48 * N + 60] - cpu.W[48 * N + 36]) < 0.02, 'the CPU film levelled');
+    // (its surface: the depth over the paper's surface, which the wet sheet's cockle bends, paper.mjs)
+    const H = i => cpu.W[i] + O.slope * cpu.paper.surface[i];
+    assert.ok(Math.abs(H(48 * N + 60) - H(48 * N + 36)) < 0.02, 'the CPU film levelled');
     // float32 against the CPU's doubles. Level, a few float32 roundings of a cell's water. On the tilted board the
     // film runs to a 0.64 mm bead in a step at face conductances near 3000 (each face's flux is that times the
     // difference of two neighbours' surface changes, and float32 holds a change of 0.3 mm to 3e-8): 5e-4 a step, and
     // up to 0.5% of the bead after 20 steps
-    assert.ok(dW < (tilt ? 5e-3 : 1e-4), `water differs by ${dW}`);
+    // On the tilted board the bead leaves a trail of cells near the levelling's floor (sheet.mjs levelFloor), and a
+    // few of them fall on the other side of it in float32: 0.013 of water at the worst cell after 20 steps.
+    assert.ok(dW < (tilt ? 2e-2 : 1e-4), `water differs by ${dW}`);
     assert.ok(dG < (tilt ? 2e-3 : 1e-4), `pigment differs by ${dG}`);
     assert.equal(stats.short, 0, 'no solve ran out of iterations');
   });
@@ -72,7 +76,10 @@ test('the GPU levelling and settling keep water and pigment to 1e-5, on a tilted
 
 test('each box fills its hollows by its own load (fillRef), strands only in a thin film, and settles a mix together, as on the CPU', { timeout: 120000 }, async t => {
   // two passages far apart, a dark one and a light one: two boxes with different fills; levelling off to see the slide alone
-  const make = () => { const s = disc({ cx: 22, cy: 48, r: 16, deep: 0.2, shallow: 0.2, conc: [6, 1] }); return disc({ cx: 74, cy: 48, r: 16, deep: 0.2, shallow: 0.2, conc: [0.5, 0.1] }, s); };
+  // on a flat sheet (no cockle): over the cockle the wet fronts' thresholds fall on a few cells that float32 and doubles
+  // decide differently, and the deposits part by 0.003 there, which is not the fill this measures
+  const flatSheet = () => createSheet(makePaper(N, N, { seed: 9, mmPerCell: MM, cockle: { rmsMm: 0 } }), [ULTRAMARINE, PHTHALO]);
+  const make = () => { const s = disc({ cx: 22, cy: 48, r: 16, deep: 0.2, shallow: 0.2, conc: [6, 1] }, flatSheet()); return disc({ cx: 74, cy: 48, r: 16, deep: 0.2, shallow: 0.2, conc: [0.5, 0.1] }, s); };
   // (the painter's slideCap: without it a deposit near its repose slides a whole cell's worth or none, by a rounding)
   const O = { ...DEFAULTS, edgeEvap: 0, level: 0, mmPerCell: MM, dt: 2, slideCap: 1, fillRef: 0.4 };
   const r = await both(t, make, O, 120); if (!r) return;
@@ -83,4 +90,27 @@ test('each box fills its hollows by its own load (fillRef), strands only in a th
   t.diagnostic(JSON.stringify({ dD, dG, effect }));
   assert.ok(effect > 1e-2, `fillRef barely changes the CPU deposit: ${effect}`);
   assert.ok(dD < 5e-4 && dG < 1e-5, `deposit differs by ${dD}, suspension by ${dG}`);
+});
+
+test('a puddle run into damp paint (backrun.mjs) on the GPU as on the CPU: water and pigment cell by cell, both kept', { timeout: 120000 }, async t => {
+  // a damp disc (0.012 mm, its paint settled) with a puddle of clean water 0.2 mm deep in its middle
+  const make = () => {
+    const s = disc({ deep: 0.012, shallow: 0.012, conc: [0, 0] });
+    for (let i = 0; i < s.n; i++) if (s.M[i]) { s.D[0][i] = 0.05; s.D[1][i] = 0.02; }
+    for (let y = 42; y < 54; y++) for (let x = 42; x < 54; x++) s.W[y * N + x] = 0.2;
+    return s;
+  };
+  const O = { ...DEFAULTS, evap: 0, paperDry: 0, absorb: 0, edgeEvap: 0, mmPerCell: MM, dt: 0.5 };
+  const r = await both(t, make, O, 30); if (!r) return;
+  const { cpu, gs } = r, ref = make();
+  const dW = worst(cpu.W, gs.W), dG = Math.max(worst(cpu.G[0], gs.G[0]), worst(cpu.G[1], gs.G[1])), dD = Math.max(worst(cpu.D[0], gs.D[0]), worst(cpu.D[1], gs.D[1]));
+  t.diagnostic(JSON.stringify({ dW, dG, dD }));
+  // the puddle ran out into the damp paint and pushed paint on: a cell two beyond the puddle's edge took water and paint
+  assert.ok(cpu.W[48 * N + 56] > 0.02, `the CPU puddle invaded: ${cpu.W[48 * N + 56]}`);
+  for (const s of [cpu, gs]) {
+    assert.ok(Math.abs(water(s) / water(ref) - 1) < 1e-5, `water ${water(s)} against ${water(ref)}`);
+    for (const k of [0, 1]) assert.ok(Math.abs(pigment(s, k) / pigment(ref, k) - 1) < 1e-5, `pigment ${k}`);
+  }
+  assert.ok(dW < 1e-4, `water differs by ${dW}`);
+  assert.ok(dG + dD < 2e-4, `pigment differs by ${dG} suspended, ${dD} settled`);
 });

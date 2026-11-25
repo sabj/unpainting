@@ -1,14 +1,12 @@
 # Painting script
 
-A painting script is a wash plan a model writes: passages in the order a painter lays them, each with its region, paint, brush, move and kind of mark. It replaces the wash plan the painter computes from the studies:
+A painting script is the plan a model writes for a whole painting. It lists passages in the order a painter would lay them. A passage is one wash or group of marks. Each has a region, a paint, a brush and a kind of mark. The painter lays the script as written, in place of the plan Auto works out from the studies. The brief a model gets, which describes every mark, is `tools/paint/AUTHOR-BRIEF.md`.
 
 ```sh
-node tools/paint-plate.mjs ... --washplan script:SCRIPT.json --paints <the script's palette> --paintsextend 0
+npm run paint -- SUBJECT paint --author script:SCRIPT.json --lines standard
 ```
 
-Code: `src/paint/methods/script-washes.mjs` (the plan), `src/paint/methods/script-marks.mjs` (the marks),
-`tools/painter/script-crop.mjs` (a script cut to a window of its sheet) and
-`tools/painter/script-overlay.mjs` (the passages and their strokes drawn over the subject).
+Code: `src/paint/methods/script-washes.mjs` (the plan) and `script-marks.mjs` (the marks). `tools/painter/script-overlay.mjs` draws a script's passages over the picture before painting.
 
 ## Format (painting-script 2)
 
@@ -35,46 +33,50 @@ Code: `src/paint/methods/script-washes.mjs` (the plan), `src/paint/methods/scrip
 }
 ```
 
-| field | meaning |
+Positions are sheet millimetres, x right, y down.
+
+| Field | Meaning |
 |---|---|
-| `sheet.widthMm` | the painter's `--sheetmm`; positions are sheet millimetres, x right, y down |
-| `palette` | box keys (`src/crop/box.mjs`); give them to the painter with `--paints` |
-| `brushes` | the kit by name; `widthMm` is the loaded belly's width at full pressure. Every brush is laid as a round today |
-| `lights` | paper kept: no wash lane runs through a light and no touch is set down in one (they are worked round, not masked) |
-| `stage` | 1 first pale washes, 2 local colours and masses, 3 shadows and glazes, 4 touches, 5 darks and accents; the replay's value step |
-| `kind` | `wash` (overlapping strokes of a brush sized to it, about a third of its width, unless `brush` is named), `strokes` (a few separate strokes), `touches` (short marks scattered like a hand), `lines` (the point along each of `paths`) |
-| `region` / `regions` | loose polygons (mm) that place the strokes; a guide to the hand, never a clip |
-| `paths` | polylines the point follows, for `lines` |
-| `strokes` | strokes written one by one: `{points: [[x, y, pressure], ...]}` (a point may add the hand's speed there in mm/s: `[x, y, pressure, speed]`), or `{from|at: [x, y], direction, lengthMm, pressure: [...], path}`; a stroke may name its own `brush` |
-| `count`, `character` | for groups: how many, and `size` (even, varied), `spread` (scattered, clustered, along a line), `denser` (top, bottom, left, right, edges, middle) |
-| `paint` | pigment parts; `swatch` (or `dilution`: very pale, pale, medium, strong, rich, dark) is the mix as one wash on white paper, and sets its strength |
-| `paper` | `dry`; `wet` (clean water first, or with `into` into the wet passage just before); `damp` with `into` (laid beside the passage just before as it loses its shine) |
-| `handling` | `mark` (one of the 26 kinds of the shared mark library, `src/paint/marks`: the executor places each stroke and the library gives it its pressure, speed, blade and water; strokes written point by point are laid as written), `hold` (upright, side: the belly, the width steadier), `start` (point, belly), `pressure` (a list from start to end; the width follows it), `path` (straight, curved, s-curve, zigzag, flick, wobble), `direction` (degrees, 0 right, 90 down), `speed` (slow: more points and a waver; fast), `load` (flooded, loaded, damp, dry: the brush's water; dry is dry brush), `lengthMm`, `look` (for people) |
-| `into` | the passage just before; this one is laid in the same wet session |
-| `wait` | how far the sheet dries before this passage: `dry` (the default: everything dried first, a new sitting), `damp` (laid straight after the passage before, beside it as it loses its shine) or `none` (straight on). The plan records it per passage |
-| `glaze` | `[i, n]`: one of a series of glazes over the same area (recorded; each is laid on a dry layer unless `wait` says otherwise) |
-| `shapes`, `reserve`, `{along: id}` | a block-in study's shapes by number (`tools/painter/script-resolve.mjs` turns them into regions, a passage's own reserves and a stroke down a shape's axis; the shapes come from the authoring tools' numbered list) |
-| `charges` | dabs of their own mix dropped into the passage while wet, one at each `at` |
-| `edges` | `lost` on dry paper: laid into a damp bed of clean water under its own footprint, so its edges run soft; `found` or `mixed`: on the paper as it is |
-| `what`, `dryFirst`, `why` | for people and judges; a stage-3 passage on dry paper is laid as a glaze |
+| `sheet` | `widthMm`, `heightMm` of the sheet |
+| `palette` | paints by key (`src/crop/box.mjs`), at most 14 |
+| `brushes` | the kit, named as the author likes: `shape` (`round`, `flat`) and `widthMm`, the loaded belly's width at full pressure |
+| `plan`, `approach` | the author's plan in words, for people |
+| `lights` | polygons kept as paper under every passage for the whole painting |
+| `passages` | below, in painting order |
 
-Touches are set down like a hand: scattered (no two nearer than half the even spacing), in clumps, or along the region's long axis, weighted toward the side `denser` names, nearest-next from the top left. Each is held to the region's chord along its direction and stops at a light. Every stroke has a small irregularity of place, angle, length and pressure, seeded by the passage's id. Format 1 scripts are upgraded on reading.
+A passage:
 
-`tools/painter/script-overlay.mjs` draws a script as the painting it describes, before it is painted: each stroke a ribbon as wide as its pressure, in its paint, the lights blank, a dot at each start and an arrow at each end; `--stages` and `--order` draw it after each stage and after 5 to 100% of the passages.
+| Field | Meaning |
+|---|---|
+| `id`, `what`, `why` | its name, and notes for people and judges |
+| `stage` | the order of work. 1 is the first pale washes, 2 the main colours and large masses, 3 shadows and glazes, 4 small touches, 5 darks and accents |
+| `kind` | `wash`: an area filled with overlapping strokes (lanes). By default the lanes follow the shape's own flow; a number in `handling.direction` lays them straight at that angle, and `"form"` asks for the shape's flow explicitly. The lanes take the wash's `path`, `pressure` and `mark`, so a wash can curve and swell. Its outline is irregular, not the exact polygon. `strokes`: a few separate strokes. `touches`: short marks scattered as a hand would. `lines`: a line drawn along each of `paths`. `erase`: pencil rubbed out |
+| `region`, `regions` | polygons that place the strokes. They guide the hand and never cut off a stroke |
+| `paths` | polylines, for `lines` |
+| `strokes` | strokes written one at a time: `{points: [[x, y, pressure], ...]}`, with three to eight points and a pressure from 0 to 1. An optional fourth number is the hand's speed in mm/s. A stroke may name its own `brush` |
+| `count`, `character` | for a group of strokes or touches: how many there are, and `size` (even, varied), `spread` (scattered, clustered, along a line), `denser` (top, bottom, left, right, edges, middle) |
+| `paint` | `pigments` in parts, and its strength as either `swatch` (the mix as one wash on white paper) or `dilution` (very pale, pale, medium, strong, rich or dark) |
+| `brush` | a name from `brushes` |
+| `paper` | `dry`, `wet` or `damp`. `wet` puts clean water down first under the passage's own area, or lays it into the wet passage just before when `into` is set. `damp` is used with `into` |
+| `into` | the passage just before, which is still wet. This one is laid in the same sitting |
+| `wait` | how far the sheet dries first: `dry` (the default), `damp` or `none` |
+| `edges` | `lost`: every edge is soft, because the paint is laid into a damp patch of its own area. `found` or `mixed`: every edge is hard |
+| `handling` | `mark` (below), `hold` (upright, side), `start` (point, belly), `pressure` (a list from start to end, and the width follows it; or a word: `light`, `medium`, `firm`, `swell`, `taper`, `fade`, `press`), `path` (straight, curved, s-curve, zigzag, flick, wobble), `direction` (degrees: 0 right, 90 down; or `"form"` to follow the shape), `speed` (slow, medium, fast), `load` (flooded, loaded, damp, dry), `lengthMm`, `look` (a note for people) |
+| `charges` | colour dropped in while the passage is wet. It has `pigments`, `dilution`, `brush`, and one drop at each point in `at` |
+| `glaze` | `[i, n]`: glaze number `i` of `n` over the same area |
 
-## A real passage
+`handling.mark` names one of 26 brush marks (`src/paint/marks/kinds.mjs`), such as `sweep`, `taper`, `comma`, `drag` or `flying-white`. The mark sets each stroke's pressure, speed, brush angle and water. A passage that writes its own `pressure` is laid as written.
 
-Passage "crown" from a model's script for Mittens (gpt-6-astra, 22 Nov 2026), its two outlines cut short:
+An `erase` passage takes no paint or brush: `widthMm` (0.5 to 10, default 3) and either `strokes` or a `region` that is rubbed in lanes. It needs dry paper.
 
-```json
-{ "id": "crown", "what": "Honey shadow near the parting of the brow", "stage": 3, "kind": "wash",
-  "paint": { "pigments": { "sienna": 2, "ochre": 2, "umber": 0.3 }, "swatch": "#f4ddcb", "dilution": "pale" },
-  "brush": "10", "paper": "wet", "edges": "lost", "wait": "dry",
-  "handling": { "mark": "sweep", "direction": -65, "hold": "side", "start": "belly", "load": "loaded", "speed": "medium" },
-  "regions": [ [[91.14, 149.9], [90.57, 147.48], "... 54 points"], [[139.76, 164.95], "... 72 points"] ],
-  "why": "Honey shadow near the parting of the brow." }
-```
+From level 2, a passage may name the shapes traced from the studies by number, with `shapes`, `reserve` and `{along: n}` (`tools/painter/script-resolve.mjs`).
 
-<img src="img/auto-vs-model-model-zoom.webp" width="60%" alt="The passage crown as painted: 17 clean-water strokes, then 14 numbered paint strokes along the stripes and brow">
+## What it cannot say
 
-Seventeen clean-water strokes, then 14 paint strokes. Auto fills a wash differently: [How Auto paints](auto-vs-model.md). The painter's own plan (`value-plan.json`) records each passage as an instruction with its strokes, so a script and the strokes it became can be compared.
+- A passage with one soft side and one hard side, or water over an area larger than the paint.
+- A light that is glazed over later, or a bare patch kept for one passage only.
+- Returning to a wash while it is wet. Only the passage just before can still be wet.
+
+## Beside the script
+
+The model's choice names its script and may also set the drawing: `{"kind": "script", "script": "script.json", "medium": "pen", "ink": "waterproof", "lines": "my-lines.json"}`. `medium` is `pencil`, `pen` or `none`; `ink` is `waterproof` or `soluble`; `lines` says when each prepared line is drawn (before the washes, with a stage, after them or not at all) and can add lines of its own.

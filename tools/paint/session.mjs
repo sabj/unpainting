@@ -48,8 +48,8 @@ import { eyesOnlyOf, isOriginal, eyesRule, viewersOf } from './eyes-only.mjs';
  */
 export const DEFAULT_LOOKS = DEFAULT_LOOK_UNITS;
 /**
- * The wall clock is not a budget (it depends on the machine and on who shares it): a far safety stop only, after which
- * a session is marked "cut off by the safety stop". Minutes; the grace is the time it then has to hand in.
+ * The most a session may run (minutes): its clock when nothing names one. A benchmark level runs on the levels' own
+ * clock, LEVEL_MINUTES (levels.mjs). The grace is the time a session then has to hand in.
  */
 export const DEFAULT_WALL_MINUTES = 360, DEFAULT_GRACE_MINUTES = 10;
 /**
@@ -141,9 +141,11 @@ const AUTO_FILES = ['auto/settings.json', 'auto/plan.json', 'auto/plan-to-edit.j
  * Without it there is no auto/, the briefs say nothing of the code's plan (forLevel), and choice.json starts as the
  * model's own script, not yet written. `packet` is preparePacket()'s; `auto` {picture: PNG buffer of the plan alone,
  * washesText, plan} (the preflight only); `settings` settingsList() (the preflight only); `forms` [{id, name, kind, boxMm}] with
- * `formsIds` the id map's file, or null. Returns {prompt, files}. Nothing of this machine's paths goes into any file.
+ * `formsIds` the id map's file, or null. `task`: the level's brief already written (brief.mjs): TASK.md is it as it
+ * stands, it names what is handed itself, and no own-script-brief.md is written. Returns {prompt, files}. Nothing of
+ * this machine's paths goes into any file.
  */
-export function writeSession({ dir, packet, sheet, realSize = null, medium, codePlan, auto = null, settings = null, forms = null, formsIds = null, looks, wallMinutes, steps = DEFAULT_STEPS, graceMinutes = DEFAULT_GRACE_MINUTES, reverts = DEFAULT_REVERTS, briefFile, readmeFile, handed = [], drawing = null, tools = TOOLS_OPEN }) {
+export function writeSession({ dir, packet, sheet, realSize = null, medium, codePlan, auto = null, settings = null, forms = null, formsIds = null, looks, wallMinutes, steps = DEFAULT_STEPS, graceMinutes = DEFAULT_GRACE_MINUTES, reverts = DEFAULT_REVERTS, briefFile, readmeFile, handed = [], drawing = null, tools = TOOLS_OPEN, task = null }) {
   if (typeof codePlan !== 'boolean') throw new Error('session: say whether this level hands over the code\'s plan (codePlan true for the preflight only)');
   if (codePlan && !(auto && settings)) throw new Error('session: the preflight\'s folder holds the code\'s plan and its settings, and none were given');
   if (!codePlan && (auto || settings)) throw new Error(`session: ${OWN_SCRIPT_ONLY}; it is not started`);
@@ -153,7 +155,8 @@ export function writeSession({ dir, packet, sheet, realSize = null, medium, code
   const ink = /^ink/.test(medium), v = { TOOLS_NOTE: tools, STEPS_MOST: steps, 'REAL_SIZE_LINE\n': realSizeLine(realSize, sheet) ? `${realSizeLine(realSize, sheet)}\n` : '', SHEET_W: sheet.widthMm, SHEET_H: sheet.heightMm, WALL_MINUTES: wallMinutes, GRACE_MINUTES: graceMinutes, LOOKS_MOST: looks, REVERTS_MOST: reverts, SHOW_COST: SHOW_ORIGINAL_COST,
     DRAWING_NOTE: ink ? 'As prepared, the drawing is waterproof ink laid before the washes; it carries the form and the washes go over it. It is offered, not required: laying no drawing (`"medium": "none"` in `choice.json`) is a normal choice, and then the brush makes the shapes on clean paper.' : 'As prepared, the drawing is light pencil laid before the washes; it only places the forms, and the paint carries form, value and edge. It is offered, not required: laying no drawing (`"medium": "none"` in `choice.json`) is a normal choice, and then the brush makes the shapes on clean paper.',
     INPUT_LIST: packet.files.map(f => `- \`${f}\`: ${f.includes('source') ? 'the SUBJECT, the picture to paint (to look at only)' : f.includes('drawing') ? 'the opening DRAWING, already on the sheet before any wash' : f.includes('forms') ? 'the NAMED FORMS, each one flat colour' : `block-in STUDY ${/study-(\d)/.exec(f)?.[1]}: the subject simplified to flat shapes (1 the broad shapes, 2 the middle study, 3 details and accents; to look at only)${codePlan ? '; the code planner reads its washes from these' : ''}`}`).join('\n') };
-  let prompt = fill(forLevel(fs.readFileSync(briefFile, 'utf8'), codePlan), v);
+  // `task`: the brief already written for the level (brief.mjs), which names what is handed itself; else the brief file filled here
+  let prompt = task ?? fill(forLevel(fs.readFileSync(briefFile, 'utf8'), codePlan), v);
   // what the session is handed beside the subject's inputs (a later try: its own previous try; level 4: the automatic
   // painter's painting): each a folder of plain files and a paragraph of the task; never a number
   const pictures = [];
@@ -161,11 +164,11 @@ export function writeSession({ dir, packet, sheet, realSize = null, medium, code
     mk(h.folder);
     for (const f of h.files) { const to = path.join(dir, h.folder, f.name); fs.mkdirSync(path.dirname(to), { recursive: true }); fs.copyFileSync(f.from, to); fs.chmodSync(to, 0o444); if (f.picture) pictures.push(`${h.folder}/${f.name}`); }
     // what it is handed is read-only: its own copy of each file, which it may read and copy out, never change in place (the originals lie outside its folder, where it cannot write)
-    prompt += `\n## ${h.title}\n\n${h.words}\n\n${h.files.map(f => `- \`${h.folder}/${f.name}\`: ${f.what}`).join('\n')}\n`;
+    if (!task) prompt += `\n## ${h.title}\n\n${h.words}\n\n${h.files.map(f => `- \`${h.folder}/${f.name}\`: ${f.what}`).join('\n')}\n`;
   }
-  if (pictures.length) prompt += `\n${seenAsk(pictures)}\n`;
+  if (pictures.length && !task) prompt += `\n${seenAsk(pictures)}\n`;
   put('TASK.md', prompt); put('README.md', fill(forLevel(fs.readFileSync(readmeFile, 'utf8'), codePlan), v));
-  put('own-script-brief.md', packet.brief);
+  if (!task) put('own-script-brief.md', packet.brief);
   put('choice.json', JSON.stringify(startChoice(codePlan), null, 1) + '\n');
   put('unpaint', UNPAINT_SH); fs.chmodSync(path.join(dir, 'unpaint'), 0o755);
   if (codePlan) {
@@ -173,7 +176,7 @@ export function writeSession({ dir, packet, sheet, realSize = null, medium, code
     put('auto/plan.json', JSON.stringify(auto.plan, null, 1) + '\n'); if (auto.toEdit) put('auto/plan-to-edit.json', JSON.stringify(auto.toEdit, null, 1) + '\n'); put('auto/washes.txt', auto.washesText); fs.writeFileSync(path.join(dir, 'auto/plan.png'), auto.picture);
   } else {
     // in a session nothing of the code's plan is in the folder, and the words given say nothing of it
-    const told = ['TASK.md', 'README.md', 'own-script-brief.md'].find(f => /code planner|code's plan|auto\//.test(fs.readFileSync(path.join(dir, f), 'utf8')));
+    const told = ['TASK.md', 'README.md', 'own-script-brief.md'].find(f => fs.existsSync(path.join(dir, f)) && /code planner|code's plan|auto\//.test(fs.readFileSync(path.join(dir, f), 'utf8')));
     if (told || AUTO_FILES.some(f => fs.existsSync(path.join(dir, f)))) throw new Error(`session: ${told ? `${told} speaks of the code's plan` : 'the folder holds the code\'s plan'}, and ${OWN_SCRIPT_ONLY}; the session is not started`);
   }
   if (forms && formsIds) { fs.copyFileSync(formsIds, path.join(dir, 'inputs/forms-ids.png')); put('inputs/forms.json', JSON.stringify(forms.map(f => ({ id: f.id, name: f.name, kind: f.kind, boxMm: f.boxMm ?? null })), null, 1) + '\n'); }
@@ -255,7 +258,7 @@ export function sessionServer({ dir, codePlan = true, sheet = null, forms = [], 
   const reach = what => { if (!reached) { reached = { what, safetyStop: what === SAFETY, atWallMinutes: +(wallSeconds() / 60).toFixed(1), looks: used(), lookUnits: spent(), steps: steps() }; note({ budgetReached: reached }); } };
   const HAND_IN = 'Hand in what you have now: leave choice.json as your final choice (./unpaint plan still checks that it compiles), write your last message, and stop.';
   const left = () => { const u = used(), r = reverts.record(), k = ledgerShowings(ledger).filter(e => e.cost > 0).length; check();
-    return `Budget of this try (the benchmark's, the same for every model and machine): ${spent()} of ${most} rendering units spent on ${u} look${u === 1 ? '' : 's'}${k ? ` and ${k} showing${k === 1 ? '' : 's'} of the subject` : ''}, ${steps()} of ${stepsMost} steps (your tool calls) taken, ${r.count} of ${r.allowed} returns to an earlier choice. Plans made: ${plans.length}. Time is not budgeted.${reached ? `\nTHE BENCHMARK'S RESOURCE BUDGET IS REACHED (${reached.what}). ${HAND_IN}${reached.safetyStop ? ` The session is ended ${graceMinutes} minutes after the safety stop.` : /steps/.test(reached.what) ? ` The session is ended after ${STEP_GRACE} more steps.` : ''}` : ''}`; };
+    return `Budget of this try (the benchmark's, the same for every model and machine): ${spent()} of ${most} rendering units spent on ${u} look${u === 1 ? '' : 's'}${k ? ` and ${k} showing${k === 1 ? '' : 's'} of the subject` : ''}, ${steps()} of ${stepsMost} steps (your tool calls) taken, ${r.count} of ${r.allowed} returns to an earlier choice. Plans made: ${plans.length}. Time: ${Math.floor(wallSeconds() / 60)} of ${wallMinutes} minutes on the clock.${reached ? `\nTHE BENCHMARK'S RESOURCE BUDGET IS REACHED (${reached.what}). ${HAND_IN}${reached.safetyStop ? ` The session is ended ${graceMinutes} minutes after the safety stop.` : /steps/.test(reached.what) ? ` The session is ended after ${STEP_GRACE} more steps.` : ''}` : ''}`; };
   /** The handed pictures each described in seen.md, or the words that ask for it. */
   const seenFault = () => {
     if (!pictures.length || described?.ok) return null;

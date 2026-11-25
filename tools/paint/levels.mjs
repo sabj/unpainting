@@ -15,6 +15,9 @@
 // at L3 and L4 is something to read, never a choice to hand in. Looks are priced by size and share (look-cost.mjs).
 // Pure: nothing is read or written here.
 
+/** The clock of every benchmark level, L1 to L4, in minutes (docs rules.md; bench/scripts/levels.mjs passes it): every brief states it. */
+export const LEVEL_MINUTES = 60;
+
 /** Retries at a level when the command line names no number (the old retry level only). */
 export const DEFAULT_RETRIES = 1;
 
