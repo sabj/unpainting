@@ -1,7 +1,7 @@
 // A scripted stand-in for a model in V4 and V5, used by `run.mjs --dry-run`. It is never a contestant. It runs in the
 // try's worktree like a model would: in V5 after try 1 it writes SELF-REVIEW.md before it reads FEEDBACK.md; it writes
 // a plan (one token wrong at first, so the admission check refuses it), traces the target's pen lines, runs the check,
-// starts the painting, looks, goes one pass on, revises a painter setting, looks again and finishes.
+// starts the painting, looks, goes one pass on, looks and revises a painter setting, looks again and finishes.
 //   node bench/dry-planner.mjs start|repair
 import fs from 'node:fs';
 import { execFileSync, spawnSync } from 'node:child_process';
@@ -27,10 +27,10 @@ const config = {
   reserves: [],
 };
 write('bench/plan/config.json', config);
-write('bench/plan/extra-args.json', ['--darkgain', '1.2']);
+write('bench/plan/extra-args.json', ['--midlayers', '3']);
 write('bench/variant.txt', 'region_w13_lay2_bogus\n');
-write('bench/PLAN.md', `# Plan (dry run)\n\nTwo families, two mid layers, darker darks.${fs.existsSync(fb) ? ' Changed from the last try: nothing; a dry run.' : ''}\n`);
-execFileSync('node', ['bench/tools/trace-ink.mjs', 'bench/plan/target.png', 'bench/plan/opening-lines.json', '.12', '14', '.62'], { stdio: 'inherit' });
+write('bench/PLAN.md', `# Plan (dry run)\n\nTwo families, three mid layers.${fs.existsSync(fb) ? ' Changed from the last try: nothing; a dry run.' : ''}\n`);
+execFileSync('node', ['bench/tools/trace-ink.mjs', 'bench/plan/target.png', 'bench/plan/opening-lines.json'], { stdio: 'inherit' });
 fs.copyFileSync('bench/plan/opening-lines.json', 'bench/plan/closing-lines.json');
 let out = paint('start');                          // refused: "bogus" is not a recipe token
 write('bench/variant.txt', 'region_w13_lay2\n');
@@ -39,7 +39,8 @@ say(`$ check.sh (exit ${check.status})\n${check.stdout.split('\n').slice(-2).joi
 out = until(paint('start'), stopped);
 paint('look');
 out = until(paint('next'), stopped);
-write('bench/plan/extra-args.json', ['--darkgain', '1.1']);
+paint('look');                                     // a revision follows a look at the same stop
+write('bench/plan/extra-args.json', ['--midlayers', '2']);
 out = until(paint('revise', 'then', 'next'), stopped);
 paint('look');
 paint('status');

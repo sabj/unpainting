@@ -449,6 +449,28 @@ export function prewetArea(mask, D, w, h, { reach = 6, margin = 0.05 } = {}) {
 
 /** Estimate mean sweep overlap per cell.
  * Divide the passage charge by this factor so overlapping lanes do not multiply the paint load. */
+/**
+ * How much more paper a passage's sweeps brush than the passage: the cells within a sweep's radius of its path (each
+ * once, inside the passage or out) over the passage's own cells. A wash planned a little past its outline, or laid with
+ * rounds that ring it, brushes more than its outline, and a brush that lays a film as deep wherever it touches puts paint
+ * on all of that.
+ */
+export function footprintSpread(paths, mask, w, h) {
+  let cells = 0; for (let i = 0; i < w * h; i++) cells += mask[i] ? 1 : 0;
+  if (!cells) return 0;
+  const seen = new Uint8Array(w * h); let under = 0;
+  const disc = (cx, cy, r) => {
+    for (let y = Math.max(0, Math.floor(cy - r)); y <= Math.min(h - 1, Math.ceil(cy + r)); y++) for (let x = Math.max(0, Math.floor(cx - r)); x <= Math.min(w - 1, Math.ceil(cx + r)); x++) {
+      const i = y * w + x; if (!seen[i] && (x + 0.5 - cx) ** 2 + (y + 0.5 - cy) ** 2 <= r * r) { seen[i] = 1; under++; }
+    }
+  };
+  for (const pts of paths) pts.forEach((b, k) => {
+    const a = k ? pts[k - 1] : b, steps = Math.max(1, Math.ceil(Math.hypot(b.x - a.x, b.y - a.y) / 0.5));
+    for (let j = k ? 1 : 0; j <= steps; j++) { const u = j / steps; disc(a.x + (b.x - a.x) * u, a.y + (b.y - a.y) * u, (a.r ?? 1) + ((b.r ?? a.r ?? 1) - (a.r ?? 1)) * u); }
+  });
+  return under / cells;
+}
+
 export function sweepCover(paths, mask, w, h, { counts = null, cells: knownCells = null, box = null } = {}) {
   let under = 0, cells = knownCells ?? 0;
   // A caller that already charged a graded wash has these exact counts. Reuse

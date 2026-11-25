@@ -64,11 +64,12 @@ test('hand masking persists across strokes; removal, blotting and lifting change
  assert.ok(sheet.P[0][30*64+40]<1);assert.equal(sheet.P[0][0],1);
 });
 
-test('complete shipped studies preserve masks and their actual removal',()=>{
- for(const name of ['h36-a','white-ships']){
-  const tape=JSON.parse(gunzipSync(fs.readFileSync(new URL(`../../demos/lab/examples/${name}/live-2500.json.gz`,import.meta.url))));
+test('complete shipped live paintings preserve masks and their actual removal',()=>{
+ const manifest=JSON.parse(fs.readFileSync(new URL('../../demos/lab/examples/recorded.json',import.meta.url)));
+ for(const file of manifest.examples.flatMap(ex=>Object.values(ex.live??{}))){
+  const tape=JSON.parse(gunzipSync(fs.readFileSync(new URL(`../../demos/lab/${file}`,import.meta.url))));
   assert.equal(tape.complete,true);
-  assert.ok(tape.marks.some(m=>m.k==='c'&&m.r?.length));
+  assert.ok(tape.marks.some(m=>m.k==='r'),'the masking fluid is recorded');
   assert.ok(tape.marks.some(m=>m.k==='R'),'the complete run includes physical mask removal');
   assert.ok(tape.marks.some(m=>m.k==='y'),'the complete run includes drying');
  }

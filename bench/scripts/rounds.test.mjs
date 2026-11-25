@@ -1,4 +1,4 @@
-// V3, V4 and V5: the plan checks, the brief, the model commands, and a dry run of each round end to end (a scripted
+// V4 and V5: the plan checks, the brief, the model commands, and a dry run of each round end to end (a scripted
 // stand-in instead of a model, a small painting on the CPU, no keys).
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -11,37 +11,30 @@ import { resolvePlan, argsBuilder, layerBase, checkExtraArgs, unknownTokens, che
 import { tokensMarkdown } from './pipeline/tokens.mjs';
 import { renderTask, loadSubjects } from './pipeline/round45.mjs';
 import { turnCommand } from './runners.mjs';
+import { modelCheckSpec } from './pipeline/check.mjs';
+import { makeWorktree } from './pipeline/harness.mjs';
 
 const build = argsBuilder({ planDir: '/p', target: '/t.png', width: 600, sheetmm: 140, targetPixels: [300, 240] });
 
-test('a model token replaces the base token in its slot; architecture and palette tokens stay off elsewhere', () => {
+test('a model token replaces the base token in its slot; every subject gets the same base', () => {
   const l = layerBase({ variant: 'region_w13_lay2', build });
   assert.equal(optionMap(l.args).get('midlayers'), '2');
-  assert.equal(l.skipped.lay4, 'plan chose lay2');
-  assert.equal(l.skipped.blk60, 'architecture only');
-  assert.equal(l.skipped.pgreen, 'Trumbull only');
-  assert.ok(l.applied.includes('dk13') && optionMap(l.args).get('darkgain') === '1.3');
-  const t = layerBase({ variant: 'region_w13', build: argsBuilder({ planDir: '/p', target: '/t.png', width: 600, sheetmm: 140, trumbull: true }), architecture: true, trumbull: true });
-  assert.ok(t.applied.includes('blk60') && t.applied.includes('pgreen'));
-  assert.match(optionMap(t.args).get('paints'), /sapgreen/);
-});
-
-test('basePalette false: Trumbull gets no paint box from the base, only from its own palette token', () => {
-  const tb = argsBuilder({ planDir: '/p', target: '/t.png', width: 600, sheetmm: 140, trumbull: true, basePalette: false });
-  const off = layerBase({ variant: 'region_w13', build: tb, architecture: true, trumbull: true, basePalette: false });
-  assert.equal(optionMap(off.args).has('paints'), false);
-  assert.match(off.skipped.pgreen, /base palette off/);
-  assert.ok(off.applied.includes('blk60'));
-  const own = layerBase({ variant: 'region_w13_pwarm', build: tb, architecture: true, trumbull: true, basePalette: false });
-  assert.equal(optionMap(own.args).get('paints'), 'ochre,rawsienna,hansa,ultramarine,cerulean,sepia');
-  assert.equal(optionMap(layerBase({ variant: 'region_w13', build }).args).has('paints'), false);
+  assert.deepEqual(l.applied, [], 'the base inherits the default recipe without token overrides');
+  for (const gain of ['darkgain', 'coolgain', 'midgain']) assert.ok(!optionMap(l.args).has(gain), `the base sets no ${gain}`);
+  // the stone, recess, lit and palette tokens and the fitted sky-lane values were removed in 0.3.3
+  const args = optionMap(layerBase({ variant: 'region_w13', build }).args);
+  for (const k of ['stoneblocks', 'groundglaze', 'recesses', 'litwarm', 'paints', 'skylanemm', 'skylanestep', 'skyfloc']) assert.ok(!args.has(k), k);
+  assert.equal(args.get('skylanes'), undefined);
 });
 
 test('refusals before painting: unknown tokens, locked options, paths out of the plan folder, plan limits', () => {
   assert.deepEqual(unknownTokens('region_w13_lay2_bogus', build), ['bogus']);
-  assert.deepEqual(unknownTokens('region_w13_pwarm', build), ['pwarm']);
+  for (const token of ['pwarm', 'pgreen', 'blk60', 'rg10', 'birr', 'rec2', 'rcl', 'lw', 'lit20', 'slane']) assert.deepEqual(unknownTokens('region_w13_' + token, build), [token]);
   assert.match(unknownTokens('region_w9_lay2', build)[0], /prefix/);
-  assert.equal(checkExtraArgs(['--darkgain', '1.1'], '/p').length, 0);
+  assert.equal(checkExtraArgs(['--midlayers', '3'], '/p').length, 0);
+  // a plan states values; gains were removed in 0.3.3, as tokens and as settings
+  for (const gain of ['darkgain', 'coolgain', 'midgain', 'calibratedplan']) assert.match(checkExtraArgs([`--${gain}`, '1'], '/p')[0], /may not set/);
+  for (const token of ['dk13', 'cg13', 'mg12']) assert.deepEqual(unknownTokens('region_w13_' + token, build), [token]);
   assert.match(checkExtraArgs(['--targetguard', 'off'], '/p')[0], /may not set --targetguard/);
   assert.match(checkExtraArgs(['--focusmap', '../x.json'], '/p')[0], /leaves the plan folder/);
   const bad = checkPlanLimits({ families: [{ id: 'f', bounds: [0, 0, 0.001, 1] }], reserves: [{ bounds: [0, 0, 0.5, 0.5] }] }, 140, {}, [300, 240]);
@@ -49,11 +42,11 @@ test('refusals before painting: unknown tokens, locked options, paths out of the
 });
 
 test('strict verdict: a setting the plan chose that nothing read fails the painting; an unread base setting does not', () => {
-  assert.equal(renderVerdict({ paintExit: 3, unused: ['--foliagerefit'], baseOptions: ['foliagerefit'], strict: true }).exit, 0);
-  const v = renderVerdict({ paintExit: 3, unused: ['--stonewarm'], extraOptions: ['stonewarm'], strict: true });
+  assert.equal(renderVerdict({ paintExit: 3, unused: ['--foliagerefit'], baseOptions: ['foliagerefit'], strict: true, continued: { total: 0, checks: {} } }).exit, 0);
+  const v = renderVerdict({ paintExit: 3, unused: ['--stonewarm'], extraOptions: ['stonewarm'], strict: true, continued: { total: 0, checks: {} } });
   assert.equal(v.exit, 4);
   assert.match(v.failures[0].reason, /read by nothing: --stonewarm/);
-  assert.equal(renderVerdict({ paintExit: 0, dropped: 2, droppedPct: 1.5, strict: true }).exit, 5);
+  assert.equal(renderVerdict({ paintExit: 0, dropped: 2, droppedPct: 1.5, strict: true, continued: { total: 0, checks: {} } }).exit, 5);
 });
 
 test('TOKENS.md is generated from plan-args.mjs', () => {
@@ -93,50 +86,42 @@ const dryRun = (round, extra) => {
 };
 const runOf = (out, dir, n) => readJson(path.join(out, dir, 'dry-run', String(n), 'run.json'));
 
-test('dry run: V3 paints two attempts in one session; the second carries its change note', () => {
-  const out = dryRun('V3', ['--tries', '2']);
-  for (const n of [1, 2]) { const r = runOf(out, 'v3-informed', n); assert.deepEqual(validateRun(r), []); assert.ok(r.complete); }
-  assert.match(runOf(out, 'v3-informed', 2).crops.hills.painterNote, /attempt 2/);
-  fs.rmSync(out, { recursive: true, force: true });
-});
-
-test('dry run: V4 plans, is refused once, paints with stops, looks, revises and finishes', () => {
-  const out = dryRun('V4', ['--tries', '1']);
-  const r = runOf(out, 'v4-pipeline', 1), p = r.crops.hills.pipeline;
-  assert.deepEqual(validateRun(r), []);
-  assert.equal(p.outcome, 'painted');
-  assert.equal(p.paintedBy, 'the model');
-  assert.ok(p.looks >= 2 && p.revisions === 1 && p.segments === 2);
-  assert.deepEqual(p.optionCheck.model, []);
-  const ck = fs.readFileSync(path.join(out, 'v4-pipeline', 'dry-run', '1', 'hills-plan', 'CHECKPOINTS.jsonl'), 'utf8');
-  assert.match(ck, /start-refused/);
-  fs.rmSync(out, { recursive: true, force: true });
-});
-
-test('dry run: V5 try 2 gets feedback on try 1 and writes its self-review', () => {
-  const out = dryRun('V5', ['--tries', '2']);
-  const r = runOf(out, 'v5-self-study', 2), p = r.crops.hills.pipeline;
-  assert.deepEqual(validateRun(r), []);
-  assert.equal(p.feedback, 'hills-plan/FEEDBACK.md');
-  assert.equal(p.selfReview, 'hills-plan/SELF-REVIEW.md');
-  const dir = path.join(out, 'v5-self-study', 'dry-run', '2', 'hills-plan');
-  assert.match(fs.readFileSync(path.join(dir, 'FEEDBACK.md'), 'utf8'), /previous try \(try 1\)/);
-  assert.equal(runOf(out, 'v5-self-study', 1).score.status, 'dry-run');
-  fs.rmSync(out, { recursive: true, force: true });
-});
-
 test('extra args admit only validated artistic controls, never execution or ink bypasses', () => {
   for (const key of ['segments', 'allowdirty', 'inkrecipe', 'inkres', 'speedvaluecache', 'aware', 'awarefoo', 'physics', 'linesupport', 'inkdarkcap', 'unknown']) {
     for (const args of [[`--${key}`, '1'], [`--${key}=1`]]) assert.ok(checkExtraArgs(args, '/p').length, args.join(' '));
   }
-  for (const args of [['--darkgain'], ['--darkgain', 'NaN'], ['--darkgain', '4'], ['--drawing', 'bogus'], ['--darkgain', '--drawing', 'first'], ['orphan']]) assert.ok(checkExtraArgs(args, '/p').length);
-  assert.deepEqual(checkExtraArgs(['--outlinemedium', 'ink', '--drawing', 'both', '--darkgain', '1.2'], '/p'), []);
+  for (const args of [['--midlayers'], ['--midlayers', 'NaN'], ['--midlayers', '9'], ['--drawing', 'bogus'], ['--midlayers', '--drawing', 'first'], ['orphan']]) assert.ok(checkExtraArgs(args, '/p').length);
+  assert.deepEqual(checkExtraArgs(['--outlinemedium', 'ink', '--drawing', 'both', '--midlayers', '2'], '/p'), []);
   const args = optionMap(layerBase({variant: 'region_w13', build}).args);
-  assert.equal(args.get('inkrecipe'), 'v2');
+  assert.equal(args.get('recipe'), 'default');
+  assert.equal(args.get('inkrecipe'), undefined);
   for (const key of ['inkkscale', 'closingpressure', 'drawwidthgain', 'openinglines']) assert.ok(!args.has(key), key);
   for (const token of ['ink2', 'ink3', 'ink4', 'sep8', 'uncap', 'dwg200']) assert.deepEqual(unknownTokens('region_w13_' + token, build), [token]);
 });
 
+
+test('the model\'s own check plans with the dirty-tree refusal off, because its worktree is stripped', () => {
+  const options={spec:{width:96,sheetmm:280},planDir:'/missing-fixture',variant:'region_w13_lay2',target:path.join(BENCH,'v2/targets/hills.png'),out:'/out'};
+  assert.equal(optionMap(resolvePlan({...options,spec:modelCheckSpec(options.spec)}).args).get('allowdirty'),'1');
+  assert.equal(options.spec.offlineFixture,undefined);
+});
+
+test('each session gets its own temporary folder, outside the workspace, gone with the worktree', () => {
+  const a = makeWorktree(), b = makeWorktree();
+  try {
+    assert.ok(fs.statSync(a.scratch).isDirectory());
+    assert.notEqual(a.scratch, b.scratch);
+    assert.ok(!a.scratch.startsWith(a.ws + path.sep));
+    assert.equal(path.dirname(a.scratch), a.tmp);
+  } finally { a.cleanup(); b.cleanup(); }
+  assert.ok(!fs.existsSync(a.scratch));
+});
+
+test('the planner is seeded with the repository\'s current skills, not the frozen V2 copy', () => {
+  const src = fs.readFileSync(new URL('./pipeline/round45.mjs', import.meta.url), 'utf8');
+  assert.match(src, /path\.join\(REPO, '\.agents', 'skills'\), path\.join\(b, 'skills'\)/);
+  assert.doesNotMatch(src, /'skill', 'skills'/);
+});
 
 test('only explicitly offline fixture specs authorize a deliberately stripped worktree', () => {
   const options={spec:{width:96,sheetmm:280},planDir:'/missing-fixture',variant:'region_w13_lay2',target:path.join(BENCH,'v2/targets/hills.png'),out:'/out'};
@@ -145,13 +130,18 @@ test('only explicitly offline fixture specs authorize a deliberately stripped wo
   assert.equal(optionMap(fixture.args).get('allowdirty'),'1');
 });
 
-test('extra args allow techcal, techcalfrom, lanemm auto/0..40, and reject invalid ranges', () => {
-  assert.deepEqual(checkExtraArgs(['--techcal', '1', '--techcalfrom', '1', '--lanemm', 'auto'], '/p'), []);
-  assert.deepEqual(checkExtraArgs(['--techcal', '0', '--techcalfrom', '5', '--lanemm', '0'], '/p'), []);
+test('extra args allow lanemm auto/0..40 and reject invalid ranges', () => {
+  assert.deepEqual(checkExtraArgs(['--lanemm', 'auto'], '/p'), []);
+  assert.deepEqual(checkExtraArgs(['--lanemm', '0'], '/p'), []);
   assert.deepEqual(checkExtraArgs(['--lanemm', '40'], '/p'), []);
-  assert.ok(checkExtraArgs(['--techcal', '2'], '/p').length);
-  assert.ok(checkExtraArgs(['--techcalfrom', '0'], '/p').length);
   assert.ok(checkExtraArgs(['--lanemm', '45'], '/p').length);
+});
+
+test('extra args refuse every delivery calibration: the engine owns delivery, not the plan', () => {
+  for (const flag of ['techcal', 'techcalfrom', 'techcalmax', 'techcalmin', 'deliverycal', 'deliverycalmax']) {
+    const bad = checkExtraArgs(['--' + flag, '1'], '/p');
+    assert.ok(bad.some(m => m.includes('may not set --' + flag)), flag + ': ' + JSON.stringify(bad));
+  }
 });
 
 test('resolvePlan resolves outlineMedium from config.drawing.medium or spec.taskStyle', () => {
@@ -179,23 +169,21 @@ test('resolvePlan resolves outlineMedium from config.drawing.medium or spec.task
   }
 });
 
-test('resolvePlan preserves base glazeGains by default and enables --drawing both when closing lines exist', () => {
+test('resolvePlan sets no gain and enables --drawing both when closing lines exist', () => {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'plan-close-'));
   try {
     fs.writeFileSync(path.join(tmpDir, 'opening-lines.json'), '[]');
     const openOnly = resolvePlan({ spec: { width: 96, sheetmm: 280 }, planDir: tmpDir, variant: 'region_w13', target: path.join(BENCH, 'v2/targets/hills.png'), out: '/out' });
     const openMap = optionMap(openOnly.args);
     assert.equal(openMap.get('drawing'), 'first');
-    assert.equal(openMap.get('darkgain'), '1.3');
-    assert.equal(openMap.get('coolgain'), '1.3');
+    for (const gain of ['darkgain', 'coolgain', 'midgain']) assert.equal(openMap.has(gain), false);
     assert.equal(openMap.has('techcal'), false);
 
     fs.writeFileSync(path.join(tmpDir, 'closing-lines.json'), '[]');
-    const withClosing = resolvePlan({ spec: { width: 96, sheetmm: 280, glazeGains: false }, planDir: tmpDir, variant: 'region_w13', target: path.join(BENCH, 'v2/targets/hills.png'), out: '/out' });
+    const withClosing = resolvePlan({ spec: { width: 96, sheetmm: 280 }, planDir: tmpDir, variant: 'region_w13', target: path.join(BENCH, 'v2/targets/hills.png'), out: '/out' });
     const closeMap = optionMap(withClosing.args);
     assert.equal(closeMap.get('drawing'), 'both');
     assert.equal(closeMap.has('darkgain'), false);
-    assert.equal(closeMap.get('techcal'), '1');
   } finally {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   }

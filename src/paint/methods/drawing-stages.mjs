@@ -6,7 +6,7 @@
 //              sideways drift, a start a little late or an end a little past), drops some pencil lines, which stay
 //              visible as pencil, and adds a few lines the pencil left out
 //   finishInk  closing accents after the washes: a share of the earlier stage's lines, chosen on the target's edges or
-//              darks at plan time, restated where they are strongest (or whole, for the architecture method)
+//              darks at plan time, each restated whole
 //
 // Every choice is made here, before the first mark, from the line file and the target's density at plan time. DOM free,
 // no file IO, deterministic: the same set and options give the same stages.
@@ -27,6 +27,17 @@ export const STAGE_DEFAULTS = Object.freeze({
 const ROLE_GAIN = { structure: 1.5, silhouette: 1.5, subject: 1.2, opening: 1, setting: 0.9, ornament: 0.5, strand: 0.6, 'dark fill': 0.3, hatch: 0.3 };
 
 const hash = i => { let s = (Math.imul(i + 1, 0x9e3779b1) ^ 0x85ebca6b) >>> 0; s = Math.imul(s ^ (s >>> 15), 0x2c1b3c6d) >>> 0; return ((s ^ (s >>> 13)) >>> 0) / 4294967296; };
+
+// A contour's variation must not change when another contour is inserted or ranked.
+// Ignore contact attributes; reversed duplicates share an identity, while deviateLine
+// still follows each gesture's actual direction for its late start and overshoot.
+function contourSeed(points) {
+  const forward = JSON.stringify(points), reverse = JSON.stringify(points.toReversed());
+  const key = forward < reverse ? forward : reverse;
+  let seed = 0x811c9dc5;
+  for (let i = 0; i < key.length; i++) seed = Math.imul(seed ^ key.charCodeAt(i), 0x01000193) >>> 0;
+  return seed;
+}
 
 export function polyLength(points) {
   let L = 0;
@@ -144,24 +155,6 @@ export function deviateLine(g, { scale, seed, step }) {
   return out;
 }
 
-/** The part of a line where `at` is at least its own median there, as runs of at least `minLen` source pixels. */
-export function strongRuns(g, at, { minLen, step }) {
-  const r = resampleLine(g, step), vals = r.points.map(at), sorted = [...vals].sort((a, b) => a - b), med = sorted[Math.floor(sorted.length / 2)] ?? 0;
-  const runs = [];
-  let cur = null;
-  const close = () => { if (cur && cur.points.length >= 2 && polyLength(cur.points) >= minLen) runs.push(cur); cur = null; };
-  r.points.forEach((p, k) => {
-    if (vals[k] >= med) {
-      cur ??= { ...g, points: [], ...(r.widths ? { widths: [] } : {}), ...(r.weights ? { weights: [] } : {}) };
-      cur.points.push(p);
-      if (r.widths) cur.widths.push(r.widths[k]);
-      if (r.weights) cur.weights.push(r.weights[k]);
-    } else close();
-  });
-  close();
-  return runs.map(q => ({ ...q, length: polyLength(q.points) }));
-}
-
 // Pencil passes by rank: 1 big shapes, 2 features, 3 detail (pencil-stage.mjs passOf).
 const passRanks = (n, k) => (k < Math.ceil(0.4 * n) ? 1 : k < Math.ceil(0.75 * n) ? 2 : 3);
 
@@ -183,6 +176,8 @@ export function planStages(lines, { image, stages, density = null }) {
   const E = D ? edgeField(D, density.w, density.h) : null;
   const edge = E ? fieldSampler(E, density.w, density.h, image.w, image.h) : null;
   const set = lines.filter(g => g.points?.length >= 2).map((g, index) => ({ ...g, index, length: g.length ?? polyLength(g.points) }));
+  // The existing index carries this original identity through prep and finish; it is not the seed.
+  const sourceSeeds = set.map(g => contourSeed(g.points));
   const score = g => placementScore(g, { dark, edge });
   const step = Math.max(1, 0.004 * short), summary = {};
   const out = { prep: null, prepInk: null, finishInk: null };
@@ -211,7 +206,7 @@ export function planStages(lines, { image, stages, density = null }) {
       added = ranked(rest, g => score(g) / Math.sqrt(Math.max(1, g.length))).slice(0, n).map(r => ({ ...r.g, added: true }));
     } else base = takeLength(set, o.amount, score).map(r => r.g);
     const scale = (stages.prepInk.deviate ?? (from === 'lines' ? 0 : o.deviate)) * 0.0025 * short;
-    out.prepInk = [...base, ...added].map(g => ({ ...deviateLine(g, { scale, seed: g.index * 3 + 1, step }), rank: g.rank ?? 1 }));
+    out.prepInk = [...base, ...added].map(g => ({ ...deviateLine(g, { scale, seed: sourceSeeds[g.index] * 3 + 1, step }), rank: g.rank ?? 1 }));
     summary.prepInk = { from, lines: out.prepInk.length, kept: base.length, added: added.length, dropped: from === 'prep' ? out.prep.length - base.length : 0, drift: +scale.toFixed(2) };
   }
 
@@ -224,13 +219,13 @@ export function planStages(lines, { image, stages, density = null }) {
     const sel = g => (at ? mean(resampleLine(g, step).points, at) : 1) * Math.sqrt(g.length ?? polyLength(g.points)) * (Number.isFinite(g.weight) ? g.weight : 1);
     const picked = ranked(pool, sel).slice(0, o.restate > 0 ? Math.max(pool.length ? 1 : 0, Math.round(o.restate * pool.length)) : 0).map(r => r.g);
     const architecture = o.method === 'architecture';
-    // an accent restates the strong part of each line; the architecture method restates the whole line, its width set
-    // by how dark the target is along it (1.6 to 4 source pixels, the Y1 closing pen)
-    // a line with no strong run long enough to read as a stroke is restated whole
-    const pieces = architecture || !at ? picked : picked.flatMap(g => { const runs = strongRuns(g, at, { minLen: 0.008 * short, step }); return runs.length ? runs : [g]; });
+    // a pen restates a chosen line whole (the accent), never the pieces of it where the target reads strongest; the
+    // architecture method also restates whole lines, its width set by how dark the target is along it (1.6 to 4
+    // source pixels, the Y1 closing pen)
+    const pieces = picked;
     const scale = o.deviate * 0.0025 * short;
-    out.finishInk = pieces.map((g, k) => {
-      const d = deviateLine(g, { scale, seed: (g.index ?? k) * 3 + 2, step });
+    out.finishInk = pieces.map(g => {
+      const d = deviateLine(g, { scale, seed: sourceSeeds[g.index] * 3 + 2, step });
       if (architecture && dark) d.widths = d.points.map(p => +(1.6 + 2.4 * Math.min(1, dark(p) / 1.2)).toFixed(3));
       return { ...d, rank: 1 };
     });

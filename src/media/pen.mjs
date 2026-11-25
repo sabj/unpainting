@@ -17,7 +17,8 @@ function inkInto(sheet, i, water, pig, damp) {
   if (damp < 0.05) return soak(sheet, i, water, pig);
   recordWetCell(sheet, i);
   const into = Math.min(Math.max(0, sheet.paper.capacity[i] - sheet.s[i]), water);
-  sheet.s[i] += into;
+  // water in the pores is water the sheet has to dry: mark where it is, as soak() and deposit() do
+  sheet.s[i] += into; sheet.wetDirty = 1;
   for (let k = 0; k < sheet.K; k++) if (pig[k]) { const d = Math.min(1, damp); sheet.P[k][i] += pig[k] * d; sheet.D[k][i] += pig[k] * (1 - d); }
   if (water > into) deposit(sheet, i, water - into, null);
 }

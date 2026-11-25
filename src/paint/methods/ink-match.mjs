@@ -30,8 +30,17 @@ function sampleAt(P, w, h, x, y) {
  * Median peak absorbance along the gestures: at each point, the darkest L* within half a pixel across the path
  * against the lighter side's lightest L* 1.5 to 3 pixels out. This is how dark a line looks at its core, which a
  * mean across a blurred profile understates for a line a pixel or two wide. Points under `minSupport` L* are skipped.
+ * `quantile` picks which point speaks for the lines (0.5 the median). With `paperL` the darkness is read against the bare
+ * paper, not the line's side: that is the ink itself, as it lies on white paper before any wash goes over it.
  */
-export function strokesPeakAbsorbance(L, w, h, gestures, { minSupport = 2 } = {}) {
+
+/**
+ * How the ink's own strength is read, on the subject and on the scrap alike: the firm lines (the 85th percentile of the
+ * line cores), against bare paper. A thin line reads pale only because a pixel is wider than it is, and a line on a
+ * mid-tone wash reads pale against its side though the ink is as black; the firm lines show the ink in the bottle.
+ */
+export const INK_STRENGTH_QUANTILE = 0.85;
+export function strokesPeakAbsorbance(L, w, h, gestures, { minSupport = 2, quantile = 0.5, paperL = null } = {}) {
   const v = [];
   for (const g of gestures) {
     if (!(g.points?.length >= 2)) continue;
@@ -40,13 +49,13 @@ export function strokesPeakAbsorbance(L, w, h, gestures, { minSupport = 2 } = {}
       const a = R[Math.max(0, k - 1)], b = R[Math.min(n - 1, k + 1)], tl = Math.hypot(b.x - a.x, b.y - a.y) || 1, nx = -(b.y - a.y) / tl, ny = (b.x - a.x) / tl, p = R[k];
       let on = Infinity; for (const d of [-0.5, -0.25, 0, 0.25, 0.5]) on = Math.min(on, sampleAt(L, w, h, p.x + d * nx, p.y + d * ny));
       const side = sg => { let m = -Infinity; for (const d of [1.5, 2, 2.5, 3]) m = Math.max(m, sampleAt(L, w, h, p.x + sg * d * nx, p.y + sg * d * ny)); return m; };
-      const lit = Math.max(side(1), side(-1));
+      const lit = paperL ?? Math.max(side(1), side(-1));
       if (lit - on >= minSupport) v.push(-Math.log(Math.max(1e-4, Yof(on)) / Math.max(1e-4, Yof(lit))));
     }
   }
   if (!v.length) return 0;
   v.sort((a, b) => a - b);
-  return v[v.length >> 1];
+  return v[Math.min(v.length - 1, Math.floor(quantile * v.length))];
 }
 
 /** The longest `count` gestures, in their drawing order: the sample the match is made on. */
@@ -59,7 +68,7 @@ export function sampleGestures(gestures, count = 60) {
 /**
  * The factor on the ink load that brings the strokes' absorbance to `cap` x `targetAbsorbance`.
  * `measure(f)` draws the sample at load factor f on a fresh blank sheet and returns its absorbance.
- * Two secant steps from f = 1, kept within [lo, hi].
+ * Two secant steps from f = 1, kept within [lo, hi] (hi: --inkloadmax, default 4).
  * @returns { factor, before, after, want }
  */
 export function matchInkLoad({ targetAbsorbance, cap = 1, measure, lo = 0.125, hi = 4 }) {
@@ -76,9 +85,9 @@ export function matchInkLoad({ targetAbsorbance, cap = 1, measure, lo = 0.125, h
 }
 
 /** Gather every bilinear neighbour used by the line probe once; render only those cells on each scrap. */
-export function sampledInkAbsorbance(w, h, gestures) {
+export function sampledInkAbsorbance(w, h, gestures, read = {}) {
   const indices = new Map();
-  strokesPeakAbsorbance(i => { if (!indices.has(i)) indices.set(i, indices.size); return 100; }, w, h, gestures);
+  strokesPeakAbsorbance(i => { if (!indices.has(i)) indices.set(i, indices.size); return 100; }, w, h, gestures, read);
   const cells = [...indices.keys()], n = cells.length;
   const white = new Uint8ClampedArray(n * 3).fill(255);
   return sheet => {
@@ -90,6 +99,6 @@ export function sampledInkAbsorbance(w, h, gestures) {
     const rgb = new Uint8ClampedArray(n * 3);
     renderCells(layers, sheet.pigments.map(p=>p.K), sheet.pigments.map(p=>p.S), white, 0, n, 1, null, rgb);
     const L = lPlane(rgb, n);
-    return strokesPeakAbsorbance(i => L[indices.get(i)], w, h, gestures);
+    return strokesPeakAbsorbance(i => L[indices.get(i)], w, h, gestures, read);
   };
 }

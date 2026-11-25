@@ -24,21 +24,22 @@ const COMMIT = '6c6faa6cb66f5a7935186c2336c2770924742bf2';
 async function makePlate(dir, o = {}) {
   fs.mkdirSync(dir, { recursive: true });
   const n = o.frames ?? 4;
+  const width = o.paintWidth ?? (/france/.test(dir) ? 1216 : /hills/.test(dir) ? 1224 : 1200);
   const commit = 'commit' in o ? o.commit : COMMIT;
   const card = {
     provenance: { backend: { adapterEvidence: { adapterInfo: { vendor: 'nvidia', device: o.device ?? 'l40s' } } } },
-    subject: 'X', codeSHA: commit, cleanTree: o.clean ?? true, exit: 3, seconds: o.seconds ?? 200,
+    subject: 'X', codeSHA: commit, cleanTree: o.clean ?? true, exit: 'exit' in o ? o.exit : 0, seconds: o.seconds ?? 200,
     args: o.args ?? ['--gpu', 'on', '--width', '1200'],
     targetSHA256: o.targetSha ?? null,
     gpuBackend: { backend: o.backend ?? 'gpu' },
-    dimensions: 'dims' in o ? o.dims : { sourceWidth: o.sourceWidth ?? 300, sourceHeight: 259, paintWidth: o.paintWidth ?? 1200, paintHeight: 1036, enlargement: 4 },
+    dimensions: 'dims' in o ? o.dims : { sourceWidth: o.sourceWidth ?? 300, sourceHeight: 259, paintWidth: width, paintHeight: 1036, enlargement: 4 },
     segments: { backend: o.sam ?? 'sam', model: { model: 'vit_b', device: 'cuda' } },
   };
   fs.writeFileSync(path.join(dir, 'run-card.json'), JSON.stringify(card));
   fs.writeFileSync(path.join(dir, 'backend.json'), JSON.stringify({ release: o.release ?? '0.3.2', commit, backend: o.backend ?? 'gpu', fallback: o.fallback ?? false }));
-  fs.writeFileSync(path.join(dir, 'frames.json'), JSON.stringify({ release: o.release ?? '0.3.2', commit, width: 1200, height: 1036, frames: Array.from({ length: n }, (_, i) => ({ src: `f${String(i).padStart(4, '0')}.jpg`, stage: i === n - 1 ? 'finished' : 'wash', position: i / (n - 1) })) }));
-  if (!o.noFrameFiles) for (let i = 0; i < n; i++) fs.writeFileSync(path.join(dir, `f${String(i).padStart(4, '0')}.jpg`), await jpg(64, 56, { r: 20 * i, g: 80, b: 80 }));
-  fs.writeFileSync(path.join(dir, 'painting.jpg'), await jpg(120, 104));
+  fs.writeFileSync(path.join(dir, 'frames.json'), JSON.stringify({ release: o.release ?? '0.3.2', commit, width, height: 1036, frames: Array.from({ length: n }, (_, i) => ({ src: `f${String(i).padStart(4, '0')}.jpg`, stage: i === n - 1 ? 'finished' : 'wash', position: i / (n - 1) })) }));
+  if (!o.noFrameFiles) for (let i = 0; i < n; i++) fs.writeFileSync(path.join(dir, `f${String(i).padStart(4, '0')}.jpg`), await jpg(width, 1036, { r: 20 * i, g: 80, b: 80 }));
+  fs.writeFileSync(path.join(dir, 'painting.jpg'), await jpg(width, 1036));
   if (o.score) fs.writeFileSync(path.join(dir, 'score.json'), JSON.stringify(o.score));
   return dir;
 }
@@ -52,14 +53,15 @@ test('readImageSize reads png, jpeg and webp headers', async () => {
 });
 
 // ---------- gates
-const base = () => ({ release: '0.3.2', commit: COMMIT, backend: 'gpu', fallback: false, argsGpuOff: false, sourceWidth: 300, paintWidth: 1200, cleanTree: true, targetSHA256: null, framesListed: 4, framesFound: 4 });
+// a plate at source scale: a 300 px target painted 300 cells wide
+const base = () => ({ release: '0.3.2', commit: COMMIT, exit: 0, backend: 'gpu', fallback: false, argsGpuOff: false, sourceWidth: 300, paintWidth: 300, cleanTree: true, targetSHA256: null, framesListed: 4, framesFound: 4 });
 const codes = l => l.map(x => x.code);
 
-test('gate: matching commit prefix is admitted, low-res source is only marked', () => {
+test('gate: matching commit prefix and a 300px source painted at its own width are admitted', () => {
   const g = gatePlate(base(), { expectedCommit: '6c6faa6' });
   assert.equal(g.admitted, true);
   assert.deepEqual(codes(g.refused), []);
-  assert.deepEqual(codes(g.marks), ['low-res-source']);
+  assert.deepEqual(codes(g.marks), []);
 });
 test('gate: commit that differs from the labelled commit is refused', () => {
   const g = gatePlate({ ...base(), commit: '20676e99e724d4bbac79ce2fc095526b2138f0f2' }, { expectedCommit: '6c6faa6' });
@@ -80,14 +82,26 @@ test('gate: CPU backend, fallback and --gpu off are all refused', () => {
     assert.ok(codes(g.refused).includes('cpu'), JSON.stringify(patch));
   }
 });
-test('gate: render narrower than 540 px is refused; strict also refuses low-res sources', () => {
-  assert.ok(codes(gatePlate({ ...base(), paintWidth: 300 }, { expectedCommit: '6c6faa6' }).refused).includes('low-res-render'));
-  assert.ok(codes(gatePlate(base(), { expectedCommit: '6c6faa6', strict: true }).refused).includes('low-res-source'));
-  assert.equal(gatePlate({ ...base(), sourceWidth: 1600 }, { expectedCommit: '6c6faa6', strict: true }).admitted, true);
+test('gate: a plate painted from an enlarged source is marked and strict refuses it; there is no least width', () => {
+  // the benchmark's old size: a 300 px target painted 1200 cells wide
+  const old = gatePlate({ ...base(), paintWidth: 1200 }, { expectedCommit: '6c6faa6' });
+  assert.equal(old.admitted, true);
+  assert.deepEqual(codes(old.marks), ['enlarged-source']);
+  assert.match(old.marks[0].text, /a 300 px target painted 1200 cells wide, 4 cells for each source pixel; plates are compared at source scale/);
+  assert.ok(codes(gatePlate({ ...base(), paintWidth: 1200 }, { expectedCommit: '6c6faa6', strict: true }).refused).includes('enlarged-source'));
+  assert.ok(codes(gatePlate({ ...base(), paintWidth: 301 }, { expectedCommit: '6c6faa6', strict: true }).refused).includes('enlarged-source'), 'one cell over is over');
+  // source scale passes strict whatever the size: a thumbnail at its own width, a large original painted smaller
+  assert.equal(gatePlate(base(), { expectedCommit: '6c6faa6', strict: true }).admitted, true);
+  assert.equal(gatePlate({ ...base(), sourceWidth: 120, paintWidth: 120 }, { expectedCommit: '6c6faa6', strict: true }).admitted, true);
+  assert.equal(gatePlate({ ...base(), sourceWidth: 1600, paintWidth: 1200 }, { expectedCommit: '6c6faa6', strict: true }).admitted, true);
+  // the pens' fine sheet (--inkres) widens the output, not the sheet
+  assert.equal(gatePlate({ ...base(), paintWidth: 1200, sheetWidth: 300 }, { expectedCommit: '6c6faa6', strict: true }).admitted, true);
+  assert.ok(codes(gatePlate({ ...base(), paintWidth: null }, { expectedCommit: '6c6faa6' }).refused).includes('render-unknown'));
 });
-test('gate: unknown source width is marked, not silently passed', () => {
+test('gate: unknown source width is marked, not silently passed, and strict refuses it', () => {
   const g = gatePlate({ ...base(), sourceWidth: null }, { expectedCommit: '6c6faa6' });
   assert.ok(codes(g.marks).includes('source-unknown'));
+  assert.ok(codes(gatePlate({ ...base(), sourceWidth: null }, { expectedCommit: '6c6faa6', strict: true }).refused).includes('source-unknown'));
 });
 test('gate: wrong target hash is refused; dirty tree and missing frames are marked', () => {
   const g = gatePlate({ ...base(), targetSHA256: 'aa', cleanTree: false, framesFound: 2 }, { expectedCommit: '6c6faa6', targetSha256: 'bb' });
@@ -109,7 +123,7 @@ test('parsePlateDir reads provenance only from the run records', async () => {
   assert.equal(p.seconds, 321);
   assert.equal(p.gpu, 'nvidia l40s');
   assert.equal(p.sam, 'sam vit_b (cuda)');
-  assert.equal(p.paintWidth, 1200);
+  assert.equal(p.paintWidth, 1216);
   assert.equal(p.sourceWidth, 300);
   assert.equal(p.framesListed, 4);
   assert.equal(p.framesFound, 4);
@@ -346,7 +360,215 @@ test('improved data names files and commits that exist in this checkout', async 
   const { spawnSync } = await import('node:child_process');
   const root = path.resolve(import.meta.dirname, '..', '..');
   for (const e of IMPROVED) {
-    for (const f of e.files) assert.ok(fs.existsSync(path.join(root, f)), `${e.id}: missing file ${f}`);
+    // a file the 0.4 deletions removed still names the release's work: it exists at commit 49447027, the last before them
+    for (const f of e.files) assert.ok(fs.existsSync(path.join(root, f)) || spawnSync('git', ['cat-file', '-e', `49447027:${f}`], { cwd: root }).status === 0, `${e.id}: missing file ${f}`);
     for (const c of e.commits) assert.equal(spawnSync('git', ['cat-file', '-e', `${c}^{commit}`], { cwd: root }).status, 0, `${e.id}: unknown commit ${c}`);
   }
+});
+
+
+test('every benchmark target including Yale 300px sources is accepted painted at its subject width, and marked when enlarged', async () => {
+  const targets = new URL('../v2/targets/', import.meta.url);
+  const specs = JSON.parse(fs.readFileSync(new URL('../v4v5/subjects.json', import.meta.url))).subjects;
+  for (const file of fs.readdirSync(targets).filter(f => /\.(png|jpe?g|webp)$/.test(f))) {
+    const { width } = await sharp(fs.readFileSync(new URL(file, targets))).metadata();
+    const subject = file.replace(/\.[^.]+$/, '');
+    assert.equal(gatePlate({ ...base(), subject, paintWidth: specs[subject].width, sourceWidth: width }, { expectedCommit: COMMIT, strict: true }).admitted, true, file);
+    assert.deepEqual(codes(gatePlate({ ...base(), subject, paintWidth: 4 * width, sourceWidth: width }, { expectedCommit: COMMIT }).marks), ['enlarged-source'], file);
+  }
+});
+
+test('actual painting dimensions gate proof and lossless PNG wins over a JPEG sibling', async t => {
+  const root = tmp(); t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const dir = await makePlate(path.join(root, 'argon1-mittens'));
+  fs.writeFileSync(path.join(dir, 'painting.jpg'), await jpg(300, 259));
+  const rejected = gatePlate(parsePlateDir(dir), { expectedCommit: COMMIT });
+  assert.ok(codes(rejected.refused).includes('render-size-mismatch'), '1200px metadata cannot legitimize a 300px preview');
+  fs.writeFileSync(path.join(dir, 'painting.png'), await png(1200, 1036));
+  const plate = parsePlateDir(dir);
+  assert.equal(plate.painting, path.join(dir, 'painting.png'));
+  assert.equal(plate.imageWidth, 1200);
+  // the fixture is a plate of the old size, 1200 px from a 300 px target: shown with its mark, refused under strict
+  const shown = gatePlate(plate, { expectedCommit: COMMIT });
+  assert.equal(shown.admitted, true);
+  assert.deepEqual(codes(shown.marks), ['enlarged-source']);
+  assert.deepEqual(codes(gatePlate(plate, { expectedCommit: COMMIT, strict: true }).refused), ['enlarged-source']);
+  fs.unlinkSync(path.join(dir, 'painting.png')); fs.unlinkSync(path.join(dir, 'painting.jpg'));
+  assert.ok(codes(gatePlate(parsePlateDir(dir), { expectedCommit: COMMIT }).refused).includes('painting-missing'));
+});
+
+const pageData = file => JSON.parse(/<script type="application\/json" id="cmp-data">([\s\S]*?)<\/script>/.exec(fs.readFileSync(file, 'utf8'))[1]);
+const uriBytes = uri => Buffer.from(uri.slice(uri.indexOf(',') + 1), 'base64');
+
+test('default delivery preserves native PNG, JPEG frames, targets, prior images and stage-strip bytes', async t => {
+  const w = await fixtureWorld(); t.after(() => fs.rmSync(w.root, { recursive: true, force: true }));
+  const dir = path.join(w.ab, 'v031-final', 'argon1-mittens');
+  const final = await png(1600, 1380); fs.writeFileSync(path.join(dir, 'painting.png'), final);
+  const cardFile = path.join(dir, 'run-card.json'), card = JSON.parse(fs.readFileSync(cardFile));
+  card.dimensions.paintWidth = 1600; card.dimensions.paintHeight = 1380;
+  fs.writeFileSync(cardFile, JSON.stringify(card));
+  const manifestFile = path.join(dir, 'frames.json');
+  const manifest = JSON.parse(fs.readFileSync(manifestFile));
+  for (const f of manifest.frames) fs.writeFileSync(path.join(dir, f.src), await jpg(1600, 1380));
+  manifest.frames[0] = {...manifest.frames[0], stage:'wash',step:'band 1 dry',valueBand:1,dried:true};
+  fs.writeFileSync(manifestFile, JSON.stringify(manifest));
+  const out = path.join(w.root, 'native.html');
+  // the fixture plates are of the old size, enlarged from 300 px targets: shown marked, and refused only under --strict
+  await generate({ runs:w.runs,plateRoots:[w.ab],out,expected:{'0.3.2':COMMIT,'0.1.1':'70ceb7c'},targetsDir:w.targets });
+  const row = pageData(out).rows.find(r => r.model === 'argon');
+  assert.deepEqual(uriBytes(row.plate.final), final);
+  assert.deepEqual(readImageSize(uriBytes(row.plate.final)), {w:1600,h:1380});
+  assert.equal(row.plate.delivery.final, 'original bytes');
+  assert.equal(row.plate.frames.length, manifest.frames.length);
+  for (const [i,f] of manifest.frames.entries()) assert.deepEqual(uriBytes(row.plate.frames[i].src), fs.readFileSync(path.join(dir,f.src)));
+  assert.equal(row.plate.frames[0].valueBand, 1); assert.equal(row.plate.frames[0].dried, true);
+  assert.equal(row.plate.frames[0].stage, 'wash band 1 dry');
+  assert.deepEqual(uriBytes(row.repaint.final), fs.readFileSync(path.join(w.ab,'v030','argon1-mittens','painting.jpg')));
+  assert.deepEqual(uriBytes(row.target.src), fs.readFileSync(path.join(w.targets,'mittens.png')));
+  const priorDir = path.join(w.runs,'v4-pipeline','argon','1');
+  assert.deepEqual(uriBytes(row.prior.final), fs.readFileSync(path.join(priorDir,'mittens.webp')));
+  assert.deepEqual(uriBytes(row.prior.stages), fs.readFileSync(path.join(priorDir,'mittens-stages.webp')));
+});
+
+test('explicit preview widths use JPEG92 and visibly disclose preview delivery', async t => {
+  const w = await fixtureWorld(); t.after(() => fs.rmSync(w.root, { recursive: true, force: true }));
+  const out = path.join(w.root,'preview.html'), dir=path.join(w.ab,'v031-final','argon1-mittens');
+  await generate({runs:w.runs,plateRoots:[w.ab],out,expected:{'0.3.2':COMMIT,'0.1.1':'70ceb7c'},frameWidth:400,finalWidth:500});
+  const row=pageData(out).rows.find(r=>r.model==='argon');
+  const expected = async (file,width) => sharp(file).resize({width,withoutEnlargement:true}).jpeg({quality:92,mozjpeg:true}).toBuffer();
+  assert.deepEqual(uriBytes(row.plate.final),await expected(path.join(dir,'painting.jpg'),500));
+  assert.equal(readImageSize(uriBytes(row.plate.final)).w,500);
+  assert.deepEqual(uriBytes(row.plate.frames[0].src),await expected(path.join(dir,'f0000.jpg'),400));
+  assert.ok(row.plate.marks.some(m=>m.code==='preview-delivery' && /JPEG92/.test(m.text)));
+  assert.match(fs.readFileSync(out,'utf8'),/Explicit preview delivery/);
+});
+
+test('native is the default and invalid preview widths fail loudly', async () => {
+  assert.equal(parseArgs([]).frameWidth,null); assert.equal(parseArgs([]).finalWidth,null);
+  for (const flag of ['--frame-width','--final-width']) for(const value of ['0','-1','NaN','Infinity','2.5','bad']) assert.throws(()=>parseArgs([flag,value]),/positive integer/);
+  await assert.rejects(generate({frameWidth:NaN}),/positive integer/);
+});
+
+
+test('a plate at its subject width passes strict, and both recorded image dimensions are required', async t => {
+  assert.ok(codes(gatePlate({...base(), subject:'h36a',paintWidth:1224},{expectedCommit:COMMIT,strict:true}).refused).includes('enlarged-source'));
+  assert.equal(gatePlate({...base(),subject:'h36a',paintWidth:300},{expectedCommit:COMMIT,strict:true}).admitted,true);
+  const root=tmp(); t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+  const dir=await makePlate(path.join(root,'argon1-mittens'));
+  for(const [w,h] of [[600,518],[1200,1000]]) {
+    fs.writeFileSync(path.join(dir,'painting.jpg'),await jpg(w,h));
+    assert.ok(codes(gatePlate(parsePlateDir(dir),{expectedCommit:COMMIT}).refused).includes('render-size-mismatch'));
+  }
+});
+
+test('missing transient frames remain explicit gaps beside separately labeled retained checkpoints', async t => {
+  const w=await fixtureWorld(); t.after(()=>fs.rmSync(w.root,{recursive:true,force:true}));
+  const dir=path.join(w.ab,'v031-final','argon1-mittens');
+  fs.unlinkSync(path.join(dir,'f0000.jpg'));
+  fs.writeFileSync(path.join(dir,'f0001.jpg'),await jpg(300,259));
+  fs.mkdirSync(path.join(dir,'stages')); fs.writeFileSync(path.join(dir,'stages','stage-010.jpg'),await jpg(1200,1036));
+  const out=path.join(w.root,'missing.html');
+  await generate({runs:w.runs,plateRoots:[w.ab],out,expected:{'0.3.2':COMMIT,'0.1.1':'70ceb7c'}});
+  const plate=pageData(out).rows.find(r=>r.model==='argon').plate;
+  assert.deepEqual(plate.playback.missingFrames,['f0000.jpg']);
+  assert.deepEqual(plate.playback.nonNativeFrames,['f0001.jpg']);
+  assert.equal(plate.playback.nativeFramesComplete,false);
+  assert.equal(plate.playback.delivered,4);
+  assert.equal(plate.recordedFrames.length,4);
+  assert.deepEqual(uriBytes(plate.recordedFrames[0].src),fs.readFileSync(path.join(dir,'f0001.jpg')));
+  assert.equal(plate.frames.length,2);
+  assert.match(plate.playback.kind,/not chronological/);
+  assert.equal(plate.checkpoints.nativeComplete,false);
+  assert.ok(plate.marks.some(m=>m.code==='frames-missing'));
+  assert.ok(plate.marks.some(m=>m.code==='frame-resolution'));
+});
+
+
+test('all retained native percentage checkpoints and every dried band including band1 remain accessible', async t => {
+  const w=await fixtureWorld(); t.after(()=>fs.rmSync(w.root,{recursive:true,force:true}));
+  const dir=path.join(w.ab,'v031-final','argon1-mittens');
+  for(const file of fs.readdirSync(dir).filter(f=>/^f\d+\.jpg$/.test(f))) fs.unlinkSync(path.join(dir,file));
+  fs.mkdirSync(path.join(dir,'stages'));
+  const files=[];
+  for(const percent of [10,25,50,75,100]) {
+    const file=`stages/stage-${String(percent).padStart(3,'0')}.jpg`;
+    fs.writeFileSync(path.join(dir,file),await jpg(1200,1036)); files.push(file);
+  }
+  for(const band of [1,2,3,4,5]) {
+    const file=`value-band-${band}-dried.png`;
+    fs.writeFileSync(path.join(dir,file),await png(1200,1036)); files.push(file);
+  }
+  fs.writeFileSync(path.join(dir,'value-executed-counts.json'),JSON.stringify({bands:[1,2,3,4,5].map(band=>({band,strokes:1}))}));
+  const out=path.join(w.root,'checkpoints.html');
+  const options={runs:w.runs,plateRoots:[w.ab],out,expected:{'0.3.2':COMMIT,'0.1.1':'70ceb7c'}};
+  await generate(options);
+  const plate=pageData(out).rows.find(r=>r.model==='argon').plate;
+  assert.equal(plate.playback.missingFrames.length,5);
+  assert.equal(plate.playback.nativeFramesComplete,false);
+  assert.equal(plate.checkpoints.nativeComplete,true);
+  assert.equal(plate.frames.length,11,'all ten checkpoints precede explicit final endpoint');
+  for(const [i,file] of files.entries()) {
+    assert.equal(plate.frames[i].file,file);
+    assert.deepEqual(uriBytes(plate.frames[i].src),fs.readFileSync(path.join(dir,file)));
+    assert.deepEqual(plate.frames[i].sourceDimensions,{w:1200,h:1036});
+  }
+  assert.equal(plate.frames[5].band,1,'early light band remains accessible');
+  assert.match(plate.frames[10].stage,/not a recorded frame/);
+  assert.ok(plate.marks.some(m=>m.code==='checkpoint-evidence'));
+  fs.unlinkSync(path.join(dir,'value-band-1-dried.png'));
+  await generate(options);
+  const missing=pageData(out).rows.find(r=>r.model==='argon').plate;
+  assert.equal(missing.checkpoints.nativeComplete,false);
+  assert.ok(missing.checkpoints.missing.includes('value-band-1-dried.png'));
+  fs.writeFileSync(path.join(dir,'value-band-1-dried.png'),await png(1200,1036));
+  fs.unlinkSync(path.join(dir,'value-band-3-dried.png'));
+  const countsFile=path.join(dir,'value-executed-counts.json');
+  fs.writeFileSync(countsFile,JSON.stringify({bands:[1,2,3,4,5].map(band=>({band,strokes:band===3?0:1}))}));
+  await generate(options);
+  const emptyBand=pageData(out).rows.find(r=>r.model==='argon').plate;
+  assert.equal(emptyBand.checkpoints.nativeComplete,true,'unexecuted zero-stroke band is not a missing completion');
+  assert.deepEqual(emptyBand.checkpoints.expectedBands,[1,2,4,5]);
+  const manifestFile=path.join(dir,'frames.json'),manifest=JSON.parse(fs.readFileSync(manifestFile));
+  manifest.frames[0]={...manifest.frames[0],boundary:'value',value:3};
+  fs.writeFileSync(manifestFile,JSON.stringify(manifest));
+  await generate(options);
+  assert.ok(pageData(out).rows.find(r=>r.model==='argon').plate.checkpoints.missing.includes('value-band-3-dried.png'),'explicit completed boundary wins over a contradictory zero count');
+  for(const bands of [null,{},[{band:1,strokes:'1'}],[{band:1,strokes:-1}]]) {
+    fs.writeFileSync(countsFile,JSON.stringify({bands}));
+    await assert.rejects(generate(options),/Invalid completed-band counts/);
+  }
+  fs.writeFileSync(countsFile,JSON.stringify({bands:[1,2,3,4,5].map(band=>({band,strokes:1}))}));
+  for(const f of JSON.parse(fs.readFileSync(path.join(dir,'frames.json'))).frames) fs.writeFileSync(path.join(dir,f.src),await jpg(1200,1036));
+  await generate(options);
+  const complete=pageData(out).rows.find(r=>r.model==='argon').plate;
+  assert.equal(complete.playback.kind,'recorded frames');
+  assert.equal(complete.playback.nativeFramesComplete,true);
+  assert.equal(complete.frames.length,5,'complete recorded playback stays preferred');
+  assert.equal(complete.checkpoints.images.length,9,'separate checkpoint group remains in the artifact');
+});
+
+
+test('explicit oversized preview requests never upscale native source files', async t => {
+  const w=await fixtureWorld(); t.after(()=>fs.rmSync(w.root,{recursive:true,force:true}));
+  const out=path.join(w.root,'large-preview.html');
+  await generate({runs:w.runs,plateRoots:[w.ab],out,expected:{'0.3.2':COMMIT,'0.1.1':'70ceb7c'},frameWidth:2400,finalWidth:2400});
+  const plate=pageData(out).rows.find(r=>r.model==='argon').plate;
+  assert.deepEqual(readImageSize(uriBytes(plate.final)),{w:1200,h:1036});
+  assert.deepEqual(readImageSize(uriBytes(plate.frames[0].src)),{w:1200,h:1036});
+});
+
+
+test('only a recorded successful integer exit qualifies, including actual parsed exit3', async t => {
+  for(const exit of [3,1,-1,null,undefined,'0',0.5]) {
+    assert.ok(codes(gatePlate({...base(),exit},{expectedCommit:COMMIT}).refused).includes('run-failed'),String(exit));
+  }
+  assert.equal(gatePlate(base(),{expectedCommit:COMMIT}).admitted,true);
+  const root=tmp(); t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+  const dir=await makePlate(path.join(root,'argon1-mittens'),{exit:3});
+  const parsed=parsePlateDir(dir);
+  assert.equal(parsed.exit,3);
+  assert.deepEqual(codes(gatePlate(parsed,{expectedCommit:COMMIT}).refused),['run-failed']);
+  const scanned=scanPlates([root],{expected:{'0.3.2':COMMIT}});
+  assert.equal(scanned.length,1);
+  assert.ok(scanned[0].gate.refused.some(r=>r.code==='run-failed'));
 });

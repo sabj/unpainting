@@ -2,7 +2,12 @@
 // each command is a request file bench/paint-io/req-<seq>.json and gets an answer in res-<seq>.json. This class answers
 // them and drives the painter (painting.mjs). It keeps the model's own clock (wall time minus the time the model was
 // blocked waiting for the painter or the harness) and writes every start, stop decision, look and revision to
-// CHECKPOINTS.jsonl in the try's raw folder.
+// CHECKPOINTS.jsonl in the try's raw folder, and every answer the model reads to paint-answers.jsonl.
+//
+// Looking is stepping back, not search. While painting, the model may step back LOOKS times, at pass stops only, and
+// may revise the plan once after each look, at that stop. A look shows the sheet; in default mode it also shows the
+// target beside it. In strict mode (spec.noTargetLooks) no look shows the target, and bench/plan/target.png leaves the
+// model's worktree when painting starts: no target view after planning.
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
@@ -17,6 +22,9 @@ const writeJson = (f, v) => { fs.mkdirSync(path.dirname(f), { recursive: true })
 const sha = f => crypto.createHash('sha256').update(fs.readFileSync(f)).digest('hex');
 const PLAN_FILE = n => n === 'config.json' || n === 'extra-args.json' || n.endsWith('-lines.json');
 const now = () => Date.now() / 1000;
+// A painter steps back from the board a few times while painting, at points such as after a layer has dried; three is
+// a few. The look at the finished painting changes nothing and is not one of them.
+export const LOOKS = 3;
 
 /** Copy the model's plan files (bench/plan/ and bench/variant.txt, bench/PLAN.md) to dest. */
 export function planSnapshot(ws, dest) {
@@ -28,11 +36,12 @@ export function planSnapshot(ws, dest) {
 }
 export const variantIn = dir => { const f = path.join(dir, 'variant.txt'); return (fs.existsSync(f) ? fs.readFileSync(f, 'utf8') : '').replace(/\s+/g, '') || 'region_w13'; };
 
-/** The look images: <n>-sheet.jpg (at most 1400 px wide) and <n>-compare.jpg (target | sheet, 820 px each, same height). */
+/** The look images: <n>-sheet.jpg (at most 1400 px wide) and, unless target is null (strict), <n>-compare.jpg (target | sheet, 820 px each, same height). */
 async function lookImages(sheetPng, target, dir, n) {
   fs.mkdirSync(dir, { recursive: true });
   const meta = await sharp(sheetPng).metadata();
   await sharp(sheetPng).resize({ width: Math.min(1400, meta.width) }).jpeg({ quality: 92 }).toFile(path.join(dir, `${n}-sheet.jpg`));
+  if (!target) return;
   const W = 820, gap = 12;
   const a = await sharp(target).removeAlpha().resize({ width: W }).png().toBuffer(), b = await sharp(sheetPng).removeAlpha().resize({ width: W }).png().toBuffer();
   const [ma, mb] = await Promise.all([sharp(a).metadata(), sharp(b).metadata()]);
@@ -41,9 +50,10 @@ async function lookImages(sheetPng, target, dir, n) {
 }
 
 export class PaintSession {
-  /** raw: the try's raw folder for this target; spec: {width, sheetmm, trumbull}; modelMinutes: the model-time cap. */
+  /** raw: the try's raw folder for this target; spec: {width, sheetmm}; modelMinutes: the model-time cap. */
   constructor({ repo, ws, raw, spec, target, modelMinutes = 85, gpu = 'auto', log = () => {}, planOnly = false }) {
     Object.assign(this, { repo, ws, raw, spec, target, gpu, log, planOnly });
+    this.check = checkPlan;
     this.io = path.join(ws, 'bench', 'paint-io');
     this.looksDir = path.join(ws, 'bench', 'looks');
     for (const d of [this.io, this.looksDir, raw]) fs.mkdirSync(d, { recursive: true });
@@ -52,8 +62,10 @@ export class PaintSession {
     this.t0 = now(); this.waitS = 0; this.blockedUntil = 0;
     this.usedBefore = 0; this.endedModelS = null; this.planReady = false;
     this.pending = new Map(); this.handled = new Set();
-    this.painting = null; this.started = false; this.restarts = 0; this.rev = 0; this.looks = 0; this.checks = 0;
+    this.painting = null; this.started = false; this.restarts = 0; this.rev = 0; this.looks = 0; this.checks = 0; this.checkLog = []; this.paintings = 0;
     this.revising = []; this.ended = null; this.capped = false; this.palette = null; this.planHash = null; this.startCheck = null;
+    this.strict = spec?.noTargetLooks === true; this.steps = 0; this.lookedAt = null;
+    this.answers = path.join(raw, 'paint-answers.jsonl'); this.requests = new Map();
   }
 
 
@@ -72,9 +84,10 @@ export class PaintSession {
   record(kind, fields = {}) { fs.appendFileSync(this.ckpt, JSON.stringify({ t: new Date().toISOString(), kind, modelMinutes: +(this.modelS() / 60).toFixed(2), ...fields }) + '\n'); }
 
   answer(seq, text, exit = 0) {
-    const p = this.pending.get(seq); this.pending.delete(seq);
+    const p = this.pending.get(seq), q = this.requests.get(seq); this.pending.delete(seq);
     if (p?.blocking) this.addBlocked(p.t, Math.min(now(), p.t + CLIENT_WAIT));
     writeJson(path.join(this.io, `res-${seq}.json`), { text, exit, modelMinutes: +(this.modelS() / 60).toFixed(1) });
+    fs.appendFileSync(this.answers, JSON.stringify({ t: new Date().toISOString(), seq, cmd: q?.cmd ?? null, args: q?.args ?? [], exit, text }) + '\n');
     for (const [s2, q] of [...this.pending]) if (q.kind === 'follow' && q.target === seq) this.answer(s2, text, exit);
   }
 
@@ -98,7 +111,7 @@ export class PaintSession {
   }
   remainingText(o, limit = 60) {
     const rows = o.remaining || [];
-    const lines = rows.slice(0, limit).map(r => (r.touchRound ? `  pass ${r.pass}: touch-up round ${r.touchRound} (the painter compares its sheet with the target's shape averages and adds corrective glazes)`
+    const lines = rows.slice(0, limit).map(r => (r.touchRound ? `  pass ${r.pass}: touch-up round ${r.touchRound}${this.strict ? '' : ' (the painter compares its sheet with the target\'s shape averages and adds corrective glazes)'}`
       : `  pass ${r.pass}: value ${r.value} ${r.pigment}${r.order ? ` (${r.order})` : ''}${r.touched ? ' touch-up' : ''}, ${r.passages} passages over ${(100 * (r.areaShare || 0)).toFixed(1)}% of the sheet; ${Object.entries(r.techniques || {}).map(([k, v]) => `${k} ${v}`).join(', ')}`));
     if (rows.length > limit) lines.push(`  ... and ${rows.length - limit} more`);
     if (o.closingDrawing && !o.closing) lines.push('  then the closing drawing');
@@ -106,7 +119,7 @@ export class PaintSession {
   }
   statusText() {
     const hint = this.started && !this.finished() && (!this.painting || this.painting.currentStop()[0] === null) ? '\nWhile it paints, `bash bench/paint.sh wait` returns at the next stop; time spent in wait is not counted as yours.' : '';
-    return `Painter: ${this.where()}.\nYour time: ${(this.modelS() / 60).toFixed(1)} of ${(this.limitS / 60).toFixed(0)} minutes used (waiting for the painter is not counted). Looks so far: ${this.looks}; revisions: ${this.rev}.${hint}`;
+    return `Painter: ${this.where()}.\nYour time: ${(this.modelS() / 60).toFixed(1)} of ${(this.limitS / 60).toFixed(0)} minutes used (waiting for the painter is not counted). Looks so far: ${this.steps} of ${LOOKS}; revisions: ${this.rev}.${hint}`;
   }
   planFilesHash() {
     const h = {}, plan = path.join(this.ws, 'bench', 'plan');
@@ -123,7 +136,7 @@ export class PaintSession {
     for (const seq of reqs) {
       if (this.handled.has(seq)) continue;
       const r = readJson(path.join(this.io, `req-${seq}.json`)); if (!r) continue;
-      this.handled.add(seq);
+      this.handled.add(seq); this.requests.set(seq, r);
       r.t = Math.min(now(), Date.parse(r.t) / 1000 || now());
       try { this.handle(seq, r); } catch (e) { this.log(`paint request ${seq} ${r.cmd}: ${e.stack || e}`); this.answer(seq, `The harness could not do that (${e.message}); try again or run \`bash bench/paint.sh status\`.`, 1); }
     }
@@ -167,8 +180,8 @@ export class PaintSession {
     const snap = planSnapshot(this.ws, path.join(dir, 'plan'));
     p.snapshot = snap;
     const t = now();
-    checkPlan({ repo: this.repo, spec: this.spec, planDir: snap, variant: variantIn(snap), target: this.target, work: path.join(dir, 'work') })
-      .then(chk => { p.chk = chk; writeJson(path.join(dir, 'check.json'), { ok: chk.ok, failures: chk.failures, layering: chk.layering, palette: chk.palette, seconds: +(now() - t).toFixed(1) }); })
+    this.check({ repo: this.repo, spec: this.spec, planDir: snap, variant: variantIn(snap), target: this.target, work: path.join(dir, 'work') })
+      .then(chk => { p.chk = chk; this.checkLog.push({ seconds: chk.seconds, previewSeconds: chk.previewSeconds }); writeJson(path.join(dir, 'check.json'), { ok: chk.ok, failures: chk.failures, layering: chk.layering, palette: chk.palette, seconds: +(now() - t).toFixed(1) }); })
       .catch(e => { p.chk = { crash: String(e.stack || e) }; });
   }
 
@@ -191,8 +204,21 @@ export class PaintSession {
     const plan = path.join(dir, 'plan-1'); fs.cpSync(snapshot, plan, { recursive: true });
     fs.rmSync(path.join(this.raw, 'plan'), { recursive: true, force: true }); fs.cpSync(snapshot, path.join(this.raw, 'plan'), { recursive: true });
     this.painting.run(plan, variantIn(plan));
+    this.paintings++;
     this.started = true; this.palette = chk.palette; this.startCheck = chk;
-    this.record('start', { variant: variantIn(plan), stops: initialStop === 'end' ? 'none' : 'every passage boundary' });
+    if (this.strict) this.withdrawTarget();
+    this.record('start', { variant: variantIn(plan), stops: initialStop === 'end' ? 'none' : 'every passage boundary', looks: LOOKS, strict: this.strict });
+  }
+
+  /** Strict: planning is over once painting starts, so the target leaves the model's worktree. */
+  withdrawTarget() {
+    const f = path.join(this.ws, 'bench', 'plan', 'target.png');
+    if (fs.existsSync(f)) { fs.rmSync(f); this.record('target-withdrawn', { file: 'bench/plan/target.png' }); }
+  }
+  /** Strict: a clean-sheet restart is planning again, so the target comes back. */
+  restoreTarget() {
+    const f = path.join(this.ws, 'bench', 'plan', 'target.png');
+    if (this.strict && !fs.existsSync(f) && fs.existsSync(path.join(this.ws, 'bench', 'plan'))) { fs.copyFileSync(this.target, f); this.record('target-restored', { why: 'clean-sheet restart' }); }
   }
 
   startChecked(seq) {
@@ -208,19 +234,23 @@ export class PaintSession {
   restartArchive() {
     this.restarts++;
     this.record('restart', { n: this.restarts });
-    this.started = false; this.rev = 0; this.painting = null;
+    this.started = false; this.rev = 0; this.painting = null; this.steps = 0; this.lookedAt = null;
+    this.restoreTarget();
   }
 
   async makeLook(seq, b, o, sheet) {
     const n = String(++this.looks).padStart(2, '0');
-    await lookImages(sheet, this.target, this.looksDir, n);
+    await lookImages(sheet, this.strict ? null : this.target, this.looksDir, n);
     const keep = path.join(this.raw, 'looks'); fs.mkdirSync(keep, { recursive: true });
     fs.copyFileSync(path.join(this.looksDir, `${n}-sheet.jpg`), path.join(keep, `${n}-b${b}-sheet.jpg`));
-    if (b === 'final') { this.record('look', { n: this.looks, boundary: 'final' }); return this.answer(seq, `The finished painting: bench/looks/${n}-compare.jpg (target | painting) and bench/looks/${n}-sheet.jpg.`); }
-    this.record('look', { n: this.looks, boundary: b, strokes: o.strokes, penLines: o.penLines, passesDone: o.passesDone, passesPlanned: o.passesPlanned });
-    let txt = `Look ${this.looks}: ${o.label}. Open bench/looks/${n}-compare.jpg (target left, your sheet right) or bench/looks/${n}-sheet.jpg.\n`
+    const view = this.strict ? `bench/looks/${n}-sheet.jpg (your sheet; a strict run shows no target after planning)` : `bench/looks/${n}-compare.jpg (target left, your sheet right) or bench/looks/${n}-sheet.jpg`;
+    if (b === 'final') { this.record('look', { n: this.looks, boundary: 'final', target: !this.strict }); return this.answer(seq, `The finished painting: ${view}.`); }
+    this.steps++; this.lookedAt = b;
+    this.record('look', { n: this.looks, step: this.steps, boundary: b, target: !this.strict, strokes: o.strokes, penLines: o.penLines, passesDone: o.passesDone, passesPlanned: o.passesPlanned });
+    let txt = `Look ${this.steps} of ${LOOKS}: ${o.label}. Open ${view}.\n`
       + `So far: ${o.strokes} brush strokes and ${o.penLines} pen lines; ${o.passesDone} of ${o.passesPlanned} passes painted.\nStill to come:\n${this.remainingText(o)}`;
     if (o.revisable === false) txt += `\n(Revisions are not available for this painting: ${(o.notRevisable || []).join(', ')}.)`;
+    else txt += '\nYou may revise once, here, before you go on.';
     this.answer(seq, txt);
   }
 
@@ -231,6 +261,7 @@ export class PaintSession {
       if (f?.state === 'done' && fs.existsSync(png)) { this.pending.set(seq, { ...r, kind: 'look', blocking: true, phase: 'busy' }); this.makeLook(seq, 'final', null, png).catch(e => this.answer(seq, 'The look image could not be made: ' + e.message, 1)); return; }
       return this.answer(seq, `The painter is not stopped (${this.where()}); a look shows the sheet at a stop. Use \`bash bench/paint.sh wait\`.`, 1);
     }
+    if (this.steps >= LOOKS) { this.record('look-refused', { boundary: b, why: 'no looks left' }); return this.answer(seq, `You have stepped back ${LOOKS} times, the most a painting gets. Go on with next, run <pass>, run closing or finish; the finished painting can be looked at once.`, 1); }
     this.pending.set(seq, { ...r, kind: 'look', blocking: true, phase: 'busy' });
     this.makeLook(seq, b, o, this.painting.sheetImage(b)).catch(e => this.answer(seq, 'The look image could not be made: ' + e.message, 1));
   }
@@ -259,6 +290,7 @@ export class PaintSession {
     const [b, o] = this.painting.currentStop();
     if (b === null) return this.answer(seq, `Revisions are made at a stop; the painter is ${this.where()}.`, 1);
     if (o.revisable === false) return this.answer(seq, `This painting cannot be revised (painter features without saved state: ${(o.notRevisable || []).join(', ')}).`, 1);
+    if (this.lookedAt === null || String(this.lookedAt) !== String(b)) return this.answer(seq, 'A revision follows a look at the same stop, once per look. Run `bash bench/paint.sh look` first (it uses one of your looks), or go on.', 1);
     const then = args[0] === 'then' ? [args[1] || 'next', args.slice(2)] : ['next', []];
     const cur = this.planFilesHash(), changed = [...new Set([...Object.keys(cur), ...Object.keys(this.planHash || {})])].filter(k => cur[k] !== this.planHash?.[k]).sort();
     if (!changed.length) return this.answer(seq, 'No plan file changed since the painter last planned; nothing to revise. Use next, run or finish.', 1);
@@ -284,7 +316,7 @@ export class PaintSession {
     this.revising.push({ k, seq, b, then: p.then, changed, snap, phase: 'saving' });
     p.phase = 'sent'; p.k = k;
     this.painting.go(b, null, 'save-exit');
-    this.planHash = p.cur;
+    this.planHash = p.cur; this.lookedAt = null;
     this.record('revise', { boundary: b, revision: k, strokes: o.strokes, passesDone: o.passesDone, changed, variant: variantIn(snap) });
   }
 
@@ -324,7 +356,7 @@ export class PaintSession {
     if (f && !this.revising.length) {
       if (f.state === 'done') { this.record('finished', { strokes: this.painting.progress().strokes }); return this.answer(seq, 'The painting is finished. `bash bench/paint.sh look` shows it once; then stop.'); }
       if (f.planningRefused) return this.answer(seq, `The painter refused your plan while painting: ${f.planningRefused}\nNothing will be judged from this painting. You may fix the plan and run \`bash bench/paint.sh start\` once more (a clean sheet).`, 1);
-      return this.answer(seq, `The painting failed: the painter exited ${f.segments.at(-1).exit}.`, 1);
+      return this.answer(seq, `The painting stopped at the render time limit (painter exit ${f.segments.at(-1).exit}). It cannot be restarted.`, 1);
     }
     if (age > ANSWER_AFTER) {
       if (p.kind === 'revise') return this.answer(seq, `Revision ${p.k} passed the check (${p.changed.join(', ')}); the painter is saving the painting and planning again from your revised files, then goes on. Run \`bash bench/paint.sh wait\` to see where it stops.`);
@@ -343,7 +375,7 @@ export class PaintSession {
   }
 
   /** A repair turn after the painter refused the plan: the model's clock starts again and one fresh start is allowed. */
-  reopen() { this.usedBefore = this.modelS(); this.endedModelS = null; this.ended = null; this.t0 = now(); this.waitS = 0; this.blockedUntil = 0; this.record('reopen', { why: 'repair turn' }); }
+  reopen() { this.usedBefore = this.modelS(); this.endedModelS = null; this.ended = null; this.t0 = now(); this.waitS = 0; this.blockedUntil = 0; this.restoreTarget(); this.record('reopen', { why: 'repair turn' }); }
 
   /** After the model's process exited: let a start or revise whose check is still running finish. */
   async settle(limitS = 900) {

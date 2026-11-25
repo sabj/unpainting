@@ -144,6 +144,11 @@ export function widePalette(px, w, h, paperRGB, lean, { weight = 1, gain = 0.5, 
   const unreached = keys && extend ? keyHueCoverage(sample, colours, named, reach).hues.filter(r => r.loss > 1e-6) : [];
   const covered = keys && !extend ? { paints: named, added: [], coverage: null } : keys ? coverKeyHues(sample, colours, named, { max: named.length + 2, ...reach }) : coverKeyHues(sample, colours, chosen.paints, { max });
   const extra = (add || []).map(k => BOX.find(p => p.key === k) ?? (() => { throw new Error(`--paintsadd: no box paint ${k} (${BOX.map(p => p.key).join(', ')})`); })()).filter(p => !covered.paints.some(q => q.key === p.key));
+  // A watercolourist's earths: a picture whose local colours are mostly muted warm (stone, sand, wood, old paper) is
+  // painted with raw sienna and burnt sienna and greyed with ultramarine, not mixed from a clean yellow, a rose and a blue,
+  // whose near-complementary greys dry dull and mauve
+  const earths = !keys ? earthPans(colours).filter(p => ![...covered.paints, ...extra].some(q => q.key === p.key)) : [];
+  extra.push(...earths);
   const paints = [...covered.paints, ...extra], changed = covered.added.length || extra.length || (guarded && guarded.decision.action !== 'kept');
   const e = changed ? score(paints) : chosen.e, trail = changed ? [...chosen.trail, e] : chosen.trail;
   const n = w * h, chroma = chromaOf(channelDensity(px, n, paperRGB), n);
@@ -156,6 +161,14 @@ export function widePalette(px, w, h, paperRGB, lean, { weight = 1, gain = 0.5, 
   const coverageNote = forNote + (palette.hueCoverage ? `; key hues ${covered.coverage.loss < 1e-6 ? 'covered' : `gap ${covered.coverage.loss.toFixed(1)} at palette limit`}${covered.added.length && !keys ? `, added ${covered.added.join(', ')}` : ''}` : '');
   const guardLine = guarded ? `\n${guardNote(guarded.decision)}` : '';
   return { palette, note: `palette wide: ${paints.length} box paints (${paints.map(p => p.name).join(', ')}), sheet and local error ${trail.map(v => v.toFixed(2)).join(' to ')}; ${colours.length} local colours: ${cols}${coverageNote}${guardLine}` };
+}
+
+/** Muted warm local colours: hue (Lab degrees) and chroma between these; their share of the sample that brings in the earths. */
+const EARTH_HUE = [45, 90], EARTH_C = [4, 32], EARTH_SHARE = 0.2;
+/** The earth pans for a picture whose local colours are mostly muted warm (raw sienna, burnt sienna, ultramarine), or none. */
+function earthPans(colours) {
+  const share = colours.filter(r => r.h >= EARTH_HUE[0] && r.h <= EARTH_HUE[1] && r.C >= EARTH_C[0] && r.C <= EARTH_C[1]).reduce((a, r) => a + r.share, 0);
+  return share >= EARTH_SHARE ? ['rawsienna', 'sienna', 'ultramarine'].map(k => BOX.find(p => p.key === k)) : [];
 }
 
 /**
@@ -186,12 +199,40 @@ export function puddleLabels(A, k, w, h, { K = 8, floor = 0.04, radius = 2, stri
   return { labels, centres };
 }
 
+/** Two puddles whose colours differ by less than this CIEDE2000 (hue and chroma, at one lightness) are one wash: under 2.3 the
+ *  eye does not tell them apart (src/eval/colour.mjs: 1 is a just-noticeable difference). */
+const PUDDLE_VISIBLE_DE = 2.3;
+
+/**
+ * Puddles the eye cannot tell apart are one: a puddle joins the larger puddle whose paint, rendered at this puddle's own mean
+ * amount, differs from its own by less than `de` in hue and chroma. The cut then keeps only the colour differences a
+ * flat wash would show. `pigments` carry K and S; `A` is the fitted paint per cell (n * k).
+ * @returns { labels (Uint8Array, n, the surviving puddle ids), merged (how many puddles joined another) }
+ */
+export function mergeCloseColours({ labels, centres }, A, k, pigments, paperRGB, { de = PUDDLE_VISIBLE_DE } = {}) {
+  const K = centres.length, n = labels.length, total = new Float64Array(K), count = new Float64Array(K);
+  for (let i = 0; i < n; i++) { let t = 0; for (let j = 0; j < k; j++) t += A[i * k + j]; total[labels[i]] += t; count[labels[i]]++; }
+  const mean = Array.from({ length: K }, (_, c) => (count[c] ? total[c] / count[c] : 0));
+  const paper = Uint8ClampedArray.from(paperRGB), optics = pigments.map(q => ({ K: q.K, S: q.S ?? [0, 0, 0] }));
+  // the colour of puddle c's paint laid at `amount`, as Lab against the paper
+  const colour = (c, amount) => { const out = renderLayers([pigments.map((_, j) => Float32Array.of(centres[c][j] * amount))], optics, paper, 1, 1); return labPlanes(out, 1, paperRGB); };
+  const order = Array.from({ length: K }, (_, c) => c).filter(c => count[c] > 0).sort((a, b) => count[b] - count[a]);
+  const into = Int32Array.from({ length: K }, (_, c) => c), kept = [];
+  for (const c of order) {
+    const own = colour(c, mean[c]);
+    const host = kept.find(d => hueChroma(own.L[0], own.a[0], own.b[0], colour(d, mean[c]).a[0], colour(d, mean[c]).b[0]) < de);
+    if (host === undefined) kept.push(c); else into[c] = host;
+  }
+  const out = new Uint8Array(n); for (let i = 0; i < n; i++) out[i] = into[labels[i]];
+  return { labels: out, merged: order.length - kept.length };
+}
+
 /**
  * A pass's components cut again by puddle: connected pieces that share a component and a puddle label, with any piece
  * under `small` cells folded into the largest neighbouring piece of its own component (so a colour's fringe is laid
  * with its neighbour rather than dropped). Same shape as raster.js components' result.
  */
-export function splitByPuddle(labels, puddles, w, h, small) {
+export function splitByPuddle(labels, puddles, w, h, small, { thin = 0 } = {}) {
   const n = w * h, out = new Int32Array(n), stack = new Int32Array(n), areas = [0];
   let next = 1;
   for (let s = 0; s < n; s++) {
@@ -221,6 +262,36 @@ export function splitByPuddle(labels, puddles, w, h, small) {
     let moved = 0;
     for (let i = 0; i < n; i++) { const p = out[i]; if (p && into[p]) { out[i] = into[p]; moved++; } }
     if (!moved) break;
+    areas.fill(0); for (let i = 0; i < n; i++) if (out[i]) areas[out[i]]++;
+  }
+  // A piece a wash would drop (under `small` cells, or with `thin` > 0 and twice its area over its boundary cells under
+  // `thin`: a sliver along a cut) joins the neighbour it shares most boundary with, so the cut partitions the component and
+  // no cell the uncut wash covered is left bare. A piece with no neighbour is the whole component and stays as it is.
+  for (let round = 0; round < 12; round++) {
+    const edge = new Int32Array(next), share = new Map();
+    for (let i = 0; i < n; i++) {
+      const p = out[i]; if (!p) continue;
+      const x = i % w, y = (i - x) / w;
+      let boundary = false;
+      for (const j of [x > 0 ? i - 1 : -1, x < w - 1 ? i + 1 : -1, y > 0 ? i - w : -1, y < h - 1 ? i + w : -1]) {
+        const q = j < 0 ? 0 : out[j];
+        if (q === p) continue;
+        boundary = true;
+        if (q && labels[j] === labels[i]) { const key = p * next + q; share.set(key, (share.get(key) ?? 0) + 1); }
+      }
+      if (boundary) edge[p]++;
+    }
+    const into = new Int32Array(next);
+    const failing = []; for (let p = 1; p < next; p++) if (areas[p] > 0 && (areas[p] < small || (thin > 0 && edge[p] > 0 && 2 * areas[p] / edge[p] < thin))) failing.push(p);
+    failing.sort((a, b) => areas[a] - areas[b]);
+    const gone = new Set();
+    for (const p of failing) {
+      let best = 0, bestShare = 0;
+      for (let q = 1; q < next; q++) { if (q === p || gone.has(q) || !areas[q]) continue; const sh = share.get(p * next + q) ?? 0; if (sh > bestShare) { bestShare = sh; best = q; } }
+      if (best) { into[p] = best; gone.add(p); }
+    }
+    if (!gone.size) break;
+    for (let i = 0; i < n; i++) { const p = out[i]; if (p && into[p]) out[i] = into[p]; }
     areas.fill(0); for (let i = 0; i < n; i++) if (out[i]) areas[out[i]]++;
   }
   const map = new Int32Array(next), dense = [0];

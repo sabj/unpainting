@@ -47,6 +47,22 @@ export function darkWarmth(sample, paints) {
   return b / idx.length;
 }
 
+/**
+ * The pan that brings the darkest tenth's warmth (b*) to the picture's own when it is more than 1.5 off, or null: any library pan
+ * not chosen, the one that leaves the least gap, taken only if it narrows the gap and the palette has room (`max`).
+ */
+export function warmthFix(sample, chosen, library, max) {
+  if (chosen.length >= max) return null;
+  const want = darkWarmth(sample, null), have = darkWarmth(sample, chosen);
+  if (!(Math.abs(have - want) > 1.5)) return null;
+  let best = null;
+  for (const p of library.filter(q => !chosen.includes(q))) {
+    const off = Math.abs(darkWarmth(sample, [...chosen, p]) - want);
+    if (best === null || off < best.off) best = { p, off };
+  }
+  return best && best.off < Math.abs(have - want) ? best.p : null;
+}
+
 // Every per-cell result depends only on the cell's colour, so the work runs once per distinct colour.
 function uniqueOf(sample) {
   if (sample._u) return sample._u;
@@ -112,25 +128,13 @@ export function chooseBox(px, w, h, paperRGB, { library = BOX, min = 2, max = 5,
     if (best.e - score(chosen) >= gain) break;
     chosen = best.t;
   }
-  // Add a dark when the dark cells' warmth (b*) is off. dE00 compresses hue error at low lightness and misses it.
-  const darkKeys = ['lampblack', 'paynes', 'sepia', 'umber'];
-  // no typed-array spread into Math.min: hundreds of thousands of cells overflow the call stack
+  // Match the darkest tenth's warmth (b*): dE00 compresses hue error at low lightness and misses it. Any pan may fix it, whatever
+  // dark pan is already chosen: a warm sepia does not make a neutral charcoal.
   let darkest = Infinity;
   for (let i = 0; i < sample.lab.L.length; i++) if (sample.lab.L[i] < darkest) darkest = sample.lab.L[i];
-  if (darkest < 45 && !chosen.some(p => darkKeys.includes(p.key))) {
-    const want = darkWarmth(sample, null), have = darkWarmth(sample, chosen);
-    if (Math.abs(have - want) > 1.5) {
-      let best = null;
-      for (const p of library.filter(q => darkKeys.includes(q.key) && !chosen.includes(q))) {
-        const b = darkWarmth(sample, [...chosen, p]);
-        const off = Math.abs(b - want);
-        if (best === null || off < best.off) best = { p, off };
-      }
-      if (best && best.off < Math.abs(have - want)) {
-        chosen = [...chosen, best.p];
-        trail.push(score(chosen));
-      }
-    }
+  if (darkest < 45) {
+    const fix = warmthFix(sample, chosen, library, max);
+    if (fix) { chosen = [...chosen, fix]; trail.push(score(chosen)); }
   }
   if (swap) {
     for (let i = 0; i < chosen.length; i++) {

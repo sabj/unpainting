@@ -1,99 +1,69 @@
 # Scoring
 
-A try is one model session that paints the requested targets. Each painting gets three things: an automated score for the finished painting, a progression check (an evaluation of saved painting stages), and a share in its try's cheat-risk score. The code is in [../scorer/](../scorer/) and [../scripts/score.mjs](../scripts/score.mjs). Rubric version: `bench-v3-median5`, with the median of five calls per judge.
-
-The painting toolkit given to models writes each final image.
-
-Judge version: `J1`. All published scores are J1. A new panel, rubric or image protocol gets a new J number; scores from different J versions are not compared. `JUDGE_ROUTE` picks the judge route: `together` (default, needs `TOGETHER_API_KEY`) or `openrouter` (zero-data-retention providers, needs `OPENROUTER_API_KEY`). Results group by painter, sim and judge version. See [versions](../../docs/versions.md).
-
-## The finished painting
-
-`scorer/score_painting.py` scores one painting against its target, 0 to 10.
-
-- AI image judges: Kimi-K3, GLM-5.3-Flash and Qwen3.5-9B. Each sees the target and the painting, blind, with a short description of the target's painting style. Each gives 0 to 10 for `composition_values`, `edges_detail` and `marks_texture`, and one overall.
-- Combined judge score: each judge is called 5 times at temperature 0 (the least random sampling setting). Its score is the median of its valid calls, and it needs at least 3. The vision score is the mean of the three judges' medians. If a judge has fewer than 3 valid calls, the painting's score is incomplete and stays empty. No average over a smaller panel is made.
-- Judge J2, for internal gates only (`score_painting.py --judge J2`): the same panel, prompt, images and medians as J1, but every judge needs all 5 calls valid. A call that fails, is cut off at the token limit or does not parse is made again with both images; a reply rewritten into JSON from text alone does not count. Each result records `judgeVersion`, `minValidCalls`, `callCounts` and, for J2, every attempt with its HTTP status and finish reason (`visionAttempts`). Published scores stay J1, and J2 scores are not compared with them.
-- Repeatable image measurements: value shapes, edges and marks, each normalized to 0 to 10, from `scorer/classic.py`. Their mean is the classic score. No metric uses pixel error.
-- Composite: the mean of the vision score and the classic score. A try's score is the mean of its targets' composites and needs every target.
-
-The judges are told not to reward pixel similarity, and that blur and smear are failures. "5 is a competent amateur; 9-10 is close to the target's quality."
-
-### J2 sampling profiles
-
-The judge version identifies the rules; the profile identifies the sampling budget. These profiles keep the existing J2 panel, prompt, image preparation, median aggregation and strict response validation:
-
-| Profile | Required valid calls per judge | Initial panel calls | Use |
-|---|---:|---:|---|
-| `J2-lite` | 1 | 3 | Routine development screening |
-| `J2-standard` | 3 | 9 | Closer comparisons |
-| `J2-full` | 5 | 15 | Release decisions; the existing J2 default |
-
 ```sh
-python3 bench/scorer/score_painting.py --target target.png --image painting.png --judge J2 --profile lite --out score.json
+npm run bench:score04 -- RUN_FOLDER... --out DIR      # or one manifest.json in place of the folders
+npm run bench:summary04 -- DIR/results.json --set core|extended
 ```
 
-Omitting `--profile` retains full J2 unless `BENCH_SCORE_CALLS` explicitly selects 1, 3 or 5 calls, which records the corresponding profile. A conflicting explicit profile and environment override is refused. Other J2 call counts are refused. J1 keeps its own default and call-count overrides. J2 profiles cannot be applied to J1. The V1 to V3 toolkit runs use J1. New explicit V4 benchmark profiles select J2-lite or J2-full; see [profiles](profiles.md).
+`bench:score04` runs `bench/scorer/score04.py` under `BENCH_SCORE_PYTHON` (else `python3`), which needs `bench/scorer/requirements.txt`. It writes `DIR/results.json` and `DIR/SCORES.md` and keeps every judge reply in `DIR/readings/`. `bench:summary04` writes `DIR/SUMMARY.md`.
 
-Every profile requires all three judges. A missing judge leaves the composite incomplete; it never produces a score from a smaller panel. Failed, truncated and malformed responses use the existing bounded J2 retries with both images: up to three judgement attempts, each with up to three HTTP attempts, followed by at most two top-up rounds for still-missing samples. A top-up round requests only the missing samples. Lite reduces initial calls by 80% versus full; actual cost and latency depend on retries and provider behavior.
+## Inputs
 
-Results record `judgeProfile`, the requested and required counts and panel in `sampling`, actual valid counts in `callCounts`, valid scores in `visionSamples`, and HTTP attempts in `visionAttempts` (including top-up round and sample slot). Retain those samples for paired lite/full calibration without paying for the same responses again. Different profiles must remain distinguishable in comparisons; neither ranking agreement nor interchangeable scores have been established.
+- A run folder from `npm run paint`, for Auto and for every level. It holds `run.json`, the painting, its video frames (`frames.json`) and `usage.json`.
+- Or a manifest. This is a JSON list, or `{"runs": [...]}`, of folders or of `{folder, subject, level, author}`. `npm run unpaint -- score RUN_DIR` writes one for a benchmark run. `{subject, level, author, failed: "why"}` with no folder stands for a scheduled run that left nothing.
 
-With one valid call per judge, repeatability is unmeasured: `pm` is null and `repeatabilityMeasured` is false. `judgeSpread` is the range of the judges' overall scores and measures panel disagreement, not repeatability. Repeated profiles retain the existing `pm` dispersion calculation; it is not a calibrated confidence interval. Escalate both sides of an ambiguous comparison to the same profile. Changes to the artistic rubric or image protocol require a new judge version, rather than a cheaper J2 profile.
+A failed run is a row marked FAILED, with its reason. It counts as the lowest score.
 
-Every painting is scored at its target's native size (for example 306 x 242 for Hills): V1 to V3 paintings are already that size, and the 1224 px V4 and V5 renders are Lanczos-downscaled to it, so all five rounds share one scale and nothing is upscaled. Some V4 and V5 records keep an older 720 px upscaled score as `scoreOld`; results do not use it.
+Before any judge is called, the scorer refuses a bad input and names it. Bad inputs are a folder that is not a run, a missing original, a missing video, a video with fewer than ten frames after its first wash, or a hosted route without its key. These exit with code 2. Exit code 1 means the results were written, but a judge is missing a reading. That figure is left empty, and a smaller panel never stands in.
 
-Score from the toolkit's own `final.png`, not from a compressed thumbnail. The marks metric is sensitive to compression: a 600 px WebP of a published painting gave a marks score 2.4 points lower than the PNG it was made from.
+## What is scored
 
-## How far to trust the score
+- Human-ness is the main score. Does the painting, and its video stopped at any point, look made by a person?
+- Quality is how good the painting is as a watercolour, judged alone. The original is judged the same way. A painting's quality is its share of the original's score. If the original scores 9 and the painting 4.5, the quality is 50%. It can go over 100%.
+- Combined is two parts human-ness to one part quality (`WEIGHTS` in `bench/scorer/s04_table.py`). Both parts stay visible.
+- Likeness has its own column and is not in the combined figure. Is it a painting of its original?
+- Adjusted for Auto is (painting - Auto) / max(top - Auto, top / 5), shown beside the raw figure. 0 means level with Auto. It needs exactly one Auto painting of the picture among the inputs.
 
-The published scorer has these checks.
+## Human-ness
 
-- Scores are relative, very coarse, and open to improvement.
-- Agreement between judges (Kendall tau, a measure of ranking agreement, 156 paintings): Kimi-K3 and GLM-5.3-Flash 0.849, Kimi-K3 and Qwen3.5-9B 0.805, GLM-5.3-Flash and Qwen3.5-9B 0.759.
-- Controls: for every subject the target itself beats a blurred and a posterized copy (reduced to a few colors) of it.
-- Indexed score: the leaderboard ranks by each painting's composite as a percentage of its target's own score in the Target column below, the same ceiling for every round. The target is scored against itself on the paintings' path at native size, 3 runs of 5 calls per judge, and the column is the mean of the 3 runs.
-- The target self-score is not a perfect 10. Shown the same image twice, Qwen3.5-9B answers 10 on nearly every call, Kimi-K3 gives 8 to 9, and GLM-5.3-Flash gives 5 to 6. A few single calls answer 1 or 3; the median of 5 calls absorbs them.
+The judges see, in order:
 
-| Subject | Target | Runs | Blurred | Posterized |
-|---|---:|---|---:|---:|
-| Hills | 8.43 | 8.54, 8.38, 8.38 | 3.48 | 5.10 |
-| France | 8.43 | 8.38, 8.21, 8.71 | 3.38 | 5.05 |
-| Ships | 8.76 | 9.04, 8.70, 8.54 | 3.74 | 4.77 |
-| Trumbull | 8.57 | 8.57, 8.57, 8.57 | 3.31 | 5.08 |
+1. The video's first frame, the untouched paper. It gives context and is not scored.
+2. The drawing frame, the last one before the first wash. It is scored and reported but is not in the figure. It is missing when nothing was drawn first.
+3. Ten stills of the painting in progress, from the first wash to nine tenths of the way to the finish. Their average, as a percentage of 5, is the figure.
+4. The finished sheet. It is scored and reported but is not in the figure.
 
-The Blurred and Posterized columns come from a controls run with one call per judge. They check that each target beats its degraded copies.
+The ten stills are spaced at equal steps of progress, not by frame number. A frame's progress is how much of the finished picture is on the sheet, which is 1 - |frame - finished| / |paper - finished| (`bench/scorer/s04_readings.py`). Each still is labelled only with its percentage. The judge never sees the original.
 
-- Retest: 10 paintings scored twice differed by 0.14 on average and 0.34 at most.
-- Cost: scoring the published runs took 4,189 judge calls and $19.95.
+Each judge says whether this is the order and kind of mark a person would use. Then it scores each still from 1 to 5 by the [rubric](human-ness-rubric.md) and names the tells by letter. A tell is a sign that a machine made the painting. The rubric's hash is written into the results. Editing the rubric starts a new series.
 
-## The progression check
+## Quality and likeness
 
-`scorer/progression.py` shows the judges one row of images: the target, then the painting at 10, 25, 50, 75 and 100% of its strokes. Each judge first asks whether this is the order and the kind of mark a person with a brush and pen would use, then scores each stage 1 to 5:
+Quality: the judge sees one picture alone and scores it from 0 to 10 as a watercolour. It is not told whether this is an original or a painting.
 
-- 5: unmistakably a person's painting in progress
-- 4: convincing with one small tell (a sign of machine rendering)
-- 3: plausible but a tell a viewer would notice
-- 2: mostly not, two or more tells
-- 1: a finished image being uncovered by a filter, mask, wipe or dissolve
+Likeness: the judge sees the original, then the finished painting. It scores from 1 to 5 how well the painting matches the original in subject, composition, light and dark, and colour. A 5 is unmistakably this picture. A 3 has the subject and composition, but the tones or colours plainly differ, or a main part is missing. A 1 is a different picture. An average of 1.5 or less is flagged.
 
-The tells it names include speckle trails, cut or scalloped wash edges, flat slabs standing in for a form, a region arriving finished while its neighbour is untouched, a travelling front or wipe, dark before light, and fine detail in the first 25%. The published runs used GLM-5.3-Flash and Qwen3.5-9B for this check. The mean of the 10% and 25% stages (`earlyMean`) feeds the cheat-risk score.
+Pictures are shown at 640 px on the long side for human-ness, and 768 px for quality and likeness.
 
-## The cheat-risk score
+## Judges
 
-See [anti-cheat.md](anti-cheat.md#the-cheat-risk-score). A high score means a person reviews the try. It does not exclude it.
+- There is one panel, `open3`. It has three models, GLM-5.3-Flash, Qwen3.8-27B and Gemma-4-31B, set to low reasoning (`bench/scorer/s04_judge.py`). `JUDGE_PANEL` names another panel.
+- `JUDGE_ROUTE` says where the judges run. `local` is the default and uses Ollama at `JUDGE_LOCAL_URL`, with the model tags in `JUDGE_LOCAL_TAGS`. `openrouter` uses providers that keep no data and needs `OPENROUTER_API_KEY`. `together` needs `TOGETHER_API_KEY`.
+- Each judge gives three readings, at temperature 0. A judge's figure is the middle one of its three. The panel's figure is the average of the judges' figures. A judge never sees a painter's name or level.
+- A saved reply is reused only if nothing that could change it has changed. `--fresh` reads again. `--repeat N` scores the same paintings again without sharing any reading, so two repeats measure how much the judges' scores wobble.
+- Every results file names its panel, route and judge label (`open3-local-3x`). Results with different labels are not compared.
 
-## Explicit benchmark profiles
+## The summary
 
-The scoring CLI reads the requested judge version/profile and route from the run record, unless explicitly overridden.
-Final-score caches require identical target and native-size image hashes, style, rubric, judge version/profile and route.
-Progression caches also require identical stage sheets, style and declared panel. `--force` bypasses caches.
+`SUMMARY.md` lists every model's levels against Auto, then each model's pictures (`bench/scripts/levels.mjs`).
 
-For explicit profiles, both progression judges must each supply all five valid stage scores. The wrapper retains each
-judge's response; a missing stage or judge leaves progression incomplete and its aggregate empty. A run is complete
-only when every planned target has complete final and progression scores. Failed/incomplete scoring is saved before
-the CLI returns failure. `--judges-only` preserves progression and still requires it for a complete result.
+- A level's score is the average of the combined figure (0 to 100) over the pictures that [run-sets.json](../run-sets.json) schedules at that level. A failed run, or a scheduled picture with no painting, counts as 0 and is listed with the reason.
+- The adjustment divides a model's gain over Auto by the room left above Auto, with a minimum of a fifth of the scale. The interval comes from resampling the pictures (a bootstrap).
+- L3 against L2, and L4 against L3, are shown for the pictures that both levels painted.
+- It stops with a reason instead of a number in four cases. One is when Auto's records differ in commit, judge label or scheme. Another is when a model was scored by a different judge than Auto. Another is when a model painted a picture Auto did not. The last is when a painting was judged but has no figure.
 
-Explicit profiles with missing targets or tries keep their planned denominator and receive no aggregate ranking.
-Partial per-target scores remain inspectable. J1 aggregation and published runs use their own rules.
-Sampling profiles keep the artistic rubric. The progression rubric does not judge technique well enough to gate
-an ink-first painting automatically, so a person reviews the process before a release.
+## Beside the score
+
+These are never blended into the score. They are the painter's [cheat risk](rules.md#cheat-risk), a measure computed by code against the original (`bench/scorer/classic.py`, which rates tone shapes, edges and marks from 0 to 10), and each run's usage (look units, steps, tokens, cost and minutes).
+
+0.4 scores never share a table with rounds V1 to V5 ([older rounds](older-rounds.md)).

@@ -1,61 +1,38 @@
-// --recipe: a named preset of flags put in front of the command line, then the presets the value plan opts into, then
-// the value plan's drawing flags. Typed flags win for named recipes; with --recipe none, the plan's drawing
-// overrides harness template flags. The last occurrence of a repeated flag is read.
+// --recipe: a named set of flags put in front of the command line, then the value plan's drawing flags. Typed flags
+// win for named recipes; with --recipe none, the plan's drawing overrides harness template flags. The last occurrence of a repeated flag is read.
 //
 // default, combined, general: one general process, adjusted through drawing, washes and order.
-// v096: the V096 compatibility recipe. CLI options override plan choices.
-// penwash (also `--style penwash`): pen and wash. A prepared ink drawing first, pruned for line economy, then the
-// washes in an illustrator's order, lights first (src/paint/methods/pen-wash-plan.mjs planStages): paper whites kept,
-// one pale unifying first wash, one mid-value shadow wash, a few small darks. No value ladder, touch-ups, closing pen
-// or frisket; a limited palette comes from --paints.
+// The pen-and-wash recipe (penwash, --style penwash) planned its washes from a value map of the subject; it was removed
+// in 0.4 (last at commit 49447027). A prepared ink drawing with a study wash plan is the pen and wash now.
 import fs from 'node:fs';
 import path from 'node:path';
-import { TUNED_DEFAULT_FLAGS } from './tuned/default-flags.mjs';
-import { presetFlags } from './tuned/presets.mjs';
 import { pipelineFlags } from './pipeline-plan.mjs';
 import { drawingFlags } from './drawing-plan.mjs';
+import { subjectMediumOf, drawingForSubject, argvForSubject } from './subject-medium.mjs';
 
 const DEFAULT_RECIPE = 'default';
 
 // Generic watercolor methods: paper, palette, paint order, layers, drawing and film.
-const METHOD_FLAGS = '--palettewide 1 --physical 1 --paperbase source --loadedcontact 1 --order painter --brushchoice 0 --midlayers 4 --paperrel 1 --paperlights 1 --paperrgb auto --paper coldpress --paperphysical 1 --texture 0 --touchpoints 2 --finaldarks 0 --layerhue 1 --drawing both --sourcelines 0 --linesource none --frames 8 --markcadence 8 --marks 1 --subjectseam 0.5 --smallmarks 1 --smallmarklights 0 --washjoin 1 --undercover 0';
+const METHOD_FLAGS = '--palettewide 1 --physical 1 --paperbase source --loadedcontact 1 --paperrgb auto --paper coldpress --paperphysical 1 --drawing both --frames 8 --markcadence 8 --marks 1 --subjectseam 0.5 --undercover 0';
 // Planes painted as shaped marks.
 const TECHNIQUE_FLAGS = '--shapedmarks 1';
 
-// V096 as it was: the methods with shaped marks and sky lanes, then the tuned flags.
-const V096_METHOD_FLAGS = '--palettewide 1 --physical 1 --paperbase source --loadedcontact 1 --order painter --brushchoice 0 --midlayers 4 --paperrel 1 --paperlights 1 --paperrgb auto --paper coldpress --paperphysical 1 --texture 0 --touchpoints 2 --layerhue 1 --drawing both --frames 8 --markcadence 8 --marks 1';
-const V096_TECHNIQUE_FLAGS = '--shapedmarks 1 --skylanes 1 --skyblue 1 --skysplit 1';
 
-// The pen-and-wash washes as tuned by eye on Flatiron and Yale: every passage flooded wet in wet, 60% of
-// the picture kept as light, strong shadow (0.6) and deep (1.2) glazes read from a finer value map, coloured lights in the local
-// wash, a capped local mix fitted for hue (pen-wash-plan.mjs, pen-wash.mjs), sparser small marks (pen-wash-lines.mjs)
-// and closer mop lanes with no overhang, so a flooded wash edge is smooth rather than sawtoothed. A deeper sky, one
-// connected shadow wash and a green foliage wash each won an advisor panel A/B.
-// --pwdeepcontrast and --pwpenvary stay off: judged in both orders they showed no win.
-const PENWASH_STAGE_FLAGS = '--penwashplan stages --pwwhitemm 2.5 --pwfinemm 2.5 --pwholemm2 40 --pwshadowpiece 0.015 --pwdrygain 0.6 --pwsoftgrad 30';
-const PENWASH_FLAGS = '--pwallwet 1 --pwminlight 0.6 --pwlightness 0.7 --pwshadowmin 0.6 --pwdeepmin 1.2 --pwshadowblur 0.8 --pwhuegap 18 --pwdarkhuegap 10 --pwlightchroma 14 --pwlocalmax 0.22 --pwcaplweight 0.3 --pwchroma 1.25 --pwmonolocal warm:0.7,cool:0.15,earth:0.15 --pwtileink 5 --pwkeep 0.4 --pwspeck 1.2 --mopgap 0.6 --mopover 0 --pwsky 0.2 --pwskyto 0.6 --pwshadowone 4 --pwfoliage 5 --pwfoliagemax 0.5 --pwkeeplights 10';
 const RECIPES = {
   general: [METHOD_FLAGS, TECHNIQUE_FLAGS, '--drawing first'].join(' '),
   default: [METHOD_FLAGS, TECHNIQUE_FLAGS, '--drawing first'].join(' '),
   combined: [METHOD_FLAGS, TECHNIQUE_FLAGS, '--drawing first'].join(' '),
-  v096: [V096_METHOD_FLAGS, V096_TECHNIQUE_FLAGS, TUNED_DEFAULT_FLAGS].join(' '),
-  penwash: [METHOD_FLAGS, '--drawing first --penwash 1 --order ladder --touchpoints 0 --finaldarks 0 --paperlights 0 --paperrel 0 --smalllights 0 --midlayers 0 --shapedmarks 0 --palettewide 1 --pwmin 2 --pwmax 3', PENWASH_FLAGS, PENWASH_STAGE_FLAGS].join(' '),
-  person: '--masses 8 --masscap 0.15 --massload 0.5 --masswet 99 --mopgap 1.3 --masspaper 0.12 --massfeather 0.4 --massmaxlevel 1 --segwash 1 --segwashes 1 --pigphys 1 --gran 0.08 --skipheld 0.15 --skipheldmin 0.01 --whitefloor 1.0 --resistmin 0.002 --smalllights frisket --drawing both --inkfilter 1 --inktiers 1 --outlinemedium ink --segink 1 --tier3 0.15 --mllines 1 --contain 0 --cutin 0 --maxvalues 4 --minshape 80 --shapes 3 --shapedeep 1.6 --shapequant 0.6 --shapeload 0.7 --ladderseg 0.5 --boxpick 0 --texture 0 --washgrain 0.15 --marks 1',
 };
 
-// `--style penwash` names the pen-and-wash recipe. A numeric --style (a styled target, 0..1) passes through.
+// `--style penwash` named the pen-and-wash recipe, removed in 0.4. A numeric --style (a styled target, 0..1) passes through.
 export function styleAlias(argv) {
-  const at = argv.lastIndexOf('--style');
-  if (at < 0 || argv[at + 1] !== 'penwash') return argv;
-  const recipe = argv.lastIndexOf('--recipe');
-  if (recipe >= 0 && !['penwash', 'default'].includes(argv[recipe + 1])) throw new Error(`--style penwash conflicts with --recipe ${argv[recipe + 1]}`);
-  const drop = new Set([at, at + 1, ...(recipe >= 0 ? [recipe, recipe + 1] : [])]);
-  const rest = argv.filter((_, i) => !drop.has(i));
-  return ['--recipe', 'penwash', ...rest];
+  const at = argv.lastIndexOf('--style'), recipe = argv.lastIndexOf('--recipe');
+  if ((at >= 0 && argv[at + 1] === 'penwash') || (recipe >= 0 && argv[recipe + 1] === 'penwash')) throw new Error('the penwash recipe (--style penwash, --recipe penwash) was removed in 0.4: its washes came from a value map of the subject (last at commit 49447027); give a prepared ink drawing and --washplan STUDY instead');
+  return argv;
 }
 
 // The value plan the command line names, or null when there is none.
-function readPlan(argv, root) {
+export function readPlan(argv, root) {
   const at = argv.lastIndexOf('--valueplan');
   if (at < 0 || !argv[at + 1]) return null;
   try {
@@ -65,11 +42,17 @@ function readPlan(argv, root) {
   }
 }
 
-// The preset names a plan opts into, checked.
-function planPresets(plan) {
-  const names = plan?.presets ?? [];
-  if (!Array.isArray(names) || names.some(n => typeof n !== 'string')) throw new Error('value plan presets: a list of preset names');
-  return names;
+// A value plan that selects a style (styleSelection) asked for the light-to-dark value plan, the per-cell "printing press",
+// removed in 0.4. The V4 and V5 benchmark tasks wrote such plans; they ran on 0.2.x and 0.3.x and replay from tag v0.3.2.
+function refuseRemovedPlan(plan) {
+  if (plan?.styleSelection != null) throw new Error('value plan styleSelection was removed in 0.4 with the light-to-dark value plan (last at commit 49447027). The V4 and V5 benchmark tasks that wrote it ran on 0.2.x and 0.3.x: check out tag v0.3.2 to replay them.');
+}
+
+// Presets were named sets of flags fitted to one benchmark subject (the architecture preset, fitted on Trumbull). They
+// were removed in 0.3.3 with the rules they switched on; a plan or recipe that still names one fails the run.
+function refusePresets(plan, typed) {
+  const names = [...(plan?.presets ?? []), ...typed];
+  if (names.length) throw new Error(`presets were removed (they held settings fitted to one subject): ${names.join(', ')}`);
 }
 
 // The sheet settings a value plan declares: widthMm must match --sheetmm when both are given; seed and targetGuard
@@ -104,22 +87,26 @@ function planSheet(plan, argv) {
   return out;
 }
 
-// Preset flags, less any flag the command line gives itself, so a typed flag is never repeated by a preset.
-function presetArgv(names, argv) {
-  const flags = presetFlags(names), out = [];
-  for (let i = 0; i < flags.length; i += 2) if (!argv.includes(flags[i])) out.push(flags[i], flags[i + 1]);
-  return out;
+// The command line with the recipe's flags and the plan's drawing flags in front of it, and the line to log about the
+// choice. No --recipe means the default recipe. An unknown recipe name or any preset
+// throws. With recipe none, the plan overrides the harness template.
+// --subjectmedium none|pencil: an ink drawing, from the plan or the command line, becomes a graphite preparatory drawing
+// (subject-medium.mjs). `subjectMedium` in the result says what was asked for when that happened.
+export function expandRecipe({ argv: given0, root = process.cwd() }) {
+  const medium = subjectMediumOf(given0);
+  const written = readPlan(styleAlias(given0), root);
+  refuseRemovedPlan(written);
+  const forSubject = drawingForSubject(written?.drawing ?? null, medium);
+  const r = expandFor({ argv: given0, plan: forSubject.asked ? { ...written, drawing: forSubject.drawing } : written });
+  const fitted = argvForSubject(r.argv, medium, { planAsked: forSubject.asked }), asked = fitted.asked;
+  return { ...r, argv: fitted.argv, subjectMedium: asked ? { medium, asked, dropped: fitted.dropped } : null };
 }
 
-// The command line with the recipe's flags, the presets' flags and the plan's drawing flags in front of it, and the
-// line to log about the choice. No --recipe means the default recipe, except on an --areaplan run. An unknown recipe
-// name or preset throws. With recipe none, the plan overrides the harness template.
-export function expandRecipe({ argv: given0, root = process.cwd() }) {
+function expandFor({ argv: given0, plan }) {
   const argv = styleAlias(given0);
-  const plan = readPlan(argv, root);
   let drawing = drawingFlags(plan?.drawing ?? null);
   const at = argv.lastIndexOf('--recipe');
-  const [given, ...typed] = at < 0 ? [argv.includes('--areaplan') ? 'none' : DEFAULT_RECIPE] : String(argv[at + 1]).split('+');
+  const [given, ...typed] = at < 0 ? [DEFAULT_RECIPE] : String(argv[at + 1]).split('+');
   const name = given === 'none' && at < 0 ? null : given;
   const combined = ['default', 'combined', 'general'].includes(name);
   const hasWashPlan = Boolean(plan && (plan.washes || (plan.order && typeof plan.order === 'object' && !Array.isArray(plan.order)) || plan.subjectOrder));
@@ -127,11 +114,10 @@ export function expandRecipe({ argv: given0, root = process.cwd() }) {
   const washFlags = (name === 'none' && hasWashPlan && pipeline) ? pipeline.flags : [];
   if (combined && pipeline) drawing = pipeline.flags;
   else if (washFlags.length) drawing = [];
-  const presets = [...new Set([...planPresets(plan), ...typed])];
-  const extra = presetArgv(presets, argv);
+  refusePresets(plan, typed);
   const sheet = planSheet(plan, argv);
-  const tail = [...extra, ...sheet, ...drawing];
-  const describe = note => [note, presets.length ? `presets ${presets.join(', ')}` : null, plan?.drawing ? 'drawing from the plan' : null].filter(Boolean).join(', ');
+  const tail = [...sheet, ...drawing];
+  const describe = note => [note, plan?.drawing ? 'drawing from the plan' : null].filter(Boolean).join(', ');
   if (name === null) return tail.length ? { argv: [...tail, ...argv], note: describe('no recipe') } : { argv, note: null };
   if (name === 'none') {
     const expanded = [...argv, ...washFlags, ...tail];
@@ -152,13 +138,6 @@ export function expandRecipe({ argv: given0, root = process.cwd() }) {
   const flags = preset.split(' ');
   // Pen-and-wash uses its source-toned sheet and a lean wash palette. Methods meant for colorful paintings should not
   // recolor sepia studies.
-  if (combined && plan?.styleSelection?.style === 'ink-and-wash') {
-    const inkWash = {'--palettewide':'0', '--boxpick':'0', '--paperrgb':'source', '--strokeplan':'1', '--laneadapt':'1'};
-    for (const [flag, value] of Object.entries(inkWash)) {
-      const at = flags.indexOf(flag);
-      if (at >= 0) flags[at + 1] = value; else flags.push(flag, value);
-    }
-  }
   const expanded = [...flags, ...tail, ...argv];
   // Collapse scalar options once. A CLI physics override merges named coefficients.
   const values = new Map();

@@ -24,9 +24,16 @@ test('actual CLI records effective policy before failed image load; mode uses la
    [5,['--mode','full'],undefined,'1','speed-transfer-default'],
   ]){
    const out=path.join(folder,'out'+n),env={...process.env};delete env.GPU_DIRTY_UPLOAD;if(explicit!==undefined)env.GPU_DIRTY_UPLOAD=explicit;
-   const r=spawnSync(process.execPath,['tools/paint-plate.mjs',...args,'--image',path.join(folder,'absent.png'),'--gpu','off','--allowdirty','1','--out',out],{cwd:path.resolve(import.meta.dirname,'../..'),env,encoding:'utf8',timeout:10000});
+   const r=spawnSync(process.execPath,['tools/paint-plate.mjs',...args,'--image',path.join(folder,'absent.png'),'--gpu','off','--allowdirty','1','--out',out],{cwd:path.resolve(import.meta.dirname,'../..'),env,encoding:'utf8',timeout:120000});
    assert.equal(r.status,1);const actual=JSON.parse(fs.readFileSync(path.join(out,'native-mode.json')));
    assert.equal(actual.uploadPolicy.value,want);assert.equal(actual.uploadPolicy.enabled,want==='1');assert.equal(actual.uploadPolicy.selection,selection);assert.match(r.stdout,/native tracked CPU upload:/);
   }
  }finally{fs.rmSync(folder,{recursive:true,force:true});}
+});
+
+test('fast mode lets the edge feed\'s geometry trail a stroke\'s outline; full mode remakes it at once', async () => {
+  const { nativeEdgeLagPolicy, FAST_EDGE_LAG } = await import('./native-paint-mode.mjs');
+  assert.deepEqual(nativeEdgeLagPolicy('fast'), { environmentVariable: 'GPU_EDGE_LAG', value: String(FAST_EDGE_LAG) });
+  assert.equal(nativeEdgeLagPolicy('full').value, '0');
+  assert.throws(() => nativeEdgeLagPolicy('other'));
 });

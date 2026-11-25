@@ -6,7 +6,11 @@
 // region it bounds, not the edge's own dark contour; quantiles are taken over toned cells when the sheet has a large
 // unpainted paper margin), so each picture's lights are cleaned and its darker half keeps the pencil for the washes to
 // cover. Only the graphite pigment changes, so ink drawn over the pencil stays. The weights are made at plan time,
-// before the target guard seals the target; the lift itself reads only the sheet.
+// before the target guard seals the target, and planned as eraser dabs (eraserDabs): one strength per dab of a
+// kneaded eraser, ERASER_MM across. Painting lays the dabs (dabWeights) and reads no map made from the target.
+
+// a kneaded eraser pressed to the sheet under a fingertip lifts a patch about this wide
+export const ERASER_MM = 8;
 import { gaussian } from '../../keyframes/density.mjs';
 
 /** Per plan cell, how fully the pencil is erased (0..1), from the target's RGB on the w x h plan grid (3 bytes a cell),
@@ -40,6 +44,27 @@ export function eraseWeights(rgb, w, h, { full = 0.8, none = 0.4, blur = 3, reac
   return Float32Array.from(L, v => Math.max(0, Math.min(1, (v - lo) / (hi - lo))));
 }
 
+/** The eraser plan from plan-time weights: dabs on a grid `tile` cells apart, each the mean weight under it. */
+export function eraserDabs(weights, w, h, { tile }) {
+  const t = Math.max(1, Math.round(tile)), cols = Math.ceil(w / t), rows = Math.ceil(h / t), dabs = new Float32Array(cols * rows);
+  for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+    let s = 0, k = 0;
+    for (let y = r * t; y < Math.min(h, (r + 1) * t); y++) for (let x = c * t; x < Math.min(w, (c + 1) * t); x++) { s += weights[y * w + x]; k++; }
+    dabs[r * cols + c] = k ? s / k : 0;
+  }
+  return { w, h, tile: t, cols, rows, dabs };
+}
+
+/** What the dabs lift at each plan cell: each dab's strength, faded between neighbouring dab centres (bilinear). */
+export function dabWeights({ w, h, tile, cols, rows, dabs }) {
+  const out = new Float32Array(w * h), at = (c, r) => dabs[Math.min(rows - 1, Math.max(0, r)) * cols + Math.min(cols - 1, Math.max(0, c))];
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const fx = (x + 0.5) / tile - 0.5, fy = (y + 0.5) / tile - 0.5, c = Math.floor(fx), r = Math.floor(fy), ax = fx - c, ay = fy - r;
+    out[y * w + x] = (1 - ay) * ((1 - ax) * at(c, r) + ax * at(c + 1, r)) + ay * ((1 - ax) * at(c, r + 1) + ax * at(c + 1, r + 1));
+  }
+  return out;
+}
+
 /** Scale every plane of the graphite pigment by 1 - strength x weight; returns the cells touched and the mean lift. */
 export function erasePencil(planes, weights, { strength = 0.85, SC = 1, w, W2 }) {
   if (!(strength >= 0 && strength <= 1)) throw new Error(`--preperase: a share from 0 to 1, not ${strength}`);
@@ -56,11 +81,11 @@ export function erasePencil(planes, weights, { strength = 0.85, SC = 1, w, W2 })
 }
 
 /** The painter's call: lift graphite pigment `k` on `sheet` (its loose, deposited, pore and dried-layer planes). */
-export function erasePrep({ sheet, k, weights, strength, SC, w, W2, layersChanged, log = () => {} }) {
+export function erasePrep({ sheet, k, dabs, strength, SC, w, W2, layersChanged, log = () => {} }) {
   sheet._gpu?.syncLower?.(sheet, Infinity);
-  const r = erasePencil([sheet.G[k], sheet.D[k], sheet.P[k], ...sheet.layers.map(L => L[k])], weights, { strength, SC, w, W2 });
+  const r = erasePencil([sheet.G[k], sheet.D[k], sheet.P[k], ...sheet.layers.map(L => L[k])], dabWeights(dabs), { strength, SC, w, W2 });
   layersChanged(sheet);
   sheet._gpu?.cpuWroteAll?.();
-  log(`prep erase: graphite lifted in the lights before the washes, ${r.cells} cells, ${(100 * r.meanLift).toFixed(0)}% on average where lifted (strength ${strength})`);
+  log(`prep erase: graphite lifted in the lights before the washes, ${dabs.dabs.length} eraser dabs over ${r.cells} cells, ${(100 * r.meanLift).toFixed(0)}% on average where lifted (strength ${strength})`);
   return r;
 }

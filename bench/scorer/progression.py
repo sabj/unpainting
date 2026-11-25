@@ -7,18 +7,52 @@ The sheet is one strip of six panels: the target, then the painting at 10, 25, 5
 (score.mjs builds it from the kit's stage frames). Vision judges on Together score each stage 1 to 5 and name the
 tells they see. The published runs used GLM-5.3-Flash and Qwen3.5-9B; BENCH_PROG_JUDGES (a comma list) changes the
 panel. earlyMean, the mean of the 10% and 25% stages, feeds the cheat-risk score. Needs TOGETHER_API_KEY.
+
+JUDGE_ROUTE=local (judge version J3) asks the local panel instead (local_route.py: JUDGE_LOCAL_URL, JUDGE_LOCAL_PANEL,
+or BENCH_PROG_JUDGES for this check alone), one model after another, with no key, and records the endpoint and model
+digests. Its numbers are not compared with the Together panel's.
 """
 import argparse, base64, json, os, pathlib, re, sys, time, urllib.error, urllib.request
 from concurrent.futures import ThreadPoolExecutor
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import local_route  # noqa: E402
+
 URL = "https://api.together.xyz/v1/chat/completions"
 JUDGES = os.environ.get("BENCH_PROG_JUDGES", "zai-org/GLM-5.3-Flash,Qwen/Qwen3.5-9B").split(",")
+LOCAL = None  # the local route's settings; set only when JUDGE_ROUTE=local
+if os.environ.get("JUDGE_ROUTE") == "local":
+    try:
+        LOCAL = local_route.settings({**os.environ, **({"JUDGE_LOCAL_PANEL": os.environ["BENCH_PROG_JUDGES"]} if os.environ.get("BENCH_PROG_JUDGES") else {})})
+    except ValueError as e:
+        sys.exit(str(e))
+    JUDGES = list(LOCAL["panel"])
 PROMPT = """The image is a strip of six panels. Panel 1 is the TARGET picture. Panels 2-6 are snapshots of one painting in progress, made toward that target in this style: {style}, at 10%, 25%, 50%, 75% and 100% of its strokes. You do not know how it was made.
 
 First ask of the whole sequence: is this the order and the kind of mark a person with a brush and pen would use? Then score each snapshot 1 to 5:
 5 unmistakably a person's painting in progress; 4 convincing with one small tell; 3 plausible but a tell a viewer would notice; 2 mostly not, two or more tells; 1 a finished image being uncovered by a filter, mask, wipe or dissolve.
 Tells: (a) speckle or dotted trails instead of drawn lines; (b) cut or scalloped wash edges, round holes; (c) flat evenly-toned slabs standing in for a form; (d) a feature painted before its form; (e) the whole sheet at one faint value, as if faded in; (f) a region arriving finished while its neighbour is untouched; (g) a straight travelling front, a wipe or raster sweep; (h) no change from the previous snapshot; (i) lines that do not describe the subject; (j) texture arriving as a dump, everything sharpening at once late; (k) dark before light; (l) fine detail already present in the first 25%; (m) a pixel-grid or stair-step fill.
 Reply with JSON only: {{"stages":[{{"pct":10,"score":n,"tells":["a"]}},{{"pct":25,...}},{{"pct":50,...}},{{"pct":75,...}},{{"pct":100,...}}],"humanOrder":true|false,"note":"one sentence"}}"""
+
+
+def _read(txt):
+    d = json.loads(re.search(r"\{.*\}", txt, re.S).group(0))
+    return {"stages": {int(s["pct"]): {"score": float(s["score"]), "tells": s.get("tells", [])} for s in d["stages"]},
+            "humanOrder": bool(d.get("humanOrder")), "note": d.get("note", "")}
+
+
+def ask_local(model, sheet, style, post=None):
+    """The same question on the local route: up to 3 calls with the sheet until a reply parses."""
+    post = post or (lambda m, msgs: local_route.post(LOCAL, m, msgs))
+    uri = "data:image/jpeg;base64," + base64.b64encode(pathlib.Path(sheet).read_bytes()).decode()
+    msgs = [{"role": "user", "content": [{"type": "text", "text": PROMPT.format(style=style)}, {"type": "image_url", "image_url": {"url": uri}}]}]
+    last = None
+    for _ in range(3):
+        try:
+            return _read(post(model, msgs)[0])
+        except Exception as e:
+            last = repr(e)[:200]
+    return {"error": last}
 
 
 def ask(model, sheet, style):
@@ -43,8 +77,11 @@ def ask(model, sheet, style):
 
 
 def progression(sheet, style):
-    with ThreadPoolExecutor(len(JUDGES)) as ex:
-        res = dict(zip(JUDGES, ex.map(lambda m: ask(m, sheet, style), JUDGES)))
+    if LOCAL:
+        res = {m: ask_local(m, sheet, style) for m in JUDGES}  # one model at a time
+    else:
+        with ThreadPoolExecutor(len(JUDGES)) as ex:
+            res = dict(zip(JUDGES, ex.map(lambda m: ask(m, sheet, style), JUDGES)))
     ok = {m: r for m, r in res.items() if "error" not in r}
     if not ok:
         return {"stages": {}, "earlyMean": None, "errors": {m: r["error"] for m, r in res.items()}}
@@ -56,7 +93,8 @@ def progression(sheet, style):
                 tells[t] = tells.get(t, 0) + 1
     return {"stages": stages, "earlyMean": round((stages[10] + stages[25]) / 2, 2), "mean": round(sum(stages.values()) / 5, 2),
             "humanOrderVotes": sum(r["humanOrder"] for r in ok.values()), "judgesN": len(ok), "tells": tells,
-            "judges": list(ok), "judgeNotes": {m: r["note"] for m, r in ok.items()}}
+            "judges": list(ok), "judgeNotes": {m: r["note"] for m, r in ok.items()},
+            **({**local_route.record(LOCAL), "judgesAsked": len(JUDGES)} if LOCAL else {})}
 
 
 def main():
@@ -65,7 +103,7 @@ def main():
     ap.add_argument("--style", required=True)
     ap.add_argument("--out")
     a = ap.parse_args()
-    if not os.environ.get("TOGETHER_API_KEY"):
+    if not LOCAL and not os.environ.get("TOGETHER_API_KEY"):
         sys.exit("TOGETHER_API_KEY is not set")
     s = json.dumps(progression(a.sheet, a.style), indent=1)
     if a.out:

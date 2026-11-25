@@ -6,7 +6,7 @@ import path from 'node:path';
 import sharp from 'sharp';
 import { createTargetGuard, TargetGuardError, writeGuardReport, LOOK_MIN_CELLS, HARD_LOOK_BUDGET, normalizeMode } from './no-target.mjs';
 import { lintSource } from './lint-target-use.mjs';
-import { smallShare, sweepFront, progressionFlags, combine, pickStages, cheatRisk, HF_CEILING, readFrames } from './cheat-risk.mjs';
+import { smallShare, sweepFront, progressionFlags, combine, pickStages, cheatRisk, HF_CEILING, readFrames, SMALL_MARK, strokeCeiling } from './cheat-risk.mjs';
 import { promoteCheck } from './promote-check.mjs';
 
 const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'guard-'));
@@ -308,7 +308,28 @@ test('stage picks are the frames nearest each share of the timeline', () => {
   assert.equal(p[10].src, 'f1.jpg'); assert.equal(p[25].src, 'f2.jpg'); assert.equal(p[75].src, 'f4.jpg'); assert.equal(p[100].src, 'f5.jpg');
 });
 
+test('two stages never take the same frame when there are enough frames', () => {
+  // five passes whose strokes pile up late: nearest-frame picking would give 10, 25 and 50 percent the same frame
+  const frames = [0, 0.02, 0.04, 0.06, 0.9, 1].map((p, i) => ({ src: `f${i}.jpg`, position: p }));
+  const p = pickStages(frames);
+  const srcs = [10, 25, 50, 75, 100].map(s => p[s].src);
+  assert.equal(new Set(srcs).size, 5);
+  assert.deepEqual(srcs, [...srcs].sort());
+  assert.equal(p[100].src, 'f5.jpg');
+  // fewer frames than stages: each stage takes its nearest frame
+  const few = pickStages([0, 0.5, 1].map((q, i) => ({ src: `g${i}.jpg`, position: q })));
+  assert.equal(few[10].src, 'g0.jpg'); assert.equal(few[50].src, 'g1.jpg'); assert.equal(few[100].src, 'g2.jpg');
+});
+
 test('honest ceiling follows the painting width', () => { assert.equal(HF_CEILING(540), 0.53); assert.equal(HF_CEILING(1086), 0.645); });
+
+test('stroke ceiling is one cover of the sheet in the smallest mark that is not small', () => {
+  assert.deepEqual(SMALL_MARK, { widthMm: 1.5, aspect: 3 });
+  assert.equal(strokeCeiling(15, 45), 100);            // 675 mm2 of sheet, 6.75 mm2 per mark
+  assert.equal(strokeCeiling(280, 375.2), 15563);
+  assert.equal(strokeCeiling(560, 750.4), 4 * 15563 + 3);   // grows with the sheet's area, not its width
+  for (const bad of [[0, 10], [10, NaN], [-1, 10], [undefined, 10]]) assert.throws(() => strokeCeiling(...bad), /sheet size/);
+});
 
 async function fakeRun({ copyTarget = false, guard = { mode: 'gentle', violations: 0, byName: {} } } = {}) {
   const d = tmp(), W = 64, H = 64;
@@ -334,6 +355,9 @@ test('cheatRisk on a run writes stage frames and catches a copied target', async
   assert.equal(b.parts.copy, 1);
   assert.ok(b.risk > a.risk);
   assert.equal(a.guard.pixelFit, 0);
+  assert.deepEqual(a.sheetMm, [64, 64]);
+  assert.equal(a.strokeCeiling, strokeCeiling(64, 64));
+  assert.equal(a.strokeCeiling, 606);
 });
 
 test('an in-memory tape preserves every audit result without rereading its export', async () => {

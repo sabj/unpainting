@@ -14,7 +14,10 @@ export async function runTape(tape,api,resume=null){
  const {w,h}=api.sheet(), scale=w/tape.w, unit=tape.scale||10;
  const brushes=new Map(),pens=new Map();let done=resume?.done||0;
  const scaled=(o,keys,mass=[])=>{o={...o};for(const key of keys)if(o[key]!=null)o[key]*=scale;for(const key of mass)if(o[key]!=null)o[key]*=scale*scale;return o;};
- const brush=id=>{if(!brushes.has(id))brushes.set(id,createBrush(scaled(tape.brushOpts[tape.brushes[id]??id],['radius','stiffness','streakLength'],['capacity','loadWater'])));return brushes.get(id);};
+ // A section brush's capacity is per hair of a brush sized in mm (its volume follows its radius in cells and the cell),
+ // so it scales with the sheet once, not with its area; its hand speed (vs) is in mm/s and does not scale.
+ const brushOpts=o=>o.model==='section'?{...scaled(o,['radius','stiffness','streakLength'],['loadWater']),...(o.capacity!=null?{capacity:o.capacity*scale}:{})}:scaled(o,['radius','stiffness','streakLength'],['capacity','loadWater']);
+ const brush=id=>{if(!brushes.has(id))brushes.set(id,createBrush(brushOpts(tape.brushOpts[tape.brushes[id]??id])));return brushes.get(id);};
  const pen=id=>{if(!pens.has(id))pens.set(id,createPen(scaled(tape.penOpts[tape.pens[id]??id],['nib','flex','travel','reach','pad'],['reservoir','drop','feed'])));return pens.get(id);};
  if(resume){for(const [id,v]of resume.brushes){const b=brush(id),rs=b.rs;Object.assign(b,v);rs.s=v.rs.s;b.rs=rs;}for(const [id,v]of resume.pens){const p=pen(id);Object.assign(p,v);p.sheet=api.sheet();}if(resume.contactBrush!=null)api.sheet()._contactBrush=brushes.get(resume.contactBrush);}
  const field=(a,div=1)=>Float32Array.from({length:w*h},(_,i)=>a[Math.min(tape.h-1,Math.floor(Math.floor(i/w)/scale))*tape.w+Math.min(tape.w-1,Math.floor((i%w)/scale))]/div);
@@ -42,7 +45,7 @@ export async function runTape(tape,api,resume=null){
    const reach=flows.size?Math.max(w,h):isPen?tool.nib+tool.flex+tool.reach+tool.pad+6:strokeReach(tool,api.sheet().paper,Math.max(tool.radius,...pts.map(p=>p.r??tool.radius)));
    const contact=await api.touch(pts,reach,()=>{api.sheet().wetting=!!m.wt;
     if(isPen)penStroke(tool,api.sheet(),pts,{spacing:m.sp??.5,between});
-    else stroke(tool,api.sheet(),pts,{spacing:m.sp??.7,upright:m.u===2?'sweep':!!m.u,lift:m.lf!==0,between});
+    else stroke(tool,api.sheet(),pts,{spacing:m.sp??.7,upright:m.u===2?'sweep':!!m.u,lift:m.lf!==0,between,...(m.vs!==undefined?{speed:m.vs}:{})});
     api.sheet().wetting=false;
    });
    if(pts.length)await api.present(pts.at(-1),isPen?tool.nib/2:pts.at(-1).r??tool.radius,done,0,contact);
@@ -64,7 +67,7 @@ export async function runTape(tape,api,resume=null){
     for(let q=1;q<=n&&await api.ready(done);q++){
      const f=q/n,pt={...b,x:a.x+(b.x-a.x)*f,y:a.y+(b.y-a.y)*f,p:a.p+(b.p-a.p)*f};
      if(a.r!=null&&b.r!=null)pt.r=a.r+(b.r-a.r)*f;
-     const contact=await api.touch([prev,pt],reach,()=>{api.sheet().wetting=!!m.wt;if(isPen)penStroke(tool,api.sheet(),[prev,pt],{spacing:(m.sp??.5)*scale});else stroke(tool,api.sheet(),[prev,pt],{lift:false,spacing:Math.max(.2,(m.sp??.7)*scale),upright:m.u===2?'sweep':!!m.u});});
+     const contact=await api.touch([prev,pt],reach,()=>{api.sheet().wetting=!!m.wt;if(isPen)penStroke(tool,api.sheet(),[prev,pt],{spacing:(m.sp??.5)*scale});else stroke(tool,api.sheet(),[prev,pt],{lift:false,spacing:Math.max(.2,(m.sp??.7)*scale),upright:m.u===2?'sweep':!!m.u,...(m.vs!==undefined?{speed:m.vs}:{})});});
      await api.present(pt,isPen?(pt.nw??tool.nib+tool.flex*pt.p)/2:(pt.r??tool.radius),done,Math.hypot(pt.x-prev.x,pt.y-prev.y),contact);prev=pt;
     }
    }

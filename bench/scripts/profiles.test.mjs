@@ -9,15 +9,25 @@ import { PaintSession } from './pipeline/session.mjs';
 import { runTurn } from './pipeline/harness.mjs';
 
 test('routine V4 is lite; other rounds keep full; lite cannot masquerade as a V5 learning run', () => {
-  assert.equal(profileForRound('V4').id, 'lite-v1');
-  assert.equal(profileForRound('V5').id, 'full-v1');
+  assert.equal(profileForRound('V4').id, 'lite-v2');
+  assert.equal(profileForRound('V5').id, 'full-v2');
   assert.throws(() => profileForRound('V5', 'lite'), /V4 planning screen/);
   assert.throws(() => benchmarkProfile('cheap'), /unknown/);
 });
-test('lite changes native density and recording, preserving physical size and subject parameters', () => {
-  const source = { width: 1200, sheetmm: 280, taskStyle: 'ink and wash' };
-  assert.deepEqual(profileSubject(source, benchmarkProfile('lite')), { ...source, width: 540, benchmarkProfile: 'lite-v1', recordingMarks: 0, planOnly: true, renderTimeoutMs: 600000, checkTimeoutMs: 120000 });
-  assert.equal(source.width, 1200);
+test('both profiles paint a subject at its own width; lite changes recording and budgets, never the density', () => {
+  const source = { width: 300, sheetmm: 77.7, taskStyle: 'ink and wash' };
+  assert.deepEqual(profileSubject(source, benchmarkProfile('lite')), { ...source, benchmarkProfile: 'lite-v2', recordingMarks: 0, planOnly: true, renderTimeoutMs: 600000, checkTimeoutMs: 120000 });
+  assert.equal(profileSubject(source, benchmarkProfile('full')).width, 300);
+  assert.equal(benchmarkProfile('lite').width, null, 'lite-v1 capped at 540, over every crop: lite-v2 has no cap');
+  assert.equal(source.width, 300);
+});
+test('a profile cap or a dry width lowers a subject width and never raises it', () => {
+  const source = { width: 300, sheetmm: 77.7 }, lite = benchmarkProfile('lite');
+  assert.equal(profileSubject(source, { ...lite, width: 160 }).width, 160);
+  assert.equal(profileSubject(source, { ...lite, width: 540 }).width, 300);
+  assert.equal(profileSubject(source, lite, 96).width, 96);
+  assert.equal(profileSubject(source, lite, 1200).width, 300);
+  assert.equal(profileSubject(source, { ...lite, width: 160 }, 96).width, 96);
 });
 test('core default retains the complete registry and optional Muse selection', () => {
   const models = loadModels(), before = models.length;
@@ -48,7 +58,7 @@ test('wall watchdog terminates a local model process that ignores SIGTERM', asyn
   try {
     const r = await runTurn({ cmd: process.execPath, args: ['-e', "process.on('SIGTERM',()=>{}); setInterval(()=>{},100);"] },
       { cwd: root, events: path.join(root, 'events'), stderr: path.join(root, 'stderr'), capMs: 150, killGraceMs: 50 });
-    assert.equal(r.killed, true); assert.equal(r.reason, 'the wall-clock limit'); assert.ok(r.seconds < 3);
+    assert.equal(r.killed, true); assert.equal(r.reason, 'the wall-clock limit'); assert.ok(r.seconds < 30);   // (0.2 s idle; a busy machine is slow to start node)
   } finally { fs.rmSync(root, { recursive: true, force: true }); }
 });
 
@@ -58,7 +68,7 @@ test('lite waits for descendant cleanup even after a normal model CLI exit', asy
     const descendant = "const fs=require('fs');process.on('SIGTERM',()=>{});fs.writeFileSync('ready','1');setTimeout(()=>fs.writeFileSync('late','1'),500);setInterval(()=>{},100);";
     const parent = `const fs=require('fs');require('child_process').spawn(process.execPath,['-e',${JSON.stringify(descendant)}],{stdio:'ignore'});const t=setInterval(()=>{if(fs.existsSync('ready')){clearInterval(t);process.exit(0)}},10);`;
     const r = await runTurn({ cmd: process.execPath, args: ['-e', parent] },
-      { cwd: root, events: path.join(root, 'events'), stderr: path.join(root, 'stderr'), capMs: 3000, killGraceMs: 50, cleanupGroup: true });
+      { cwd: root, events: path.join(root, 'events'), stderr: path.join(root, 'stderr'), capMs: 30000, killGraceMs: 50, cleanupGroup: true });   // (the cap is not under test: on a busy machine node took over 3 s to start twice)
     assert.equal(r.killed, false); assert.equal(r.code, 0); assert.ok(r.cleanupSeconds >= .04);
     await new Promise(resolve => setTimeout(resolve, 550));
     assert.equal(fs.existsSync(path.join(root, 'late')), false, 'a tool cannot continue during the renderer phase');

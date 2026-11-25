@@ -19,35 +19,30 @@ test('explicit zero clears a pigment floc while unset overrides preserve it', ()
  assert.equal(run([p],{flocblue:2})[0].floc,1);
 });
 
-// --boxphys 1: each chosen box paint's published physics on the sheet; picking is not touched.
+// Box paints always settle with their published physics; colour, scattering and picking are not touched.
 import { BOX, boxPigment } from '../../crop/box.mjs';
-import { physicalOf } from '../../../demos/lab/media/pigment-physical.js';
+import { physicalOf } from '../../media/pigment-physical.mjs';
 const boxed = keys => keys.map(k => boxPigment(BOX.find(p => p.key === k)));
-test('--boxphys defaults off: pigments pass unchanged, same objects', () => {
- const ps = boxed(['ultramarine', 'phthaloblue']);
+test('each box paint carries its own granulation, flocculation, staining and density; colour and scattering kept', () => {
+ const keys = ['ultramarine', 'phthaloblue', 'cadyellow', 'sienna'], ps = boxed(keys);
  const out = run(ps);
- assert.equal(out[0], ps[0]); assert.equal(out[1], ps[1]);
- assert.equal(run(ps, { boxphys: 0 })[0], ps[0]);
-});
-test('--boxphys 1 gives each box paint its own physics and leaves colour and picking constants alone', () => {
- const keys = ['ultramarine', 'phthaloblue', 'cadyellow'], ps = boxed(keys);
- const out = run(ps, { boxphys: 1 });
  out.forEach((p, i) => {
   const row = physicalOf(keys[i]);
-  assert.deepEqual(p.K, ps[i].K); assert.equal(p.gamma, row.gamma); assert.equal(p.omega, row.omega); assert.equal(p.rho, row.rho); assert.deepEqual(p.S, row.scatter);
+  assert.deepEqual(p.K, ps[i].K); assert.deepEqual(p.S, ps[i].S);
+  assert.equal(p.gamma, row.gamma); assert.equal(p.omega, row.omega); assert.equal(p.rho, row.rho);
  });
+ assert.ok(out[0].gamma > out[3].gamma && out[3].gamma > out[1].gamma, 'ultramarine granulates more than sienna, and phthalo blue not at all');
  assert.ok(out[0].floc > 0); assert.equal('floc' in out[1], false);
  assert.equal(ps[0].gamma, 0.25, 'the input pigment is not mutated');
 });
-test('--boxphys leaves pigments with no box key alone and composes with --pigphys', () => {
+test('a pigment with no box name passes unchanged, and box physics survive the hue heuristic', () => {
  const loose = pigment([.8, .3, .1], { floc: .27 }), ps = [loose, ...boxed(['ultramarine'])];
- const out = run(ps, { boxphys: 1 });
- assert.equal(out[0], loose);
- const both = run(ps, { boxphys: 1, pigphys: 1 });
+ assert.equal(run(ps)[0], loose);
+ const both = run(ps, { pigphys: 1 });
  assert.equal(both[1].gamma, physicalOf('ultramarine').gamma, 'authored physics survive the hue heuristic');
  assert.equal(both[1].floc, physicalOf('ultramarine').floc);
 });
 test('an explicit flag still overrides the table', () => {
- const out = run(boxed(['ultramarine']), { boxphys: 1, gammablue: 0.3, flocblue: 0.1 });
+ const out = run(boxed(['ultramarine']), { gammablue: 0.3, flocblue: 0.1 });
  assert.equal(out[0].gamma, 0.3); assert.equal(out[0].floc, 0.1);
 });

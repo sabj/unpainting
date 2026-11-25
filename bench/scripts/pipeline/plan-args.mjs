@@ -1,26 +1,31 @@
 // The painter command for a V4 or V5 plan, and the checks on it. A plan is the model's files in one folder:
 // config.json (regions, reserves, styles), drawing paths (*-lines.json), extra-args.json (painter settings), and
-// variant.txt (recipe tokens). The painter is tools/paint-plate.mjs with no recipe of its own (--recipe none): every
-// setting comes from the fixed template below, the base recipe tokens (BASE) and the plan, in that order.
+// variant.txt (recipe tokens). The painter is tools/paint-plate.mjs with the default recipe plus the plan: shared painter defaults live in
+// src/paint/recipe.mjs; the template supplies execution settings and explicit plan overrides.
 //
-// Layering: a model token replaces the base token in the same slot (_lay2 replaces _lay4). Stone-block tokens apply to
-// architecture only, palette tokens to Trumbull only, and the base's sepia ink yields to a plan drawn in another ink.
-// With spec.basePalette false, the base adds no paint box at all: only a plan's own palette token or --paints does.
+// Layering: a model token replaces the base token in the same slot (_lay2 replaces _lay4), and the base's sepia ink
+// yields to a plan drawn in another ink. Every subject gets the same base; no token applies to one subject only.
 // Settings the plan asks for that the painter never reads are noted against the painting (renderVerdict), and fail it
 // under --strict-verdict. Base settings a subject has no use for are never noted.
 //
-// This file is copied into the model's worktree as bench/plan-args.mjs, so it imports only Node built-ins.
+// This file is copied into the model's worktree as bench/plan-args.mjs, so it imports only Node built-ins and
+// copy.mjs, which is copied beside it.
 import fs from 'node:fs';
 import path from 'node:path';
 import zlib from 'node:zlib';
+import { lineSources } from './copy.mjs';
 
-// rec2x, rcl and tv8 were dropped in 0.3.1: recess settings act only with --recesses 1 (the architecture preset sets
-// them itself) and texture variety acts only on dry-brush texture passages, which are never planned.
-export const BASE = 'region_w13_lay4_sky3_cg13_rg10_blk60_bmm40_bka20_birr_skyb_cpp_dk13_pgreen_tp2';
+// tv8 was dropped in 0.3.1: texture variety acts only on dry-brush texture passages, which are never planned.
+// Removed in 0.3.3 with the rules they set, all fitted on Trumbull: the stone-block, ground-glaze, recess and lit-stone
+// tokens (blk, bka, bmm, birr, bvar, bcl, rg, rec2, rec2x, rcl, rac, rx, lw, lit), the palette tokens (pwarm, pgold,
+// pgreen, pbs, rv) and the Trumbull-only paint box, and the fitted sky-lane radius and step (6 mm, .8) and sky mottle
+// (.5) of the base, which made _slane (sky lanes at the painter's own radius) a token of its own. A plan that names a
+// removed token gets the unknown-token problem.
+// _sg (--stylegain) and _tp (--touchgain) are not model-settable: a gain that covers an engine error is a calibration, not a
+// painter's choice (docs/honesty.md). The two touch-up rounds the base always had stay a fixed default recipe setting; the
+// touch-up gain is the painter's own default.
+export const BASE = 'region_w13';
 const DEFAULT_VARIANT = 'region_w13';
-const ARCHITECTURE_ONLY = /^(blk|bmm|bka|rg|rec)\d*x?$|^birr$|^rcl$/;
-const GLAZE_GAINS = /^(dk|cg)\d+$/;
-const PALETTE = /^(pwarm|pgold|pgreen|pbs|rv)$/;
 const LINES = name => `${name}-lines.json`;
 
 const m = (v, re) => v.match(re);
@@ -29,50 +34,36 @@ const hundredth = (v, re) => String(Number(m(v, re)[1]) / 100);
 
 /**
  * The paint-plate command for a variant, as [script, --option, value, ...]. ctx: {planDir, target, width, sheetmm,
- * trumbull, out, compile, gpu, linesExist}. The regular expressions are the recipe tokens; bench/v4v5/TOKENS.md lists them.
+ * out, compile, gpu, linesExist}. The regular expressions are the recipe tokens; bench/v4v5/TOKENS.md lists them.
  */
-export function argsBuilder({ planDir, target, width, sheetmm, trumbull = false, basePalette = true, out = 'out', compile = false, gpu = 'auto', targetPixels = [1, 1], linesExist = () => true, outlineMedium = 'auto' }) {
+export function argsBuilder({ planDir, target, width, sheetmm, out = 'out', compile = false, gpu = 'auto', targetPixels = [1, 1], linesExist = () => true, outlineMedium = 'auto' }) {
   return v => {
     const shaped = v.startsWith('region_w13') || v.startsWith('region_w15');
-    // basePalette false: Trumbull gets a box only when the variant names a palette token; otherwise the painter picks
-    const named = variantParts(v).tokens.some(t => PALETTE.test(t));
-    const paints = !trumbull || (!basePalette && !named) ? [] : ['--paints', /_rv/.test(v) ? 'ochre,rawsienna,sienna,hansa,ultramarine,cerulean,sepia,rose'
-      : /_pgreen/.test(v) ? (/_pbs/.test(v) ? 'ochre,rawsienna,sienna,hansa,ultramarine,cerulean,sepia,sapgreen' : 'ochre,rawsienna,hansa,ultramarine,cerulean,sepia,sapgreen')
-        : /_pwarm/.test(v) ? 'ochre,rawsienna,hansa,ultramarine,cerulean,sepia' : /_pgold/.test(v) ? 'ochre,hansa,ultramarine,cerulean,sepia'
-          : 'ochre,rawsienna,sienna,hansa,ultramarine,cerulean,sepia'];
     const opening = /_opk/.test(v) ? 'closingink' : 'opening';
     const closing = (/_ink4/.test(v) ? ['closingink4', 'closing'] : /_ink[23]/.test(v) ? ['closingink', 'closing'] : ['closing']).find(f => linesExist(f));
     const t = (re, flags) => (re.test(v) ? flags() : []);
-    return ['tools/paint-plate.mjs', '--recipe', 'none', '--inkrecipe', 'v2', '--image', target, '--width', String(width), '--scale', '1', '--sheetmm', String(sheetmm), '--palettewide', '1', ...paints,
+    return ['tools/paint-plate.mjs', '--recipe', 'default', '--image', target, '--width', String(width), '--scale', '1', '--sheetmm', String(sheetmm), '--palettewide', '1',
       '--physical', '1', '--paperbase', /_cur/.test(v) ? 'white' : 'source', '--loadedcontact', '1', '--order', 'painter', '--valueplan', path.join(planDir, 'config.json'),
-      '--brushchoice', v.startsWith('region_w15') ? '1' : '0', '--shapedmarks', shaped ? '1' : '0',
+      ...(v.startsWith('region_w15') ? ['--brushchoice', '1'] : []), '--shapedmarks', shaped ? '1' : '0',
       ...t(/_onedom/, () => ['--middomain', '0']), ...t(/_nest/, () => ['--nestedmid', '1']), ...t(/_lay(\d)/, () => ['--midlayers', m(v, /_lay(\d)/)[1]]),
-      ...t(/_dk(\d+)/, () => ['--darkgain', tenth(v, /_dk(\d+)/)]), ...t(/_lf/, () => ['--loadfeather', '1.5']),
-      ...t(/_sg(\d+)/, () => ['--stylegain', tenth(v, /_sg(\d+)/)]), ...t(/_ls(\d+)/, () => ['--layersmooth', tenth(v, /_ls(\d+)/)]),
+      ...t(/_lf/, () => ['--loadfeather', '1.5']),
+      ...t(/_ls(\d+)/, () => ['--layersmooth', tenth(v, /_ls(\d+)/)]),
       ...t(/_acc(\d+)/, () => ['--accentshare', tenth(v, /_acc(\d+)/)]), ...t(/_lt/, () => ['--layertexture', '1']),
       ...(/_cur/.test(v) ? ['--paperlights', '1'] : /_relonly/.test(v) ? ['--paperrel', '1'] : ['--paperrel', '1', '--paperlights', '1']),
       ...(/_cur/.test(v) ? ['--paperrgb', '252,251,248'] : /_relonly/.test(v) ? [] : ['--paperrgb', 'auto']),
-      ...t(/_cg(\d+)/, () => ['--coolgain', tenth(v, /_cg(\d+)/)]),
-      ...(/_noslane/.test(v) ? [] : /_slane/.test(v) ? ['--skylanes', '1'] : ['--skylanes', '1', '--skylanemm', '6', '--skylanestep', '.8']),
-      ...t(/_st(\d+)/, () => ['--shadowthresh', hundredth(v, /_st(\d+)/)]), ...t(/_mg(\d+)/, () => ['--midgain', tenth(v, /_mg(\d+)/)]),
+      ...t(/_noslane/, () => ['--skylanes', '0']),
+      ...t(/_st(\d+)/, () => ['--shadowthresh', hundredth(v, /_st(\d+)/)]),
       ...t(/_shw(\d+)/, () => ['--shadowwater', hundredth(v, /_shw(\d+)/)]),
-      ...t(/_dkf/, () => ['--darkfirst', '1']), ...t(/_rg(\d+)/, () => ['--groundglaze', tenth(v, /_rg(\d+)/)]),
-      ...t(/_blk(\d+)/, () => ['--stoneblocks', hundredth(v, /_blk(\d+)/)]), ...t(/_bka(\d+)/, () => ['--stoneblockamt', hundredth(v, /_bka(\d+)/)]),
-      ...t(/_bmm(\d+)/, () => ['--stoneblockmm', tenth(v, /_bmm(\d+)/)]), ...t(/_dp(\d+)/, () => ['--deepaccent', m(v, /_dp(\d+)/)[1]]),
-      ...t(/_ms(\d+)/, () => ['--minshapecells', m(v, /_ms(\d+)/)[1]]), ...t(/_birr/, () => ['--stoneirregular', '1']),
-      ...t(/_dg(\d+)/, () => ['--deepgrow', m(v, /_dg(\d+)/)[1]]),       ...t(/_rx(\d+)/, () => ['--recessmax', m(v, /_rx(\d+)/)[1]]), ...t(/_bvar/, () => ['--stonecourses', '1']),
-      ...t(/_tv(\d+)/, () => ['--texvariety', tenth(v, /_tv(\d+)/)]), ...t(/_rac/, () => ['--recessaccent', '1']),
-      ...t(/_eye(\d+)/, () => ['--eyering', String(Number(m(v, /_eye(\d+)/)[1]) / targetPixels[0])]),
-      ...t(/_skyb/, () => ['--skyblue', '1', '--skyfloc', '.5']), ...t(/_cpp/, () => ['--paper', 'coldpress']),
+      ...t(/_dkf/, () => ['--darkfirst', '1']),
+      ...t(/_ms(\d+)/, () => ['--minshapecells', m(v, /_ms(\d+)/)[1]]),
+      ...t(/_tv(\d+)/, () => ['--texvariety', tenth(v, /_tv(\d+)/)]),
+      ...t(/_cpp/, () => ['--paper', 'coldpress']),
       ...t(/_tfl(\d+)/, () => ['--texflow', tenth(v, /_tfl(\d+)/)]),
       ...t(/_novar/, () => ['--physics', 'filmDiffuse=0']), ...t(/_sk1/, () => ['--skyonelayer', '1']),
-      ...t(/_bcl(\d+)/, () => ['--stoneclusters', m(v, /_bcl(\d+)/)[1]]),       ...t(/_fs60/, () => ['--fastsettle', '60']), ...t(/_fl0/, () => ['--feedbacklag', '0']),
-      ...(/_rec2x/.test(v) ? ['--recesslayers', '2', '--recessshare', '.75'] : /_rec2/.test(v) ? ['--recesslayers', '2'] : []),
-      ...t(/_rcl/, () => ['--recessclean', '1']), 
-      ...t(/_tp(\d)/, () => ['--touchpoints', m(v, /_tp(\d)/)[1], '--touchgain', '.6']),
+      ...t(/_fs60/, () => ['--fastsettle', '60']), ...t(/_fl0/, () => ['--feedbacklag', '0']),
       ...t(/_spl(\d*)/, () => ['--strokeplan', '1', '--lanemm', m(v, /_spl(\d*)/)[1] || '6']), ...t(/_sml(\d+)/, () => ['--strokemm', m(v, /_sml(\d+)/)[1]]),
-      ...t(/_wre(\d+)/, () => ['--washreach', tenth(v, /_wre(\d+)/)]), ...t(/_lit(\d+)/, () => ['--litlift', hundredth(v, /_lit(\d+)/)]),
-      ...t(/_lad/, () => ['--laneadapt', '1']), ...t(/_lw/, () => ['--litwarm', '1']),
+      ...t(/_wre(\d+)/, () => ['--washreach', tenth(v, /_wre(\d+)/)]),
+      ...t(/_lad/, () => ['--laneadapt', '1']),
       ...(/_sky(?=\d|_|$)/.test(v) ? ['--layerhue', '1', '--skysplit', '1'] : /_hue/.test(v) ? ['--layerhue', '1'] : []),
       ...t(/_efade/, () => ['--edgefade', '1.2']), ...t(/_stone/, () => ['--layertexture', '1', '--texshort', '1', '--texpress', '.5']),
       ...(/_stub2/.test(v) ? ['--texshort', '1', '--texpress', '.6'] : /_stub/.test(v) ? ['--texshort', '1'] : []),
@@ -80,7 +71,7 @@ export function argsBuilder({ planDir, target, width, sheetmm, trumbull = false,
       ...t(/_ew(\d+)/, () => ['--edgewobble', tenth(v, /_ew(\d+)/)]), 
       ...t(/_sfa(\d+)/, () => ['--softarcs', m(v, /_sfa(\d+)/)[1], '--softarclen', '200', '--softmm', '1.0']),
       '--drawing', closing ? 'both' : 'first', ...(linesExist(opening) ? ['--drawingfile', path.join(planDir, opening)] : []), ...(closing ? ['--drawinglast', path.join(planDir, closing)] : []),
-      '--outlinemedium', outlineMedium, '--texture', '0', '--mode', 'fast', '--paperphysical', '1', '--frames', '8', '--marks', '1', '--video', '0', '--seed', '0',
+      '--outlinemedium', outlineMedium, '--mode', 'fast', '--paperphysical', '1', '--frames', '8', '--marks', '1', '--video', '0', '--seed', '0',
       '--out', out, '--targetguard', 'gentle', ...(compile ? ['--valuepreviewonly', '1'] : ['--gpu', gpu])];
   };
 }
@@ -99,8 +90,8 @@ const variantParts = v => { const p = v.split('_'); return { prefix: p.slice(0, 
 
 // tokens in one slot are alternatives: a model token takes every option any alternative in its slot sets
 const GROUPS = [[/^(hue|sky\d*)$/, 'hue', ['hue', 'sky', 'sky3']], [/^sep\d?$/, 'sep', ['sep', 'sep2', 'sep4', 'sep8']], [/^ink[234]d?$/, 'ink', ['ink2', 'ink3', 'ink4']],
-  [/^rec2x?$/, 'rec', ['rec2', 'rec2x']], [/^lay\d$/, 'lay', ['lay2', 'lay4']], [/^(cur|relonly)$/, 'paper', ['cur', 'relonly']], [/^(no)?slane$/, 'slane', ['slane', 'noslane']],
-  [/^softs?$/, 'soft', ['soft', 'softs']], [/^(stub2?|stone)$/, 'stub', ['stub', 'stub2', 'stone']], [/^(pwarm|pgold|pgreen|pbs|rv)$/, 'pal', ['pwarm', 'pgold', 'pgreen', 'rv']]];
+  [/^lay\d$/, 'lay', ['lay2', 'lay4']], [/^(cur|relonly)$/, 'paper', ['cur', 'relonly']], [/^noslane$/, 'slane', ['noslane']],
+  [/^softs?$/, 'soft', ['soft', 'softs']], [/^(stub2?|stone)$/, 'stub', ['stub', 'stub2', 'stone']]];
 function slotOf(t) { for (const [re, name] of GROUPS) if (re.test(t)) return name; return t.replace(/\d+/g, 'N'); }
 const alternatives = t => GROUPS.find(([re]) => re.test(t))?.[2] ?? [];
 // options a token sets or removes, against the bare prefix
@@ -112,17 +103,13 @@ function delta(build, prefix, token) {
 
 /**
  * The base recipe under the plan's own tokens. Returns the args to run and an account of the layers.
- * architecture: stone blocks apply; trumbull: palette tokens apply; sepiaInk: false when the plan draws in another ink.
+ * sepiaInk: false when the plan draws in another ink.
  */
-export function layerBase({ variant, build, architecture = false, trumbull = false, basePalette = true, glazeGains = true, sepiaInk = true, linesExist = () => true, base = BASE }) {
+export function layerBase({ variant, build, sepiaInk = true, linesExist = () => true, base = BASE }) {
   const { prefix, tokens: mt } = variantParts(variant), { tokens: bt } = variantParts(base);
   const modelArgs = build(variant), modelSlots = new Set(mt.map(slotOf)), skipped = {}, applied = [];
   for (const b of bt) {
     if (modelSlots.has(slotOf(b))) { skipped[b] = 'plan chose ' + mt.filter(t => slotOf(t) === slotOf(b)).join(','); continue; }
-    if (!architecture && ARCHITECTURE_ONLY.test(b)) { skipped[b] = 'architecture only'; continue; }
-    if (!trumbull && PALETTE.test(b)) { skipped[b] = 'Trumbull only'; continue; }
-    if (!basePalette && PALETTE.test(b)) { skipped[b] = 'base palette off; the plan names none'; continue; }
-    if (!glazeGains && GLAZE_GAINS.test(b)) { skipped[b] = 'calibrated 0.3.1 delivery (glaze gains off)'; continue; }
     if (!sepiaInk && slotOf(b) === 'sep') { skipped[b] = 'plan draws in another ink'; continue; }
     applied.push(b);
   }
@@ -147,11 +134,11 @@ export function layerBase({ variant, build, architecture = false, trumbull = fal
 // urban-sketch's own wash is a single 25% band (near-blank sheets); its cells get the ink-and-wash value floor
 const valueFloorFor = config => { const s = config?.styleSelection; const styles = [s?.style, ...Object.values(s?.regions ?? {}).map(r => r?.style)]; return styles.includes('urban-sketch') ? 'ink-and-wash' : null; };
 
-// Only artistic controls belong to model plans; execution and ink safety stay with the harness.
+// Only artistic controls belong to model plans; execution, delivery (charging, calibration) and ink safety stay with
+// the harness and the engine.
 const numeric = (min, max) => v => v.trim() !== '' && Number.isFinite(Number(v)) && Number(v) >= min && Number(v) <= max;
 const choice = values => v => values.includes(v);
 export const ALLOWED_EXTRA_ARGS = Object.freeze({
-  darkgain: numeric(0, 3), coolgain: numeric(0, 3), midgain: numeric(0, 3),
   midlayers: v => numeric(0, 8)(v) && Number.isInteger(Number(v)),
   paints: v => /^[a-z]+(?:,[a-z]+)*$/.test(v),
   drawing: choice(['first', 'both', 'last', 'none']),
@@ -160,14 +147,12 @@ export const ALLOWED_EXTRA_ARGS = Object.freeze({
   valuefloor: choice(['ink-and-wash', 'precise-watercolor', 'urban-sketch', 'atmospheric-wet']),
   focusmap: v => /\.json$/i.test(v),
   brushchoice: choice(['0', '1']),
+  smallmarks: choice(['0', '1']),
+  washjoin: choice(['0', '1']),
   strokeplan: choice(['0', '1']),
   lanemm: v => v === 'auto' || numeric(0, 40)(v),
   strokemm: numeric(0, 300),
-  techcal: choice(['0', '1']),
-  washsystem: choice(['0', '1']), calibratedplan: choice(['0', '1']), paperrule: choice(['0', '1']),
-  mixedwash: choice(['0', '1']), mixedshadows: choice(['0', '1']), scalelayers: choice(['0', '1']),
-  gradedlanes: choice(['0', '1']), softchoice: choice(['0', '1']),
-  techcalfrom: numeric(1, 5),
+  paperrule: choice(['0', '1']),
   drawinghand: choice(['0', '1']),
   washinkfree: choice(['0', '1']),
   inkdarkskip: numeric(0, 1),
@@ -177,6 +162,8 @@ export const ALLOWED_EXTRA_ARGS = Object.freeze({
   softsplit: choice(['0', '1']),
   softmm: numeric(0.1, 10),
 });
+// any gain or calibration option is refused even if it is ever added to the list above
+export const GAIN_OPTION = /gain|calibrat|cal$|cal(?:from|max|min|extent|mode)$/;
 const isPathLike = (k, v) => k === 'focusmap' || path.isAbsolute(v) || v.includes('/') || v.includes('..');
 /** Problems with extra-args.json (empty = fine): locked options, and path values that leave the plan folder. */
 export function checkExtraArgs(extra, planDir) {
@@ -186,8 +173,11 @@ export function checkExtraArgs(extra, planDir) {
   for (let i = 0; i < extra.length;) {
     const flag = extra[i++];
     const key = flag.startsWith('--') ? flag.slice(2) : '';
-    const validate = Object.hasOwn(ALLOWED_EXTRA_ARGS, key) ? ALLOWED_EXTRA_ARGS[key] : null;
-    if (!validate) bad.push('extra-args.json may not set ' + flag);
+    const gain = GAIN_OPTION.test(key.replace(/=.*$/, ''));
+    const validate = !gain && Object.hasOwn(ALLOWED_EXTRA_ARGS, key) ? ALLOWED_EXTRA_ARGS[key] : null;
+    if (gain) bad.push('extra-args.json may not set ' + flag + ': a gain or calibration covers an engine error; the plan states values');
+    else if (Object.hasOwn(REMOVED_EXTRA_ARGS, key)) bad.push(`extra-args.json: ${flag} was removed: ${REMOVED_EXTRA_ARGS[key]}`);
+    else if (!validate) bad.push('extra-args.json may not set ' + flag);
     if (i === extra.length || extra[i].startsWith('--')) { bad.push('extra-args.json missing value for ' + flag); continue; }
     const a = extra[i++];
     if (validate && !validate(a)) bad.push('extra-args.json invalid value for ' + flag + ': ' + a);
@@ -201,6 +191,43 @@ export function checkExtraArgs(extra, planDir) {
   }
   return bad;
 }
+// Gains and calibrations a plan may not set, in any mode: each moves paint by a factor or a threshold to cover what the
+// engine delivers, instead of stating a value or a technique (docs/honesty.md). Refused with the reason, before painting.
+export const REFUSED_TOKENS = Object.freeze({
+  dp: 'a value gain: doubles dark weight sheet-wide wherever the target is darker than a threshold',
+  acc: 'a value gain: moves middle demand into the accent band',
+  lit: 'a value gain: removes a share of the middle layers',
+  novar: 'a physics switch: turns off film diffusion, a physical process, which can hide engine faults',
+});
+// Tokens whose painter setting was removed (src/paint/removed-options.mjs): a stored plan that names one is refused
+// with the reason, never painted as if the setting had acted.
+const DEEP_ACCENT_REMOVED = 'the deep accents (--deepaccent) were removed: they restated every cell darker than a threshold as two late dark layers, a rule over target pixels; the plan names its last darks';
+export const REMOVED_TOKENS = Object.freeze({
+  dg: DEEP_ACCENT_REMOVED,
+  eye: 'the eye ring (--eyering) was removed: it drew an iris ring round each catchlight reserve inside the deep accents, a rule shaped to one kind of subject',
+  skyb: 'the sky tube (--skyblue) was removed: it swapped the blue of sky cells for a second, heavily granulating tube, a switch by region; each pigment now granulates as published, so choose a granulating blue (ultramarine, cerulean) for a textured sky',
+});
+// extra-args.json options whose painter setting was removed, with the reason
+const REMOVED_EXTRA_ARGS = Object.freeze({ deepaccent: DEEP_ACCENT_REMOVED, deepgrow: DEEP_ACCENT_REMOVED, deepaccentin: DEEP_ACCENT_REMOVED, eyering: REMOVED_TOKENS.eye });
+const tokenName = t => t.replace(/\d+$/, '');
+const refusedReason = t => REFUSED_TOKENS[tokenName(t)] ?? REMOVED_TOKENS[tokenName(t)];
+/** Refused gain and calibration tokens, and tokens whose setting was removed, in a variant, as plain-language problems. */
+export function refusedTokens(variant) {
+  return variantParts(variant).tokens.filter(t => refusedReason(t)).map(t => Object.hasOwn(REFUSED_TOKENS, tokenName(t))
+    ? `recipe token "${t}" is refused: ${REFUSED_TOKENS[tokenName(t)]}; the plan states values, the engine delivers them`
+    : `recipe token "${t}" is refused: ${REMOVED_TOKENS[tokenName(t)]}`);
+}
+// plan fields with the same job: washes.charge picks the demand quantile each passage is charged at (delivery)
+export const REFUSED_PLAN_FIELDS = Object.freeze({ 'washes.charge': 'a delivery calibration: the quantile of demand each passage is charged at; the engine owns charging' });
+// plan fields whose painter setting was removed (src/paint/pipeline-plan.mjs refuses them too)
+const REMOVED_PLAN_FIELDS = Object.freeze({ 'washes.deepAccent': DEEP_ACCENT_REMOVED });
+/** Refused plan fields present in config.json, as plain-language problems. */
+export function refusedPlanFields(config) {
+  const at = (o, k) => k.split('.').reduce((v, part) => (v && typeof v === 'object' && Object.hasOwn(v, part) ? v[part] : undefined), o);
+  return [...Object.entries(REFUSED_PLAN_FIELDS).filter(([k]) => at(config, k) !== undefined).map(([k, why]) => `config.json may not set ${k}: ${why}`),
+    ...Object.entries(REMOVED_PLAN_FIELDS).filter(([k]) => at(config, k) !== undefined).map(([k, why]) => `config.json: ${k} was removed: ${why}`)];
+}
+
 /** Tokens that map to no painter option, and a prefix other than region_w13 or region_w15. */
 export function unknownTokens(variant, build) {
   const { prefix, tokens } = variantParts(variant);
@@ -243,12 +270,45 @@ export function checkPlanLimits(config, sheetmm, linesByName, targetPixels) {
 
 const readJson = f => { try { return JSON.parse(fs.readFileSync(f, 'utf8')); } catch { return null; } };
 const STYLE_INK = { 'urban-sketch': 'black' };
+
+/** A subject's drawing medium, as a person looking at the target would name it (bench/v4v5/subjects.json `medium`). */
+export const SUBJECT_MEDIA = Object.freeze(['none', 'pencil', 'pen']);
+const isGraphite = v => v === 'graphite' || /^graphite-/.test(v);
+// settings only a pen reads; dropped with the pen so they are not held against the plan as unread
+const INK_ONLY = ['inkprofile', 'washinkfree', 'drawinghand', 'inkdarkskip'];
+/**
+ * The source decides the medium. Remove an incompatible ink request; never
+ * reinterpret its paths as graphite. Explicit graphite remains opening-only.
+ * The painter enforces the same rule on config.drawing, which outranks CLI.
+ */
+export function subjectMediumRule({ medium, planMedium, outlineMedium, extraArgs, noDrawing }) {
+  const keep = { outlineMedium, extraArgs, firstOnly: false, override: null };
+  if (medium == null) return keep;
+  if (!SUBJECT_MEDIA.includes(medium)) throw new Error(`subject medium must be none, pencil or pen, not ${JSON.stringify(medium)}`);
+  if (medium === 'pen' || noDrawing) return keep;
+  // the painter gives a plan's drawing section the last word, then extra-args, then the template (src/paint/recipe.mjs)
+  const at = extraArgs.lastIndexOf('--outlinemedium'), extraMedium = at >= 0 && at + 1 < extraArgs.length ? extraArgs[at + 1] : null;
+  const asked = planMedium ?? extraMedium ?? outlineMedium;
+  if (asked === 'none') return keep;
+  const drawn = isGraphite(asked) ? 'graphite' : 'none';
+  const out = [], removed = [];
+  for (let i = 0; i < extraArgs.length; i += 2) {
+    const key = extraArgs[i].replace(/^--/, ''), value = extraArgs[i + 1];
+    if (INK_ONLY.includes(key) || (drawn === 'none' && ['drawingfile', 'drawinglast', 'stages'].includes(key))) { removed.push(`${extraArgs[i]} ${value}`); continue; }
+    out.push(extraArgs[i], ...(value === undefined ? [] : [key === 'outlinemedium' && value !== 'none' ? drawn : key === 'drawing' && value !== 'none' ? (drawn === 'none' ? 'none' : 'first') : value]));
+  }
+  return { outlineMedium: drawn, extraArgs: out, firstOnly: drawn === 'graphite',
+    override: { subjectMedium: medium, asked, drawn, closingDropped: false, removed,
+      reason: drawn === 'none'
+        ? `the subject's medium is ${medium}: no pen lines; the ${asked} drawing request is removed without substituting graphite`
+        : `the subject's medium is ${medium}: graphite remains a preparatory drawing with no closing lines` } };
+}
 /** PNG width and height from the file header. */
 export const pngSize = file => { const b = fs.readFileSync(file); return [b.readUInt32BE(16), b.readUInt32BE(20)]; };
 
 /**
  * Everything about one plan: the paint-plate args and the refusals that come before any painting.
- * spec: {crop, width, sheetmm, trumbull}. planDir: the plan folder; variant: the tokens (variant.txt).
+ * spec: {crop, width, sheetmm}. planDir: the plan folder; variant: the tokens (variant.txt).
  * Returns {args, problems, layering, modelOptions, baseOptions, extraOptions}.
  */
 export function resolvePlan({ spec, planDir, variant, target, out, compile = false, gpu = 'auto', pausedir = null, resumestate = null }) {
@@ -262,22 +322,44 @@ export function resolvePlan({ spec, planDir, variant, target, out, compile = fal
   let extra = null;
   if (fs.existsSync(extraFile)) { extra = readJson(extraFile); if (extra === null) problems.push('extra-args.json is not valid JSON'); }
   problems.push(...checkExtraArgs(extra, planDir));
-  const extraArgs = Array.isArray(extra) ? extra.map(String) : [];
+  const planExtraArgs = Array.isArray(extra) ? extra.map(String) : [];
   const targetPixels = pngSize(target);
-  // spec.basePalette false: no paint box from the base tokens; a plan's own palette token or --paints still applies
-  const basePalette = spec.basePalette !== false;
   const planMedium = config?.drawing?.medium && config.drawing.medium !== 'none' ? config.drawing.medium : null;
   const isPenWash = spec?.taskStyle === 'penwash' || (typeof spec?.taskStyle === 'string' && (spec.taskStyle.includes('penwash') || spec.taskStyle.includes('ink-and-watercolor')));
-  const outlineMedium = planMedium ?? (isPenWash ? 'ink' : 'graphite');
-  const build = argsBuilder({ planDir, target, width: spec.width, sheetmm: spec.sheetmm, trumbull: spec.trumbull, basePalette, out, compile, gpu, targetPixels, linesExist, outlineMedium });
-  problems.push(...unknownTokens(safeVariant, build).map(t => (t.startsWith('prefix') ? t : `unknown recipe token "${t}": it maps to no painter option, so nothing would read it`)));
+  // the subject's medium decides when the plan does not: a pen subject is drawn in ink, a subject with no pen
+  // (spec.medium none or pencil) may use graphite prep, but an ink request is removed, never converted.
+  const planOff = k => { const i = planExtraArgs.lastIndexOf('--' + k); return i >= 0 && planExtraArgs[i + 1] === 'none'; };
+  // a drawing section with ink stages and no medium is an ink drawing too
+  const inkStages = ['prepInk', 'finishInk'].some(k => config?.drawing?.stages?.[k]);
+  const noDrawing = config?.drawing?.medium === 'none' || planOff('drawing');
+  const mediumRule = subjectMediumRule({ medium: spec.medium, planMedium: planMedium ?? (inkStages ? 'ink' : null), outlineMedium: planMedium ?? (isPenWash || (spec.medium === 'pen' && !noDrawing) ? 'ink' : 'graphite'), extraArgs: planExtraArgs, noDrawing });
+  const { outlineMedium, extraArgs } = mediumRule;
+  let mediumOverride = mediumRule.override;
+  const build = argsBuilder({ planDir, target, width: spec.width, sheetmm: spec.sheetmm, out, compile, gpu, targetPixels, linesExist, outlineMedium });
+  problems.push(...refusedTokens(safeVariant));
+  if (config && typeof config === 'object') problems.push(...refusedPlanFields(config));
+  problems.push(...unknownTokens(safeVariant, build).filter(t => !refusedReason(t)).map(t => (t.startsWith('prefix') ? t : `unknown recipe token "${t}": it maps to no painter option, so nothing would read it`)));
   const styleName = config?.styleSelection?.style;
   const extraInk = extraArgs.includes('--inkprofile') ? extraArgs[extraArgs.lastIndexOf('--inkprofile') + 1] : null;
   const sepiaInk = !(extraInk && extraInk !== 'sepia-ink') && !extraArgs.includes('--inkk') && STYLE_INK[styleName] !== 'black';
-  const glazeGains = spec.glazeGains !== false;
-  const layered = layerBase({ variant: safeVariant, build, architecture: spec.trumbull, trumbull: spec.trumbull, basePalette, glazeGains, sepiaInk, linesExist });
-  const args = [...layered.args];
-  if (!glazeGains && !args.includes('--techcal')) args.push('--techcal', '1');
+  const layered = layerBase({ variant: safeVariant, build, sepiaInk, linesExist });
+  let args = [...layered.args];
+  if (mediumRule.firstOnly) {
+    // a preparatory drawing comes before the washes: no closing lines
+    const last = args.indexOf('--drawinglast');
+    mediumOverride.closingDropped = last >= 0 || optionMap(args).get('drawing') !== 'first' || planExtraArgs.some((a, i) => planExtraArgs[i - 1] === '--drawing' && a !== 'first' && a !== 'none');
+    if (last >= 0) args = args.filter((_, i) => i !== last && i !== last + 1);
+    args[args.lastIndexOf('--drawing') + 1] = 'first';
+    // a graphite drawing that was opening only already, with nothing removed, was not overridden
+    if (isGraphite(mediumOverride.asked) && !mediumOverride.closingDropped && !mediumOverride.removed.length) mediumOverride = null;
+  }
+  if (mediumOverride?.drawn === 'none') {
+    mediumOverride.closingDropped = args.includes('--drawinglast') || optionMap(args).get('drawing') !== 'first';
+    args = args.filter((arg, i, all) => !['--drawingfile', '--drawinglast'].includes(arg) && !['--drawingfile', '--drawinglast'].includes(all[i - 1]));
+    args[args.lastIndexOf('--drawing') + 1] = 'none';
+  }
+  // the painter applies the same rule to the plan's own drawing section, which the harness arguments cannot override
+  if (spec.medium === 'none' || spec.medium === 'pencil') args.push('--subjectmedium', spec.medium);
   const hasDrawingFile = args.includes('--drawingfile');
   const extraVal = name => { const i = extraArgs.lastIndexOf('--' + name); return i >= 0 && i + 1 < extraArgs.length && !extraArgs[i + 1].startsWith('--') ? extraArgs[i + 1] : null; };
   const effMedium = extraVal('outlinemedium') ?? (config?.drawing?.medium === 'none' ? 'none' : outlineMedium);
@@ -297,8 +379,6 @@ export function resolvePlan({ spec, planDir, variant, target, out, compile = fal
   // Offline scripted fixtures deliberately remove tracked benchmark data from their worktree.
   // Keep the dirty-tree evidence; ordinary contestant runs retain the painter's refusal.
   if (spec.offlineFixture === true) args.push('--allowdirty', '1');
-  // Since 0.1.1 a wet-on-wet stroke on uneven paper is logged, not a stop that loses the painting (tag v0.1.0 has the old rule)
-  if (!args.includes('--wetgate')) args.push('--wetgate', '0');
   if (pausedir) args.push('--pausedir', pausedir);
   if (resumestate) args.push('--resumestate', resumestate);
   const linesByName = {};
@@ -317,7 +397,9 @@ export function resolvePlan({ spec, planDir, variant, target, out, compile = fal
   if (config) problems.push(...checkPlanLimits(config, spec.sheetmm, linesByName, targetPixels));
   return {
     args, problems, variant: safeVariant, extraArgs,
-    layering: { base: BASE, basePalette, applied: layered.applied, skipped: layered.skipped, edits: layered.edits, valueFloor },
+    layering: { base: BASE, applied: layered.applied, skipped: layered.skipped, edits: layered.edits, valueFloor, mediumOverride,
+      // where the drawn lines come from (a tracer's stamp, or the painter's own reading of the target); see copy.mjs
+      lines: lineSources(linesByName, { painterOwnDrawing: effMedium !== 'none' && ((['first', 'both'].includes(effDrawing) && !hasDrawingFile) || (['both', 'last'].includes(effDrawing) && !args.includes('--drawinglast'))) }) },
     modelOptions: layered.modelOptions, baseOptions: layered.baseOptions, extraOptions: extraArgs.filter(a => a.startsWith('--')).map(a => a.slice(2)),
     templateOptions: [...optionMap(build(variantParts(safeVariant).prefix)).keys()],
   };
@@ -328,9 +410,10 @@ export function resolvePlan({ spec, planDir, variant, target, out, compile = fal
  * (painting.png, painter exit 0 or 3) counts as painted. Settings the plan chose that nothing read, unused options
  * nobody asked for and passages with no brush path are kept as notes against the plan. strict (--strict-verdict)
  * makes those three fail the painting again, as in the published 0.1 results. A painter killed by a signal, any other
- * painter exit and a missing painting always fail.
+ * painter exit and a missing painting always fail. continued: the painter's continued-checks.json; a painting that
+ * continued past any failed check, or wrote no such record, is painted but not clean (note 7; a failure under strict).
  */
-export function renderVerdict({ paintExit, unused = [], modelOptions = [], extraOptions = [], baseOptions = [], templateOptions = [], dropped = 0, droppedPct = 0, finished = true, strict = false }) {
+export function renderVerdict({ paintExit, unused = [], modelOptions = [], extraOptions = [], baseOptions = [], templateOptions = [], dropped = 0, droppedPct = 0, finished = true, strict = false, continued = null }) {
   const failures = [], notes = [], fail = (code, reason) => failures.push({ code, reason });
   const note = (code, reason) => (strict ? fail(code, reason) : notes.push({ code, reason }));
   const model = new Set([...modelOptions, ...extraOptions]), base = new Set([...baseOptions, ...templateOptions, 'valuefloor']);
@@ -342,5 +425,13 @@ export function renderVerdict({ paintExit, unused = [], modelOptions = [], extra
   if (check.unknown.length) note(4, 'unused options nobody asked for: --' + check.unknown.join(' --'));
   if (dropped > 0) note(5, `passages with no executed paths: ${dropped} dropped (${droppedPct.toFixed(1)}% of the planned mass)`);
   if (!finished) fail(6, 'no finished painting');
-  return { exit: failures.length ? failures[0].code : 0, failures, notes, optionCheck: check, strict };
+  // checks the painter continued past (src/media/checks.mjs, continued-checks.json): physics or plan checks that failed
+  // mid-painting. The painting still counts as painted, but it is not clean, and --strict-verdict fails it.
+  let clean = true;
+  if (!continued) { clean = false; note(7, 'no continued-checks.json: the run did not record the checks it continued past, so it cannot be called clean'); }
+  else if (continued.total > 0) {
+    clean = false;
+    note(7, `CONTINUED PAST ${continued.total} FAILED CHECKS: ${Object.entries(continued.checks ?? {}).map(([name, c]) => `${name} x${c.count}`).join(', ')}`);
+  }
+  return { exit: failures.length ? failures[0].code : 0, failures, notes, optionCheck: check, strict, clean, continuedChecks: continued };
 }

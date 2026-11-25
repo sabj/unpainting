@@ -50,6 +50,8 @@ const finalComplete = s => s?.complete === true && Number.isFinite(s.composite) 
 
 
 const specs = Object.fromEntries(loadCrops().map(c => [c.task, c]));
+const subjectsFile = path.join(BENCH, "v4v5", "subjects.json");
+const subjectsDoc = fs.existsSync(subjectsFile) ? readJson(subjectsFile).subjects || {} : {};
 const PRIVATE = process.env.BENCH_PRIVATE_CROPS ? path.resolve(process.env.BENCH_PRIVATE_CROPS) : null;
 const targetOf = c => (specs[c].distributed ? path.join(V2, specs[c].file) : PRIVATE && path.join(PRIVATE, `${c}.png`));
 
@@ -120,6 +122,22 @@ try {
         crop.progression = sheet ? { ...(progCached ? crop.progression : explicit ? await progression(sheet, style) : py('progression.py', ['--sheet', sheet, '--style', style])), cacheKey: progKey, cacheHit: Boolean(progCached) } : null;
         copyHF = py('copy_band.py', ['--target', target, '--image', image]).copyHF;
         crop.copyHF = copyHF;
+      }
+
+      if (!has('no-fullsize')) {
+        try {
+          // the sheet this painting was painted on: the try's own record first, since subjects.json describes new runs
+          // (published V4 and V5 tries were painted 1200 px wide on 158 and 280 mm sheets, the subjects are now ~78 mm)
+          const ownSheet = crop.sheet?.W > 0 && crop.sheet?.mmPerCell > 0 ? +(crop.sheet.W * crop.sheet.mmPerCell).toFixed(2) : null;
+          const plateMm = ownSheet ?? subjectsDoc[c]?.sheetmm;
+          if (!(plateMm > 0)) throw new Error(`${c}: no sheet width in the try's record or bench/v4v5/subjects.json`);
+          const fullsizeArgs = ['--image', final, '--style', style, '--plate-mm', String(plateMm)];
+          if (has('no-fullsize-vision') || has('no-vision') || !process.env.TOGETHER_API_KEY) fullsizeArgs.push('--no-vision');
+          if (opt('fullsize-calls')) fullsizeArgs.push('--calls', opt('fullsize-calls'));
+          crop.fullsize = py('fullsize.py', fullsizeArgs);
+        } catch (err) {
+          crop.fullsize = { complete: false, error: err.message };
+        }
       }
     } else if (!fs.existsSync(path.join(frames, 'stage-100.png'))) {
       problems.push(`${c}: no stage frames`);

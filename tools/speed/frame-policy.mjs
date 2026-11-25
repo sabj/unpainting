@@ -10,20 +10,16 @@ export function fastPaintFrame(stage) {
 }
 
 /**
- * Mixed washes lay few passes, and one pass can hold half the strokes, so frames at pass ends alone can leave two playback
- * stages on one frame. This keeps a forced frame each time the sweeps laid cross another of `count` equal shares of the
- * planned total. `laid()` counts one sweep and says whether a frame is due now.
+ * Whether a fast-mode painting keeps the frame the painter asks for at `stage`. `policy` is the run's framePolicy
+ * after keep(stage); `sameAsLast`: the last frame kept was of this same stage.
+ * A film (--video 1) keeps every frame asked for, the --frames ones laid inside a pass too: several of those share
+ * one stage, so they are kept though it repeats. Keeping all frames without a film (--keepallframes) keeps completed
+ * boundaries only (fastPaintFrame).
  */
-export function progressFrames(total, count = 12) {
-  let done = 0, next = 1;
-  return {
-    laid() {
-      done++;
-      if (!(total > 0) || done >= total || done < next * total / count) return false;
-      while (done >= next * total / count) next++;
-      return true;
-    },
-  };
+export function fastKeepsFrame(stage, policy, sameAsLast) {
+  if (policy.film) return !sameAsLast || Boolean(stage.laying);
+  if (policy.all && !fastPaintFrame(stage) && !policy.byDefault) return false;
+  return !sameAsLast;
 }
 
 export function framePolicy({ video = false, keepAll = false } = {}) {
@@ -31,10 +27,17 @@ export function framePolicy({ video = false, keepAll = false } = {}) {
   let next = 0, firstWash = false, last = null, prevOf = 0;
   return {
     all,
+    // the film is switched on (--video 1): its frames are kept lossless (src/media/frame-file.mjs)
+    film: Boolean(video),
     state() { return {next, firstWash, last, prevOf}; },
     restore(state) { if (state) ({next, firstWash, last, prevOf = 0} = state); },
+    // what the checkpoint policy would keep, worked out under every policy (so keeping all is a superset of it)
+    byDefault: false,
     keep(stage) {
-      if (all) return true;
+      this.byDefault = this.decide(stage);
+      return all || this.byDefault;
+    },
+    decide(stage) {
       const key = JSON.stringify(stage);
       if (key === last) return false;
       if (stage.stage === 'paint') {

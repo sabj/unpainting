@@ -1,23 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { setStrict, resetChecks, continuedSummary } from '../../media/checks.mjs';
-import { measureBrush, describeLayer, shadowEdges, chooseShadowTechnique, compoundClump, fitMoistStroke, measurePaper, enforcePaper, paperReady, strokeCells } from './wetdry.mjs';
+import { measureBrush, compoundClump, fitMoistStroke, measurePaper, enforcePaper, paperReady, strokeCells } from './wetdry.mjs';
 
-test('reference edges distinguish a hard step from a soft ramp at two resolutions', () => {
- for (const scale of [1,2]) {
-  const w=100*scale,h=60*scale, mask=new Uint8Array(w*h).fill(1);
-  const soft=Float32Array.from(mask,(_,i)=>80+100/(1+Math.exp(-(i%w-50*scale)/(5*scale))));
-  const hard=Float32Array.from(mask,(_,i)=>i%w<50*scale?80:180);
-  assert.equal(chooseShadowTechnique(shadowEdges(soft,mask,w,h,0.259/scale,130)).technique,'wet blend');
-  assert.equal(chooseShadowTechnique(shadowEdges(hard,mask,w,h,0.259/scale,130)).technique,'dry layer');
- }
-});
-test('canopy silhouette is excluded; insufficient internal evidence is logged', () => {
- const w=100,h=60,mask=Uint8Array.from({length:w*h},(_,i)=>i%w<50?1:0);
- const L=Float32Array.from(mask,v=>v?80:220);
- const m=shadowEdges(L,mask,w,h,0.259);
- assert.equal(m.samples,0);assert.match(chooseShadowTechnique(m).evidence,/insufficient/);
-});
 const sheet=()=>({w:3,h:3,n:9,W:new Float32Array(9),s:new Float32Array(9),paper:{capacity:new Float32Array(9).fill(1)}});
 test('GPU water is synchronized before a stroke; damp pores prevent a dry stroke',()=>{
  const s=sheet();let reads=0,dries=0;
@@ -65,19 +50,6 @@ test('one compound clump lifts across gaps without requiring or touching their d
  assert.ok(!cells.includes(10*40+20),'lifted connector must not count as contact');
 });
 
-test('soft edge choice survives bounded paper grain and changes of sampling scale',()=>{
- for(const scale of [1,2,4]) {
-  const w=100*scale,h=50*scale,mask=new Uint8Array(w*h).fill(1);
-  const light=Float32Array.from(mask,(_,i)=>80+100/(1+Math.exp(-(i%w-50*scale)/(5*scale)))+6*Math.sin(i*1.79));
-  assert.equal(chooseShadowTechnique(shadowEdges(light,mask,w,h,.259/scale,130)).technique,'wet blend');
- }
-});
-test('sparse layer evidence falls back explicitly to the region, then dry',()=>{
- const scant={samples:1,widthMm:4,gradientPerMm:9};
- const choice=chooseShadowTechnique(scant,{samples:8,widthMm:2,gradientPerMm:9});
- assert.equal(choice.technique,'wet blend');assert.equal(choice.evidence,'region shadow edges');
- assert.equal(chooseShadowTechnique(scant).technique,'dry layer');
-});
 test('non-finite water cannot pass a paper gate',()=>{
  const s=sheet();s.W[4]=NaN;
  assert.throws(()=>measurePaper(s,[4]),/Non-finite/);
@@ -105,11 +77,4 @@ test('brush audit settles GPU state and measures actual remaining pigment and wa
  let reads=0;b._pend={hairs:true,link:{settleBrush:()=>{reads++;b.hairs[0].water=.5;}}};
  assert.deepEqual(measureBrush(b),{waterMass:2.5,pigmentMass:[1.5,.75],pigmentConcentration:[.6,.3]});
  assert.equal(reads,1);b.resW=NaN;assert.throws(()=>measureBrush(b),/Invalid/);
-});
-test('layer plans choose actual moves and explain preserved lights and failure signs', () => {
- const soft=describeLayer(chooseShadowTechnique({samples:8,widthMm:2}),1);
- const hard=describeLayer(chooseShadowTechnique({samples:8,widthMm:.8}),2);
- assert.equal(soft.move,'dry on wet');assert.equal(hard.move,'wet on dry');
- assert.equal(soft.brush.size,8);assert.equal(hard.brush.size,4);
- assert.ok(soft.protectedLights);assert.ok(hard.failureSigns.length);assert.equal(hard.operations[0],'dry');
 });

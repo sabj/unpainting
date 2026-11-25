@@ -8,11 +8,11 @@
 // Picking runs on one set of reference constants for every paint (kscale 0.55, scatter 0.02, rho 0.05, omega 1.4,
 // gamma 0.25), so a paint's physics cannot change which paints a picture gets. boxPigment is that reference pigment.
 // physicalPigment is the same pigment with the paint's published granulation, staining, flocculation, scattering and
-// density from the table Paint Lab shares (demos/lab/media/pigment-physical.js), applied on the sheet under
+// density from the table Paint Lab shares (src/media/pigment-physical.mjs), applied on the sheet under
 // --boxphys 1 (src/paint/methods/pigment-physics.mjs). DOM free.
 import { fromJCh, cat02, xyzOfCat02, linearOfXYZ, encode } from './ciecam.mjs';
 import { labOf } from '../eval/colour.mjs';
-import { MIXED_OF, physicalOf, physicsFields } from '../../demos/lab/media/pigment-physical.js';
+import { MIXED_OF, physicalOf, physicsFields } from '../media/pigment-physical.mjs';
 
 const unit = v => { const m = Math.hypot(...v); return m > 1e-12 ? v.map(x => x / m) : [0.577, 0.577, 0.577]; };
 

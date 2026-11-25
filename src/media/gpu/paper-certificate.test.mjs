@@ -1,7 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {attachGpu} from './link.mjs';
-import {createSheet,dry,step,DEFAULTS} from '../sheet.mjs';
+import {createSheet,dry,step,DEFAULTS as SHEET_DEFAULTS} from '../sheet.mjs';
+// the GPU sheet has no pinned-edge feed (src/media/edge-feed.mjs) and refuses one; these tests run both sheets without it
+const DEFAULTS = { ...SHEET_DEFAULTS, edgeEvap: 0 };
 import {makePaper} from '../paper.mjs';
 import {createPen,dipPen} from '../pen.mjs';
 import {dryPenGate} from '../draw.mjs';

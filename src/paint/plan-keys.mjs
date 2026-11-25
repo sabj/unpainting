@@ -1,6 +1,6 @@
 // Value plan keys (--valueplan): every key the painter reads, so a key it would ignore is reported, not silently
 // dropped. Three "plan" Mittens controls once matched the control byte for byte because the code they ran on read none
-// of their new keys (washes.paints, darkGain, deepAccent).
+// of their new keys (washes.paints, darkGain).
 //
 // The tree below lists the keys and where they are read. `washes` and `order` are read only by the combined recipe
 // (src/paint/pipeline-plan.mjs, recipe default/combined/general); under another recipe they count as unused. NOTES are
@@ -26,8 +26,8 @@ const TEXTURE = { bounds: ANY, budget: ANY, spacing: ANY, minDensity: ANY, reser
 
 // src/paint/drawing-plan.mjs drawingFlags
 const DRAWING = {
-  medium: ANY, inkColor: ANY, ink: { color: ANY, waterproof: ANY }, linework: ANY, source: ANY, amount: ANY, lines: ANY, maxLines: ANY,
-  weight: ANY, closingLines: ANY, resolution: ANY, map: ANY, mapSmoothing: ANY,
+  medium: ANY, reason: ANY, inkColor: ANY, ink: { color: ANY, waterproof: ANY }, linework: ANY, source: ANY, amount: ANY, lines: ANY, maxLines: ANY,
+  weight: ANY, closingLines: ANY, resolution: ANY, map: ANY, mapSmoothing: ANY, hand: ANY, joinGap: ANY, damp: ANY,
   stages: {
     prep: { amount: ANY, weight: ANY, fade: ANY, frames: ANY },
     prepInk: { from: ANY, keep: ANY, add: ANY, amount: ANY, deviate: ANY, method: ANY },
@@ -39,8 +39,9 @@ const DRAWING = {
 const WASHES = {
   // src/paint/methods/finish-texture.mjs furLightReserves, through --furreserves
   furReserves: { bounds: ANY, reach: ANY, drop: ANY, dark: ANY, maxDensity: ANY, minCells: ANY },
-  paints: ANY, darkGain: ANY, deepAccent: { max: ANY, grow: ANY, families: ANY },
+  paints: ANY,
   colour: ANY, sessions: ANY, inkAware: ANY, charge: ANY, carryMm: ANY, paleLimit: ANY,
+  skyOneLayer: ANY, lanes: ANY, soften: { enabled: ANY, maxArcMm: ANY }, edgeFadeMm: ANY, edgeWobbleMm: ANY, smallMarks: ANY, joinSmall: ANY,
   physics: { holeRimMm: ANY, marangoni: ANY, slope: ANY },
 };
 
@@ -52,7 +53,7 @@ function planKeyTree({ pipeline }) {
     name: ANY, photo: ANY, // tools/painter/value-plan-preview.mjs
     sheet: { widthMm: ANY, seed: ANY, targetGuard: ANY }, // src/paint/recipe.mjs planSheet; tools/paint-plate.mjs --sheetmm
     // light-to-dark.mjs, target-regions.mjs, subject-order.mjs; referenceCue and baseMove describe the target regions
-    families: list({ id: ANY, bounds: ANY, referenceCue: ANY, baseMove: ANY }),
+    families: list({ id: ANY, bounds: ANY, referenceCue: ANY, baseMove: ANY, drawingRole: ANY }), // drawingRole: family-roles.mjs
     reserves: list({ bounds: ANY, reason: ANY }), // light-to-dark.mjs; tools/paint-plate.mjs resists
     styleSelection: { style: ANY, reason: ANY, regions: named({ style: ANY, reason: ANY }) }, // src/paint/styles/loader.mjs
     view: { wholeOf: ANY }, // tools/paint-plate.mjs --cellfamilies default

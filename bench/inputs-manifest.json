@@ -1,0 +1,2061 @@
+{
+ "schema": "unpaint-inputs@1",
+ "written": "2026-11-24",
+ "what": "The inputs of the benchmark's pictures: every file with its sha256. Paths are relative to the inputs' root (the folder of the subject list). node tools/prepare/manifest.mjs verify checks a copy against it.",
+ "pictures": [
+  {
+   "id": "manet-morisot-fan-crop-qs",
+   "title": "Manet, Morisot with a Fan (the approved crop)",
+   "registered": false,
+   "listedFrom": "manet-morisot-fan-crop",
+   "inputId": "manet-morisot-fan-crop",
+   "underRule": false,
+   "sheet": {
+    "rule": "as registered, before the one-area rule",
+    "widthMm": 380.12,
+    "heightMm": 319.8,
+    "cellsAcross": 1462
+   },
+   "sourcePx": [
+    2100,
+    1767
+   ],
+   "studySeed": {
+    "chosen": 11,
+    "final": true,
+    "seedsMade": [
+     7,
+     11,
+     42
+    ],
+    "why": "automatic rule (segaudit/pick.py), lowest penalty of the candidate sets (42=23.81, 7=26.76 rejected: s3L8 values off the picture (quantile difference 11.3 L*, painted ratio 0.94), 11=18.04); judged on its source",
+    "rule": "the auditor's rule (segaudit/pick.py): studies are made at seeds 42, 7 and 11; the seed whose s3/s1/s4 colours and values are closest to the picture (dE10, false whites, false darks) is used"
+   },
+   "prepared": false,
+   "absent": [
+    "not registered under the sheet rule: listed from the earlier registration manet-morisot-fan-crop"
+   ],
+   "files": [
+    {
+     "role": "source",
+     "path": "studio/img/manet-morisot-fan-crop.jpg",
+     "sha256": "9415a39d36460608767735eb62ebf76a64a94c378a1c62913b9c8360ddfd364e",
+     "bytes": 1165395
+    },
+    {
+     "role": "line classification",
+     "path": "classify/manet-morisot-fan-crop.json",
+     "sha256": "d6790027c3783270a912c7bb2ba3039d36c01ec56d5420a93be5839667aa42b8",
+     "bytes": 2210
+    },
+    {
+     "role": "drawing picture",
+     "path": "guides/manet-morisot-fan-crop-layin.png",
+     "sha256": "ff391bf712ff4a811cbde2c994375a10f1875feff8f42da67953a20f41e044fd",
+     "made": {
+      "prompt": "l1",
+      "seed": "not recorded",
+      "steps": "not recorded",
+      "host": "not recorded",
+      "chosenFrom": "guides/manet-morisot-fan-crop-layin-l1L8-s7.png",
+      "record": "none found"
+     },
+     "bytes": 3050362
+    },
+    {
+     "role": "drawing vectors",
+     "path": "replay/vectors/manet-morisot-fan-crop-std-layin-v2-lines.json",
+     "sha256": "f0ea5d664c83d9763f99e15f7c5f5951e927f472cc6d7c1176df977346c77131",
+     "bytes": 1102271
+    },
+    {
+     "role": "drawing vectors",
+     "path": "replay/vectors/manet-morisot-fan-crop-std-layin-v2-vectors.json",
+     "sha256": "09abcfca53b6edb26faad45280776f2081882be5cd69061d15887b5622be211d",
+     "bytes": 10909792
+    },
+    {
+     "role": "line map",
+     "path": "classify/manet-morisot-fan-crop-linemap.png",
+     "sha256": "a52188c5c66b307333423a6e64679ece8aadbc96ad95562e0dab96ec23b3b419",
+     "bytes": 4251
+    },
+    {
+     "role": "study 1",
+     "path": "studies/manet-morisot-fan-crop-study-s3L8-s11.png",
+     "sha256": "4ef637cbe263d30df86b86df7549e840b7cb57138340be50410c9cd410bb50c9",
+     "made": {
+      "prompt": "not recorded",
+      "seed": "not recorded",
+      "steps": "not recorded",
+      "host": "not recorded",
+      "record": "none found"
+     },
+     "bytes": 1189639
+    },
+    {
+     "role": "study 2",
+     "path": "studies/manet-morisot-fan-crop-study-s1L8-s11.png",
+     "sha256": "cffba7998bd052bc23a1e3a8aaf7c62f2b2c800daeace530173fb3e875b97ab6",
+     "made": {
+      "prompt": "not recorded",
+      "seed": "not recorded",
+      "steps": "not recorded",
+      "host": "not recorded",
+      "record": "none found"
+     },
+     "bytes": 4508034
+    },
+    {
+     "role": "study 3",
+     "path": "studies/manet-morisot-fan-crop-study-s4L8-s11.png",
+     "sha256": "b483b0cf86b8913cccf78739378cb83cd2ed60fcbb61c5b54312bf2098d5dd0f",
+     "made": {
+      "prompt": "not recorded",
+      "seed": "not recorded",
+      "steps": "not recorded",
+      "host": "not recorded",
+      "record": "none found"
+     },
+     "bytes": 4521149
+    },
+    {
+     "role": "labels",
+     "path": "labels/manet-morisot-fan-crop.json",
+     "sha256": "7d60551d1b8790e2447fc321c13948ff40f1b0ba0cff04d3ded72e28382f5938",
+     "bytes": 2636
+    },
+    {
+     "role": "named forms",
+     "path": "named-forms/manet-morisot-fan-crop/receipt.json",
+     "sha256": "5323cad159bf0e1d63828a41b9078eed2790f2bf584a0508cbd1d644b59d5365",
+     "bytes": 1457
+    },
+    {
+     "role": "named forms",
+     "path": "named-forms/manet-morisot-fan-crop/named-sam.png",
+     "sha256": "694c8625156c3628fdb6bcf7385e3b190d18625ec9de7ad0b88f196407878a54",
+     "bytes": 40202
+    },
+    {
+     "role": "named forms",
+     "path": "named-forms/manet-morisot-fan-crop/labels.json",
+     "sha256": "b3964a1b13041eccba91b5f2053ca81fff126e3e4429ab5fccbbee384a7064d3",
+     "bytes": 1338
+    }
+   ]
+  },
+  {
+   "id": "tiepolo-bacchus-qs",
+   "title": "Tiepolo, Bacchus and Ariadne",
+   "registered": false,
+   "listedFrom": "tiepolo-bacchus",
+   "inputId": "tiepolo-bacchus",
+   "underRule": false,
+   "sheet": {
+    "rule": "as registered, before the one-area rule",
+    "widthMm": 298.74,
+    "heightMm": 380.12,
+    "cellsAcross": 1149
+   },
+   "sourcePx": [
+    1600,
+    2035
+   ],
+   "studySeed": {
+    "chosen": 42,
+    "final": true,
+    "seedsMade": [
+     7,
+     11,
+     42
+    ],
+    "why": "automatic rule (segaudit/pick.py), lowest penalty of the seed sets (42=24.62, 7=34.09, 11=34.12); judged on the whole picture. Seed 42 here is the RunPod twin (-s42r) of studies first made on the Mac, so all three seeds come from one backend",
+    "rule": "the auditor's rule (segaudit/pick.py): studies are made at seeds 42, 7 and 11; the seed whose s3/s1/s4 colours and values are closest to the picture (dE10, false whites, false darks) is used"
+   },
+   "prepared": false,
+   "absent": [
+    "line classification: classify/tiepolo-bacchus.json is not the file the subject list pins (4208f0e4e646, pinned 6739a99fe491)",
+    "not registered under the sheet rule: listed from the earlier registration tiepolo-bacchus"
+   ],
+   "files": [
+    {
+     "role": "source",
+     "path": "studio/img/tiepolo-bacchus-ariadne.jpg",
+     "sha256": "9af6854e13dc6e99010f8cb35d38fd5f3e1b6c59ebd3a890a804bd378efd5355",
+     "bytes": 614711
+    },
+    {
+     "role": "line classification",
+     "path": "classify/tiepolo-bacchus.json",
+     "sha256": "4208f0e4e646ddbef8ee88d86c3d89ce779cbf72c5ddbc3d5056b6e2d82f7286",
+     "bytes": 8097
+    },
+    {
+     "role": "drawing picture",
+     "path": "guides/tiepolo-bacchus-orig-line.png",
+     "sha256": "3286720f22775c4faeb86c4cc76fe90803cf8b6bf14c00019a9ab8800a1c32ff",
+     "made": {
+      "host": "this Mac",
+      "record": "SUBJECT-SET.md:230 (b819 note)"
+     },
+     "bytes": 927892
+    },
+    {
+     "role": "drawing vectors",
+     "path": "replay/vectors/tiepolo-bacchus-std-ink-lines.json",
+     "sha256": "cf7a97918f7f00fc7b7f14a0d9596f66306cd9c97ab417b244b271bec11e0cca",
+     "bytes": 1217355
+    },
+    {
+     "role": "drawing vectors",
+     "path": "replay/vectors/tiepolo-bacchus-std-ink-vectors.json",
+     "sha256": "9f500f4bbb1938498915cf27874a10e0ec47e7848688b3e18696382b8c2c1406",
+     "bytes": 13822142
+    },
+    {
+     "role": "line map",
+     "path": "classify/tiepolo-bacchus-linemap.png",
+     "sha256": "df95ee4f8c4784bf2343cc89900e6027fc988395330ca70c58d0e5d02b3c7bfd",
+     "bytes": 7642
+    },
+    {
+     "role": "study 1",
+     "path": "studies/tiepolo-bacchus-study-s3L8-s42r-c4.png",
+     "sha256": "f1bdb69924c0a994efea01c022ec3ff742b27dd9fb56b75e9092648ff32dede5",
+     "made": {},
+     "bytes": 1192381
+    },
+    {
+     "role": "study 2",
+     "path": "studies/tiepolo-bacchus-study-s1vL8-s42-k3-c4-f1.png",
+     "sha256": "f794e8c5ffbc0f314bf7726566742c3773ff7805c72bb36400c8a447720f3646",
+     "made": {},
+     "bytes": 3490424
+    },
+    {
+     "role": "study 3",
+     "path": "studies/tiepolo-bacchus-study-s4vL8-s42-k3-c4-f1.png",
+     "sha256": "b4fc6f8e0317468292f13da6c5b3eb8d52082d3a7c086720554fe1603051b69b",
+     "made": {},
+     "bytes": 3537998
+    },
+    {
+     "role": "labels",
+     "path": "labels/tiepolo-bacchus.json",
+     "sha256": "476799397d02da182926c4642fdcc9e091942f6ad5b589b8214e89f2cbd72a5d",
+     "bytes": 6456
+    },
+    {
+     "role": "named forms",
+     "path": "named-forms/tiepolo-bacchus/receipt.json",
+     "sha256": "c058adf9a989dac033d4fb82efdfc10bc0282c6d232cd4f0554b53d2bd77bdeb",
+     "bytes": 2880
+    },
+    {
+     "role": "named forms",
+     "path": "named-forms/tiepolo-bacchus/named-sam.png",
+     "sha256": "1d4ede4732986bd1fd57b867b7921903898aea5d190a7c3def1544ade7948ec2",
+     "bytes": 41550
+    },
+    {
+     "role": "named forms",
+     "path": "named-forms/tiepolo-bacchus/labels.json",
+     "sha256": "591bcd37873dff7f7e1481e3090b41c84312abc67826c761f330771717c19ceb",
+     "bytes": 1863
+    }
+   ]
+  },
+  {
+   "id": "homer-water-fan-qs",
+   "title": "Homer, The Water Fan",
+   "registered": false,
+   "listedFrom": "homer-water-fan",
+   "inputId": "homer-water-fan",
+   "underRule": false,
+   "sheet": {
+    "rule": "as registered, before the one-area rule",
+    "widthMm": 380.12,
+    "heightMm": 264.68,
+    "cellsAcross": 1462
+   },
+   "sourcePx": [
+    3000,
+    2089
+   ],
+   "studySeed": {
+    "chosen": 11,
+    "final": true,
+    "seedsMade": [
+     7,
+     11,
+     42
+    ],
+    "why": "automatic rule (segaudit/pick.py), lowest penalty of the candidate sets (42=26.53 rejected: s3L8 values off the picture (quantile difference 14.1 L*, painted ratio 0.98), 7=21.78 rejected: s3L8 values off the picture (quantile difference 11.4 L*, painted ratio 1.01), 11=17.11); judged on its source",
+    "rule": "the auditor's rule (segaudit/pick.py): studies are made at seeds 42, 7 and 11; the seed whose s3/s1/s4 colours and values are closest to the picture (dE10, false whites, false darks) is used"
+   },
+   "prepared": false,
+   "absent": [
+    "not registered under the sheet rule: listed from the earlier registration homer-water-fan"
+   ],
+   "files": [
+    {
+     "role": "source",
+     "path": "studio/img/homer-water-fan.jpg",
+     "sha256": "57c7d31d2113674f9c44d358e7d9f260932b99528225531286e502bb07bd32ae",
+     "bytes": 2735833
+    },
+    {
+     "role": "line classification",
+     "path": "classify/homer-water-fan.json",
+     "sha256": "939441a5b64efc36bb5c93e8a6f0903cb8edfbf674f34ce0b77f7eecea287fff",
+     "bytes": 2097
+    },
+    {
+     "role": "drawing picture",
+     "path": "guides/homer-water-fan-layin.png",
+     "sha256": "6b47e17a425b832e9b50cb0a916053513d5a6b3e6135d14bf36018140109b761",
+     "made": {
+      "prompt": "l1",
+      "seed": "11",
+      "steps": "8",
+      "host": "this Mac (mflux 8-bit MLX, Lightning 8-step LoRA; made locally with guides/tools/qwen_local_prep.py, not on a pod; bf16 on the pod for the older subjects)",
+      "chosenFrom": "guides/homer-water-fan-layin-l1L8-s11.png",
+      "record": "guides/tools/qwen-local-water-fan-tyrol.log:115"
+     },
+     "bytes": 4298352
+    },
+    {
+     "role": "drawing vectors",
+     "path": "replay/vectors/homer-water-fan-std-layin-v2-lines.json",
+     "sha256": "7671f39adc9fc601112380b98cd6b876a074840f40c30dfdb9ffa48d784c1a8e",
+     "bytes": 1764812
+    },
+    {
+     "role": "drawing vectors",
+     "path": "replay/vectors/homer-water-fan-std-layin-v2-vectors.json",
+     "sha256": "4ffed37e4f2972b18257bb2849c99c36005302fd17ef047bc518b6269f1e3088",
+     "bytes": 22947044
+    },
+    {
+     "role": "line map",
+     "path": "classify/homer-water-fan-linemap.png",
+     "sha256": "54ccc91d0dcd390f472e2fb409af334ef77125d6c6fca5be48e742135517b562",
+     "bytes": 6418
+    },
+    {
+     "role": "study 1",
+     "path": "studies/homer-water-fan-study-s3L8-s11.png",
+     "sha256": "16e559486c624f055f47d18bb2e5af067963830a1191ca6244b666124c55dc77",
+     "made": {
+      "prompt": "s3",
+      "seed": "11",
+      "steps": "8",
+      "host": "this Mac (mflux 8-bit MLX, Lightning 8-step LoRA; made locally with guides/tools/qwen_local_prep.py, not on a pod; bf16 on the pod for the older subjects)",
+      "record": "guides/tools/qwen-local-water-fan-tyrol.log:127"
+     },
+     "bytes": 1995034
+    },
+    {
+     "role": "study 2",
+     "path": "studies/homer-water-fan-study-s1L8-s11.png",
+     "sha256": "d36a8115de770aec3a4728df5e035382bbb19429582d1693a5fca54e57f4243f",
+     "made": {
+      "prompt": "s1",
+      "seed": "11",
+      "steps": "8",
+      "host": "this Mac (mflux 8-bit MLX, Lightning 8-step LoRA; made locally with guides/tools/qwen_local_prep.py, not on a pod; bf16 on the pod for the older subjects)",
+      "record": "guides/tools/qwen-local-water-fan-tyrol.log:139"
+     },
+     "bytes": 6272642
+    },
+    {
+     "role": "study 3",
+     "path": "studies/homer-water-fan-study-s4L8-s11.png",
+     "sha256": "db695e3288898dab6d2a150954146f03bb5f282c4b48db6422364ef19617d601",
+     "made": {
+      "prompt": "s4",
+      "seed": "11",
+      "steps": "8",
+      "host": "this Mac (mflux 8-bit MLX, Lightning 8-step LoRA; made locally with guides/tools/qwen_local_prep.py, not on a pod; bf16 on the pod for the older subjects)",
+      "record": "guides/tools/qwen-local-water-fan-tyrol.log:151"
+     },
+     "bytes": 7000072
+    },
+    {
+     "role": "labels",
+     "path": "labels/homer-water-fan.json",
+     "sha256": "2ea08030d4c28bc80c0e24f3bb2b9f7a1e2849621f30e6ff5e462c4e5d4cd53a",
+     "bytes": 3190
+    },
+    {
+     "role": "named forms",
+     "path": "named-forms/homer-water-fan/receipt.json",
+     "sha256": "b2730d5e9a377933554d109fba092edd70f9a23414ce7b582ac22f3cafe47c2d",
+     "bytes": 1581
+    },
+    {
+     "role": "named forms",
+     "path": "named-forms/homer-water-fan/named-sam.png",
+     "sha256": "2a1c2ff2839963b82f824c8641dd66f8b48d3cbe8a46920791b565a79f0abc0a",
+     "bytes": 36048
+    },
+    {
+     "role": "named forms",
+     "path": "named-forms/homer-water-fan/labels.json",
+     "sha256": "57a27e74d87c1b3a7cb3f4bd4685208a682e0cf7b160ca96002458f9145db483",
+     "bytes": 1639
+    }
+   ]
+  },
+  {
+   "id": "prout-laundresses-qs",
+   "title": "Prout, Laundresses before the Wasserturm, Nuremberg",
+   "registered": false,
+   "listedFrom": "prout-laundresses",
+   "inputId": "prout-laundresses",
+   "underRule": false,
+   "sheet": {
+    "rule": "as registered, before the one-area rule",
+    "widthMm": 273.26,
+    "heightMm": 380.12,
+    "cellsAcross": 1051
+   },
+   "sourcePx": [
+    2902,
+    4036
+   ],
+   "studySeed": {
+    "chosen": null,
+    "final": false,
+    "seedsMade": [
+     42
+    ],
+    "why": null,
+    "rule": "the auditor's rule (segaudit/pick.py): studies are made at seeds 42, 7 and 11; the seed whose s3/s1/s4 colours and values are closest to the picture (dE10, false whites, false darks) is used"
+   },
+   "prepared": false,
+   "absent": [
+    "drawing picture: guides/prout-laundresses-layin.png is not on disk",
+    "drawing vectors: replay/vectors/prout-laundresses-std-layin-lines.json is not on disk",
+    "drawing vectors: replay/vectors/prout-laundresses-std-layin-vectors.json is not on disk",
+    "study 1: studies/prout-laundresses-study-s3L8.png is on disk but not pinned in the subject list",
+    "study 2: studies/prout-laundresses-study-s1L8.png is on disk but not pinned in the subject list",
+    "study 3: studies/prout-laundresses-study-s4L8.png is on disk but not pinned in the subject list",
+    "labels: labels/prout-laundresses.json is not on disk",
+    "named forms: named-forms/prout-laundresses/receipt.json is not on disk",
+    "named forms: named-forms/prout-laundresses/named-sam.png is not on disk",
+    "named forms: named-forms/prout-laundresses/labels.json is not on disk",
+    "the study seed is not final (pending (no entry in segaudit/seed-choice.json; seed 42 is NOT a default))",
+    "not registered under the sheet rule: listed from the earlier registration prout-laundresses"
+   ],
+   "files": [
+    {
+     "role": "source",
+     "path": "studio/img/prout-laundresses.jpg",
+     "sha256": "000bc08afc03f5403120227212ce47d4bc1c5978f45e396a7f629ed38af14715",
+     "bytes": 4490148
+    },
+    {
+     "role": "line classification",
+     "path": "classify/prout-laundresses.json",
+     "sha256": "eedf765de4fee5b5af2df4e4d21414b102ad0aa486f8faff6a3e08e7d56e248f",
+     "bytes": 2187
+    },
+    {
+     "role": "drawing picture",
+     "path": "guides/prout-laundresses-layin.png",
+     "sha256": null,
+     "bytes": null,
+     "absent": true
+    },
+    {
+     "role": "drawing vectors",
+     "path": "replay/vectors/prout-laundresses-std-layin-lines.json",
+     "sha256": null,
+     "bytes": null,
+     "absent": true
+    },
+    {
+     "role": "drawing vectors",
+     "path": "replay/vectors/prout-laundresses-std-layin-vectors.json",
+     "sha256": null,
+     "bytes": null,
+     "absent": true
+    },
+    {
+     "role": "line map",
+     "path": "classify/prout-laundresses-linemap.png",
+     "sha256": "b99efe02c0245528a29fd251885e003394ce1b42c5a68c224c0c9ba473f37fbb",
+     "bytes": 7583
+    },
+    {
+     "role": "study 1",
+     "path": "studies/prout-laundresses-study-s3L8.png",
+     "sha256": "9d3478b661c1250dcd97c9c57b7530c00759924a41738b540c6a0f3182c73e09",
+     "bytes": 2612295
+    },
+    {
+     "role": "study 2",
+     "path": "studies/prout-laundresses-study-s1L8.png",
+     "sha256": "88b6dede0df71f3841f669c30cc822477684aa5bc47c4d3df11d42fc3556f7db",
+     "bytes": 7835207
+    },
+    {
+     "role": "study 3",
+     "path": "studies/prout-laundresses-study-s4L8.png",
+     "sha256": "65051c1fb1d197a56268ecb85dd09a1ea6712487efe70c91220ae7b4ff187cd6",
+     "bytes": 9241459
+    },
+    {
+     "role": "labels",
+     "path": "labels/prout-laundresses.json",
+     "sha256": null,
+     "bytes": null,
+     "absent": true
+    },
+    {
+     "role": "named forms",
+     "path": "named-forms/prout-laundresses/receipt.json",
+     "sha256": null,
+     "unpinnedInRegistry": true,
+     "bytes": null,
+     "absent": true
+    },
+    {
+     "role": "named forms",
+     "path": "named-forms/prout-laundresses/named-sam.png",
+     "sha256": null,
+     "unpinnedInRegistry": true,
+     "bytes": null,
+     "absent": true
+    },
+    {
+     "role": "named forms",
+     "path": "named-forms/prout-laundresses/labels.json",
+     "sha256": null,
+     "unpinnedInRegistry": true,
+     "bytes": null,
+     "absent": true
+    }
+   ]
+  },
+  {
+   "id": "guardi-qs",
+   "title": "Guardi, a colonnade",
+   "registered": false,
+   "listedFrom": "guardi",
+   "inputId": "guardi",
+   "underRule": false,
+   "sheet": {
+    "rule": "as registered, before the one-area rule",
+    "widthMm": 254.02,
+    "heightMm": 380.12,
+    "cellsAcross": 977
+   },
+   "sourcePx": [
+    1600,
+    2394
+   ],
+   "studySeed": {
+    "chosen": 42,
+    "final": true,
+    "seedsMade": [
+     7,
+     11,
+     42
+    ],
+    "why": "automatic rule (segaudit/pick.py), lowest penalty of the seed sets (42=12.02, 7=17.45, 11=14.43); judged on the whole picture. Seed 42 here is the RunPod twin (-s42r) of studies first made on the Mac, so all three seeds come from one backend",
+    "rule": "the auditor's rule (segaudit/pick.py): studies are made at seeds 42, 7 and 11; the seed whose s3/s1/s4 colours and values are closest to the picture (dE10, false whites, false darks) is used"
+   },
+   "prepared": false,
+   "absent": [
+    "line classification: classify/guardi.json is not the file the subject list pins (b347f028e628, pinned 18c16cbb921f)",
+    "not registered under the sheet rule: listed from the earlier registration guardi"
+   ],
+   "files": [
+    {
+     "role": "source",
+     "path": "studio/img/guardi-colonnade.jpg",
+     "sha256": "eee83dc7ec516d0c304534360d036d10057d9d0fe980afad995f57e2d8e522d6",
+     "bytes": 1092883
+    },
+    {
+     "role": "line classification",
+     "path": "classify/guardi.json",
+     "sha256": "b347f028e6281a478425bdcb0427e16cf5d47f5940d32fb005f94085797faab1",
+     "bytes": 9134
+    },
+    {
+     "role": "drawing picture",
+     "path": "guides/guardi-orig-line.png",
+     "sha256": "1e6ce6051ea909a7a6ebe38bbe159b254245d2515da25c4d2f4d335bc8e7650f",
+     "made": {
+      "host": "this Mac",
+      "record": "SUBJECT-SET.md:230 (b819 note)"
+     },
+     "bytes": 1570112
+    },
+    {
+     "role": "drawing vectors",
+     "path": "replay/vectors/guardi-std-ink-lines.json",
+     "sha256": "302f6552279283bead3f7a63ed8afc02cd4a105c5159efc5804d013f2b9d031d",
+     "bytes": 2987272
+    },
+    {
+     "role": "drawing vectors",
+     "path": "replay/vectors/guardi-std-ink-vectors.json",
+     "sha256": "606cd77d2a594ef4cdc8ea90fc996b4cd4de5532964962530938328eb312fe26",
+     "bytes": 39910163
+    },
+    {
+     "role": "line map",
+     "path": "classify/guardi-linemap.png",
+     "sha256": "93c7c4f91f6da23bbeb0f5c9189756fa19a02871286cc134890dbc4e955cefb9",
+     "bytes": 6950
+    },
+    {
+     "role": "study 1",
+     "path": "studies/guardi-study-s3L8-s42r.png",
+     "sha256": "c169ffdbecacd93a68811bc9916088d4deab19fcf4a7c39ea3780941ce6ba729",
+     "made": {
+      "prompt": "s3",
+      "seed": "42",
+      "steps": "8",
+      "host": "RunPod (H100, diffusers bf16, Lightning 8-step LoRA fused)",
+      "record": "guides/tools/qwen-runpod.log:226"
+     },
+     "bytes": 1861125
+    },
+    {
+     "role": "study 2",
+     "path": "studies/guardi-study-s1L8-s42r.png",
+     "sha256": "dea4278c3b16b5ea71e8489ef5c3065e684251f144f7f5d8c05333942eac7546",
+     "made": {
+      "prompt": "s1",
+      "seed": "42",
+      "steps": "8",
+      "host": "RunPod (H100, diffusers bf16, Lightning 8-step LoRA fused)",
+      "record": "guides/tools/qwen-runpod.log:229"
+     },
+     "bytes": 4803522
+    },
+    {
+     "role": "study 3",
+     "path": "studies/guardi-study-s4L8.png",
+     "sha256": "eaaf2a2b43ea7a19d595f4fc0d4b8c13f7402fde57b1061005e4a1ff419ed9e3",
+     "made": {
+      "prompt": "s4",
+      "seed": "42",
+      "steps": "8",
+      "host": "RunPod (H100, diffusers bf16, Lightning 8-step LoRA fused)",
+      "record": "guides/tools/qwen-runpod.log:48"
+     },
+     "bytes": 4653214
+    },
+    {
+     "role": "labels",
+     "path": "labels/guardi.json",
+     "sha256": "542a1bfacf2bae146df485d9e08e0234271f760b14b26f3d233e41247173d960",
+     "bytes": 7415
+    },
+    {
+     "role": "named forms",
+     "path": "named-forms/guardi/receipt.json",
+     "sha256": "9d0dff94a06f0e4fb27e080165ac9930256afe965bf2bd476c3bb44b21178148",
+     "bytes": 3462
+    },
+    {
+     "role": "named forms",
+     "path": "named-forms/guardi/named-sam.png",
+     "sha256": "e64e24fe315eddfcd874eae2a4d7e7681844ac8f68602db689d17fe978885a16",
+     "bytes": 74402
+    },
+    {
+     "role": "named forms",
+     "path": "named-forms/guardi/labels.json",
+     "sha256": "68196b8d8deead01bc6d3bc73b5a5c4907803499e2e0700e2163bb36bb617850",
+     "bytes": 2340
+    }
+   ]
+  },
+  {
+   "id": "bonington-french-town-qs",
+   "title": "Bonington, French Town, Buildings and River",
+   "registered": false,
+   "listedFrom": "bonington-french-town",
+   "inputId": "bonington-french-town",
+   "underRule": false,
+   "sheet": {
+    "rule": "as registered, before the one-area rule",
+    "widthMm": 300.56,
+    "heightMm": 380.12,
+    "cellsAcross": 1156
+   },
+   "sourcePx": [
+    1664,
+    2104
+   ],
+   "studySeed": {
+    "chosen": null,
+    "final": false,
+    "seedsMade": [],
+    "why": null,
+    "rule": "the auditor's rule (segaudit/pick.py): studies are made at seeds 42, 7 and 11; the seed whose s3/s1/s4 colours and values are closest to the picture (dE10, false whites, false darks) is used"
+   },
+   "prepared": false,
+   "absent": [
+    "drawing picture: guides/bonington-french-town-layin.png is not on disk",
+    "drawing vectors: replay/vectors/bonington-french-town-std-layin-lines.json is not on disk",
+    "drawing vectors: replay/vectors/bonington-french-town-std-layin-vectors.json is not on disk",
+    "study 1: studies/bonington-french-town-study-s3L8.png is not on disk",
+    "study 2: studies/bonington-french-town-study-s1L8.png is not on disk",
+    "study 3: studies/bonington-french-town-study-s4L8.png is not on disk",
+    "labels: labels/bonington-french-town.json is not on disk",
+    "named forms: named-forms/bonington-french-town/receipt.json is not on disk",
+    "named forms: named-forms/bonington-french-town/named-sam.png is not on disk",
+    "named forms: named-forms/bonington-french-town/labels.json is not on disk",
+    "the study seed is not final (pending (no entry in segaudit/seed-choice.json; seed 42 is NOT a default))",
+    "not registered under the sheet rule: listed from the earlier registration bonington-french-town"
+   ],
+   "files": [
+    {
+     "role": "source",
+     "path": "studio/img/bonington-french-town.jpg",
+     "sha256": "013fa911ffb2169d5b421eaa32560d531a19f0dd0e6309c3a531801272483651",
+     "bytes": 1426128
+    },
+    {
+     "role": "line classification",
+     "path": "classify/bonington-french-town.json",
+     "sha256": "71c0c44e31baabde205c0badbffc9d00a37be430fec70444fe40aeb20f005c6a",
+     "bytes": 2154
+    },
+    {
+     "role": "drawing picture",
+     "path": "guides/bonington-french-town-layin.png",
+     "sha256": null,
+     "bytes": null,
+     "absent": true
+    },
+    {
+     "role": "drawing vectors",
+     "path": "replay/vectors/bonington-french-town-std-layin-lines.json",
+     "sha256": null,
+     "bytes": null,
+     "absent": true
+    },
+    {
+     "role": "drawing vectors",
+     "path": "replay/vectors/bonington-french-town-std-layin-vectors.json",
+     "sha256": null,
+     "bytes": null,
+     "absent": true
+    },
+    {
+     "role": "line map",
+     "path": "classify/bonington-french-town-linemap.png",
+     "sha256": "af7ebc373dfb337261ca74687ffcc6f9daf8583b9dc000cc2df2a3e5b96c4053",
+     "bytes": 7686
+    },
+    {
+     "role": "study 1",
+     "path": "studies/bonington-french-town-study-s3L8.png",
+     "sha256": null,
+     "bytes": null,
+     "absent": true
+    },
+    {
+     "role": "study 2",
+     "path": "studies/bonington-french-town-study-s1L8.png",
+     "sha256": null,
+     "bytes": null,
+     "absent": true
+    },
+    {
+     "role": "study 3",
+     "path": "studies/bonington-french-town-study-s4L8.png",
+     "sha256": null,
+     "bytes": null,
+     "absent": true
+    },
+    {
+     "role": "labels",
+     "path": "labels/bonington-french-town.json",
+     "sha256": null,
+     "bytes": null,
+     "absent": true
+    },
+    {
+     "role": "named forms",
+     "path": "named-forms/bonington-french-town/receipt.json",
+     "sha256": null,
+     "unpinnedInRegistry": true,
+     "bytes": null,
+     "absent": true
+    },
+    {
+     "role": "named forms",
+     "path": "named-forms/bonington-french-town/named-sam.png",
+     "sha256": null,
+     "unpinnedInRegistry": true,
+     "bytes": null,
+     "absent": true
+    },
+    {
+     "role": "named forms",
+     "path": "named-forms/bonington-french-town/labels.json",
+     "sha256": null,
+     "unpinnedInRegistry": true,
+     "bytes": null,
+     "absent": true
+    }
+   ]
+  },
+  {
+   "id": "turner-esseillon-qs",
+   "title": "Turner, The Fort of L'Esseillon",
+   "registered": false,
+   "listedFrom": "turner-esseillon",
+   "inputId": "turner-esseillon",
+   "underRule": false,
+   "sheet": {
+    "rule": "as registered, before the one-area rule",
+    "widthMm": 380.12,
+    "heightMm": 260.26,
+    "cellsAcross": 1462
+   },
+   "sourcePx": [
+    3451,
+    2363
+   ],
+   "studySeed": {
+    "chosen": 11,
+    "final": true,
+    "seedsMade": [
+     7,
+     11,
+     42
+    ],
+    "why": "automatic rule (segaudit/pick.py), lowest penalty of the candidate sets (42=21.82, 7=18.4, 11=17.27); judged on its source",
+    "rule": "the auditor's rule (segaudit/pick.py): studies are made at seeds 42, 7 and 11; the seed whose s3/s1/s4 colours and values are closest to the picture (dE10, false whites, false darks) is used"
+   },
+   "prepared": false,
+   "absent": [
+    "not registered under the sheet rule: listed from the earlier registration turner-esseillon"
+   ],
+   "files": [
+    {
+     "role": "source",
+     "path": "studio/img/turner-esseillon.jpg",
+     "sha256": "388de84e49931f6c757309c9d961f522956c8b1661a7f3b053f81df412ea8b76",
+     "bytes": 3032533
+    },
+    {
+     "role": "line classification",
+     "path": "classify/turner-esseillon.json",
+     "sha256": "f06c838795eab3f657f8900964fc8c123b0029bb94b59bbd357b807dada070c0",
+     "bytes": 2100
+    },
+    {
+     "role": "drawing picture",
+     "path": "guides/turner-esseillon-layin.png",
+     "sha256": "1ff83ca3ae761d36c23aa1e8c4493cb36bda39d3b9d6d123897b46e766cf69ce",
+     "made": {
+      "prompt": "l1",
+      "seed": "7",
+      "steps": "8",
+      "host": "this Mac (mflux 8-bit MLX, Lightning 8-step LoRA; made locally with guides/tools/qwen_local_prep.py, not on a pod; bf16 on the pod for the older subjects)",
+      "chosenFrom": "guides/turner-esseillon-layin-l1L8-s7.png",
+      "record": "guides/tools/onboard-local-driver.log:220"
+     },
+     "bytes": 3762835
+    },
+    {
+     "role": "drawing vectors",
+     "path": "replay/vectors/turner-esseillon-std-layin-v2-lines.json",
+     "sha256": "66360782507ec15da0ffde08db48e0146c271f8c03fa9af14c82fc24e4c18f2e",
+     "bytes": 2657802
+    },
+    {
+     "role": "drawing vectors",
+     "path": "replay/vectors/turner-esseillon-std-layin-v2-vectors.json",
+     "sha256": "81ee0f292483f3a3bb9e445c1188740220fcb1500c9cc4362bb7efb11dea89a0",
+     "bytes": 33589742
+    },
+    {
+     "role": "line map",
+     "path": "classify/turner-esseillon-linemap.png",
+     "sha256": "b884402353d8ddb1ab0dbff23be91ac5776a6793ba1dcb62623bcb43807e7b29",
+     "bytes": 2576
+    },
+    {
+     "role": "study 1",
+     "path": "studies/turner-esseillon-study-s3L8-s11.png",
+     "sha256": "19d0f0b6ddb40a0e2d63768fe3cd4c1ef9198070e9b6278d5f670d2915f9c9c3",
+     "made": {
+      "prompt": "s3",
+      "seed": "11",
+      "steps": "8",
+      "host": "this Mac (mflux 8-bit MLX, Lightning 8-step LoRA; made locally with guides/tools/qwen_local_prep.py, not on a pod; bf16 on the pod for the older subjects)",
+      "record": "guides/tools/onboard-local-driver.log:280"
+     },
+     "bytes": 1440393
+    },
+    {
+     "role": "study 2",
+     "path": "studies/turner-esseillon-study-s1L8-s11.png",
+     "sha256": "53590a11ef28ea4e23b2d8e63397cc25c5aaa599010d0ee2e0edf0cccba9d5f6",
+     "made": {
+      "prompt": "s1",
+      "seed": "11",
+      "steps": "8",
+      "host": "this Mac (mflux 8-bit MLX, Lightning 8-step LoRA; made locally with guides/tools/qwen_local_prep.py, not on a pod; bf16 on the pod for the older subjects)",
+      "record": "guides/tools/onboard-local-driver.log:292"
+     },
+     "bytes": 4566510
+    },
+    {
+     "role": "study 3",
+     "path": "studies/turner-esseillon-study-s4L8-s11.png",
+     "sha256": "a035094e2c11af69e5479b4c7a9cf0162c83bf788aba9144252479122dd86fec",
+     "made": {
+      "prompt": "s4",
+      "seed": "11",
+      "steps": "8",
+      "host": "this Mac (mflux 8-bit MLX, Lightning 8-step LoRA; made locally with guides/tools/qwen_local_prep.py, not on a pod; bf16 on the pod for the older subjects)",
+      "record": "guides/tools/onboard-local-driver.log:304"
+     },
+     "bytes": 5044606
+    },
+    {
+     "role": "labels",
+     "path": "labels/turner-esseillon.json",
+     "sha256": "6b2bcbb2162c094c44e364fc6c1027d39a1d72f73bab114933ec788447913dbd",
+     "bytes": 6520
+    },
+    {
+     "role": "named forms",
+     "path": "named-forms/turner-esseillon/receipt.json",
+     "sha256": "7fcf55163f6006330115bb75c65628049c00c02f800467604709b08fa908918c",
+     "bytes": 2759
+    },
+    {
+     "role": "named forms",
+     "path": "named-forms/turner-esseillon/named-sam.png",
+     "sha256": "8e7ac1319d369ea36a9ba0034b8a6647791cf5962d2e3d16ce5416c359725f8c",
+     "bytes": 72534
+    },
+    {
+     "role": "named forms",
+     "path": "named-forms/turner-esseillon/labels.json",
+     "sha256": "e8c8741704af54c820d0b7d72320a8ec04427a9a332527b21f9037bfcf7bedb9",
+     "bytes": 3430
+    }
+   ]
+  },
+  {
+   "id": "sargent-tyrol-qs",
+   "title": "Sargent, In Austrian Tyrol",
+   "registered": false,
+   "listedFrom": "sargent-tyrol",
+   "inputId": "sargent-tyrol",
+   "underRule": false,
+   "sheet": {
+    "rule": "as registered, before the one-area rule",
+    "widthMm": 380.12,
+    "heightMm": 254.28,
+    "cellsAcross": 1462
+   },
+   "sourcePx": [
+    3332,
+    2230
+   ],
+   "studySeed": {
+    "chosen": 42,
+    "final": true,
+    "seedsMade": [
+     7,
+     11,
+     42
+    ],
+    "why": "automatic rule (segaudit/pick.py), lowest penalty of the candidate sets (42=13.88, 7=17.82, 11=22.15); judged on its source",
+    "rule": "the auditor's rule (segaudit/pick.py): studies are made at seeds 42, 7 and 11; the seed whose s3/s1/s4 colours and values are closest to the picture (dE10, false whites, false darks) is used"
+   },
+   "prepared": false,
+   "absent": [
+    "not registered under the sheet rule: listed from the earlier registration sargent-tyrol"
+   ],
+   "files": [
+    {
+     "role": "source",
+     "path": "studio/img/sargent-tyrol.jpg",
+     "sha256": "2b4a460863bf511a5345b7362650c22ed14c1bc61303d60c3880fe155166b538",
+     "bytes": 4396958
+    },
+    {
+     "role": "line classification",
+     "path": "classify/sargent-tyrol.json",
+     "sha256": "adee283969a056cb003891687f37c3d64953a3d79664fad8c2106ac25fae3b2c",
+     "bytes": 2215
+    },
+    {
+     "role": "drawing picture",
+     "path": "guides/sargent-tyrol-layin.png",
+     "sha256": "d1cf1394bc01773c3df18a8dea490609db8cca2e01f72bb82f1f133bdc8473f5",
+     "made": {
+      "prompt": "l1",
+      "seed": "7",
+      "steps": "8",
+      "host": "this Mac (mflux 8-bit MLX, Lightning 8-step LoRA; made locally with guides/tools/qwen_local_prep.py, not on a pod; bf16 on the pod for the older subjects)",
+      "chosenFrom": "guides/sargent-tyrol-layin-l1L8-s7.png",
+      "record": "guides/tools/qwen-local-water-fan-tyrol.log:211"
+     },
+     "bytes": 6947585
+    },
+    {
+     "role": "drawing vectors",
+     "path": "replay/vectors/sargent-tyrol-std-layin-v2-lines.json",
+     "sha256": "2592402fc7b4ec216038bf5a3f8831c7acad37dd5bea851bf32b8901aa133163",
+     "bytes": 2155476
+    },
+    {
+     "role": "drawing vectors",
+     "path": "replay/vectors/sargent-tyrol-std-layin-v2-vectors.json",
+     "sha256": "2ad651e37051c2c2541119740f8bff294cf18d55efae2af1c8f054bbd15c8c13",
+     "bytes": 29488824
+    },
+    {
+     "role": "line map",
+     "path": "classify/sargent-tyrol-linemap.png",
+     "sha256": "2edb9df74d0ec590ab9d99ddc89d1eeff27211f1e2023c725026e789ca5f6811",
+     "bytes": 6800
+    },
+    {
+     "role": "study 1",
+     "path": "studies/sargent-tyrol-study-s3L8.png",
+     "sha256": "0c2356d69dfb7f83b2f5a11e5c118077aecfbcbd2af82962ce271587fad693a1",
+     "made": {
+      "prompt": "s3",
+      "seed": "42",
+      "steps": "8",
+      "host": "this Mac (mflux 8-bit MLX, Lightning 8-step LoRA; made locally with guides/tools/qwen_local_prep.py, not on a pod; bf16 on the pod for the older subjects)",
+      "record": "guides/tools/qwen-local-water-fan-tyrol.log:175"
+     },
+     "bytes": 2252713
+    },
+    {
+     "role": "study 2",
+     "path": "studies/sargent-tyrol-study-s1L8.png",
+     "sha256": "b7451958e488e9a94bf39aa76031973faff3eee985479ad7456d1e01fdcbe9b1",
+     "made": {
+      "prompt": "s1",
+      "seed": "42",
+      "steps": "8",
+      "host": "this Mac (mflux 8-bit MLX, Lightning 8-step LoRA; made locally with guides/tools/qwen_local_prep.py, not on a pod; bf16 on the pod for the older subjects)",
+      "record": "guides/tools/qwen-local-water-fan-tyrol.log:187"
+     },
+     "bytes": 7718992
+    },
+    {
+     "role": "study 3",
+     "path": "studies/sargent-tyrol-study-s4L8.png",
+     "sha256": "a38e1f0985e625f1c4147170b510dc57c48488cfbf100dbd1d59c6b03ff30117",
+     "made": {
+      "prompt": "s4",
+      "seed": "42",
+      "steps": "8",
+      "host": "this Mac (mflux 8-bit MLX, Lightning 8-step LoRA; made locally with guides/tools/qwen_local_prep.py, not on a pod; bf16 on the pod for the older subjects)",
+      "record": "guides/tools/qwen-local-water-fan-tyrol.log:199"
+     },
+     "bytes": 8386540
+    },
+    {
+     "role": "labels",
+     "path": "labels/sargent-tyrol.json",
+     "sha256": "ae4702273d7eb3560f9036568e4fff74c1723a127ea51eb07501cd1fbc8bcaa4",
+     "bytes": 4175
+    },
+    {
+     "role": "named forms",
+     "path": "named-forms/sargent-tyrol/receipt.json",
+     "sha256": "787f1b17d174b9095ad29cc706ff0fc6d9fc5aaf4850b315e7db978b715180fb",
+     "bytes": 2053
+    },
+    {
+     "role": "named forms",
+     "path": "named-forms/sargent-tyrol/named-sam.png",
+     "sha256": "a706f350dec998ccb9677bb476a84dc84cf9090bf348e807686f4e5a9fdb6873",
+     "bytes": 86170
+    },
+    {
+     "role": "named forms",
+     "path": "named-forms/sargent-tyrol/labels.json",
+     "sha256": "10155485d1d3db5cf32ad1bc10a3d8adf9620f86de1f70500ebef39acf3624ea",
+     "bytes": 2149
+    }
+   ]
+  },
+  {
+   "id": "ender-mountain-valley-qs",
+   "title": "Ender, Mountain Valley",
+   "registered": false,
+   "listedFrom": "ender-mountain-valley",
+   "inputId": "ender-mountain-valley",
+   "underRule": false,
+   "sheet": {
+    "rule": "as registered, before the one-area rule",
+    "widthMm": 380.12,
+    "heightMm": 277.94,
+    "cellsAcross": 1462
+   },
+   "sourcePx": [
+    3437,
+    2512
+   ],
+   "studySeed": {
+    "chosen": null,
+    "final": false,
+    "seedsMade": [
+     42
+    ],
+    "why": null,
+    "rule": "the auditor's rule (segaudit/pick.py): studies are made at seeds 42, 7 and 11; the seed whose s3/s1/s4 colours and values are closest to the picture (dE10, false whites, false darks) is used"
+   },
+   "prepared": false,
+   "absent": [
+    "drawing picture: guides/ender-mountain-valley-layin.png is not on disk",
+    "drawing vectors: replay/vectors/ender-mountain-valley-std-layin-lines.json is not on disk",
+    "drawing vectors: replay/vectors/ender-mountain-valley-std-layin-vectors.json is not on disk",
+    "study 1: studies/ender-mountain-valley-study-s3L8.png is on disk but not pinned in the subject list",
+    "study 2: studies/ender-mountain-valley-study-s1L8.png is on disk but not pinned in the subject list",
+    "study 3: studies/ender-mountain-valley-study-s4L8.png is on disk but not pinned in the subject list",
+    "labels: labels/ender-mountain-valley.json is on disk but not pinned in the subject list",
+    "named forms: named-forms/ender-mountain-valley/receipt.json is not on disk",
+    "named forms: named-forms/ender-mountain-valley/named-sam.png is not on disk",
+    "named forms: named-forms/ender-mountain-valley/labels.json is not on disk",
+    "the study seed is not final (pending (no entry in segaudit/seed-choice.json; seed 42 is NOT a default))",
+    "not registered under the sheet rule: listed from the earlier registration ender-mountain-valley"
+   ],
+   "files": [
+    {
+     "role": "source",
+     "path": "studio/img/ender-mountain-valley.jpg",
+     "sha256": "3cd7f61165d964e23a86211524b1f55540435e68c0aefec6e327c37c68a820d7",
+     "bytes": 2554066
+    },
+    {
+     "role": "line classification",
+     "path": "classify/ender-mountain-valley.json",
+     "sha256": "79636102e387b46f9b829d84038947b489ac38cda700076b78e70f67d43272e6",
+     "bytes": 2199
+    },
+    {
+     "role": "drawing picture",
+     "path": "guides/ender-mountain-valley-layin.png",
+     "sha256": null,
+     "bytes": null,
+     "absent": true
+    },
+    {
+     "role": "drawing vectors",
+     "path": "replay/vectors/ender-mountain-valley-std-layin-lines.json",
+     "sha256": null,
+     "bytes": null,
+     "absent": true
+    },
+    {
+     "role": "drawing vectors",
+     "path": "replay/vectors/ender-mountain-valley-std-layin-vectors.json",
+     "sha256": null,
+     "bytes": null,
+     "absent": true
+    },
+    {
+     "role": "line map",
+     "path": "classify/ender-mountain-valley-linemap.png",
+     "sha256": "0505ccd28ba34628e7bd9b99df4e0eb3fc97cdea9b5c58039dea51472d5316e3",
+     "bytes": 7494
+    },
+    {
+     "role": "study 1",
+     "path": "studies/ender-mountain-valley-study-s3L8.png",
+     "sha256": "926a014a8c5bd36ca60d9b137bfb2fa5a727d2618cfb17149c74dadcece5ed7e",
+     "bytes": 2753008
+    },
+    {
+     "role": "study 2",
+     "path": "studies/ender-mountain-valley-study-s1L8.png",
+     "sha256": "ccdae475390223dbea5c8f0eaa5ec58607df27911588e2dc25be7fc11ca0783d",
+     "bytes": 7131548
+    },
+    {
+     "role": "study 3",
+     "path": "studies/ender-mountain-valley-study-s4L8.png",
+     "sha256": "b4043f1968583fd8649122fd807dfa9498103411176b55201840f591b50c5535",
+     "bytes": 8445009
+    },
+    {
+     "role": "labels",
+     "path": "labels/ender-mountain-valley.json",
+     "sha256": "d57e27d9f9071518ef81011f7904a2eeca76209f412b130955196de4d26b4c07",
+     "bytes": 3818
+    },
+    {
+     "role": "named forms",
+     "path": "named-forms/ender-mountain-valley/receipt.json",
+     "sha256": null,
+     "unpinnedInRegistry": true,
+     "bytes": null,
+     "absent": true
+    },
+    {
+     "role": "named forms",
+     "path": "named-forms/ender-mountain-valley/named-sam.png",
+     "sha256": null,
+     "unpinnedInRegistry": true,
+     "bytes": null,
+     "absent": true
+    },
+    {
+     "role": "named forms",
+     "path": "named-forms/ender-mountain-valley/labels.json",
+     "sha256": null,
+     "unpinnedInRegistry": true,
+     "bytes": null,
+     "absent": true
+    }
+   ]
+  },
+  {
+   "id": "white-ships-1488-qs",
+   "title": "Sargent, White Ships",
+   "registered": false,
+   "listedFrom": "white-ships-1488",
+   "inputId": "white-ships-1488",
+   "underRule": false,
+   "sheet": {
+    "rule": "as registered, before the one-area rule",
+    "widthMm": 380.12,
+    "heightMm": 270.14,
+    "cellsAcross": 1462
+   },
+   "sourcePx": [
+    1488,
+    1057
+   ],
+   "studySeed": {
+    "chosen": null,
+    "final": false,
+    "seedsMade": [],
+    "why": null,
+    "rule": "the auditor's rule (segaudit/pick.py): studies are made at seeds 42, 7 and 11; the seed whose s3/s1/s4 colours and values are closest to the picture (dE10, false whites, false darks) is used"
+   },
+   "prepared": false,
+   "absent": [
+    "drawing picture: guides/white-ships-1488-layin.png is not on disk",
+    "drawing vectors: replay/vectors/white-ships-1488-std-layin-lines.json is not on disk",
+    "drawing vectors: replay/vectors/white-ships-1488-std-layin-vectors.json is not on disk",
+    "study 1: studies/white-ships-1488-study-s3L8.png is not on disk",
+    "study 2: studies/white-ships-1488-study-s1L8.png is not on disk",
+    "study 3: studies/white-ships-1488-study-s4L8.png is not on disk",
+    "labels: labels/white-ships-1488.json is not on disk",
+    "named forms: named-forms/white-ships-1488/receipt.json is not on disk",
+    "named forms: named-forms/white-ships-1488/named-sam.png is not on disk",
+    "named forms: named-forms/white-ships-1488/labels.json is not on disk",
+    "the study seed is not final (pending (no entry in segaudit/seed-choice.json; seed 42 is NOT a default))",
+    "not registered under the sheet rule: listed from the earlier registration white-ships-1488"
+   ],
+   "files": [
+    {
+     "role": "source",
+     "path": "studio/img/white-ships-1488.jpg",
+     "sha256": "9049016f7929f49a78a15082ada6d73282c9ceaa12cfce93618c34ef0c7c3b77",
+     "bytes": 818448
+    },
+    {
+     "role": "line classification",
+     "path": "classify/white-ships-1488.json",
+     "sha256": "4d6f275d8260d9a1c0fccb52d08442482ffe8f523708a61d5cef1ead036e445a",
+     "bytes": 2245
+    },
+    {
+     "role": "drawing picture",
+     "path": "guides/white-ships-1488-layin.png",
+     "sha256": null,
+     "bytes": null,
+     "absent": true
+    },
+    {
+     "role": "drawing vectors",
+     "path": "replay/vectors/white-ships-1488-std-layin-lines.json",
+     "sha256": null,
+     "bytes": null,
+     "absent": true
+    },
+    {
+     "role": "drawing vectors",
+     "path": "replay/vectors/white-ships-1488-std-layin-vectors.json",
+     "sha256": null,
+     "bytes": null,
+     "absent": true
+    },
+    {
+     "role": "line map",
+     "path": "classify/white-ships-1488-linemap.png",
+     "sha256": "1e444a24affd18ddb2ab0d94949ce09753882c060f4ab08cdfbf598e40859619",
+     "bytes": 11730
+    },
+    {
+     "role": "study 1",
+     "path": "studies/white-ships-1488-study-s3L8.png",
+     "sha256": null,
+     "bytes": null,
+     "absent": true
+    },
+    {
+     "role": "study 2",
+     "path": "studies/white-ships-1488-study-s1L8.png",
+     "sha256": null,
+     "bytes": null,
+     "absent": true
+    },
+    {
+     "role": "study 3",
+     "path": "studies/white-ships-1488-study-s4L8.png",
+     "sha256": null,
+     "bytes": null,
+     "absent": true
+    },
+    {
+     "role": "labels",
+     "path": "labels/white-ships-1488.json",
+     "sha256": null,
+     "bytes": null,
+     "absent": true
+    },
+    {
+     "role": "named forms",
+     "path": "named-forms/white-ships-1488/receipt.json",
+     "sha256": null,
+     "unpinnedInRegistry": true,
+     "bytes": null,
+     "absent": true
+    },
+    {
+     "role": "named forms",
+     "path": "named-forms/white-ships-1488/named-sam.png",
+     "sha256": null,
+     "unpinnedInRegistry": true,
+     "bytes": null,
+     "absent": true
+    },
+    {
+     "role": "named forms",
+     "path": "named-forms/white-ships-1488/labels.json",
+     "sha256": null,
+     "unpinnedInRegistry": true,
+     "bytes": null,
+     "absent": true
+    }
+   ]
+  },
+  {
+   "id": "morisot-avenue-du-bois-qs",
+   "title": "Morisot, A Woman Seated at a Bench on the Avenue du Bois",
+   "registered": false,
+   "listedFrom": "morisot-avenue-du-bois",
+   "inputId": "morisot-avenue-du-bois",
+   "underRule": false,
+   "sheet": {
+    "rule": "as registered, before the one-area rule",
+    "widthMm": 380.12,
+    "heightMm": 350.48,
+    "cellsAcross": 1462
+   },
+   "sourcePx": [
+    3193,
+    2943
+   ],
+   "studySeed": {
+    "chosen": null,
+    "final": false,
+    "seedsMade": [],
+    "why": null,
+    "rule": "the auditor's rule (segaudit/pick.py): studies are made at seeds 42, 7 and 11; the seed whose s3/s1/s4 colours and values are closest to the picture (dE10, false whites, false darks) is used"
+   },
+   "prepared": false,
+   "absent": [
+    "drawing picture: guides/morisot-avenue-du-bois-layin.png is not on disk",
+    "drawing vectors: replay/vectors/morisot-avenue-du-bois-std-layin-lines.json is not on disk",
+    "drawing vectors: replay/vectors/morisot-avenue-du-bois-std-layin-vectors.json is not on disk",
+    "study 1: studies/morisot-avenue-du-bois-study-s3L8.png is not on disk",
+    "study 2: studies/morisot-avenue-du-bois-study-s1L8.png is not on disk",
+    "study 3: studies/morisot-avenue-du-bois-study-s4L8.png is not on disk",
+    "labels: labels/morisot-avenue-du-bois.json is not on disk",
+    "named forms: named-forms/morisot-avenue-du-bois/receipt.json is not on disk",
+    "named forms: named-forms/morisot-avenue-du-bois/named-sam.png is not on disk",
+    "named forms: named-forms/morisot-avenue-du-bois/labels.json is not on disk",
+    "the study seed is not final (pending (no entry in segaudit/seed-choice.json; seed 42 is NOT a default))",
+    "not registered under the sheet rule: listed from the earlier registration morisot-avenue-du-bois"
+   ],
+   "files": [
+    {
+     "role": "source",
+     "path": "studio/img/morisot-avenue-du-bois.jpg",
+     "sha256": "823d5f24f77ddf48ebb708ec2cbd92d8de6dbca2a90fef8bf3130b42913feafe",
+     "bytes": 2466622
+    },
+    {
+     "role": "line classification",
+     "path": "classify/morisot-avenue-du-bois.json",
+     "sha256": "57ff6f1223e02f5c8e49a511df2a06cd63e33ad2105b5c8cf7d8562143b6aeeb",
+     "bytes": 2103
+    },
+    {
+     "role": "drawing picture",
+     "path": "guides/morisot-avenue-du-bois-layin.png",
+     "sha256": null,
+     "bytes": null,
+     "absent": true
+    },
+    {
+     "role": "drawing vectors",
+     "path": "replay/vectors/morisot-avenue-du-bois-std-layin-lines.json",
+     "sha256": null,
+     "bytes": null,
+     "absent": true
+    },
+    {
+     "role": "drawing vectors",
+     "path": "replay/vectors/morisot-avenue-du-bois-std-layin-vectors.json",
+     "sha256": null,
+     "bytes": null,
+     "absent": true
+    },
+    {
+     "role": "line map",
+     "path": "classify/morisot-avenue-du-bois-linemap.png",
+     "sha256": "e7b651fa365607827df84065b2516394dcf8b436320141a1390161bbeda27213",
+     "bytes": 11391
+    },
+    {
+     "role": "study 1",
+     "path": "studies/morisot-avenue-du-bois-study-s3L8.png",
+     "sha256": null,
+     "bytes": null,
+     "absent": true
+    },
+    {
+     "role": "study 2",
+     "path": "studies/morisot-avenue-du-bois-study-s1L8.png",
+     "sha256": null,
+     "bytes": null,
+     "absent": true
+    },
+    {
+     "role": "study 3",
+     "path": "studies/morisot-avenue-du-bois-study-s4L8.png",
+     "sha256": null,
+     "bytes": null,
+     "absent": true
+    },
+    {
+     "role": "labels",
+     "path": "labels/morisot-avenue-du-bois.json",
+     "sha256": null,
+     "bytes": null,
+     "absent": true
+    },
+    {
+     "role": "named forms",
+     "path": "named-forms/morisot-avenue-du-bois/receipt.json",
+     "sha256": null,
+     "unpinnedInRegistry": true,
+     "bytes": null,
+     "absent": true
+    },
+    {
+     "role": "named forms",
+     "path": "named-forms/morisot-avenue-du-bois/named-sam.png",
+     "sha256": null,
+     "unpinnedInRegistry": true,
+     "bytes": null,
+     "absent": true
+    },
+    {
+     "role": "named forms",
+     "path": "named-forms/morisot-avenue-du-bois/labels.json",
+     "sha256": null,
+     "unpinnedInRegistry": true,
+     "bytes": null,
+     "absent": true
+    }
+   ]
+  },
+  {
+   "id": "cezanne-bathers-bridge-qs",
+   "title": "Cezanne, Bathers Under a Bridge",
+   "registered": false,
+   "listedFrom": "cezanne-bathers-bridge",
+   "inputId": "cezanne-bathers-bridge",
+   "underRule": false,
+   "sheet": {
+    "rule": "as registered, before the one-area rule",
+    "widthMm": 380.12,
+    "heightMm": 294.06,
+    "cellsAcross": 1462
+   },
+   "sourcePx": [
+    3859,
+    2984
+   ],
+   "studySeed": {
+    "chosen": null,
+    "final": false,
+    "seedsMade": [],
+    "why": null,
+    "rule": "the auditor's rule (segaudit/pick.py): studies are made at seeds 42, 7 and 11; the seed whose s3/s1/s4 colours and values are closest to the picture (dE10, false whites, false darks) is used"
+   },
+   "prepared": false,
+   "absent": [
+    "drawing picture: guides/cezanne-bathers-bridge-layin.png is not on disk",
+    "drawing vectors: replay/vectors/cezanne-bathers-bridge-std-layin-lines.json is not on disk",
+    "drawing vectors: replay/vectors/cezanne-bathers-bridge-std-layin-vectors.json is not on disk",
+    "study 1: studies/cezanne-bathers-bridge-study-s3L8.png is not on disk",
+    "study 2: studies/cezanne-bathers-bridge-study-s1L8.png is not on disk",
+    "study 3: studies/cezanne-bathers-bridge-study-s4L8.png is not on disk",
+    "labels: labels/cezanne-bathers-bridge.json is not on disk",
+    "named forms: named-forms/cezanne-bathers-bridge/receipt.json is not on disk",
+    "named forms: named-forms/cezanne-bathers-bridge/named-sam.png is not on disk",
+    "named forms: named-forms/cezanne-bathers-bridge/labels.json is not on disk",
+    "the study seed is not final (pending (no entry in segaudit/seed-choice.json; seed 42 is NOT a default))",
+    "not registered under the sheet rule: listed from the earlier registration cezanne-bathers-bridge"
+   ],
+   "files": [
+    {
+     "role": "source",
+     "path": "studio/img/cezanne-bathers-bridge.jpg",
+     "sha256": "d35ae8c02f04123816320afcd5a0ec8d5d46b3b6ba731f6707e52ec24ef1a143",
+     "bytes": 3621380
+    },
+    {
+     "role": "line classification",
+     "path": "classify/cezanne-bathers-bridge.json",
+     "sha256": "87e48d9022ba90cb3bba654f258af051705ca13ed1bdaaaf0b7d5c0362d884ba",
+     "bytes": 2203
+    },
+    {
+     "role": "drawing picture",
+     "path": "guides/cezanne-bathers-bridge-layin.png",
+     "sha256": null,
+     "bytes": null,
+     "absent": true
+    },
+    {
+     "role": "drawing vectors",
+     "path": "replay/vectors/cezanne-bathers-bridge-std-layin-lines.json",
+     "sha256": null,
+     "bytes": null,
+     "absent": true
+    },
+    {
+     "role": "drawing vectors",
+     "path": "replay/vectors/cezanne-bathers-bridge-std-layin-vectors.json",
+     "sha256": null,
+     "bytes": null,
+     "absent": true
+    },
+    {
+     "role": "line map",
+     "path": "classify/cezanne-bathers-bridge-linemap.png",
+     "sha256": "d8ee0321d6015764eb0cf3fada662277521c2b019dd4b2d0fe31fe17346aab34",
+     "bytes": 11324
+    },
+    {
+     "role": "study 1",
+     "path": "studies/cezanne-bathers-bridge-study-s3L8.png",
+     "sha256": null,
+     "bytes": null,
+     "absent": true
+    },
+    {
+     "role": "study 2",
+     "path": "studies/cezanne-bathers-bridge-study-s1L8.png",
+     "sha256": null,
+     "bytes": null,
+     "absent": true
+    },
+    {
+     "role": "study 3",
+     "path": "studies/cezanne-bathers-bridge-study-s4L8.png",
+     "sha256": null,
+     "bytes": null,
+     "absent": true
+    },
+    {
+     "role": "labels",
+     "path": "labels/cezanne-bathers-bridge.json",
+     "sha256": null,
+     "bytes": null,
+     "absent": true
+    },
+    {
+     "role": "named forms",
+     "path": "named-forms/cezanne-bathers-bridge/receipt.json",
+     "sha256": null,
+     "unpinnedInRegistry": true,
+     "bytes": null,
+     "absent": true
+    },
+    {
+     "role": "named forms",
+     "path": "named-forms/cezanne-bathers-bridge/named-sam.png",
+     "sha256": null,
+     "unpinnedInRegistry": true,
+     "bytes": null,
+     "absent": true
+    },
+    {
+     "role": "named forms",
+     "path": "named-forms/cezanne-bathers-bridge/labels.json",
+     "sha256": null,
+     "unpinnedInRegistry": true,
+     "bytes": null,
+     "absent": true
+    }
+   ]
+  },
+  {
+   "id": "mittens-closeup-qs",
+   "title": "Mittens, close-up",
+   "registered": false,
+   "listedFrom": "mittens-closeup",
+   "inputId": "mittens-closeup-v2",
+   "underRule": false,
+   "sheet": {
+    "rule": "as registered, before the one-area rule",
+    "widthMm": 282.36,
+    "heightMm": 376.48,
+    "cellsAcross": 1086
+   },
+   "sourcePx": [
+    1086,
+    1448
+   ],
+   "studySeed": {
+    "chosen": 11,
+    "final": true,
+    "seedsMade": [
+     7,
+     11,
+     42
+    ],
+    "why": "automatic rule (segaudit/pick.py), lowest penalty of the candidate sets (42=27.39, 7=9.43, 11=7.79, 42-strict=48.38, 7-strict=24.32, 11-strict=37.85 rejected: s3L8, 42-astra=55.74 rejected: s3L8; s3L8 not a block-in (flat share 0.26 against the picture's 0.27), 7-astra=28.7 rejected: s3L8; s3L8 not a block-in (flat share 0.27 against the picture's 0.27), 11-astra=37.8 rejected: s3L8; s3L8 not a block-in (flat share 0.30 against the picture's 0.27), 42-astra-m=22.37, 7-astra-m=5.74 rejected: s3L8 not a block-in (flat share 0.44 against the picture's 0.27), 11-astra-m=3.16 rejected: s3L8 not a block-in (flat share 0.38 against the picture's 0.27), 42-strict-n=39.02, 7-strict-n=18.33, 11-strict-n=19.02); judged on its source",
+    "rule": "the auditor's rule (segaudit/pick.py): studies are made at seeds 42, 7 and 11; the seed whose s3/s1/s4 colours and values are closest to the picture (dE10, false whites, false darks) is used"
+   },
+   "prepared": false,
+   "absent": [
+    "not registered under the sheet rule: listed from the earlier registration mittens-closeup"
+   ],
+   "files": [
+    {
+     "role": "source",
+     "path": "handoff/sources/mittens-closeup.png",
+     "sha256": "d9161317fee220f76f008a2b62599ad1c215ceff5f7d16883480a52bef0d931b",
+     "bytes": 2683907
+    },
+    {
+     "role": "line classification",
+     "path": "classify/mittens-closeup-v2.json",
+     "sha256": "ff21c99b388107db86b44a51900d5afa0e6bdddd45e50735a14d8e91b835e98c",
+     "bytes": 5366
+    },
+    {
+     "role": "drawing picture",
+     "path": "guides/mittens-closeup-v2-layin.png",
+     "sha256": "43e75ee70712e00729a7f41a9a5ef47bb63cc45ce3b873e4c88a612a22fdb9b0",
+     "made": {
+      "prompt": "l1",
+      "seed": "7",
+      "steps": "8",
+      "host": "RunPod (H100, diffusers bf16, Lightning 8-step LoRA fused)",
+      "chosenFrom": "guides/mittens-closeup-v2-layin-l1L8-s7.png",
+      "record": "guides/tools/qwen-runpod.log:456"
+     },
+     "bytes": 3381344
+    },
+    {
+     "role": "drawing vectors",
+     "path": "replay/vectors/mittens-closeup-v2-std-layin-lines.json",
+     "sha256": "0a7603da286bafab66517d85db78ac5b81d8276a43d6b7674a968ad95211b952",
+     "bytes": 1371416
+    },
+    {
+     "role": "drawing vectors",
+     "path": "replay/vectors/mittens-closeup-v2-std-layin-vectors.json",
+     "sha256": "cde05ea2483d80c02b5f5e0ebc27346231140544de08efb24b73cc26467384a5",
+     "bytes": 28424579
+    },
+    {
+     "role": "line map",
+     "path": "classify/mittens-closeup-v2-linemap.png",
+     "sha256": "6aac61675d9b19b3abd7d994eddce1781efc44cc0c803e7c217b8c3173b3467b",
+     "bytes": 5693
+    },
+    {
+     "role": "study 1",
+     "path": "studies/mittens-closeup-v2-study-s3L8-s11.png",
+     "sha256": "b253187db469e54726f75cf3b552e86b9bc7de6156d4bea083fe88191b923a4f",
+     "made": {
+      "prompt": "s3",
+      "seed": "11",
+      "steps": "8",
+      "host": "RunPod (H100, diffusers bf16, Lightning 8-step LoRA fused)",
+      "record": "guides/tools/qwen-runpod.log:457"
+     },
+     "bytes": 1104021
+    },
+    {
+     "role": "study 2",
+     "path": "studies/mittens-closeup-v2-study-s1L8-s11.png",
+     "sha256": "2c89d7269a47d3e490637184e9c4f3e0ff15683ef060b0c72c0a925ba42aaff5",
+     "made": {
+      "prompt": "s1",
+      "seed": "11",
+      "steps": "8",
+      "host": "RunPod (H100, diffusers bf16, Lightning 8-step LoRA fused)",
+      "record": "guides/tools/qwen-runpod.log:458"
+     },
+     "bytes": 1544861
+    },
+    {
+     "role": "study 3",
+     "path": "studies/mittens-closeup-v2-study-s4L8-s11.png",
+     "sha256": "d12d92f090f87f89cf248a6e49c933fd1c4eb76fafef73cc439cd90b4568247c",
+     "made": {
+      "prompt": "s4",
+      "seed": "11",
+      "steps": "8",
+      "host": "RunPod (H100, diffusers bf16, Lightning 8-step LoRA fused)",
+      "record": "guides/tools/qwen-runpod.log:459"
+     },
+     "bytes": 1651468
+    },
+    {
+     "role": "labels",
+     "path": "labels/mittens-closeup-v2.json",
+     "sha256": "4fdc2dd0ada207c57a53fae8425fe70da85c9acc79108f41313999b33b5d4ff8",
+     "bytes": 3246
+    },
+    {
+     "role": "named forms",
+     "path": "named-forms/mittens-closeup/receipt.json",
+     "sha256": "e3d3a9fcef5ddac09766e13757234347e863fff8dde56a6f5742ebf0d7486d1f",
+     "bytes": 2062
+    },
+    {
+     "role": "named forms",
+     "path": "named-forms/mittens-closeup/named-sam.png",
+     "sha256": "fced4520aa36a17a74e55bad199cb901eec3570c04b5ecc15f5d6b0490937367",
+     "bytes": 28198
+    },
+    {
+     "role": "named forms",
+     "path": "named-forms/mittens-closeup/labels.json",
+     "sha256": "0d6821d4b906f6f60b4fb2d1b415004566a2a331f98fa595741ec558733a2126",
+     "bytes": 3369
+    }
+   ]
+  },
+  {
+   "id": "kasha-portrait-qs",
+   "title": "Kasha portrait",
+   "registered": false,
+   "listedFrom": "kasha-portrait",
+   "inputId": "kasha-portrait",
+   "underRule": false,
+   "sheet": {
+    "rule": "as registered, before the one-area rule",
+    "widthMm": 232.96,
+    "heightMm": 312,
+    "cellsAcross": 896
+   },
+   "sourcePx": [
+    896,
+    1200
+   ],
+   "studySeed": {
+    "chosen": 11,
+    "final": true,
+    "seedsMade": [
+     7,
+     11,
+     42
+    ],
+    "why": "automatic rule (segaudit/pick.py), lowest penalty of the seed sets (42=10.38, 7=13.55, 11=9.99); judged on the whole picture",
+    "rule": "the auditor's rule (segaudit/pick.py): studies are made at seeds 42, 7 and 11; the seed whose s3/s1/s4 colours and values are closest to the picture (dE10, false whites, false darks) is used"
+   },
+   "prepared": false,
+   "absent": [
+    "line classification: classify/kasha-portrait.json is not the file the subject list pins (0dc6d6c5faf4, pinned 029922c88f7a)",
+    "not registered under the sheet rule: listed from the earlier registration kasha-portrait"
+   ],
+   "files": [
+    {
+     "role": "source",
+     "path": "handoff/sources/kasha-portrait.jpg",
+     "sha256": "a6f09ee35893bd30fd0830b89ec0be0c9488bb327848df70acf48c13b79e68bc",
+     "bytes": 882419
+    },
+    {
+     "role": "line classification",
+     "path": "classify/kasha-portrait.json",
+     "sha256": "0dc6d6c5faf4e7f425757414409bd393e6f60dfd8b95393a4f6d889bd12b516b",
+     "bytes": 5043
+    },
+    {
+     "role": "drawing picture",
+     "path": "guides/kasha-portrait-inkprep.png",
+     "sha256": "9ccb42945531096b737990832c3e2cebcd875ec5a51c346c621539e419cc4f8c",
+     "made": {
+      "prompt": "e6",
+      "seed": "11",
+      "steps": "8",
+      "host": "RunPod (H100, diffusers bf16, Lightning 8-step LoRA fused)",
+      "chosenFrom": "guides/kasha-portrait-inkprep-e6L8-s11.png",
+      "record": "guides/tools/qwen-runpod.log:153"
+     },
+     "bytes": 4637042
+    },
+    {
+     "role": "drawing vectors",
+     "path": "replay/vectors/kasha-portrait-std-ink-v3-lines.json",
+     "sha256": "36c42b5a077f06fcc86a302fe08e9e203ede3de984db1b5eaf4f0c969c90c93a",
+     "bytes": 7341355
+    },
+    {
+     "role": "drawing vectors",
+     "path": "replay/vectors/kasha-portrait-std-ink-v3-vectors.json",
+     "sha256": "e965ce59b57bfd50c1a1f0a67417c3c47dde768d63d355f79d2acecfa28802a9",
+     "bytes": 71400312
+    },
+    {
+     "role": "line map",
+     "path": "classify/kasha-portrait-linemap.png",
+     "sha256": "ff905cecc6a6130797ed8422290d932e6179be5d13e7157c909b06948dc69dfb",
+     "bytes": 7549
+    },
+    {
+     "role": "study 1",
+     "path": "studies/kasha-portrait-study-s3L8-s11.png",
+     "sha256": "b984d4649742abcb9a778edc7b9aca2962e36741d6b92a9dfe7b4e04852c1f1e",
+     "made": {
+      "prompt": "s3",
+      "seed": "11",
+      "steps": "8",
+      "host": "RunPod (H100, diffusers bf16, Lightning 8-step LoRA fused)",
+      "record": "guides/tools/qwen-runpod.log:157"
+     },
+     "bytes": 2032351
+    },
+    {
+     "role": "study 2",
+     "path": "studies/kasha-portrait-study-s1L8-s11.png",
+     "sha256": "05ef56aa38d4decf39b8cfc3c74f69909642ad10b3896866a7216fbeac4cb4e9",
+     "made": {
+      "prompt": "s1",
+      "seed": "11",
+      "steps": "8",
+      "host": "RunPod (H100, diffusers bf16, Lightning 8-step LoRA fused)",
+      "record": "guides/tools/qwen-runpod.log:160"
+     },
+     "bytes": 3662289
+    },
+    {
+     "role": "study 3",
+     "path": "studies/kasha-portrait-study-s4L8-s11.png",
+     "sha256": "f617ccaa23eea17db708f7ea80a4ab937354c979b429f8556b8a50ec59edc4ce",
+     "made": {
+      "prompt": "s4",
+      "seed": "11",
+      "steps": "8",
+      "host": "RunPod (H100, diffusers bf16, Lightning 8-step LoRA fused)",
+      "record": "guides/tools/qwen-runpod.log:163"
+     },
+     "bytes": 4497582
+    },
+    {
+     "role": "labels",
+     "path": "labels/kasha-portrait.json",
+     "sha256": "1c115bdcd97be12f616b75cdc2925863af2cf5d1c78f62de588377d34f1b1726",
+     "bytes": 2852
+    },
+    {
+     "role": "named forms",
+     "path": "named-forms/kasha-portrait/receipt.json",
+     "sha256": "c30865e5a11fac13e3a528d7d1aa92e9a822155099a677915ebddabd6adc26dc",
+     "bytes": 1692
+    },
+    {
+     "role": "named forms",
+     "path": "named-forms/kasha-portrait/named-sam.png",
+     "sha256": "34a9e91c2ac3d3c1f7139c307363ae8497b1314eea5f4efb87bb69064dc3c701",
+     "bytes": 17727
+    },
+    {
+     "role": "named forms",
+     "path": "named-forms/kasha-portrait/labels.json",
+     "sha256": "5dd04fd0934533ec7addf7d1aa9211a74aec5e8dec785e99e34ec4d10945f513",
+     "bytes": 970
+    }
+   ]
+  },
+  {
+   "id": "h36-qs",
+   "title": "Yale Rosewalk",
+   "registered": false,
+   "listedFrom": "h36",
+   "inputId": "h36",
+   "underRule": false,
+   "sheet": {
+    "rule": "as registered, before the one-area rule",
+    "widthMm": 380.12,
+    "heightMm": 253.5,
+    "cellsAcross": 1462
+   },
+   "sourcePx": [
+    1536,
+    1024
+   ],
+   "studySeed": {
+    "chosen": 42,
+    "final": true,
+    "seedsMade": [
+     7,
+     11,
+     42
+    ],
+    "why": "automatic rule (segaudit/pick.py), lowest penalty of the seed sets (42=12.5, 7=16.64, 11=15.28); judged on the whole picture",
+    "rule": "the auditor's rule (segaudit/pick.py): studies are made at seeds 42, 7 and 11; the seed whose s3/s1/s4 colours and values are closest to the picture (dE10, false whites, false darks) is used"
+   },
+   "prepared": false,
+   "absent": [
+    "line classification: classify/h36.json is not the file the subject list pins (416ea33b004b, pinned cad98a1205ff)",
+    "not registered under the sheet rule: listed from the earlier registration h36"
+   ],
+   "files": [
+    {
+     "role": "source",
+     "path": "handoff/sources/h36-artwork.png",
+     "sha256": "2744c78e1f5e9e7b153fe6dd34faae28a697a06c1767c7b2d680c6cdd288be50",
+     "bytes": 3686904
+    },
+    {
+     "role": "line classification",
+     "path": "classify/h36.json",
+     "sha256": "416ea33b004b689081f8d748390c314439238428c9f0aa5e86176146aadc326c",
+     "bytes": 8852
+    },
+    {
+     "role": "drawing picture",
+     "path": "guides/h36-inkprep.png",
+     "sha256": "4b7fb84345da1bb5f793bf57d763d87dc0d4c19f160587d05008ab187a2fe7a8",
+     "made": {
+      "prompt": "e6",
+      "seed": "42",
+      "steps": "8",
+      "host": "RunPod (H100 80GB SXM)",
+      "chosenFrom": "guides/h36-inkprep-e6L8.png",
+      "record": "guides/README.md:72-78 (run header; subject h36 named at :77; no per-file line)"
+     },
+     "bytes": 1933759
+    },
+    {
+     "role": "drawing vectors",
+     "path": "replay/vectors/h36-std-ink-v3-lines.json",
+     "sha256": "016c2c1392205b9d146620ef70cbfd5fee3fa4ff0e598465e615d34a897a1e5b",
+     "bytes": 4625431
+    },
+    {
+     "role": "drawing vectors",
+     "path": "replay/vectors/h36-std-ink-v3-vectors.json",
+     "sha256": "5847ede5fba088ea9fef0e9546d31d82e94f7a55a3055077dd397e213ffadfe4",
+     "bytes": 48571911
+    },
+    {
+     "role": "line map",
+     "path": "classify/h36-linemap.png",
+     "sha256": "438ddf4aca77630255722fdc1764ec1d82162b8d59c66cc3cd145c209f0e6a81",
+     "bytes": 5889
+    },
+    {
+     "role": "study 1",
+     "path": "studies/h36-study-s3L8.png",
+     "sha256": "e3d50a14cf5d3c7483436a65faddb3c316ff3d2b3dc20f28fa82407be47741db",
+     "made": {
+      "prompt": "s3",
+      "seed": "42 (run header, studies/README.md:3; not on the line)",
+      "steps": "8",
+      "host": "RunPod (studies/README.md:1, 19 Nov run)",
+      "record": "studies/run.log:49"
+     },
+     "bytes": 1099126
+    },
+    {
+     "role": "study 2",
+     "path": "studies/h36-study-s1L8.png",
+     "sha256": "85e4072ae606eecf4e66afcbf026b99cf28c0c208be0361ea61695c9fcdda11d",
+     "made": {
+      "prompt": "s1",
+      "seed": "42 (run header, studies/README.md:3; not on the line)",
+      "steps": "8",
+      "host": "RunPod (studies/README.md:1, 19 Nov run)",
+      "record": "studies/run.log:47"
+     },
+     "bytes": 1555923
+    },
+    {
+     "role": "study 3",
+     "path": "studies/h36-study-s4L8.png",
+     "sha256": "d41715e132f6f59b92884c6788ebdd68498bdc2f65b1bb9b2e1f4abb2b603eb3",
+     "made": {
+      "prompt": "s4",
+      "seed": "42 (run header, studies/README.md:3; not on the line)",
+      "steps": "8",
+      "host": "RunPod (studies/README.md:1, 19 Nov run)",
+      "record": "studies/run.log:50"
+     },
+     "bytes": 2569979
+    },
+    {
+     "role": "labels",
+     "path": "labels/h36.json",
+     "sha256": "ddacb60a783d64f51c82a3a3bff9c22f360343b0a42d8a5b15a484538e106c64",
+     "bytes": 7235
+    },
+    {
+     "role": "named forms",
+     "path": "named-forms/h36/receipt.json",
+     "sha256": "6aa3983ce8b595c2a482d9074e1e390c0de1a40d0e309721ae6f395d9bc29230",
+     "bytes": 4024
+    },
+    {
+     "role": "named forms",
+     "path": "named-forms/h36/named-sam.png",
+     "sha256": "b7e34adf15e36b4a7f4aecb0468c5933974509d55c40a8e768017b318e0b7138",
+     "bytes": 32484
+    },
+    {
+     "role": "named forms",
+     "path": "named-forms/h36/labels.json",
+     "sha256": "0d43994802d6344ce7abe3264f9744132e1236c936b2760882c43f3becf26998",
+     "bytes": 2980
+    }
+   ]
+  }
+ ],
+ "prepared": 0,
+ "of": 15,
+ "totalBytes": 523324518
+}

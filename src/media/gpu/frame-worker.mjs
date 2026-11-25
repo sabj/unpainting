@@ -6,6 +6,7 @@ import {startSpeedProfile} from '../../../tools/speed/profile.mjs';
 const speedProfile = startSpeedProfile(process.env.GPU_PROF === '1');
 let renderMs = 0;
 import path from 'node:path';
+import { encodeFrame } from '../frame-file.mjs';
 import { renderCells } from '../km.mjs';
 import { execution } from '../../eval/composite.mjs';
 import { gaussian } from '../../keyframes/density.mjs';
@@ -44,7 +45,7 @@ const settle = id => {
   const rgb = rendered.get(id), what = named.get(id);
   if (!rgb || !what) return;
   rendered.delete(id); named.delete(id);
-  if (what.name) writes.push(sharp(rgb, { raw: { width: outW, height: outH, channels: 3 } }).jpeg({ quality }).toFile(path.join(out, what.name)).then(() => { done++; }));
+  if (what.name) writes.push(encodeFrame(sharp(rgb, { raw: { width: outW, height: outH, channels: 3 } }), what.name, quality).toFile(path.join(out, what.name)).then(() => { done++; }));
   else { const paintedD = sheetDensity(rgb); marks.set(id, { pass: what.mark, numbers: execution(what.planD, paintedD, w, h, gaussian), paintedD }); done++; }
 };
 

@@ -1,10 +1,61 @@
 # unpaint-bench
 
-AI models paint five small targets, each a section of a larger image, with the simulator's brush and pen. In V1 to V3 each painting gets 2,500 strokes and about 15 minutes. In V4 and V5 the model plans each painting and the painter paints it, with 85 minutes of the model's own time per painting. Vision judges score the finished painting and the order it was painted in.
+AI models paint a picture with the simulator's brush and pen. Judges score how human the making looks and how good the painting is. Auto, the code planner alone, paints every picture too, and each model is measured against it.
 
-## Rounds
+## Pictures
 
-The benchmark has five rounds, V1 to V5, each with different tools or feedback. A try is one model session that paints the requested targets.
+Fifteen: four groups of three museum works and three made with an image generator. Core pictures are in bold.
+
+| Group | Pictures |
+|---|---|
+| Figural | **Manet, Morisot with a Fan** · Tiepolo, Bacchus and Ariadne · Homer, The Water Fan |
+| Architectural | **Prout, Laundresses before the Wasserturm** · Guardi, A Colonnade · Bonington, French Town |
+| Landscape | **Turner, The Fort of L'Esseillon** · Sargent, In Austrian Tyrol · Ender, Mountain Valley |
+| Abstract or loose | **Sargent, White Ships** · Morisot, Avenue du Bois · Cezanne, Bathers Under a Bridge |
+| Generated | **Mittens** · Kasha portrait · Yale Rosewalk |
+
+The five core pictures run Auto and levels 1 to 4; the other ten run Auto and level 2 ([run-sets.json](run-sets.json): `core` and `extended`). Museum, medium, size, rights and credit of each: [PICTURES.md](PICTURES.md).
+
+Every picture is painted whole on a quarter sheet's area (27.9 x 38.1 cm, 0.26 mm a cell) in its own proportions; Manet's Morisot with a Fan is the one crop. The model is told the original's real size ([real-sizes.json](real-sizes.json)) as a fact.
+
+## Levels
+
+Every level is one fresh session, handed no other level's result, so all levels and pictures can run at once. Each adds one thing.
+
+| Level | What the model is given | How it works |
+|---|---|---|
+| L1 | The picture, the [script format](../docs/painting-script.md) and painting tips | Fixed rounds |
+| L2 | L1 and the prepared inputs: the drawing, the three colour studies, the named forms, the studies' traced shapes. Nothing of Auto | Fixed rounds |
+| L3 | L2 and Auto's plan, to read, and Auto's finished painting, to improve on | Fixed rounds |
+| L4 | L3's inputs | An open session with a shell and tools |
+
+At every level the model hands in its own painting script, the budget is 3.0 look units, the session has 60 minutes on the clock, code may not read the picture's pixels, and no score or critique is shown. [Rules](docs/rules.md) has the detail; [scoring](docs/scoring.md) the judges.
+
+## Run it
+
+Set up as in [getting started](../docs/running.md#the-benchmarks-pictures): the inputs folder, `npm run doctor`, each model's command-line tool signed in. That page runs one picture by hand at each level. The scorer needs Python with `bench/scorer/requirements.txt` (`BENCH_SCORE_PYTHON` names it, else `python3`).
+
+```sh
+node tools/paint/run-sets.mjs core                           # every painting the set asks for; starts nothing
+npm run unpaint -- prepare core --pool local --jobs 3        # once a commit: Auto's plan, traced shapes and painting
+npm run unpaint -- benchmark --out work/bench-04 --set core --models neon-m,sonnet-m    # lists each session's command
+npm run unpaint -- benchmark --out work/bench-04 --set core --models neon-m,sonnet-m --start
+npm run unpaint -- status work/bench-04                      # sessions finished, failed, still running
+
+JUDGE_ROUTE=openrouter OPENROUTER_API_KEY=... npm run unpaint -- score work/bench-04 --out work/bench-04/scores
+npm run bench:summary04 -- work/bench-04/scores/results.json --set core
+```
+
+- Without `--models` the launcher runs the ten models of the roster in `run-sets.json`. `--levels` and `--pictures` narrow it.
+- `--start` needs a clean checkout and Auto's painting prepared at this commit. It starts every session at once, each in `work/bench-04/<model>-<picture>-<level>/`, and paints through the [render pool](../docs/running.md#more-than-one-machine): a Mac mini or rented pods (`--pool mini,pod`; `--with-pods` starts the renter). On one machine, run the listed commands one after another instead.
+- `score` writes the manifest of finished sessions and Auto's prepared paintings, then scores them into `--out`: `results.json` and `SCORES.md`. `JUDGE_ROUTE=local` (the default) reads with Ollama. `summary04` writes `SUMMARY.md`: every model's levels against Auto.
+- By hand, without the launcher: `npm run bench:score04 -- AUTO_RUN MODEL_RUN... --out DIR`.
+
+`npm run bench:test` tests the scorer and the run records. To add a picture see [preparing a picture](../tools/prepare/README.md); to add a model, [getting started](../docs/running.md#your-own-picture-and-your-own-model).
+
+## Older rounds
+
+V1 to V5 ran on releases 0.1 and 0.3 and are kept as a record: [older rounds](docs/older-rounds.md), [leaderboard](results/leaderboard.md), [gallery](results/gallery.md), [findings](results/FINDINGS.md). Their scores never share a table with 0.4.
 
 <!-- rounds-table:start -->
 | Round | What the model gets | Learns between tries | Winning painting (J1) |
@@ -15,60 +66,3 @@ The benchmark has five rounds, V1 to V5, each with different tools or feedback. 
 | V4 | The full painting pipeline | No | <a href="results/gallery.md"><img src="runs/v4-pipeline/argon/1/mittens.webp" width="96" alt="Gemini 4 Argon (High), mittens, 77.17% of target"></a> |
 | V5 | The full pipeline plus its own earlier tries | Yes | <a href="results/gallery.md"><img src="runs/v5-self-study/astra/3/mittens.webp" width="96" alt="Codex Astra, mittens, 84.13% of target"></a> |
 <!-- rounds-table:end -->
-
-V1 to V5 are published. V3 ran the Claude, Codex, Gemini 4 Argon and Muse models. V4 and V5 ran the Claude, Codex and Gemini 4 Argon models. Not every model ran every round. The [leaderboard](results/leaderboard.md) lists the tries each model ran. In V4 and V5 the first try is shared: V5 try 1 has no feedback yet, so it is also V4 try 1.
-
-## Subjects
-
-| Subject | Style | Target in the repo |
-|---|---|---|
-| Hills | Loose ink and wash | Yes, photo by Sam Jackson, see [NOTICE](../NOTICE) |
-| France | Pen and light wash | Yes, photo by Sam Jackson, see [NOTICE](../NOTICE) |
-| Ships | Watercolor after Sargent | Yes, public domain |
-| Mittens | Portrait sketch and light washes | Yes, photo by Sam Jackson, see [NOTICE](../NOTICE) |
-| Trumbull | Architectural watercolor | Yes, third-party photo credited in [NOTICE](../NOTICE) |
-
-V3 is compared on Hills, France and Ships. The 0.1.1 Muse V3 runs painted all five targets; their Mittens and Trumbull paintings are shown but not counted. V4 and V5 painted all five. One of the painter's preset recipes was tuned on Trumbull, so V4 and V5 Trumbull scores may run high. [Target sizes](crops/README.md) gives the physical scale.
-
-## Results
-
-All five rounds were painted with painter V096, sim 100 and judges J1, in releases 0.1.0 and 0.1.1. Each result is labelled with its round, painter version, sim version, judge version and release. To benchmark a newer painter or sim, rerun V4 or V5 with it; the new tries form their own group in that round. To reproduce, check out the tag a result names, `v0.1.0` or `v0.1.1`; [versions](../docs/versions.md) explains the scheme.
-
-- [Leaderboard](results/leaderboard.md): scores, intervals, cost and time per model and round
-- [Gallery](results/gallery.md): each model's best painting of each target, shown as its 10 to 100% stages
-- [Findings](results/FINDINGS.md): what changed between rounds
-
-## Method
-
-- [Rules](docs/rules.md): budget, materials and what a script may read
-- [Anti-cheat](docs/anti-cheat.md): the guard, a check that blocks target-pixel reads, and the cheat-risk score
-- [Scoring](docs/scoring.md) and [statistics](docs/statistics.md)
-- [Run format](docs/run-format.md): what each try records
-- [Protocol inputs](v2/README.md): toolkit, briefs, technique guides and runners; [V3](v3/README.md) and [V4 and V5](v4v5/README.md) add their own briefs
-- [Adding a model](docs/adding-a-model.md)
-
-## Reproduce
-
-You can rerun every round on your own machine, with the published briefs and rules. V4 and V5 use the checked-out painter: V102, sim 103 in release 0.3.0. Scores can differ from the published V096 runs. The plan's drawing section and explicit arguments control the drawing medium and order; explicit command-line arguments take precedence. Keep new runs under their actual painter, simulator and judge versions rather than rewriting historical results. A V3 session offers `--tries` attempts (default 3). The published sessions offered up to five.
-
-```sh
-npm run bench:test                                   # check every run record, that results/ regenerates unchanged, and dry runs of V3 to V5
-npm run bench:build                                  # rebuild results/ from runs/
-npm run bench:run -- --dry-run                       # a scripted painter runs V1, no keys needed
-npm run bench:run -- --dry-run --round V5            # a scripted planner runs V5 at a small size, no keys needed
-npm run bench:run -- --round V4 --model opus         # one model, one lite planning try on the five targets
-npm run bench:run -- --round V4 --model opus --profile full  # three full self-view tries
-```
-
-V5 try 1 reuses V4 try 1 (the same session).
-
-## Routine development benchmark
-
-`npm run bench:lite -- --plan` shows the offline allocation before any model calls.
-`npm run bench:lite -- --gpu off` runs all five targets with Astra, Sol, Opus, Sonnet, Argon-high and Gemini Flash.
-Use `--models all` or explicit keys such as `--models core,wonderfull,spark` to include other registered models.
-
-Lite is a separate planning screen: one five-minute plan per target, one harness check and render after the model exits,
-no automatic repairs, at most 540 native cells across, and J2-lite judging. Full mode keeps three tries and model
-self-view. Both preserve physical paper sizes, guards and all required stages. Their results are grouped separately;
-a cheap screen does not establish full-resolution painting quality. See [profiles and measurements](docs/profiles.md).

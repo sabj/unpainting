@@ -23,6 +23,14 @@ export function nativeDryOptions(mode, options) {
   return {...options, dt: Math.max(14, dt), analyticTail: true};
 }
 
+// Fast mode: between strokes' flows the GPU edge feed's geometry trails the moving outline by up to this many steps
+// (src/media/gpu/stepfull.mjs EF_STROKE_LAG), not remade at every step. Full mode and other callers: remade at once.
+export const FAST_EDGE_LAG = 16;
+export function nativeEdgeLagPolicy(mode) {
+  nativePaintMode(mode);
+  return { environmentVariable: 'GPU_EDGE_LAG', value: mode === 'fast' ? String(FAST_EDGE_LAG) : '0' };
+}
+
 // CLI policy only: generic GpuLink callers keep their own environment.
 export function nativeUploadPolicy(mode, explicit) {
   nativePaintMode(mode);

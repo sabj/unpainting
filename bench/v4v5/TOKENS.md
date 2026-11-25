@@ -1,8 +1,8 @@
 # Recipe tokens
 
-Base (always applied, under your tokens): `region_w13_lay4_sky3_cg13_rg10_blk60_bmm40_bka20_birr_skyb_cpp_dk13_pgreen_tp2`.
+Base (always applied, under your tokens): `region_w13`.
 
-Numbers in a token are free: `_dk11` sets --darkgain 1.1, `_lay3` sets --midlayers 3 (the examples below show the scaling). Tokens in one slot replace each other: lay2/lay4; rec2/rec2x; hue/sky/sky3; cur/relonly; slane/noslane; soft/softs; stub/stub2/stone; pwarm/pgold/pgreen/pbs/rv. Stone-block and ground tokens of the base (blk, bmm, bka, birr, rg) act on architecture only. A setting only acts while its switch is on, so the painter reports the others as unused: rec2, rec2x, rcl and rac need the architecture preset (--recesses), eye and dg need _dp, and the texture tokens (tv, tfl, stub, stub2) change no painting at all. Palette tokens act only on Trumbull; there `--paints` is: default ochre,rawsienna,sienna,hansa,ultramarine,cerulean,sepia; _pgreen ochre,rawsienna,hansa,ultramarine,cerulean,sepia,sapgreen (+_pbs adds sienna); _pwarm ochre,rawsienna,hansa,ultramarine,cerulean,sepia; _pgold ochre,hansa,ultramarine,cerulean,sepia; _rv adds rose and --roseviolet 1. Elsewhere set `--paints` in extra-args.json (pigment names: src/paint/methods/material-profiles.mjs). `<plan>` is bench/plan.
+Numbers in a token are free: `_lay3` sets --midlayers 3, `_st35` sets --shadowthresh .35 (the examples below show the scaling). There is no dark, cool or middle gain: the painter delivers the value the plan states. Tokens in one slot replace each other: lay2/lay4; hue/sky/sky3; cur/relonly; soft/softs; stub/stub2/stone. A setting only acts while its switch is on, so the painter reports the others as unused: the texture tokens (tv, tfl, stub, stub2) change no painting at all. Every subject gets the same base. Choose pigments with `--paints` in extra-args.json (pigment names: src/paint/methods/material-profiles.mjs). `<plan>` is bench/plan.
 
 | token | painter options it sets (on top of the template) |
 |---|---|
@@ -10,55 +10,35 @@ Numbers in a token are free: `_dk11` sets --darkgain 1.1, `_lay3` sets --midlaye
 | `_nest` | --nestedmid 1 |
 | `_lay2` | --midlayers 2 |
 | `_lay4` | --midlayers 4 |
-| `_dk13` | --darkgain 1.3 |
 | `_lf` | --loadfeather 1.5 |
-| `_sg12` | --stylegain 1.2 |
 | `_ls10` | --layersmooth 1 |
-| `_acc3` | --accentshare 0.3 |
+| `_acc3` | refused: a value gain: moves middle demand into the accent band |
 | `_lt` | --layertexture 1 |
 | `_cur` | --paperbase white, --paperrel (removed), --paperrgb 252,251,248 |
 | `_relonly` | --paperlights (removed), --paperrgb (removed) |
-| `_cg13` | --coolgain 1.3 |
-| `_noslane` | --skylanes (removed), --skylanemm (removed), --skylanestep (removed) |
-| `_slane` | --skylanemm (removed), --skylanestep (removed) |
+| `_noslane` | --skylanes 0 |
 | `_st40` | --shadowthresh 0.4 |
-| `_mg12` | --midgain 1.2 |
 | `_shw45` | --shadowwater 0.45 |
 | `_dkf` | --darkfirst 1 |
-| `_rg10` | --groundglaze 1 |
-| `_blk60` | --stoneblocks 0.6 |
-| `_bka20` | --stoneblockamt 0.2 |
-| `_bmm40` | --stoneblockmm 4 |
-| `_dp80` | --deepaccent 80 |
+| `_dp80` | refused: a value gain: doubles dark weight sheet-wide wherever the target is darker than a threshold |
 | `_ms120` | --minshapecells 120 |
-| `_birr` | --stoneirregular 1 |
-| `_dg2` | --deepgrow 2 |
+| `_dg2` | refused: the deep accents (--deepaccent) were removed: they restated every cell darker than a threshold as two late dark layers, a rule over target pixels; the plan names its last darks |
 | `_ts3` |  |
-| `_rx3` | --recessmax 3 |
-| `_bvar` | --stonecourses 1 |
 | `_tv8` | --texvariety 0.8 |
-| `_rac` | --recessaccent 1 |
-| `_eye10` | --eyering <n>/<target width> |
-| `_skyb` | --skyblue 1, --skyfloc .5 |
+| `_eye10` | refused: the eye ring (--eyering) was removed: it drew an iris ring round each catchlight reserve inside the deep accents, a rule shaped to one kind of subject |
+| `_skyb` | refused: the sky tube (--skyblue) was removed: it swapped the blue of sky cells for a second, heavily granulating tube, a switch by region; each pigment now granulates as published, so choose a granulating blue (ultramarine, cerulean) for a textured sky |
 | `_cpp` | --paper coldpress |
 | `_tsh8` |  |
 | `_tfl8` | --texflow 0.8 |
-| `_novar` | --physics filmDiffuse=0 |
+| `_novar` | refused: a physics switch: turns off film diffusion, a physical process, which can hide engine faults |
 | `_sk1` | --skyonelayer 1 |
-| `_bcl3` | --stoneclusters 3 |
 | `_fs60` | --fastsettle 60 |
 | `_fl0` | --feedbacklag 0 |
-| `_rec2` | --recesslayers 2 |
-| `_rec2x` | --recesslayers 2, --recessshare .75 |
-| `_rcl` | --recessclean 1 |
 | `_ssp2` |  |
-| `_tp2` | --touchpoints 2, --touchgain .6 |
 | `_spl6` | --strokeplan 1, --lanemm 6 |
 | `_sml30` | --strokemm 30 |
 | `_wre15` | --washreach 1.5 |
-| `_lit20` | --litlift 0.2 |
 | `_lad` | --laneadapt 1 |
-| `_lw` | --litwarm 1 |
 | `_sky` | --layerhue 1, --skysplit 1 |
 | `_sky3` | --layerhue 1, --skysplit 1 |
 | `_hue` | --layerhue 1 |

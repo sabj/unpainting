@@ -8,14 +8,20 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
+import { reportDesignedPaths } from '../../../tools/designed-paths-check.mjs';
 import { resolvePlan, renderVerdict } from './plan-args.mjs';
 
 const readJson = f => { try { return JSON.parse(fs.readFileSync(f, 'utf8')); } catch { return null; } };
 const writeJson = (f, v) => { fs.writeFileSync(f + '.tmp', JSON.stringify(v, null, 1)); fs.renameSync(f + '.tmp', f); };
+/** Why a painter run failed, from its log: its Error line, else its last line of output, else the exit code. */
+export function painterFailure(log, code) {
+  const lines = log.split('\n').map(l => l.trim()).filter(Boolean);
+  return lines.find(l => /^(Error|[A-Za-z]*Error)[: ]/.test(l)) || (lines.length ? `the painter exited ${code}; its last line was: ${lines.at(-1)}` : `the painter exited ${code} with no output`);
+}
 export const bkey = b => (String(b) === 'closing' ? 1e9 : Number(b));
 
 export class Painting {
-  /** spec: {width, sheetmm, trumbull}; dir: this painting's folder; initialStop: 0 (stop before the first wash) or 'end'. */
+  /** spec: {width, sheetmm}; dir: this painting's folder; initialStop: 0 (stop before the first wash) or 'end'. */
   constructor({ repo, spec, target, dir, gpu = 'auto', initialStop = 0, env = {} }) {
     Object.assign(this, { repo, spec, target, dir, gpu, env });
     this.aware = path.join(dir, 'aware');
@@ -26,7 +32,8 @@ export class Painting {
     this.segments = [];
     this.state = 'idle';     // running | saved | done | failed
     this.released = new Set();
-    this.planningRefused = null;
+    this.planningRefused = null;   // why the painter stopped with an error, or null
+    this.paintBegan = false;       // whether it had begun to lay paint when it did
     this.deadline = spec.renderTimeoutMs ? Date.now() + spec.renderTimeoutMs : null;
   }
 
@@ -53,9 +60,11 @@ export class Painting {
       seg.exit = code; seg.seconds = (Date.now() - seg.start) / 1000;
       this.child = null;
       if (code === 75 && fs.existsSync(path.join(this.aware, 'saved.json'))) { this.saved = readJson(path.join(this.aware, 'saved.json')); fs.rmSync(path.join(this.aware, 'saved.json')); this.state = 'saved'; return; }
-      if (k === 1 && code !== 0 && code !== 3 && !fs.existsSync(path.join(this.aware, 'progress.json'))) {
-        const text = fs.readFileSync(seg.log, 'utf8');
-        this.planningRefused = (text.split('\n').find(l => /^(Error|[A-Za-z]*Error)[: ]/.test(l)) || `the painter exited ${code} before painting`).trim();
+      // A painter that stops with an error, before or after it began to lay paint, refused the plan: the model is told why
+      // and may start once more from a clean sheet (TASK.md). A run killed at the render time limit did not refuse anything.
+      if (code !== 0 && code !== 3 && !seg.timedOut) {
+        this.planningRefused = painterFailure(fs.readFileSync(seg.log, 'utf8'), code);
+        this.paintBegan = fs.existsSync(path.join(this.aware, 'progress.json'));
       }
       this.state = code === 0 || code === 3 ? 'done' : 'failed';
     });
@@ -110,7 +119,13 @@ export class Painting {
     const dm = [...text.matchAll(/(\d+) passages yielded no brush path and were never painted, carrying ([\d.]+)% of the planned mass/g)].at(-1);
     const finished = fs.existsSync(path.join(this.out, 'painting.png'));
     const v = renderVerdict({ paintExit: last.exit, unused, modelOptions: union('modelOptions'), extraOptions: union('extraOptions'), baseOptions: union('baseOptions'),
-      templateOptions: union('templateOptions'), dropped: dm ? Number(dm[1]) : 0, droppedPct: dm ? Number(dm[2]) : 0, finished, strict });
+      templateOptions: union('templateOptions'), dropped: dm ? Number(dm[1]) : 0, droppedPct: dm ? Number(dm[2]) : 0, finished, strict,
+      continued: readJson(path.join(this.out, 'continued-checks.json')) });
+    {
+      const designed = reportDesignedPaths(this.out, { logFiles: this.segments.map(s => s.log) });
+      v.designedPaths = designed;
+      if (!designed.ok) { v.exit ||= 4; v.failures.push({ code: 4, reason: 'required designed paths did not run; see designed-paths-check.txt' }); }
+    }
     return { ...v, unused, segments: this.segments.map(s => ({ k: s.k, variant: s.variant, resumed: Boolean(s.resume), exit: s.exit, seconds: s.seconds })), layering: last.plan.layering, args: last.args };
   }
 }

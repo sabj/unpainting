@@ -1,0 +1,119 @@
+// Level 1's model command, closed the way a level 2 to 4 session is (tools/paint/session.mjs, session-net.mjs): the
+// whole process tree runs under this harness's seatbelt profile, out only through a gate on loopback that passes the
+// model's own service, with the fixed toolbox first on PATH and a clean environment. What it keeps: its attempt's
+// folder (the worktree with the kit, the tips and its outputs, the target picture to look at, its temporary folder),
+// node and the node modules the kit needs (read only), and its own process to paint in. Nothing of the repository,
+// the home folder, other users, other volumes or another session can be read.
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { execFileSync, spawn } from 'node:child_process';
+import { REPO } from '../lib.mjs';
+import { seatbelt, cleanEnv, museFiles, SIGN_IN_EXPOSURE } from '../../../tools/paint/session.mjs';
+import { PROVIDER_HOSTS, startGate, makeToolbox, proxyEnv } from '../../../tools/paint/session-net.mjs';
+import { mainCheckoutOf, segPythonFor } from '../../../tools/paint/run.mjs';
+
+const real = d => { try { return fs.realpathSync(d); } catch { return d; } };
+const above = d => { const out = []; for (let p = path.dirname(d); p !== path.dirname(p); p = path.dirname(p)) out.push(p); return out; };
+const which = cli => { try { return real(execFileSync('/usr/bin/which', [cli], { encoding: 'utf8' }).trim()); } catch { return null; } };
+
+/** The runners level 1 can close: the ones whose service the gate knows. Any other is refused before it starts. */
+export function closable(runner) {
+  if (runner === 'dry-run' || PROVIDER_HOSTS[runner]) return;
+  throw new Error(`level 1 runs closed (no network but the model's own service, nothing readable outside its folder), and the ${runner} runner has no gate yet: its service's hosts are not in tools/paint/session-net.mjs PROVIDER_HOSTS (${Object.keys(PROVIDER_HOSTS).join(', ')} have them). It is not started open`);
+}
+
+/** What one runner's command reads and writes of the home folder to sign in and run (as session.mjs sessionCall). */
+function ofRunner(runner, home) {
+  if (runner === 'claude') {
+    const bin = which('claude');
+    return { readable: [...(bin ? [path.dirname(bin)] : []), path.join(home, 'Library', 'Keychains')], write: [], metadata: [path.join(home, '.local', 'bin'), path.join(home, '.local', 'bin', 'claude'), home], signIn: true,
+      env: { CLAUDE_CODE_DISABLE_AUTO_MEMORY: '1', DISABLE_TELEMETRY: '1', DISABLE_ERROR_REPORTING: '1', CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: '1' },
+      // its own sandbox off inside ours (two do not nest), no user settings (the home folder is hidden), nothing kept of the session there
+      args: a => [...a, ...(a.includes('--settings') ? [] : ['--settings', JSON.stringify({ sandbox: { enabled: false } })]), ...(a.includes('--setting-sources') ? [] : ['--setting-sources', 'project']), ...(a.includes('--no-session-persistence') ? [] : ['--no-session-persistence'])] };
+  }
+  if (runner === 'agy') {
+    const bin = which('agy');
+    return { readable: [...(bin ? [bin] : []), path.join(home, 'Library', 'Application Support', 'antigravity'), path.join(home, 'Library', 'Keychains')], write: [path.join(home, '.gemini')], metadata: [...(bin ? [path.dirname(bin)] : []), home], signIn: true, env: { DO_NOT_TRACK: '1' }, args: a => a };
+  }
+  if (runner === 'codex') {
+    // its own folder holds its sign-in file and what it keeps as it runs; the user's config.toml is not loaded (no MCP
+    // servers or plugins of the operator's), nothing of the session is kept there, and its usage reports are off
+    const bin = which('codex'), add = ['--ignore-user-config', '--ephemeral', '-c', 'analytics.enabled=false'];
+    return { readable: bin ? [bin] : [], write: [path.join(home, '.codex')], metadata: [...(bin ? [path.dirname(bin)] : []), home], signIn: true, env: {},
+      args: a => (a[0] === 'exec' && !a.includes('--ignore-user-config') ? ['exec', ...add, ...a.slice(1)] : a) };
+  }
+  if (runner === 'muse') {
+    // its own sandbox off inside ours (two do not nest), its launcher's update off; its session log, which the round
+    // reads its tokens from (runners.mjs museUsage), is written in its data folder
+    const own = museFiles(home);
+    return { readable: own.readable, write: own.write, metadata: own.metadata, signIn: true, env: own.env,
+      args: a => (a[0] === 'exec' && !a.includes('--disable-sandbox') ? ['exec', '--disable-sandbox', ...a.slice(1)] : a) };
+  }
+  return { readable: [], write: [], metadata: [], signIn: false, env: {}, args: a => a };
+}
+
+/**
+ * The closed form of a turn's command `c` ({cmd, args, env?, stdinFile?}) for `runner`, in the attempt's folder `tmp`
+ * (its worktree, its scratch and its pictures are inside it). Resolves {cmd, args, env (the whole environment the
+ * command is started with), stdinFile, profile, closed (in words), can(file) (whether a file is readable under the
+ * profile), done() -> {gated, passed, refused}}. Throws for a runner that cannot be closed, or when the toolbox's
+ * Python is missing: nothing is started open.
+ */
+export async function closeTurn(c, { runner, tmp, extraEnv = {}, rules = [], repo = REPO, home = os.homedir(), env = process.env, python = segPythonFor(repo, env) }) {
+  closable(runner);
+  const own = real(tmp), r = ofRunner(runner, home);
+  const toolbox = makeToolbox(python, { pathNow: env.PATH ?? '/usr/bin:/bin' }), gate = await startGate(PROVIDER_HOSTS[runner] ?? []);
+  // nothing of the repository (this checkout, the main one it is a worktree of, and so every worktree and raw run under them)
+  const deny = [...new Set([repo, mainCheckoutOf(repo), ...(env.UNPAINT_SESSION_DENY ?? '').split(':').filter(Boolean).map(d => path.resolve(d))].filter(Boolean).flatMap(d => [d, real(d)]))];
+  // read only: the node modules the kit imports (the worktree's link leads into the repository), node itself, the toolbox
+  const node = real(process.execPath), modules = real(path.join(repo, 'node_modules'));
+  const readable = [...new Set([path.join(repo, 'node_modules'), modules, path.dirname(path.dirname(node)), ...toolbox.readable, ...r.readable])];
+  const base = seatbelt({ deny, write: [...new Set([...r.write, real(os.tmpdir()), '/private/tmp', '/private/var/folders'])], cwd: own, local: true, gated: true, readable,
+    hidden: [...new Set([home, real(home), '/Users', '/Volumes'])],
+    // node resolves a module by looking at every folder above it: the folders above the node modules may be seen to exist (never listed or read)
+    metadata: [...new Set([...r.metadata, ...above(path.join(repo, 'node_modules')), ...above(modules)])] });
+  // rules said last win: a caller's (the guard's log, guardLog below) close what the folder's own rule opened
+  const profile = [base, ...rules].join('\n');
+  const can = file => { try { execFileSync('sandbox-exec', ['-p', profile, '/bin/cat', file], { stdio: 'pipe' }); return true; } catch { return false; } };
+  const done = async () => { await gate.stop(); fs.rmSync(toolbox.dir, { recursive: true, force: true }); return { gated: true, passed: gate.passed, refused: gate.refused }; };
+  return { cmd: 'sandbox-exec', args: ['-p', profile, c.cmd, ...r.args(c.args)], stdinFile: c.stdinFile, profile, can, done, gate,
+    env: { ...cleanEnv(env), ...extraEnv, ...(c.env ?? {}), ...r.env, ...proxyEnv(gate.url), ...toolbox.env },
+    closed: `the whole command runs under a seatbelt profile of this harness: it reads and writes its attempt's folder and temporary folders, reads node, its node modules and the toolbox, and nothing else of the repository, the home folder${r.signIn ? ` (but its program and its sign-in: ${SIGN_IN_EXPOSURE})` : ''}, other users, other volumes or other sessions; it reaches only this machine's loopback, where a gate ${PROVIDER_HOSTS[runner] ? 'passes its own service\'s hosts and refuses every other' : 'refuses every host'} (no downloads, no installs)` };
+}
+
+/**
+ * The guard's log of blocked image reads (bench/v2/kit/guard.mjs, py/sitecustomize.py: $BENCH_VIOLATIONS), kept where
+ * the session it polices cannot change it. The guards run in the model's own processes, so they must be able to write
+ * a line; they must not be able to take one back. `file` is a named pipe in the attempt's folder: a line written to
+ * it leaves the folder at once and is appended to `kept` (outside everything the session may write) by a reader of
+ * this harness. `rules` close the pipe's folder under the profile: nothing in it may be made, removed, renamed or
+ * replaced; only writing into the pipe is left. stop() ends the reader when every writer is gone and says whether the
+ * pipe is still the one that was made; one that is not (its folder moved away with the attempt's) is written to
+ * `kept` as a line of its own, so it counts as a violation. What this does not close: the guards themselves lie in
+ * the model's folder and process, and a model that takes them out writes no line at all.
+ */
+export function guardLog(tmp, kept) {
+  const dir = path.join(real(tmp), 'guard'), file = path.join(dir, 'violations.jsonl');
+  fs.mkdirSync(dir, { recursive: true }); fs.rmSync(file, { force: true }); fs.rmSync(kept, { force: true });
+  execFileSync('/usr/bin/mkfifo', [file]);
+  const made = fs.statSync(file).ino, hold = fs.openSync(file, 'r+'), out = fs.openSync(kept, 'a');   // held open: the reader sees no end until stop()
+  const reader = spawn('/bin/cat', [file], { stdio: ['ignore', out, 'ignore'] }); fs.closeSync(out);
+  const ended = new Promise(r => reader.on('close', r));
+  let stopped = null;
+  const stop = async () => {
+    if (stopped) return stopped;
+    fs.closeSync(hold);
+    const late = setTimeout(() => reader.kill('SIGKILL'), 5000); await ended; clearTimeout(late);
+    let intact = false; try { const s = fs.lstatSync(file); intact = s.isFIFO() && s.ino === made; } catch { /* gone */ }
+    if (!intact) fs.appendFileSync(kept, JSON.stringify({ t: Date.now(), kind: 'guard-log-replaced', path: file }) + '\n');
+    return (stopped = { intact, lines: fs.readFileSync(kept, 'utf8').split('\n').filter(Boolean).length });
+  };
+  return { file, kept, stop, rules: [`(deny file-write* (subpath ${JSON.stringify(dir)}))`, `(allow file-write-data (literal ${JSON.stringify(file)}))`] };
+}
+
+/** The profile tried before the model is started (as tools/paint/cli.mjs does): a file of the repository must not be readable, the brief must be. */
+export function probe(turn, { repoFile = path.join(REPO, 'package.json'), ownFile }) {
+  if (turn.can(repoFile)) throw new Error('level 1\'s sandbox does not hold: a file of the repository can be read under it; the model is not started');
+  if (!turn.can(ownFile)) throw new Error(`level 1's sandbox cannot be started on this machine (${ownFile}, in the attempt's own folder, is not readable under it); the model is not started`);
+}

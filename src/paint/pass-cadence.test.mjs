@@ -24,7 +24,7 @@ test('the mark cadence is about MARKS_PER_PAINTING a painting and every pass whe
 });
 
 test('the recipes pin the mark cadence to their old --frames, and a later --frames does not move it', () => {
-  for (const recipe of ['default', 'v096']) {
+  for (const recipe of ['default']) {
     const argv = expandRecipe({ argv: ['--recipe', recipe, '--frames', '120'] }).argv;
     const get = name => argv[argv.lastIndexOf('--' + name) + 1];
     assert.equal(get('markcadence'), '8', recipe);
@@ -32,11 +32,9 @@ test('the recipes pin the mark cadence to their old --frames, and a later --fram
   }
 });
 
-const ARGS = ['tools/paint-plate.mjs', '--recipe', 'none', '--image', 'bench/v2/targets/hills.png', '--width', '64', '--scale', '1', '--sheetmm', '80',
-  '--palettewide', '1', '--physical', '1', '--order', 'painter', '--midlayers', '2', '--texture', '0', '--mode', 'fast', '--video', '0',
+const ARGS = ['tools/paint-plate.mjs', '--recipe', 'none', '--image', 'bench/v2/targets/hills.png', '--washplan', 'bench/v2/targets/hills.png', '--width', '64', '--scale', '1', '--sheetmm', '80',
+  '--palettewide', '1', '--physical', '1', '--mode', 'fast', '--video', '0',
   '--targetguard', 'gentle', '--seed', '0', '--gpu', 'off', '--allowdirty', '1',
-  // enough passes that the all-frame film holds more frames than the checkpoint film; mixed washes would lay too few on this sheet
-  '--mixedwash', '0',
   // segmentation is not under test: off keeps the run free of the SAM python and checkpoint (src/crop/segment-prep.mjs)
   '--segments', 'off'];
 const run = (args, log) => new Promise(resolve => {
@@ -53,7 +51,7 @@ test('filming every stage at a different --frames leaves the painting byte-ident
   ]);
   assert.equal(a, 0, fs.readFileSync(path.join(work, 'off.log'), 'utf8').slice(-800));
   assert.equal(b, 0, fs.readFileSync(path.join(work, 'on.log'), 'utf8').slice(-800));
-  const frames = d => fs.readdirSync(d).filter(f => /^f\d{4}\.jpg$/.test(f)).length;
+  const frames = d => fs.readdirSync(d).filter(f => /^f\d{4}\.(jpg|webp|png)$/.test(f)).length;
   assert.ok(frames(on) > frames(off), `capture on kept ${frames(on)} frames, off ${frames(off)}`);
   const feedback = f => fs.readFileSync(f, 'utf8').split('\n').find(l => l.startsWith('feedback:'));
   assert.equal(feedback(path.join(work, 'on.log')), feedback(path.join(work, 'off.log')));

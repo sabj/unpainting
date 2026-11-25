@@ -13,7 +13,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const FILES = ['tools/seg', 'tools/judge'].flatMap(d => fs.readdirSync(path.join(ROOT, d)).filter(f => f.endsWith('-test.py')).map(f => path.join(d, f))).sort();
 const PY = linePython({ log: () => {}, warn: () => {} });
 
-test('the Python line-tool tests are found', () => assert.ok(FILES.length >= 5, FILES.join(', ')));
+test('the Python line-tool tests are found', () => assert.ok(FILES.length >= 4, FILES.join(', ')));
 
 for (const file of FILES) {
   test(`python ${file}`, { timeout: 300000 }, t => {

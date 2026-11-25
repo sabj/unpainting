@@ -74,9 +74,11 @@ export function scaleLines(doc, w, h, { keepOrder = false, file = null } = {}) {
       const ws = Array.isArray(g.widths) && g.widths.length === (g.points || []).length ? g.widths : null;
       const wt = Array.isArray(g.weights) && g.weights.length === (g.points || []).length ? g.weights : null;
       const sw = (sx + sy) / 2;
+      // a line with one width and no per-point widths is drawn with that one nib along its whole length
+      const one = !ws && Number.isFinite(g.width) && g.width > 0 ? g.width * sw : null;
       const points = (g.points || []).map(([x, y], k) => {
         const q = { x: x * sx, y: y * sy };
-        if (ws) q.width = ws[k] * sw;
+        if (ws) q.width = ws[k] * sw; else if (one != null) q.width = one;
         if (wt) q.weight = wt[k];
         return q;
       });
@@ -88,6 +90,10 @@ export function scaleLines(doc, w, h, { keepOrder = false, file = null } = {}) {
       if (g.region) out.region = g.region;
       if (g.soft) out.soft = true;
       if (Number.isFinite(g.tier)) out.tier = g.tier;
+      // a person's drawing order (tools/seg/order-strokes.mjs): the hand keeps it
+      if (Number.isFinite(g.seq)) out.seq = g.seq;
+      // the subject's own line along this one, measured at plan time (line-weight.mjs)
+      if (g.subjectLine) out.subjectLine = g.subjectLine;
       return out;
     })
     .filter(g => g.points.length >= 2);

@@ -98,22 +98,21 @@ test('stages: contradictions and unknown names are refused with the field named'
   assert.throws(() => drawingFlags({ closingLines: 0, stages: { prepInk: true } }), /closingLines and stages/);
   assert.throws(() => drawingFlags({ medium: 'graphite', stages: { prepInk: true } }), /stages.prep/);
   assert.throws(() => drawingFlags({ stages: { prepInk: { method: 'hatch' } } }), /prepInk.method/);
+  assert.throws(() => drawingFlags({ stages: { prepInk: { method: 'connected' } } }), /prepInk.method "connected" was removed: .+/);
   assert.throws(() => drawingFlags({ stages: { finishInk: { restate: 3 } } }), /finishInk.restate/);
 });
 
-test('source and ink: the line source, the colour and waterproof ink', () => {
-  assert.deepEqual(drawingFlags({ source: 'source-ink' }), ['--linesource', 'source-ink']);
-  assert.deepEqual(drawingFlags({ source: 'auto' }), ['--linesource','auto']);
+test('source and ink: a traced line source is refused, the colour and waterproof ink', () => {
+  // the painter no longer traces the subject: a plan that names a line source fails loudly (removed in 0.4)
+  for (const source of ['source-ink', 'auto', 'photo-sketch', 'hed']) assert.throws(() => drawingFlags({ source }), /drawing.source was removed in 0.4/);
+  assert.deepEqual(drawingFlags({ source: 'none' }), []);
   assert.deepEqual(drawingFlags({ ink: { color: 'black', waterproof: true } }), ['--inkprofile', 'black-ink', '--inkfast', '1']);
   assert.deepEqual(drawingFlags({ ink: { color: 'sepia' } }), ['--inkprofile', 'sepia-ink']);
-  assert.throws(() => drawingFlags({ source: 'hed' }), /drawing.source/);
   assert.throws(() => drawingFlags({ ink: { waterproof: 'yes' } }), /waterproof/);
   assert.throws(() => drawingFlags({ inkColor: 'black', ink: { color: 'sepia' } }), /disagree/);
 });
 
-test('linework "auto" runs the universal linework stage; other values are refused', () => {
-  assert.deepEqual(drawingFlags({ linework: 'auto' }), ['--linework', 'auto']);
-  assert.deepEqual(drawingFlags({ linework: 'off' }), ['--linework', 'off']);
+test('drawing.linework, map and mapSmoothing were removed in 0.4 and fail loudly', () => {
+  for (const d of [{ linework: 'auto' }, { linework: 'off' }, { map: 'm.png' }, { mapSmoothing: 0.5 }]) assert.throws(() => drawingFlags(d), /was removed in 0.4/);
   assert.deepEqual(drawingFlags({ linework: 'auto', medium: 'none' }), ['--drawing', 'none']);
-  assert.throws(() => drawingFlags({ linework: 'on' }), /drawing.linework/);
 });

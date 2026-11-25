@@ -55,3 +55,38 @@ test("writeRunCard records input hashes, segments, drawing stages, GPU backend a
     fs.rmSync(tmp, { recursive: true, force: true });
   }
 });
+
+test("writeRunCard records the medium decision with its evidence under the drawing", () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "run-card-medium-"));
+  try {
+    const decision = { medium: "pencil", basis: "source", vetoed: true, evidence: { penSharePct: 0.31, penFirstPct: 0.5, inkRequestedBy: ["--inkrecipe wash"], planDeclared: null, planStyles: [] }, note: "medium pencil: ink is removed" };
+    const card = writeRunCard({ root: tmp, out: tmp, mediumDecision: decision, code: { commit: "abc12345", git: true, dirty: false, tracked: [], untracked: [] } });
+    assert.deepEqual(card.drawing.mediumDecision, decision);
+    assert.equal(writeRunCard({ root: tmp, out: tmp, code: null }).drawing.mediumDecision, undefined);
+  } finally {
+    resetChecks();
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
+test("writeRunCard records the source size, the sheet against it and the enlargement the run accepted", () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "run-card-scale-"));
+  try {
+    const dims = { sourceWidth: 300, sourceHeight: 263, paintWidth: 300, paintHeight: 263, enlargement: 1, sheetWidth: 300, sourceScale: 1, sourceScaleAllowed: 1 };
+    assert.deepEqual(writeRunCard({ root: tmp, out: tmp, dimensions: dims }).dimensions, dims);
+    // a card from before the setting keeps its sizes and says nothing about the scale
+    assert.deepEqual(writeRunCard({ root: tmp, out: tmp, dimensions: { sourceWidth: 300, paintWidth: 1200, enlargement: 4 } }).dimensions,
+      { sourceWidth: 300, sourceHeight: null, paintWidth: 1200, paintHeight: null, enlargement: 4, sheetWidth: null, sourceScale: null, sourceScaleAllowed: null });
+  } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
+});
+
+test("the run card carries the caption block that labels its image: subject, code, mode, sizes, sheet and date", () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "run-card-caption-"));
+  try {
+    const caption = { subject: "overlook-art", role: null, codeSHA: "25a5feaa", looking: "looking", speed: "fast", sourcePx: "1086x1448", renderWidth: 1086, sheetMm: 280, date: "2026-11-18T17:40:00.000Z" };
+    const card = writeRunCard({ root: tmp, out: tmp, args: [], caption });
+    assert.deepEqual(card.caption, caption);
+    assert.deepEqual(JSON.parse(fs.readFileSync(path.join(tmp, "run-card.json"), "utf8")).caption, caption);
+    assert.equal(writeRunCard({ root: tmp, out: tmp, args: [] }).caption, null, "no caption, none written");
+  } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
+});

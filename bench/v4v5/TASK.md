@@ -1,8 +1,10 @@
+> **Retired in 0.4.** This task ran on painter 0.2.x and 0.3.x. Its plans (styleSelection, recipe tokens, `example/`) ask for the light-to-dark value plan and options that 0.4 removed, so it cannot run on this trunk: `npm run bench:run` refuses V4 and V5. Check out tag `v0.3.2` to replay it. The next task is the draft in `bench/v6/`.
+
 # Painting plan: {SUBJECT_NAME}, round {ROUND}, try {TRY} of {TRIES}
 
 You are preparing a plan for a fixed watercolour painter and painting it. The painter runs on this machine; you start it
-with `bash bench/paint.sh start`, and it stops at every passage boundary so you can look at your painting and change
-what is not painted yet (see "Painting and looking", below). Your painting is judged by the finished painting and by
+with `bash bench/paint.sh start`, and it stops at every passage boundary; at three stops of your choice you may step
+back, look at your painting and change what is not painted yet (see "Painting and looking", below). Your painting is judged by the finished painting and by
 how much its progress frames look like a person painting.
 
 {ROUND_RULES}
@@ -10,6 +12,7 @@ how much its progress frames look like a person painting.
 ## The task
 
 - Target: `bench/plan/target.png`. Requested style: **{TASK_STYLE}**.
+- Drawing medium of the target: **{MEDIUM}** ({MEDIUM_TEXT}).
 - Output: {WIDTH} px wide on a sheet {SHEETMM} mm wide. These, the target and the sheet size are fixed
   (`bench/frozen.json`).
 - Your working folder is this tree. Write only the files listed under "What you deliver". Everything else you change is
@@ -19,7 +22,8 @@ how much its progress frames look like a person painting.
 ## What is fixed for everyone
 
 - The painter code (`tools/paint-plate.mjs`) and its base recipe. Every painting starts from the base recipe
-  `region_w13_lay4_sky3_cg13_rg10_blk60_bmm40_bka20_birr_skyb_cpp_dk13_pgreen_tp2`.
+  `region_w13`, running `--recipe default` from `src/paint/recipe.mjs` plus your plan.
+  Washes and order inherit that recipe, just as a normal painter run does.
   Your recipe tokens and painter settings are layered on top of it (below).
 - Fast drying mode, seed 0, the recording (progress frames and the stroke log), the target guard in `gentle` mode (the
   painter may look at broad shape averages of the target while painting; cell-level target reads are blocked and
@@ -39,6 +43,13 @@ All files go in `bench/plan/` unless stated.
      bounds as fractions 0..1 of the target. The painter's own colour/value segmentation of the target is assigned to
      the family whose bounds overlap it most, and a family with its own style in `styleSelection.regions` paints its
      cells in that style. Empty `[]` leaves the painter's own segmentation unlabelled.
+   - `washes`: optional wash rules. `colour` is `family` (default) or `layered`;
+     `sessions` is `passage` (default), `dry` or `connected`; `carryMm` defaults to 2 and
+     `paleLimit` to 0.16. `paints` names the pigment box. Omitted fields use the default recipe.
+   - `order`: optional `{subjects, strength}`; `subjects` orders family ids and `strength`
+     controls that ordering. See `docs/plan-format.md` for the subject-order format.
+   - `drawing`: medium, source and `stages` can state the drawing stages explicitly.
+     A family may name its `drawingRole`; see `docs/plan-format.md`.
    - `reserves`: paper whites kept out of every wash. Each `{reason, bounds:[x0,y0,x1,y1]}` (fractions). The painter
      also keeps near-paper target lights on its own.
    - Limits: at most 64 families (short side at least 2 mm on the sheet) and 64 reserves (short side at least 1 mm).
@@ -47,37 +58,66 @@ All files go in `bench/plan/` unless stated.
      region styles create such edges unless they follow real edges in the target or stay small. The check below runs
      the painter's planning step and catches this.
 2. **Drawing paths: `opening-lines.json` (lines drawn before the washes) and `closing-lines.json` (lines drawn
-   last).** Set `drawing.medium: "ink"` in `config.json` for ink, or use `--outlinemedium ink`
-   in `extra-args.json`. When `closing-lines.json` is present, `--drawing both` is enabled automatically unless overridden.
-   Prepared paths use the harness-owned v2 ink rules: source support, smoothing, darkness caps and damp pen.
+   last).** The target's drawing medium (above) decides the drawing when your plan does not: a pen target is drawn
+   in ink, any other target in graphite. You may choose: set `drawing.medium` in `config.json`, or use
+   `--outlinemedium` in `extra-args.json`. Use ink only when the target's drawing medium is pen and the target itself
+   shows pen lines. Dark painted edges, whiskers, hair and window bars are not pen lines: paint them, or leave them to
+   a light pencil drawing. When the medium is not pen, no drawing is drawn in ink and none has closing lines: the
+   harness draws your opening lines in graphite as a light preparatory drawing, drops the closing lines and pen
+   settings, and records the override in the result (the check prints it as `mediumOverride`). You may always choose
+   no drawing.
+   When `closing-lines.json` is present, `--drawing both` is enabled automatically unless overridden.
+   Prepared paths use the default painter’s ink rules.
    Raw v1 ink controls and legacy ink/sep/uncap/dwg tokens are not admitted. Without a drawing file the painter
    draws from its own reading of the target. Schema:
    `{"image":{"w":W,"h":H}, "lines":[{"points":[[x,y],...], "width":1, "weight":1, ...}], "medium":"ink"}` with
    `image` equal to the target's pixel size and points in target pixels. At most 4000 lines and 400000 points per file.
    An empty `lines` list with `"medium":"none"` draws nothing. Tracers you may run:
-   `node bench/tools/trace-ink.mjs <target.png> <out.json> [minContrast=.12] [minLen=10] [maxLum=.62]` and
+   `node bench/tools/trace-ink.mjs <target.png> <out.json>` (limits from the subject's own value range, not settable; one nib and one weight per line) and
    `node bench/tools/closing-ink.mjs` (read its header).
 3. **`bench/variant.txt` (required): recipe tokens.** `region_w13` or `region_w15` followed by `_token`s, e.g.
-   `region_w13_lay2_dk11`. Write only what you want to change: the base is applied automatically. A token you write
-   replaces the base token in the same slot (for example `_lay2` replaces the base `_lay4`). A token that changes nothing on this subject is refused. Stone-block and recess tokens of the base act
-   on architecture only; palette tokens (`_pwarm`, `_pgold`, `_pgreen`, `_pbs`, `_rv`) act only on Trumbull; elsewhere
-   choose pigments with `--paints` in `extra-args.json`. `region_w15` switches to brush choice per passage. The full
+   `region_w13_lay2_noslane`. Write only what you want to change: the base is applied automatically. A token you write
+   replaces the base token in the same slot (for example `_lay2` replaces the base `_lay4`). A token that changes nothing on this subject is refused. Every subject
+   gets the same base; choose pigments with `--paints` in `extra-args.json`. `region_w15` switches to brush choice per passage. The full
    token list with the painter options each sets is in `bench/TOKENS.md`.
 4. **`extra-args.json` (optional): painter settings.** A JSON array of painter options and values, appended last (they
-   win over the recipe), e.g. `["--darkgain","1.1","--paints","ochre,sienna,ultramarine,cerulean,sepia"]`. Options are
-   limited to `--darkgain`, `--coolgain`, `--midgain` (0–3), `--midlayers` (integer 0–8),
+   win over the recipe), e.g. `["--midlayers","3"]`. There is no gain to set: the painter delivers the values your plan states. Choose pigments with `--paints`, and choose ones that can reach
+   the target's most saturated colours, not just its hues: an earth lies in the direction of an orange or a green but
+   no amount of it makes a clear one, and a palette of earths and greys turns bright fur, foliage, sky or cloth to
+   mud. Find the most saturated passages of the target first and give each a pigment that is at least as clean, then
+   add what the quiet passages and the darks need. Two example palettes for two different pictures: a sunlit garden
+   with red flowers under a blue sky, `["--paints","hansa,cadred,rose,ultramarine,phthalogreen,sienna"]`; a grey
+   stone street in rain, `["--paints","ochre,rawsienna,umber,cerulean,paynes"]`. Neither is a default: read your
+   own target. The painter paints with the pigments you name, and each settles as the real pigment does: ultramarine and
+   cerulean granulate heavily, the earths (ochre, siennas, umber) moderately, and the staining paints (phthalos,
+   quinacridone rose, hansa) not at all, so a textured sky wants a granulating blue and a smooth one a phthalo. Options are
+   Small dark pieces are painted once, last (`--smallmarks 1`); small wash pieces join their neighbouring
+   wash (`--washjoin 1`). Both are inherited from the default recipe and may be set to 0 or 1 in this file.
+   Other options are limited to `--midlayers` (integer 0–8),
    `--paints` (comma-separated pigment names), `--drawing` (first/both/last/none),
    `--outlinemedium` (graphite/ink/none/auto), `--inkprofile` (sepia-ink/black-ink),
    `--valuefloor` (a style name), and `--focusmap` (a `.json` file inside the plan folder).
    Every option needs a separate value. All other options are refused, including segmentation, dirty-code
-   bypasses, ink recipes/resolution, speed, awareness and physics controls. The config drawing takes precedence
-   over template and extra drawing flags. An option nothing reads
+   bypasses, ink recipes/resolution, speed, awareness and physics controls. Explicit tokens and extra flags override recipe defaults; avoid conflicting drawing flags
+   when declaring the drawing in config.json. An option nothing reads
    {UNREAD_OPTION}. Pigment names: `src/paint/methods/material-profiles.mjs`.
 5. **`bench/PLAN.md` (required): your plan in words.** Reference cues, each region's technique and order, moisture and
    load, protected lights, edges, values, what would show failure, and (V5) what you changed and why. Recorded, not
    executed.
 
-## Before you paint: run the check
+## Before you paint: iterate on the plan preview, then render once
+
+A render is the expensive step (minutes of machine time, one painting). The plan preview is free: when the check admits
+your plan it also writes a CPU **plan preview**, your plan booked flat and rendered through the sheet's optics, and
+prints how its values compare with the target (dark share, mean lightness, the darkest and lightest tails, paper
+share). It is `bench/check-out/preview.jpg` (target left, plan preview right). It predicts the painted values. It
+shows values and colour areas, not edges, brush marks or texture, so judge those from the skills and the example. Use
+the preview as your main feedback: change the plan, run the check, look at the preview, and repeat until the values and
+colour areas are right. Then render once with `bash bench/paint.sh start`. The harness records how many checks you ran,
+their preview time, and the render's time. One render is allowed; a second start is possible only when the painter
+itself refused the plan before painting began.
+
+## Run the check
 
 `bash bench/check.sh` runs exactly the admission check `bash bench/paint.sh start` runs (a few minutes at full width):
 the refusals before any painting (it prints the painter arguments your plan resolves to, the base tokens applied or
@@ -92,16 +132,16 @@ the only way to paint. Do not edit code, do not use the network except for your 
 
 ## Painting and looking (self-view)
 
-When your plan passes the check, paint it yourself and watch it as you like:
+When your plan passes the check, paint it yourself:
 
 - `bash bench/paint.sh start` runs the same admission check as `bash bench/check.sh` and starts painting your plan files
   as they are. It answers when the painter has stopped before the first wash (your opening drawing done).
 - The painter stops at every passage boundary: before the first wash, after each pass of the light-to-dark ladder (once
   the painter has dried it as it always does), and before the closing drawing. A pass is one pigment at one value step;
   a painting has about 25 to 45 passes (near the end the painter adds touch-up passes of its own).
-- At a stop, `bash bench/paint.sh look` writes `bench/looks/<n>-compare.jpg` (the target and your sheet so far, side by
-  side) and `bench/looks/<n>-sheet.jpg`, and prints the stroke count and the passes still to come. Open the image to
-  see it. Look as often as you like.
+- At a stop, `bash bench/paint.sh look` writes {LOOK_VIEW}, and prints the stroke count and the passes still to come.
+  Open the image to see it. A look is stepping back from the board, as a painter does a few times while painting:
+  you have three looks while painting (the stops are yours to choose), and one more at the finished painting.{STRICT_NOTE}
 - To go on: `bash bench/paint.sh next` (paint the next pass, stop after it), `bash bench/paint.sh run <pass>` (stop
   after that pass), `bash bench/paint.sh run closing` (stop before the closing drawing) or `bash bench/paint.sh finish`
   (no more stops). They wait for the painter (a pass takes from seconds to minutes); if one answers "still painting",
@@ -111,11 +151,12 @@ When your plan passes the check, paint it yourself and watch it as you like:
   It checks the files like `bash bench/check.sh`; then the painter plans again from them and goes on from where it is.
   What is on the paper stays: the opening drawing and the passes already painted cannot change, and the painter
   continues with the next pass of the re-planned ladder (pass k+1 when k passes are painted). The pigments cannot change
-  once painting has started. A revision the check refuses changes nothing. You may revise as often as you like.
+  once painting has started. A revision the check refuses changes nothing. A revision follows a look: once per look,
+  at the stop where you looked.
 - Time: this try has 85 minutes of your own time (planning, looking, revising). Time spent waiting in `bench/paint.sh`
   (for the painter or its check) is not counted. When the 85 minutes are up, the session ends and the painter
   finishes your current plan without stopping. `bash bench/paint.sh status` shows where the painter is and the time you have used.
-- The target guard stays on while painting: your looks are your own; the painter's own reads of the target are blocked
+- The target guard stays on while painting: your looks are counted; the painter's own reads of the target are blocked
   and recorded as before, every stroke is logged, and the plan limits still apply to every revision.
 - When the painting is finished, stop. (If you stop before starting it, the harness checks and paints your plan files
   as they are, without stops.)
@@ -135,7 +176,7 @@ When your plan passes the check, paint it yourself and watch it as you like:
 
 ```bash
 P=bench/plan
-node bench/tools/trace-ink.mjs $P/target.png $P/opening-lines.json .12 14 .62   # pen lines traced from the target
+node bench/tools/trace-ink.mjs $P/target.png $P/opening-lines.json               # lines traced from the target
 cp $P/opening-lines.json $P/closing-lines.json                                  # same lines closing the painting
 cat > $P/config.json <<'JSON'
 {"subject":"EXAMPLE","name":"EXAMPLE",
@@ -145,7 +186,7 @@ cat > $P/config.json <<'JSON'
              {"id":"EXAMPLE.sea","bounds":[0,0.45,1,1],"baseMove":"wet on dry","referenceCue":"darker sea, broken lights"}],
  "reserves":[{"reason":"brightest cloud edge","bounds":[0.6,0.13,0.66,0.19]}]}
 JSON
-echo '["--darkgain","1.1"]' > $P/extra-args.json                                # a painter setting on top of the base
+echo '["--outlinemedium","graphite"]' > $P/extra-args.json                      # a painter setting on top of the base
 echo region_w13_lay2_noslane > bench/variant.txt                                # 2 mid layers, no sky lanes
 bash bench/check.sh                                                             # ends with ADMITTED
 ```

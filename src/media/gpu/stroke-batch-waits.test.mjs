@@ -47,3 +47,12 @@ test('dispatch telemetry includes zero-dispatch transfers and queue waits', asyn
   d.queue.submit([d.createCommandEncoder().finish()]); await d.queue.onSubmittedWorkDone();
   assert.deepEqual(p.snapshot().betweenWaits, { '1/1/0': 1 }); assert.deepEqual(p.waitKinds, { queue: 1 });
 });
+test('dispatch telemetry counts dispatches and workgroups by kernel and op, readbacks by op', async () => {
+  const d = device(); d.createComputePipeline = desc => ({ label: desc.label }); const p = instrumentDispatches(d);
+  const a = d.createComputePipeline({ label: 'lv_cg_a#{"LVPAR":1}' }), e = d.createCommandEncoder(), pass = e.beginComputePass();
+  p.op = 'step'; pass.setPipeline(a); pass.dispatchWorkgroups(4); pass.dispatchWorkgroups(2, 3); pass.end(); d.queue.submit([e.finish()]);
+  p.op = 'down'; await d.createBuffer({ size: 64 }).mapAsync(1);
+  const s = p.snapshot();
+  assert.deepEqual(s.kernels.lv_cg_a, { dispatches: 2, indirect: 0, workgroups: 10, ops: { step: 2 } });
+  assert.equal(s.passes, 1); assert.deepEqual(s.readbacks, { down: { n: 1, bytes: 64 } });
+});

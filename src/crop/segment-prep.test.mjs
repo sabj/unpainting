@@ -7,7 +7,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import sharp from 'sharp';
-import { describeSegments, prepareSegments, resolveSamCheckpoint, resolveSegPython, segmentKey } from './segment-prep.mjs';
+import { describeSegments, prepareSegments, resolveSamCheckpoint, resolveSegDevice, resolveSegPython, segmentKey } from './segment-prep.mjs';
 import { hasSegments, loadSegments, segmentPaths } from './segments.mjs';
 
 const temp = t => { const d = fs.mkdtempSync(path.join(os.tmpdir(), 'segprep-')); t.after(() => fs.rmSync(d, { recursive: true, force: true })); return d; };
@@ -26,10 +26,10 @@ async function repo(t) {
 }
 
 // A stand-in for the seg python: writes a two-region map made by `backend` and counts its runs in <root>/runs.
-async function fakePython(root, { backend = 'sam', fail = false } = {}) {
+async function fakePython(root, { backend = 'sam', fail = false, choice = 'auto' } = {}) {
   const fixture = path.join(root, 'fixture');
   await sharp(Buffer.from([1, 1, 2, 2, 1, 1, 2, 2, 1, 1, 2, 2]), { raw: { width: 4, height: 3, channels: 1 } }).png().toFile(`${fixture}.png`);
-  const made = backend === 'sam' ? { backend: 'sam', model: 'vit_b', device: 'mps', masks: 9, laid: 2 } : { backend: 'kmeans', k: 8 };
+  const made = backend === 'sam' ? { backend: 'sam', model: 'vit_b', device: 'mps', deviceChoice: choice, masks: 9, laid: 2 } : { backend: 'kmeans', k: 8 };
   fs.writeFileSync(`${fixture}.json`, JSON.stringify({ mode: 'regions', backend: made, image: { w: 4, h: 3 }, legend: { 1: 'r1', 2: 'r2' },
     regions: [{ id: 1, name: 'r1', foreground: false, area: 0.5 }, { id: 2, name: 'r2', foreground: true, area: 0.5 }] }));
   const script = `#!/bin/sh
@@ -86,7 +86,7 @@ test('a map is made once per target, registered under the target name, logged wi
   const checkpoint = touch(path.join(root, 'sam.pth'));
   const out = temp(t), logs = [];
   const opt = options({ segpython: python, samcheckpoint: checkpoint });
-  const first = prepareSegments({ image, root, out, opt, log: l => logs.push(l), env: {} });
+  const first = await prepareSegments({ image, root, out, opt, log: l => logs.push(l), env: {} });
   assert.equal(first.backend, 'sam');
   assert.equal(first.regions, 2);
   assert.equal(first.cached, false);
@@ -98,7 +98,7 @@ test('a map is made once per target, registered under the target name, logged wi
   assert.ok(hasSegments('target'));
   const seg = await loadSegments('target', 8, 6);
   assert.deepEqual(seg.regions.map(r => r.name), ['r1', 'r2']);
-  const again = prepareSegments({ image, root, opt, log: l => logs.push(l), env: {} });
+  const again = await prepareSegments({ image, root, opt, log: l => logs.push(l), env: {} });
   assert.equal(again.cached, true);
   assert.equal(runs(root), 1, 'the cached map is not made again');
   assert.match(logs[1], /2 regions, 1 inside the frame; from the cache$/);
@@ -108,25 +108,63 @@ test('SAM is required by default: no checkpoint, a failing script or a k-means m
   const { root, image } = await repo(t);
   const python = await fakePython(root, { backend: 'kmeans' });
   const log = () => {};
-  assert.throws(() => prepareSegments({ image, root, opt: options({ segpython: python }), log, env: {} }), /SAM is required and no sam_vit_b_01ec64.pth was found/);
+  await assert.rejects(() => prepareSegments({ image, root, opt: options({ segpython: python }), log, env: {} }), /SAM is required and no sam_vit_b_01ec64.pth was found/);
   const checkpoint = touch(path.join(root, 'sam.pth'));
-  assert.throws(() => prepareSegments({ image, root, opt: options({ segpython: python, samcheckpoint: checkpoint }), log, env: {} }), /asked for sam, the map .* was made by kmeans/);
+  await assert.rejects(() => prepareSegments({ image, root, opt: options({ segpython: python, samcheckpoint: checkpoint }), log, env: {} }), /asked for sam, the map .* was made by kmeans/);
   const failing = await fakePython(temp(t), { fail: true });
-  assert.throws(() => prepareSegments({ image, root, opt: options({ segpython: failing, samcheckpoint: checkpoint, segcache: temp(t) }), log, env: {} }), /SAM required and it did not run: no torch/);
+  await assert.rejects(() => prepareSegments({ image, root, opt: options({ segpython: failing, samcheckpoint: checkpoint, segcache: temp(t) }), log, env: {} }), /SAM required and it did not run: no torch/);
 });
 
 test('--segments kmeans asks for no checkpoint, and --segments off says so and makes nothing', async t => {
   const { root, image } = await repo(t);
   const python = await fakePython(root, { backend: 'kmeans' }), logs = [];
-  const r = prepareSegments({ image, root, opt: options({ segments: 'kmeans', segpython: python }), log: l => logs.push(l), env: {} });
+  const r = await prepareSegments({ image, root, opt: options({ segments: 'kmeans', segpython: python }), log: l => logs.push(l), env: {} });
   assert.equal(r.backend, 'kmeans');
   assert.match(logs[0], /^segments: k-means in Lab \(k 8\), 2 regions/);
-  assert.equal(prepareSegments({ image, root, opt: options({ segments: 'off' }), log: l => logs.push(l), env: {} }), null);
+  assert.equal(await prepareSegments({ image, root, opt: options({ segments: 'off' }), log: l => logs.push(l), env: {} }), null);
   assert.match(logs[1], /^segments: off/);
-  assert.throws(() => prepareSegments({ image, root, opt: options({ segments: 'auto' }), log: () => {}, env: {} }), /--segments: one of sam, kmeans, off/);
+  await assert.rejects(() => prepareSegments({ image, root, opt: options({ segments: 'auto' }), log: () => {}, env: {} }), /--segments: one of sam, kmeans, off/);
 });
 
 test('the log line names the backend, the region count and where the map came from', () => {
   const doc = { backend: { backend: 'sam', model: 'vit_b', device: 'cpu', masks: 40, laid: 12 }, regions: [{ foreground: true }, { foreground: false }, {}] };
   assert.equal(describeSegments(doc, { cached: false, seconds: 21.04 }), 'segments: SAM vit_b on cpu (40 masks, 12 laid), 3 regions, 1 inside the frame; made in 21.0 s');
+});
+
+test('PAINTER_SEG_DEVICE: unset is empty, mps|cpu|cuda pass, anything else fails loudly', () => {
+  assert.equal(resolveSegDevice({ env: {} }), '');
+  for (const d of ['mps', 'cpu', 'cuda']) assert.equal(resolveSegDevice({ env: { PAINTER_SEG_DEVICE: d } }), d);
+  assert.throws(() => resolveSegDevice({ env: { PAINTER_SEG_DEVICE: 'gpu' } }), /PAINTER_SEG_DEVICE="gpu": one of mps, cpu, cuda/);
+});
+
+test('an explicit device reaches the child, names the cache entry, and is logged and recorded; unset changes nothing', async t => {
+  const { root, image } = await repo(t);
+  const python = await fakePython(root);
+  const checkpoint = touch(path.join(root, 'ck.pth'));
+  const opt = options({ segpython: python, samcheckpoint: checkpoint, segcache: path.join(root, 'cache') });
+  const unset = await prepareSegments({ image, root, opt, log: () => {}, env: {} });
+  assert.equal(unset.deviceChoice, 'auto');
+  assert.equal(segmentKey({ image, backend: 'sam', root }), segmentKey({ image, backend: 'sam', root, device: '' }));
+  await fakePython(root, { choice: 'PAINTER_SEG_DEVICE' }); // what segments.py writes when the variable was set
+  const logs = [];
+  const cpu = await prepareSegments({ image, root, opt, log: l => logs.push(l), env: { PAINTER_SEG_DEVICE: 'cpu' } });
+  assert.equal(cpu.deviceChoice, 'PAINTER_SEG_DEVICE');
+  assert.notEqual(cpu.stem, unset.stem, 'a map from another device is not reused');
+  assert.equal(runs(root), 2);
+  assert.match(logs.at(-1), /\(PAINTER_SEG_DEVICE\)/);
+  await assert.rejects(prepareSegments({ image, root, opt, log: () => {}, env: { PAINTER_SEG_DEVICE: 'tpu' } }), /one of mps, cpu, cuda/);
+  assert.equal(runs(root), 2, 'a wrong value stops before any job starts');
+});
+
+test('a SAM child stuck at 0% CPU is killed and the run fails naming the image and device; nothing is retried', async t => {
+  const { root, image } = await repo(t);
+  const hang = touch(path.join(root, 'bin', 'hang'), `#!/bin/sh\necho run >> "${root}/runs"\nexec sleep 30\n`);
+  fs.chmodSync(hang, 0o755);
+  const checkpoint = touch(path.join(root, 'ck.pth'));
+  const t0 = Date.now();
+  await assert.rejects(
+    prepareSegments({ image, root, opt: options({ segpython: hang, samcheckpoint: checkpoint }), log: () => {}, env: { PAINTER_SEG_DEVICE: 'mps' }, watch: { idleMs: 400, pollMs: 50 } }),
+    e => /SAM job for .*target\.png on device mps used no CPU for/.test(e.message) && /killed after waiting/.test(e.message) && /No retry/.test(e.message));
+  assert.ok(Date.now() - t0 < 5000);
+  assert.equal(runs(root), 1, 'one launch, no retry');
 });

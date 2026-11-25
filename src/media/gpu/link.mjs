@@ -1,3 +1,4 @@
+import { toothRange } from '../paper.mjs';
 import { fixedBedLower as sumFixedBedLower } from '../fixed-bed.mjs';
 import { recordWetCells, recordWetBox, syncWetReachVersion, invalidatePaperCertificate } from '../paper-certificate.mjs';
 const fixedBedLower = sheet => sumFixedBedLower(sheet, { skipEmpty: process.env.GPU_SKIP_ZERO_LAYER === '1' });
@@ -17,10 +18,21 @@ import { FreshMap } from './fresh.mjs';
 import { resetCpuStrokeDirty, cpuStrokeDirtyRect } from '../cpu-stroke-dirty.mjs';
 import { CpuDemandWindow } from './cpu-demand-window.mjs';
 import { demandPolicy } from './demand-policy.mjs';
+import { waterStepsMost, checkWaterSteps } from './water-guard.mjs';
+// the resource guard of a session's painting (water-guard.mjs): Infinity unless the harness sets it
+const WATER_MOST = waterStepsMost();
 import { paperPlanes } from './paper-planes.mjs';
 import { mergeOf } from '../brush.mjs';
 import { deviceHealth, brokenReason, assertHealthy, markBroken } from './device-health.mjs';
 import { cpuFallbackWarning } from './backend-record.mjs';
+// one float32 step relative to 1 (2^-23): the rounding a GPU value read back as float32 can carry
+const F32_STEP = 2 ** -23;
+/** A paint or water amount read back from the GPU: within one float32 step of zero (relative to what the brush can hold) it is zero; further below zero is a fault. */
+export function readbackAmount(v, capacity, what) {
+  const floor = -F32_STEP * Math.max(1, capacity);
+  if (!(v >= floor)) throw new Error(`GPU brush readback: ${what} ${v} is below zero by more than float32 rounding (${floor})`);
+  return v < 0 ? 0 : v;
+}
 
 const PLANES = K => 4 + 3 * K;
 // DOWN_TRACE=1: count rectangle reads by caller, printed at exit
@@ -35,9 +47,11 @@ const RING_SLOTS = 256, RING_FLOATS = 6144;
 const POST_LIMIT = 4 * 1024 * 1024; // floats: 16 MB
 const TIMEOUT_MS = 30 * 60 * 1000;
 const DEFERRED_ARCHIVE_BUDGET_BYTES = 128 * 1024 * 1024;
+// Maximum staging allocation for a speculative section-brush read.
+const PREFETCH_BYTES = 64 * 1024 * 1024;
 // the worker ops that only read the sheet: every other op counts as a change (GpuLink.version)
-const READ_OPS = new Set(['down', 'paperDown', 'paperGate', 'sums', 'topDown', 'topDownRect', 'counters', 'idle', 'prof', 'dryStats', 'snap', 'framePort', 'brushState', 'lowerDown', 'lowerBatch', 'opticalInit', 'opticalFrame', 'drainDrys','demandCheckState']);
-const OPT_KEYS = ['flow', 'flowIters', 'diffuse', 'evap', 'edgeEvap', 'edgeWidth', 'absorb', 'film', 'capRate', 'capEps', 'capDelta', 'settle', 'lift', 'looseLift', 'scour', 'liftDepth', 'rewetLift', 'wetEps', 'spill', 'spillHeight', 'dampEase', 'pinning', 'pinFibre', 'encloseEase', 'slideCap', 'holeFill', 'holeSpan', 'fibreFlow', 'carryDepth', 'flowDepth', 'gran', 'granFill', 'slide', 'slideFill', 'repose', 'hold', 'sizing', 'wickFilter', 'dt', 'capSigma', 'paperDry', 'marangoni', 'slope', 'filmDiffuse', 'filmDepth', 'mmPerCell', 'edgeFlowDepth'];
+const READ_OPS = new Set(['down', 'paperDown', 'paperGate', 'sums', 'topDown', 'topSums', 'topDownRect', 'counters', 'idle', 'prof', 'dryStats', 'snap', 'framePort', 'brushState', 'lowerDown', 'lowerBatch', 'opticalInit', 'opticalFrame', 'drainDrys','demandCheckState']);
+const OPT_KEYS = ['flow', 'flowIters', 'diffuse', 'evap', 'edgeEvap', 'edgeWidth', 'absorb', 'film', 'capRate', 'capEps', 'capDelta', 'settle', 'lift', 'looseLift', 'scour', 'liftDepth', 'rewetLift', 'wetEps', 'spill', 'spillHeight', 'dampEase', 'pinning', 'pinFibre', 'encloseEase', 'slideCap', 'holeFill', 'holeSpan', 'fibreFlow', 'carryDepth', 'flowDepth', 'gran', 'granFill', 'slide', 'slideFill', 'repose', 'hold', 'sizing', 'wickFilter', 'dt', 'capSigma', 'paperDry', 'marangoni', 'slope', 'filmDiffuse', 'filmDepth', 'mmPerCell', 'edgeFlowDepth', 'edgeMm', 'reachMm', 'holdDepth', 'coSettle', 'fillRef', 'level', 'levelFloor', 'invade', 'push', 'puddle', 'meniscus', 'meniscusMm', 'tiltX', 'tiltY'];
 
 export class GpuLink {
   constructor(worker, shared, sheet) {
@@ -83,9 +97,12 @@ export class GpuLink {
   errText() { let e = 0; while (e < this.err.length && this.err[e]) e++; return new TextDecoder().decode(this.err.slice(0, e)); }
   post(msg, transfer) { assertHealthy(this.health); if(msg.op==='framePort')this.frameWorkerActive=true; if (!READ_OPS.has(msg.op)) this.version++; this.worker.postMessage(msg, transfer); }
 
+  // the board's tilt is the sheet's (sheet.mjs setTilt), not an option: it goes to the GPU sheet with the options
+  withTilt(o) { const t = this.sheet?.tilt; return { ...o, tiltX: t?.x ?? 0, tiltY: t?.y ?? 0 }; }
   applyOptions(o) {
-    if (o === this.lastO) return;
-    const pick = {}; let key = ''; for (const k of OPT_KEYS) if (o[k] !== undefined) { pick[k] = o[k]; key += `${k}=${o[k]};`; }
+    if (o === this.lastO && this.sheet?.tilt === this.lastTilt) return;
+    this.lastTilt = this.sheet?.tilt; const ot = this.withTilt(o);
+    const pick = {}; let key = ''; for (const k of OPT_KEYS) if (ot[k] !== undefined) { pick[k] = ot[k]; key += `${k}=${ot[k]};`; }
     this.lastO = o; if (key === this.lastKey) return;
     const prevVer = this.version;
     this.lastKey = key; this.post({ op: 'opts', o: pick });
@@ -114,9 +131,19 @@ export class GpuLink {
     this.stats.down++; this.stats.downMs += performance.now() - t; this.stats.downBytes = (this.stats.downBytes || 0) + a * PLANES(K) * 4;
     this.recordTransfer('down', a * PLANES(K) * 4);
   }
+  /** `rect` read into a private copy, packed W, s, M, ever, G[K], P[K], D[K] (a demand window's read-ahead); the CPU sheet is
+   *  not touched. */
+  downAhead(rect) {
+    const t = performance.now(); this.call({ op: 'down', rect });
+    const a = rect[2] * rect[3], out = this.rectData.slice(0, a * PLANES(this.K));
+    this.stats.down++; this.stats.downAhead = (this.stats.downAhead || 0) + 1; this.stats.downMs += performance.now() - t; this.stats.downBytes = (this.stats.downBytes || 0) + a * PLANES(this.K) * 4;
+    this.recordTransfer('down', a * PLANES(this.K) * 4);
+    return out;
+  }
   // A rectangle going up is packed into a private copy and posted: the worker applies it in order behind the steps, and the
   // brush carries on without waiting. Only a rectangle too big for a cheap copy goes through the shared buffer and waits.
   up(sheet, rect, logicalRect = null) {
+    if (sheet._cpuDemandWindow) sheet._cpuDemandWindow.ahead = null;
     const t = performance.now(), [x0, y0, rw, rh] = rect, a = rw * rh, K = this.K, w = this.w, post = a * PLANES(K) <= POST_LIMIT;
     const p = post ? new Float32Array(a * PLANES(K)) : this.rectData;
     for (let y = 0; y < rh; y++) {
@@ -135,6 +162,7 @@ export class GpuLink {
   full() { return [0, 0, this.w, this.h]; }
   // Uploads a demand-window payload and returns the GPU's pigment mask and signed-zero flag for the logical rectangle.
   upReduced(sheet, rect, logicalRect) {
+    if (sheet._cpuDemandWindow) sheet._cpuDemandWindow.ahead = null;
     const started = performance.now();
     if (process.env.GPU_DEMAND_READBACK === '0' || (process.env.GPU_DEMAND_READBACK !== '1' && !sheet._cpuDemandWindow)) throw new Error('GPU demand readback is disabled');
     const logical = this.validRect(logicalRect);
@@ -367,7 +395,7 @@ export class GpuLink {
     const ok = rect.every(Number.isFinite) && rect[0] >= 0 && rect[1] >= 0 && rect[2] >= 1 && rect[3] >= 1 && rect[0] + rect[2] <= this.w && rect[1] + rect[3] <= this.h;
     return ok ? rect : this.full();
   }
-  beginStroke(sheet, rect, { tracked = false, instrument, periodic = false, planOverflow = false, flowEvery = 0 } = {}) {
+  beginStroke(sheet, rect, { tracked = false, instrument, periodic = false, planOverflow = false, flowEvery = 0, prefetch = 0 } = {}) {
     this.notPlanning('another stroke');
     rect = this.validRect(rect);
     this.stroke = rect;
@@ -385,9 +413,18 @@ export class GpuLink {
       resetCpuStrokeDirty(sheet);
       sheet._cpuDemandWindow = new CpuDemandWindow(this.w,this.h,
         [sheet.W,sheet.s,sheet.M,sheet.ever,...sheet.G,...sheet.P,...sheet.D],
-        window => this.down(sheet,window),process.env.GPU_DEMAND_READBACK==='fast'?8:1);
+        window => this.down(sheet,window),process.env.GPU_DEMAND_READBACK==='fast'?8:1,rect => this.downAhead(rect));
       // ensureFresh above already read `rect`
       sheet._cpuDemandWindow.rect = process.env.GPU_DEMAND_READBACK==='fast'?null:rect.slice();
+      // A brush whose contact reaches past its planned rectangle (the section brush's tuft and varied path) reads a margin
+      // round it now, in the same transfer, rather than widening the window a read at a time as its footprints arrive.
+      if (Number.isInteger(prefetch) && prefetch > 0) {
+        // whole demand tiles (GPU_DEMAND_READBACK=fast reads in tiles of 8), so a tile-rounded demand still falls inside
+        const tile = sheet._cpuDemandWindow.tile, lo = v => Math.max(0, Math.floor(v / tile) * tile), hi = (v, n) => Math.min(n, Math.ceil(v / tile) * tile);
+        const x = lo(rect[0] - prefetch), y = lo(rect[1] - prefetch), ahead = [x, y, hi(rect[0] + rect[2] + prefetch, this.w) - x, hi(rect[1] + rect[3] + prefetch, this.h) - y];
+        // a speculative read never asks for more than a modest pack buffer (the stroke itself may still need more)
+        if (ahead[2] * ahead[3] * PLANES(this.K) * 4 * 1.5 <= PREFETCH_BYTES) sheet._cpuDemandWindow.prefetch(ahead);
+      }
     }
     syncWetReachVersion(sheet);
   }
@@ -460,7 +497,7 @@ export class GpuLink {
     const { F, U } = plan, paper = sheet.paper;
     U[0] = lanes; U[1] = K; U[2] = nClumps; F[3] = brush.flat ? 1 : 0; F[4] = brush.capacity; F[5] = brush.free; F[6] = brush.film; F[7] = brush.give;
     F[8] = brush.wetness; F[9] = brush.bridge; F[10] = brush.bridgeSoft; F[11] = brush.breakup; F[12] = brush.fine; F[13] = brush.coarse; F[14] = brush.wetMix;
-    U[15] = brush.stiffness; F[16] = paper.relief ?? 0.2; F[17] = Math.min(1, brush.load ?? 1); F[18] = brush.bridgeStreak; F[19] = mergeOf(brush);
+    U[15] = brush.stiffness; F[16] = paper.relief ?? 0.2; [F[37], F[38]] = toothRange(paper); F[17] = Math.min(1, brush.load ?? 1); F[18] = brush.bridgeStreak; F[19] = mergeOf(brush);
     U[21] = sheet.wetting ? 1 : 0; U[23] = brush.rs.s & 65535; U[22] = brush.rs.s >>> 16; F[25] = brush.feed; U[26] = 0; U[27] = SP; U[28] = H0; U[29] = S0; U[30] = HS;
     F[34] = brush.depositDepth || 0;
     F[35] = brush.resP.some(v => Object.is(v, -0)) || brush.hairs.some(h => h.pig.some(v => Object.is(v, -0))) ? 1 : 0;
@@ -544,8 +581,11 @@ export class GpuLink {
       return;
     }
     if (p.hairs) {   // not when the brush has been dipped since: the hairs are the dip's
-      for (let j = 0; j < lanes; j++) { const hr = brush.hairs[j], b = o + H0 + j * HS; hr.water = R[b]; for (let k = 0; k < K; k++) hr.pig[k] = R[b + 4 + k]; }
-      const bb = o + H0 + lanes * HS; brush.resW = R[bb]; for (let k = 0; k < K; k++) brush.resP[k] = R[bb + 4 + k];
+      // float32 rounding can leave a hair a hair's-breadth below empty (seen: -1e-10); within one float32 step of what
+      // the brush can hold (2^-23 x its capacity) that is zero, and anything further below is a real fault and stops
+      const read = (v, what) => readbackAmount(v, brush.capacity, what);
+      for (let j = 0; j < lanes; j++) { const hr = brush.hairs[j], b = o + H0 + j * HS; hr.water = read(R[b], 'hair water'); for (let k = 0; k < K; k++) hr.pig[k] = read(R[b + 4 + k], 'hair pigment'); }
+      const bb = o + H0 + lanes * HS; brush.resW = read(R[bb], 'belly water'); for (let k = 0; k < K; k++) brush.resP[k] = read(R[bb + 4 + k], 'belly pigment');
     }
     brush.rs.s = RU[o + 23] | (RU[o + 22] << 16);
     brush._pend = null; this.owners[slot] = null; this.stats.settleMs = (this.stats.settleMs || 0) + performance.now() - t0;
@@ -583,7 +623,7 @@ export class GpuLink {
   }
 
   step(sheet, o) {
-    if (this.planning) { this.applyOptions(o); this.markFlow(this.planning); this.stats.steps++; sheet.steps++; return true; }
+    if (this.planning) { this.applyOptions(o); this.markFlow(this.planning); this.stats.steps++; sheet.steps++; if (this.stats.steps > WATER_MOST) checkWaterSteps(this.stats.steps, WATER_MOST); return true; }
     if (this.needFullUp) this.fullUp(sheet);
     this.applyOptions(o);
     const prior = this.transferPhase;
@@ -594,7 +634,7 @@ export class GpuLink {
         this.stats.cpuStrokeFlows = (this.stats.cpuStrokeFlows || 0) + 1;
         this.uploadCpuStroke(sheet, this.stroke); // the brush deposited since the last sync
       }
-      this.post({ op: 'step', n: 1 }); this.stats.steps++; sheet.steps++;
+      this.post({ op: 'step', n: 1 }); this.stats.steps++; sheet.steps++; if (this.stats.steps > WATER_MOST) checkWaterSteps(this.stats.steps, WATER_MOST);
       this.paperChanged(this.stroke, 1, hadPaper ? this.paperVersion : -1);
       this.stale = true; this.topStale = true; this.fresh.stale();
       if (this.stroke) {
@@ -717,7 +757,7 @@ export class GpuLink {
     this.syncLower(sheet);
     this.stats.deferredArchiveDrains = (this.stats.deferredArchiveDrains ?? 0) + 1;
   }
-  optPick(o) { const p = {}; for (const k of OPT_KEYS) if (o[k] !== undefined) p[k] = o[k]; return p; }
+  optPick(o) { const p = {}, ot = this.withTilt(o); for (const k of OPT_KEYS) if (ot[k] !== undefined) p[k] = ot[k]; return p; }
 
   /** Make the CPU copy current everywhere (a render, thickness, a direct read). */
   syncAll(sheet) {
@@ -793,17 +833,23 @@ export class GpuLink {
     this.call({op:'opticalFrame',base:sameBase?null:base});
     this.stats.opticalFrames=(this.stats.opticalFrames??0)+1;
     this.stats.frameBytes=(this.stats.frameBytes??0)+this.n*3;
-    this.stats.opticalReadBytes=(this.stats.opticalReadBytes??0)+this.n*12;
+    this.stats.opticalReadBytes=(this.stats.opticalReadBytes??0)+Math.ceil(this.n*3/4)*4;
     return new Uint8ClampedArray(this.rectData.buffer,0,this.n*3).slice();
   }
   /** The newest dried layer, brought down if the GPU has changed it (a rewet lifts a little of it back). */
-  syncTop(sheet) {
+  syncTop(sheet, withSums = false) {
     this.flushDrys(sheet);
     if (this.paused || this.stroke) return;
     this.syncLower(sheet);
     if (this.topStale && sheet.layers.length) {
       // only the planes of the pigments the layer holds: the others are zero (a rewet lifts, it never adds)
-      const mask = this.topMask >>> 0; this.call({ op: 'topDown', mask }); const top = sheet.layers[sheet.layers.length - 1], n = this.n;
+      const mask = this.topMask >>> 0;
+      const paired = withSums && this.resident && !this.needFullUp && this.stale && !this.noSums && this.sumsVersion !== this.version;
+      if (paired) {
+        const t = performance.now(), sumMask = (this.topMask | this.wetMask) >>> 0;
+        this.call({op: 'topSums', mask, sumMask}); this.storeSums(sumMask, t);
+      } else this.call({op: 'topDown', mask});
+      const top = sheet.layers[sheet.layers.length - 1], n = this.n;
       let planes = 0; for (let k = 0; k < this.K; k++) if ((mask >>> k) & 1) { top[k].set(this.layerData.subarray(k * n, (k + 1) * n)); planes++; }
       this.topStale = false; this.topPlaceholder = false; this.stats.topDown = (this.stats.topDown || 0) + 1; this.stats.topBytes = (this.stats.topBytes || 0) + planes * n * 4;
     }
@@ -843,6 +889,9 @@ export class GpuLink {
     // only the pigments that can hold anything wet or unfixed come down (wetMask and the newest layer's, which a rewet can
     // lift); a plane that held something last time and cannot now is cleared once
     const t = performance.now(), mask = (this.topMask | this.wetMask) >>> 0; this.call({ op: 'sums', mask });
+    return this.storeSums(mask, t);
+  }
+  storeSums(mask, t) {
     const K = this.K, n = this.n;
     if (!this.sums) { this.sums = Array.from({ length: K }, () => new Float32Array(n)); this.sumsLive = 0; }
     let planes = 0;
@@ -856,6 +905,7 @@ export class GpuLink {
   /** The CPU wrote the whole sheet (masking, blotting, a CPU-only dry): the next GPU op uploads it. */
   cpuWroteAll() { this.notPlanning('a write of the whole sheet'); this.version++; this.paperWetRect=null; if (!this.paused) this.needFullUp = true; }
   fullUp(sheet) {
+    if (sheet._cpuDemandWindow) sheet._cpuDemandWindow.ahead = null;
     this.flushDrys(sheet);
     this.needFullUp = false; this.wetMask = 0; this.topMask = 0; this.up(sheet, this.full());
     this.call({ op: 'resist', mask: sheet.resist ? Uint8Array.from(sheet.resist) : null });
@@ -887,7 +937,7 @@ export class GpuLink {
  * Put `sheet` on the GPU if the mode allows and a GPU is there. mode: 'off' | 'auto' | 'on'. Returns
  * { backend: 'gpu' | 'cpu', mode, adapter?, reason? }; with 'on' and no GPU it throws. Blocks while the worker starts.
  */
-export function attachGpu(sheet, O, { mode = 'auto', log = m => console.error(m) } = {}) {
+export function attachGpu(sheet, O, { mode = 'auto', log = m => console.error(m), edgeThreads = 1 } = {}) {
   const note = { mode };
   if (mode === 'off') return sheet._gpuInfo = { ...note, backend: 'cpu', fallback: false, reason: '--gpu off' };
   const K = sheet.K, n = sheet.n, ctrlSab = new SharedArrayBuffer(64), errSab = new SharedArrayBuffer(512);
@@ -896,7 +946,7 @@ export function attachGpu(sheet, O, { mode = 'auto', log = m => console.error(m)
   const ringSab = new SharedArrayBuffer(4 * RING_SLOTS * RING_FLOATS), doneSab = new SharedArrayBuffer(4 * RING_SLOTS), sumSab = new SharedArrayBuffer(4 * K * n);
   const ctrl = new Int32Array(ctrlSab);
   const health = deviceHealth(); // a device error in the GPU thread, seen by every later call (device-health.mjs)
-  const gpuData = { ctrl: ctrlSab, health, err: errSab, adapterMetadata,strokePlanMetadata, rect: rectSab, layer: layerSab, ring: ringSab, done: doneSab, sum: sumSab };
+  const gpuData = { ctrl: ctrlSab, health, edgeThreads, err: errSab, adapterMetadata,strokePlanMetadata, rect: rectSab, layer: layerSab, ring: ringSab, done: doneSab, sum: sumSab };
   // tools/gpu/paint-batch.mjs: this painter is one sheet of a batch; its GPU thread is shared and reached through a port
   const batchPort = threadData?.gpuBatchPort;
   const worker = batchPort ? batchWorker(batchPort, gpuData) : new Worker(fileURLToPath(new URL('./worker.mjs', import.meta.url)), { workerData: gpuData });
@@ -943,7 +993,7 @@ export function attachGpu(sheet, O, { mode = 'auto', log = m => console.error(m)
       w: sheet.w, h: sheet.h, n, K, pigments: sheet.pigments, W: clone(sheet.W), s: clone(sheet.s), M: clone(sheet.M), ever: clone(sheet.ever), resist: clone(sheet.resist),
       G: sheet.G.map(clone), P: sheet.P.map(clone), D: sheet.D.map(clone), edge: new Float32Array(0), layers: [],
       paperPlanes: batchPort ? paperPlanes(paper, n) : undefined,
-      paper: { w: sheet.w, h: sheet.h, n, capacity: paper.capacity, grain: paper.grain, fdx: paper.fdx, fdy: paper.fdy, height: paper.height, valley: paper.valley, tooth: paper.tooth, proud: paper.proud, mmPerCell: paper.mmPerCell ?? 0 },
+      paper: { w: sheet.w, h: sheet.h, n, capacity: paper.capacity, grain: paper.grain, fdx: paper.fdx, fdy: paper.fdy, height: paper.height, grainH: paper.grainH, valley: paper.valley, surface: paper.surface, tooth: paper.tooth, proud: paper.proud, toothLo: paper.toothLo, toothSpan: paper.toothSpan, hollowUnit: paper.hollowUnit, zUm: paper.zUm ? true : undefined, mmPerCell: paper.mmPerCell ?? 0 },
     },
     top: top ? top.map(clone) : null,
   });

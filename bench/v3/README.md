@@ -1,14 +1,9 @@
-# V3 inputs
+# The freehand kit session
 
-V3 is V2 with attempts. One session paints one target. After each attempt the model sees its painting next to the target and paints again on a fresh sheet, keeping its notes and scripts. [scripts/v3.mjs](../scripts/v3.mjs) runs it.
+One session paints one target freehand, stroke by stroke, through `bench/kit.mjs`: round V3, and level 1 before 0.4's fixed rounds ([rules](../docs/rules.md)). `node bench/scripts/run.mjs --round V3 --model KEY --crops TARGET --out DIR` still runs it ([scripts/v3.mjs](../scripts/v3.mjs)). The kit, guard and technique guides are the [V2 ones](../v2/README.md).
 
-- [BRIEF.md](BRIEF.md): the brief, with `{CROP}`, `{SIZE}`, `{STYLE}`, `{TARGET}` and `{ATTEMPTS}` filled in per session.
-- [prompts.json](prompts.json): the first prompt and the prompt between attempts. The model may end the session early by writing `bench/DONE`.
+- [BRIEF.md](BRIEF.md) and [prompts.json](prompts.json): the brief and first prompt, filled in per session.
+- [crops.json](crops.json): the targets, each with its picture, coarse map and rendering unit (Auto's water steps, for the runaway guard). A target without one is refused.
+- [TIPS.md](TIPS.md) and [tips/](tips/): the painting tips.
 
-The toolkit, guard and technique guides are the V2 ones ([../v2/](../v2/README.md)). Rules:
-
-- Each attempt is stopped after 32 minutes. The brief says 30.
-- The paper seed is 1 for every attempt.
-- Attempt n of every target makes try n.
-
-Claude and Codex sessions are resumed between attempts. Open models on Together have no resume: each attempt is a fresh tool loop on the brief and the attempt's prompt, with the model's notes and earlier attempts on disk.
+One attempt of three runs of the model's script; the last completed run counts. The session has 60 minutes on the clock, runs closed ([closed.mjs](../scripts/pipeline/closed.mjs)) and has no network but the model's own service.

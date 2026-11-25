@@ -6,12 +6,15 @@
 //   --flocblue f, --flocgrey f, --flocviolet f, --flocearth f, --flocyellow f (unset preserves pigment): how strongly each kind flocculates, a share in [0, 1]
 //   (the grain slide in src/media/sheet.mjs mixes (1 - floc) * fibre + floc * tooth). Any floc flag turns --pigphys on.
 
-// --boxphys 1 (default 0): each box paint on the sheet takes its own published granulation, staining, flocculation,
-// scattering and density (src/crop/box.mjs physicalPigment, from the table Paint Lab shares). Picking is not affected:
-// the palette is chosen on the reference constants, and only the sheet's pigments change. Pigments with no box key
-// pass unchanged. It runs before the hue heuristic below, whose rules keep authored properties, and any explicit
-// --gamma* or --floc* flag still wins.
-import { BOX, physicalPigment } from '../../crop/box.mjs';
+// Box paints settle as their pigments do (always on): each box paint on the sheet carries its published granulation,
+// flocculation, staining and density (gamma, floc, omega, rho from the table Paint Lab shares,
+// src/media/pigment-physical.mjs). A granulating pigment (ultramarine, cerulean, the earths) settles into the
+// paper's hollows as the wash dries; a staining, non-granulating one (phthalos, quinacridone, hansa) does not. The
+// colour (K) and scattering (S) are the pigment's own as picked, so only what the sheet does with the paint changes,
+// and picking is not affected. Pigments with no box name pass unchanged. The hue heuristic below keeps these
+// authored properties; an explicit --gamma* or --floc* flag still wins.
+import { BOX } from '../../crop/box.mjs';
+import { physicsFields } from '../../media/pigment-physical.mjs';
 
 const FLOC_FLAGS = ['flocblue', 'flocgrey', 'flocviolet', 'flocearth', 'flocyellow'];
 const flocOf = (num, flag) => Math.min(1, Math.max(0, num(flag, 0) || 0));
@@ -22,23 +25,27 @@ const withPhysics = (p, num) => {
   const [r, g, b] = Array.from(p.K), top = Math.max(r, g, b), spread = top - Math.min(r, g, b);
   let kind = spread < num('pigneutral', 0.3) * top ? 'grey' : top === r ? 'blue' : top === b ? 'earth' : 'violet';
   if (kind === 'earth' && (num('gammayellow', -1) >= 0 || num('flocyellow', -1) >= 0) && g < num('pigyellow', 0.35) * b) kind = 'yellow';
-  const phys = { blue: { rho: 0.08, gamma: num('gammablue', 0.8) }, earth: { rho: 0.06, gamma: num('gammaearth', 0.5) }, grey: { rho: 0.06, gamma: num('gammagrey', 0.6) }, violet: { rho: 0.05, gamma: num('gammaviolet', 0.4) }, yellow: { rho: 0.05, gamma: num('gammayellow', 0.1) } }[kind];
+  // dUm, rhoP: each class's typical particle diameter (um) and density (kg/m^3) for the Stokes settling (src/media/settling.mjs),
+  // as src/media/pigment-physical.mjs gives the paints that stand for it: blue as ultramarine (PB29, 2 um, 2350; Handprint,
+  // Pigment Compendium), earth as the natural iron oxides (1 to 5 um, about 3500; Pigment Compendium), grey as a carbon and
+  // ultramarine mix (Payne's grey, about 0.9 um, 1870), violet as a quinacridone (0.1 um, 1500; Herbst and Hunger) and
+  // yellow as an arylide (0.2 um, 1500; Herbst and Hunger)
+  const phys = { blue: { rho: 0.08, gamma: num('gammablue', 0.8), dUm: 2, rhoP: 2350 }, earth: { rho: 0.06, gamma: num('gammaearth', 0.5), dUm: 2, rhoP: 3500 }, grey: { rho: 0.06, gamma: num('gammagrey', 0.6), dUm: 0.9, rhoP: 1870 }, violet: { rho: 0.05, gamma: num('gammaviolet', 0.4), dUm: 0.1, rhoP: 1500 }, yellow: { rho: 0.05, gamma: num('gammayellow', 0.1), dUm: 0.2, rhoP: 1500 } }[kind];
   const flag = 'floc' + kind, configured = num(flag, NaN);
   const floc = Number.isNaN(configured) ? p.floc : flocOf(num, flag);
-  return { ...p, rho: p.rho ?? phys.rho, gamma: num('gamma' + kind, p.gamma ?? phys.gamma), ...(floc != null ? { floc } : {}), kind };
+  return { ...p, rho: p.rho ?? phys.rho, gamma: num('gamma' + kind, p.gamma ?? phys.gamma), dUm: p.dUm ?? phys.dUm, rhoP: p.rhoP ?? phys.rhoP, ...(floc != null ? { floc } : {}), kind };
 };
 
-/** --boxphys: box pigments swapped for their physical pigments; the same array when the flag is off. */
-function boxPhysics({ pigments, opt, log }) {
-  if (opt('boxphys', '0') === '0') return pigments;
-  const out = pigments.map(p => { const paint = BOX.find(b => b.name === p.name && (p.key == null || b.key === p.key)); return paint ? physicalPigment(paint) : p; });
-  log(`--boxphys: box paints on their published physics: ${out.map((p, j) => (out[j] === pigments[j] ? `${j} unchanged` : `${j} ${p.name} gamma ${p.gamma} omega ${p.omega} rho ${p.rho}${p.floc ? ` floc ${p.floc}` : ''} scatter ${p.S[0]}`)).join(', ')}`);
+/** Box pigments given their published settling physics; colour and scattering kept. */
+function boxPhysics({ pigments, log }) {
+  const out = pigments.map(p => { const paint = BOX.find(b => b.name === p.name && (p.key == null || b.key === p.key)); return paint ? { ...p, ...physicsFields(paint.physics), key: paint.key } : p; });
+  if (out.some((p, j) => p !== pigments[j])) log(`pigments settle as published: ${out.map((p, j) => (p === pigments[j] ? `${j} unchanged` : `${j} ${p.name} gamma ${p.gamma} omega ${p.omega} rho ${p.rho} d ${p.dUm} um${p.floc ? ` floc ${p.floc}` : ''}`)).join(', ')}`);
   return out;
 }
 
 // The palette's pigments, each given a physics by its hue under --pigphys, as a new array either way.
 export function pigmentPhysics({ pigments: given, opt, num, log }) {
-  const pigments = boxPhysics({ pigments: given, opt, log });
+  const pigments = boxPhysics({ pigments: given, log });
   const flocSet = FLOC_FLAGS.filter(f => opt(f, '') !== '');
   for (const f of flocSet) { const v = num(f, 0); if (v !== flocOf(num, f)) log(`--${f} ${v} clamped to ${flocOf(num, f)} (floc is a share in [0, 1])`); }
   const on = opt('pigphys', '0') !== '0' || flocSet.length > 0;

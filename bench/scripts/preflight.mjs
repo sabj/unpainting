@@ -3,6 +3,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { codeState } from '../../src/paint/code-state.mjs';
+import { sourceScale } from '../../tools/plate/source-scale.mjs';
 
 export const scorePython = (explicit, env = process.env) => explicit || env.BENCH_SCORE_PYTHON || 'python3';
 
@@ -20,10 +21,16 @@ export function preflight({ root, python, env = process.env, run = spawnSync, ex
   }
 }
 
-// Authoritative post-render / comparison guardrail: prevents comparing CPU fallback runs against GPU runs,
-// prevents passing 300px crop thumbnails as full-resolution plates, enforces SAM segmentation on non-planless runs,
-// and verifies progressive playback stage distinctness.
-export function verifyComparisonRun(runDir, { requireGpu = true, requireSegments = false, requireStages = false, requireDistinctStages = true, minWidth = 540, minSourceWidth = 0, readFile = p => fs.readFileSync(p, 'utf8'), readBytes = p => fs.readFileSync(p), exists = fs.existsSync } = {}) {
+// Authoritative post-render / comparison guardrail: prevents comparing CPU fallback runs against GPU runs, refuses a
+// plate painted from an enlarged source, enforces SAM segmentation on non-planless runs, and verifies progressive
+// playback stage distinctness.
+//
+// Source scale: the render width never exceeds the source width, and plates are compared at source scale. A run must
+// record both widths, and its sheet may have at most maxSourceScale cells across for each source pixel across (1: the
+// painter's own rule, tools/plate/source-scale.mjs). There is no least width: a 300 px target painted 300 cells wide
+// passes, and so does every target in bench/v2/targets at its own width. width, when given, is the width the subject
+// specifies, and the run must have been painted exactly that wide.
+export function verifyComparisonRun(runDir, { requireGpu = true, requireSegments = false, requireStages = false, requireDistinctStages = true, maxSourceScale = 1, width: specWidth = null, readFile = p => fs.readFileSync(p, 'utf8'), readBytes = p => fs.readFileSync(p), exists = fs.existsSync } = {}) {
   const cardPath = path.join(runDir, 'run-card.json');
   const speedPath = path.join(runDir, 'paint-speed-summary.json');
   const card = exists(cardPath) ? JSON.parse(readFile(cardPath)) : null;
@@ -34,14 +41,17 @@ export function verifyComparisonRun(runDir, { requireGpu = true, requireSegments
   if (requireGpu && (backend !== 'gpu' || fallback)) {
     throw new Error(`comparison run ${runDir} used backend "${backend ?? 'unknown'}" (fallback=${fallback}); GPU hardware is required for timing and quality comparisons`);
   }
-  const width = Number(card?.dimensions?.paintWidth ?? speed?.width ?? card?.width ?? card?.frame?.[0] ?? 0);
-  if (minWidth > 0 && (!(width > 0) || width < minWidth)) {
-    throw new Error(`comparison run ${runDir} rendered at width ${width}px (< ${minWidth}px minimum); do not substitute 300px crop thumbnails for full-resolution targets`);
-  }
+  // the sheet's cells across; a card from before sheetWidth was recorded has only the output's width, which --inkres widens
+  const width = Number(card?.dimensions?.sheetWidth ?? card?.dimensions?.paintWidth ?? speed?.width ?? card?.width ?? card?.frame?.[0] ?? 0);
+  if (!(width > 0)) throw new Error(`comparison run ${runDir} records no render width, so it cannot be shown to be painted at source scale`);
   const sourceWidth = Number(card?.dimensions?.sourceWidth ?? 0);
-  const enlargement = Number(card?.dimensions?.enlargement ?? (sourceWidth > 0 && width > 0 ? +(width / sourceWidth).toFixed(2) : 0));
-  if (minSourceWidth > 0 && (!(sourceWidth > 0) || sourceWidth < minSourceWidth)) {
-    throw new Error(`comparison run ${runDir} used a ${sourceWidth}px source target (< ${minSourceWidth}px minimum, ${enlargement}x enlargement)`);
+  if (!(sourceWidth > 0)) throw new Error(`comparison run ${runDir} records no source width (run-card.json dimensions.sourceWidth), so it cannot be shown to be painted at source scale`);
+  const scale = sourceScale({ sourceWidth, width, allowed: maxSourceScale });
+  if (!scale.ok) {
+    throw new Error(`comparison run ${runDir} was painted ${width} cells wide from a ${sourceWidth} px source, ${+scale.sourceScale.toFixed(3)} cells for each source pixel (at most ${maxSourceScale}); the render width never exceeds the source width, and plates are compared at source scale`);
+  }
+  if (specWidth != null && width !== specWidth) {
+    throw new Error(`comparison run ${runDir} was painted ${width} cells wide, not the ${specWidth} its subject specifies`);
   }
   if (requireSegments) {
     const segPath = path.join(runDir, 'segments.json');
@@ -71,7 +81,7 @@ export function verifyComparisonRun(runDir, { requireGpu = true, requireSegments
       }
     }
   }
-  return { ok: true, backend, width, sourceWidth, enlargement };
+  return { ok: true, backend, width, sourceWidth, sourceScale: scale.sourceScale };
 }
 
 export function verifyTearsheetContract({ models = [], stages = [], requiredModels = ['argon', 'astra', 'opus'], minStages = 5 } = {}) {

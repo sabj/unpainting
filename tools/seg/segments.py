@@ -47,9 +47,9 @@ MIN_REGION = 0.0004
 # Where a shared boundary stops being a stray contact and becomes a line a person would draw, in points.
 MIN_BOUNDARY_FRACTION = 0.03
 
-FOREGROUND = ('figure', 'dog', 'ball')
+FOREGROUND = ('figure',)
 # Painting order, back to front: a later name wins the pixels where two regions were both claimed.
-ORDER = ('background', 'sky', 'sea', 'trees', 'sand', 'figure', 'dog', 'ball')
+ORDER = ('background', 'sky', 'sea', 'trees', 'sand', 'figure')
 
 
 def read_image(path):
@@ -88,53 +88,6 @@ def figure_mask(shape, source, explicit, mask_dir):
     if m.mean() < 0.002:
         return None, f'figure mask {path} is empty'
     return m, f'figure from {path}'
-
-
-def darkest_component(lab, blocked, shape):
-    """The dog: the darkest compact thing that is not the figure and stands on the ground. Taken as the
-    best-scoring dark component, so the figure's cast shadow and the treeline do not join it.
-    """
-    H, W = shape
-    L = lab[..., 0]
-    floor = max(22.0, float(np.percentile(L, 1.5)) + 10.0)
-    dark = ((L < floor) & ~blocked).astype(np.uint8)
-    dark = cv2.morphologyEx(dark, cv2.MORPH_OPEN, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (odd(W * 0.012),) * 2))
-    n, cc, st, ct = cv2.connectedComponentsWithStats(dark, 8)
-    best, best_score = None, 0.0
-    for i in range(1, n):
-        area = st[i, cv2.CC_STAT_AREA] / float(H * W)
-        if area < 0.0015 or area > 0.20:
-            continue
-        cy = ct[i][1] / H
-        box = st[i, cv2.CC_STAT_WIDTH] * st[i, cv2.CC_STAT_HEIGHT]
-        fill = st[i, cv2.CC_STAT_AREA] / max(1.0, box)          # a blob, not a smear along the horizon
-        score = area * fill * (0.4 + cy)                        # and standing on the ground, not floating in the sky
-        if score > best_score:
-            best, best_score = i, score
-    return None if best is None else (cc == best)
-
-
-def green_ball(bgr, shape, near):
-    """The ball: a small, saturated, green patch within reach of the figure; the reach test rejects sunlit bushes."""
-    H, W = shape
-    hsv = cv2.cvtColor(cv2.GaussianBlur(bgr, (0, 0), max(1.0, W * 0.002)), cv2.COLOR_BGR2HSV)
-    hue, sat, val = hsv[..., 0].astype(np.int32), hsv[..., 1].astype(np.int32), hsv[..., 2].astype(np.int32)
-    m = ((hue >= 30) & (hue <= 95) & (sat > 70) & (val > 50)).astype(np.uint8)
-    n, cc, st, ct = cv2.connectedComponentsWithStats(m, 8)
-    best, best_area = None, 0
-    for i in range(1, n):
-        area = st[i, cv2.CC_STAT_AREA] / float(H * W)
-        if not MIN_REGION <= area <= 0.015:                      # a fleck of sunlit leaf is not a ball
-            continue
-        w, h = st[i, cv2.CC_STAT_WIDTH], st[i, cv2.CC_STAT_HEIGHT]
-        if max(w, h) > 4 * min(w, h):                            # a ball is round; a green shrub line is not
-            continue
-        cy, cx = int(round(ct[i][1])), int(round(ct[i][0]))
-        if near is not None and not near[min(H - 1, cy), min(W - 1, cx)]:
-            continue
-        if st[i, cv2.CC_STAT_AREA] > best_area:
-            best, best_area = i, st[i, cv2.CC_STAT_AREA]
-    return None if best is None else (cc == best)
 
 
 def horizon_row(lab, blocked, shape):
@@ -235,7 +188,7 @@ def sam_masks(bgr, checkpoint, model_type='vit_b'):
     # The point grid arrives as float64 and Metal refuses it; the only change SAM needs to run on a Mac's GPU.
     original = ResizeLongestSide.apply_coords
     ResizeLongestSide.apply_coords = lambda self, c, s: original(self, c, s).astype(np.float32)
-    device = 'mps' if torch.backends.mps.is_available() else ('cuda' if torch.cuda.is_available() else 'cpu')
+    device, _ = sam_regions.pick_device(torch)
     sam = sam_model_registry[model_type](checkpoint=checkpoint).to(device)
     H, W = bgr.shape[:2]
     gen = SamAutomaticMaskGenerator(
@@ -416,27 +369,15 @@ def segment(path, args):
     figure, note = figure_mask((sh, sw), path, args.mask, args.masks)
     notes.append(note)
     blocked = np.zeros((sh, sw), bool) if figure is None else figure.copy()
-    dog = darkest_component(lab, blocked, (sh, sw))
-    if dog is not None:
-        blocked |= dog
-    reach = None if figure is None else cv2.dilate(
-        figure.astype(np.uint8), cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (odd(sw * 0.08),) * 2)) > 0
-    ball = green_ball(small, (sh, sw), reach)
-    notes.append(f"dog {'found' if dog is not None else 'not found'}, ball {'found' if ball is not None else 'not found'}")
 
     horizon = horizon_row(lab, blocked, (sh, sw))
     notes.append(f'horizon at y {horizon / sh:.2f}, paper at L {float(np.percentile(lab[..., 0], 97)):.0f}')
     clusters = clusters_in_lab(lab, args.k, max(1.0, sw * 0.004))
     paper = float(np.percentile(lab[..., 0], 97))
     names = rule_field(lab, clusters, blocked, horizon, paper, (sh, sw))
-    # The objects go in before SAM sees the field, so that SAM's boundary for the dog, which is the one it is best at,
-    # replaces the dark threshold's fringe rather than being overwritten by it.
+    # The figure goes in before SAM sees the field, so SAM's boundary replaces the mask's fringe.
     if figure is not None:
         names[figure] = 'figure'
-    if dog is not None:
-        names[dog] = 'dog'
-    if ball is not None:
-        names[ball] = 'ball'
 
     if args.sam != 'off':
         checkpoint = find_checkpoint(args.checkpoint)
@@ -451,9 +392,6 @@ def segment(path, args):
             notes.append(note)
             if masks:
                 names = snap_to_sam(names, masks, keep=set(np.unique(names)) - {''})
-    # and the ball goes back afterwards: it is a few hundred pixels, and every mask that covers it is mostly hand.
-    if ball is not None:
-        names[ball] = 'ball'
 
     names = resize_names(names, (W, H))
     field, present = compose(names, (H, W), odd(min(H, W) * BRUSH_FRACTION))
@@ -492,7 +430,7 @@ def segment_regions(path, args):
             masks, info = sam_regions.sam_masks(cv2.cvtColor(small, cv2.COLOR_BGR2RGB), checkpoint, args.model, args.points)
             field, used = sam_regions.sam_partition(masks, lab)
             backend = {**info, 'laid': used, 'checkpoint': os.path.basename(checkpoint)}
-            notes.append(f"SAM {info['model']} on {info['device']}: {info['masks']} masks, {used} laid, {info['seconds']} s")
+            notes.append(f"SAM {info['model']} on {info['device']}{' (PAINTER_SEG_DEVICE)' if info.get('deviceChoice') != 'auto' else ''}: {info['masks']} masks, {used} laid, {info['seconds']} s")
         except RuntimeError as e:
             if args.sam == 'require':
                 raise SystemExit(f'segments: SAM required and it did not run: {e}')

@@ -1,6 +1,6 @@
 {
- "retrieved": "2026-10-07",
- "note": "USD per million tokens, standard (non-batch) short-context API list prices. Used only for the estimated API-equivalent cost of subscription runs in the benchmark tables. OpenAI figures checked against the text of the OpenAI pricing page (Standard, Short context table) on 2026-10-07; they match. The page also lists higher long-context rates; per-request sizes are not recorded, so short-context rates are used.",
+ "retrieved": "2026-11-24",
+ "note": "USD per million tokens, standard (non-batch) short-context API list prices: input (fresh), cachedInput or cacheRead (cached input), output. Used for the estimated API-equivalent cost of subscription runs in the benchmark tables, and for usage.json's model.costUSD when a command reports tokens but no money (tools/paint/prices.mjs: marked 'estimated from list prices'). Cached input is a tenth of input where the provider lists none. OpenAI figures read on the OpenAI pricing page (Standard, Short context) on 2026-10-07 and again on 2026-11-24 (Terra added); Anthropic from its pricing page; Gemini as the owner gave them on 2026-11-24. An entry with 'after' changes price on that date. A key matches a model id exactly, or the id less its effort (-low, -medium, -high, -xhigh).",
  "models": {
   "claude-opus-5-5": {
    "label": "Claude Opus 5.5",
@@ -35,7 +35,7 @@
    "input": 10,
    "cachedInput": 1,
    "output": 50,
-   "verified": "2026-10-07"
+   "verified": "2026-11-24"
   },
   "gpt-6-luna": {
    "label": "Codex Luna",
@@ -51,7 +51,7 @@
    "input": 2,
    "cachedInput": 0.1,
    "output": 10,
-   "verified": "2026-10-07"
+   "verified": "2026-11-24"
   },
   "claude-fable-5-1": {
    "label": "Claude Fable 5.1",
@@ -61,6 +61,70 @@
    "cacheWrite5m": 12.5,
    "cacheRead": 0.25,
    "output": 50
+  },
+  "claude-fable-5-2": {
+   "label": "Claude Fable 5.2",
+   "source": "https://platform.claude.com/docs/en/about-claude/pricing",
+   "input": 8,
+   "cacheRead": 0.2,
+   "output": 40,
+   "verified": "2026-11-24"
+  },
+  "gpt-6.1-terra": {
+   "label": "Codex Terra",
+   "source": "https://developers.openai.com/api/docs/pricing",
+   "input": 1,
+   "cachedInput": 0.05,
+   "output": 5,
+   "verified": "2026-11-24"
+  },
+  "gemini-4-neon": {
+   "label": "Gemini 4 Neon",
+   "source": "the owner, 2026-11-24 (Google's list price)",
+   "input": 3,
+   "cachedInput": 0.3,
+   "output": 15,
+   "thinkingAsOutput": true,
+   "note": "cached input a tenth of input; thinking tokens, which agy reports apart from output, are billed as output"
+  },
+  "gemini-4-carbon": {
+   "label": "Gemini 4 Carbon",
+   "source": "the owner, 2026-11-24 (Google's list price)",
+   "input": 2,
+   "cachedInput": 0.2,
+   "output": 10,
+   "thinkingAsOutput": true,
+   "after": {
+    "date": "2026-12-01",
+    "input": 4,
+    "cachedInput": 0.4,
+    "output": 20
+   },
+   "note": "$2/$10 until 30 Nov 2026, then $4/$20; cached input a tenth of input; thinking tokens, which agy reports apart from output, are billed as output"
+  },
+  "gemini-4-argon": {
+   "label": "Gemini 4 Argon",
+   "source": "the owner, 2026-11-24 (Google's list price)",
+   "input": 2,
+   "cachedInput": 0.2,
+   "output": 10,
+   "thinkingAsOutput": true,
+   "after": {
+    "date": "2026-12-01",
+    "input": 4,
+    "cachedInput": 0.4,
+    "output": 20
+   },
+   "note": "$2/$10 until 30 Nov 2026, then $4/$20; cached input a tenth of input; thinking tokens, which agy reports apart from output, are billed as output"
+  },
+  "muse-wonder-full-1.0": {
+   "label": "Muse Wonder Full",
+   "source": "https://developer.meta.com/ai/models/muse-wonder/",
+   "input": 4,
+   "cachedInput": 0.2,
+   "output": 20,
+   "verified": false,
+   "note": "Meta publishes no API price for Wonder Full: it is sold only by subscription through Muse Code (Power $50 a month, Maximum $200). These are the API list prices of its sibling Muse Wonder (muse-wonder-1.0), read from search-indexed copies of Meta's page on 2026-11-24, not the page itself: an estimate twice over"
   }
  }
 }

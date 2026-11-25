@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {framePolicy, fastPaintFrame, progressFrames} from './frame-policy.mjs';
+import {framePolicy, fastPaintFrame, fastKeepsFrame} from './frame-policy.mjs';
 
 test('checkpoints keep first wash and five completed boundaries plus gallery stages', () => {
   const policy = framePolicy(), kept = [];
@@ -44,15 +44,23 @@ test('fast all-frame films keep every fourth completed pass, every forced bounda
   for (const stage of ['paper', 'frisket', 'prep', 'finished']) assert.equal(fastPaintFrame({stage}), true);
 });
 
-test('progress frames fall at equal shares of the sweeps, and none on the last sweep, which its pass already films', () => {
-  const p = progressFrames(120, 12);
-  const due = [];
-  for (let i = 1; i <= 120; i++) if (p.laid()) due.push(i);
-  assert.deepEqual(due, [10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110]);
-});
-
-test('progress frames skip shares a long count jumps over, and an empty plan films nothing', () => {
-  const p = progressFrames(3, 12);
-  assert.deepEqual([p.laid(), p.laid(), p.laid()], [true, true, false]);
-  assert.equal(progressFrames(0).laid(), false);
+test('a fast film keeps the frames laid inside a pass; keeping all frames without a film keeps boundaries only', () => {
+  const laying = {stage: 'paint', pass: 5, of: 40, laying: true}, boundary = {stage: 'paint', pass: 5, of: 40};
+  const film = framePolicy({video: true}), all = framePolicy({keepAll: true}), plain = framePolicy();
+  assert.equal(film.film, true); assert.equal(all.film, false); assert.equal(plain.film, false);
+  // a film: every frame asked for, and a pass's --frames shares although they repeat one stage
+  film.keep(laying);
+  assert.equal(fastKeepsFrame(laying, film, false), true);
+  assert.equal(fastKeepsFrame(laying, film, true), true);
+  assert.equal(fastKeepsFrame(boundary, film, false), true);
+  assert.equal(fastKeepsFrame(boundary, film, true), false);
+  // all frames, no film: nothing while a pass is laid, and only every fourth pass's boundary
+  all.keep(laying);
+  assert.equal(fastKeepsFrame(laying, all, false), false);
+  assert.equal(fastKeepsFrame({stage: 'paint', pass: 8, of: 40}, {all: true, film: false, byDefault: false}, false), true);
+  assert.equal(fastKeepsFrame(boundary, {all: true, film: false, byDefault: false}, false), false);
+  assert.equal(fastKeepsFrame(boundary, {all: true, film: false, byDefault: true}, false), true);
+  // checkpoints only: whatever the checkpoint policy kept, once
+  assert.equal(fastKeepsFrame(boundary, {all: false, film: false, byDefault: true}, false), true);
+  assert.equal(fastKeepsFrame(boundary, {all: false, film: false, byDefault: true}, true), false);
 });

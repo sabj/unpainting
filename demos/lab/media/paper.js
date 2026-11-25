@@ -1,4 +1,9 @@
 // Generated from src/media/paper.mjs by tools/lab/sync-site-media.mjs. Edit the source.
+import { paperRelief, HEIGHT_SPAN_UM } from './paper-relief.js';
+import { grainSurface } from './grain-field.js';
+import { cockleField } from './cockle.js';
+// a unit of the paper's height is this many mm of the water's surface (sheet.mjs DEFAULTS.slope)
+export const SURFACE_MM = 0.1;
 // Paper: a surface height made of fibres and tooth, and the capacity of its pores. Rough watercolour paper is a
 // felt of cotton fibres pressed together, lightly sized (Computer-Generated Watercolor, section 2.1); the height steers water
 // and granulating pigment, the capacity (c = h (cmax - cmin) + cmin) sets how much water it can absorb.
@@ -6,14 +11,39 @@
 
 // `scale` is cells per pixel of the picture. Every length below is a paper length, multiplied by it, so the grid
 // does not decide how coarse the paper is.
-export function makePaper(w, h, { seed = 1, fibres = 0.5, tooth = 0.5, fibreLength = 14, cmin = 0.2, cmax = 0.55, scale = 1, toothScale = 1, patternScale = 1, proudBlur = 1, coldPress = null, mmPerCell = 0 } = {}) {
+// A paper is a pure function of its size and options, and a run asks for the same one many times (every calibration
+// swatch is laid on a fresh 90 x 90 scrap of the painting's paper). The last few made are kept, and each caller gets
+// its own copy, so nothing one sheet does to its paper reaches another. A store (setPaperStore) keeps them across runs.
+const MADE = new Map(), KEEP = 4;
+let STORE = null;
+/** Keep papers outside this process: store { get(key) -> paper or null, put(key, paper) }, or null for none. */
+export const setPaperStore = store => { STORE = store; };
+const stable = v => (Array.isArray(v) ? v.map(stable) : v && typeof v === 'object' ? Object.fromEntries(Object.keys(v).sort().map(k => [k, stable(v[k])])) : v);
+export function makePaper(w, h, options = {}) {
+  const key = JSON.stringify([w, h, stable(options ?? {})]);
+  let paper = MADE.get(key);
+  if (paper) MADE.delete(key);
+  else {
+    paper = STORE?.get(key) ?? null;
+    if (!paper) { paper = buildPaper(w, h, options); STORE?.put(key, paper); }
+    if (MADE.size >= KEEP) MADE.delete(MADE.keys().next().value);
+  }
+  MADE.set(key, paper);
+  return structuredClone(paper);
+}
+function buildPaper(w, h, { seed = 1, fibres = 0.5, tooth = 0.5, fibreLength = 14, cmin = 0.2, cmax = 0.55, scale = 1, toothScale = 1, patternScale = 1, proudBlur = 1, coldPress = null, mmPerCell = 0, relief = 'cold', grainMm = 0, cockle = {} } = {}) {
   // Opt-in physical fibres: fibre size and count follow physical area.
   const fs = mmPerCell > 0 ? (280 / 1086) / mmPerCell : scale;
   const n = w * h, fib = new Float32Array(n), c2 = new Float32Array(n), s2 = new Float32Array(n); // fibre amount, and orientation as doubled angles (a fibre has no head or tail)
   // tooth coarseness in pixels of the picture. coldPress { mmPerCell }: a physical cold-press sheet instead of value
   // noise, with hollows and tooth in millimetres (0.4 mm a unit), so the sheet reads the same at any resolution.
   const ts = coldPress ? 0.4 / coldPress.mmPerCell : (mmPerCell > 0 ? fs : scale) * toothScale, ps = (mmPerCell > 0 ? fs : scale) * patternScale;
-  const CP = coldPress ? coldPressField(w, h, coldPress.mmPerCell, seed, coldPress) : null;
+  // A physical sheet (coldPress or mmPerCell given) has its relief in micrometres (paper-relief.mjs): one field from 0.1
+  // to a few millimetres, averaged over each cell and never stretched to the grid's range, so the same sheet at any
+  // cell size is the same paper. `relief` cold (default), rough or hot. The fibres below still give the direction water
+  // wicks along. The cold-press bump options (coldPress.bumpMm, cover, swell, pits) and fibres/tooth are not read there.
+  const physMm = coldPress ? coldPress.mmPerCell : mmPerCell;
+  const RF = physMm > 0 ? paperRelief(w, h, physMm, { seed, relief }) : null;
   const blur = r => Math.max(1, Math.round(r * ts));
   let s = seed * 9301 + 49297; const rnd = () => (s = (s * 16807) % 2147483647) / 2147483647;
   // fibres: many short, slightly curved strands laid at random, a little thicker in the middle
@@ -33,13 +63,18 @@ export function makePaper(w, h, { seed = 1, fibres = 0.5, tooth = 0.5, fibreLeng
   for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
     // Two roughnesses: the tooth, a pixel or two across, leaves specks of paper in a wash; the pattern, several
     // pixels across, makes a wash pool in patches. One noise field cannot be both.
-    const i = y * w + x, t = CP ? CP[i] : 0.6 * vn(x / (2.5 * ts), y / (2.5 * ts)) + 0.4 * vn(x / (7 * ps) + 11, y / (7 * ps) + 3);
+    const i = y * w + x;
+    if (RF) { height[i] = RF.height[i]; continue; }
+    const t = 0.6 * vn(x / (2.5 * ts), y / (2.5 * ts)) + 0.4 * vn(x / (7 * ps) + 11, y / (7 * ps) + 3);
     height[i] = fibres * Math.min(1, blurred[i] * fscale) + tooth * t; lo = Math.min(lo, height[i]); hi = Math.max(hi, height[i]);
   }
-  for (let i = 0; i < n; i++) height[i] = (height[i] - lo) / (hi - lo || 1);
+  if (!RF) for (let i = 0; i < n; i++) height[i] = (height[i] - lo) / (hi - lo || 1);
   // pigment settles and water pools at the scale of the paper's hollows, a few fibres across, not per fibre
-  const valley = box(height, w, h, blur(1)); let vl = Infinity, vh = -Infinity; for (const v of valley) { vl = Math.min(vl, v); vh = Math.max(vh, v); }
-  for (let i = 0; i < n; i++) { valley[i] = (valley[i] - vl) / (vh - vl || 1); capacity[i] = valley[i] * (cmax - cmin) + cmin; }
+  // On a physical sheet that is the height itself (each cell already averages the relief over its area), not stretched:
+  // granulating pigment settles into hollows a few tenths of a millimetre across (looks/ref-washes.jpg).
+  const valley = RF ? Float32Array.from(height) : box(height, w, h, blur(1));
+  if (!RF) { let vl = Infinity, vh = -Infinity; for (const v of valley) { vl = Math.min(vl, v); vh = Math.max(vh, v); } for (let i = 0; i < n; i++) valley[i] = (valley[i] - vl) / (vh - vl || 1); }
+  for (let i = 0; i < n; i++) capacity[i] = valley[i] * (cmax - cmin) + cmin;
   // the tooth a dragged brush feels: hills and hollows about a millimetre across, over which a clump rides
   const toothH = box(box(box(height, w, h, blur(2)), w, h, blur(2)), w, h, blur(2)); let tl = Infinity, th = -Infinity; for (const v of toothH) { tl = Math.min(tl, v); th = Math.max(th, v); }
   for (let i = 0; i < n; i++) toothH[i] = (toothH[i] - tl) / (th - tl || 1);
@@ -50,39 +85,55 @@ export function makePaper(w, h, { seed = 1, fibres = 0.5, tooth = 0.5, fibreLeng
   // proud: how far a fibre stands above its surroundings, blurred at proudBlur cells at height's own scale.
   const proudLow = box(height, w, h, Math.max(1, Math.round(proudBlur * (mmPerCell > 0 ? fs : 1))));
   const proud = new Float32Array(n); for (let i = 0; i < n; i++) proud[i] = height[i] - proudLow[i];
-  const rel = new Float32Array(n); for (let i = 0; i < n; i++) rel[i] = height[i] - toothH[i];
+  // toothLo, toothSpan: the blurred tooth's own range before it was stretched to 0..1. A brush compares a fibre with the
+  // tooth level under it in the height's own units (toothLevel); compared with the stretched tooth, the coarse hills read
+  // as sunk below their own fibres and the hollows as raised, so a light brush touched the hollows and skipped the hills.
+  const toothLo = tl, toothSpan = th - tl || 1;
+  const rel = new Float32Array(n); for (let i = 0; i < n; i++) rel[i] = height[i] - (toothLo + toothSpan * toothH[i]);
   const sorted = Float32Array.from(rel).sort();
-  const relief = Math.max(1e-4, sorted[Math.floor(n * 0.9)] - sorted[Math.floor(n * 0.1)]);
-  return { w, h, n, height, capacity, valley, proud, tooth: toothH, fdx, fdy, grain, relief, mmPerCell: coldPress ? coldPress.mmPerCell : mmPerCell };
+  const gridSpread = Math.max(1e-4, sorted[Math.floor(n * 0.9)] - sorted[Math.floor(n * 0.1)]);
+  // On a physical sheet the spread is the paper's own, at full resolution (10th to 90th percentile of a relief of that
+  // RMS about its millimetre mean, 2.56 RMS), so a brush reaches the same depth into the same paper on any grid; and
+  // subRelief is the part of it a cell's mean hides (the RMS finer than the cell), which softens a cell's contact by
+  // the share of its area that stands above a level, where the cell's mean alone would switch it at once.
+  let reliefSpread = gridSpread, subRelief = 0;
+  if (RF) {
+    const full = RF.hollowRmsUm / HEIGHT_SPAN_UM; let v = 0; for (let i = 0; i < n; i++) v += rel[i] * rel[i];
+    reliefSpread = 2.56 * full; subRelief = Math.sqrt(Math.max(0, full * full - v / n));
+  }
+  // zUm, reliefOf (physical sheets): the relief in micrometres and the seed and preset it was made from (sub-cell grain
+  // evaluates the same field finer, subcell-grain.mjs); hollow: each cell's depth below the tooth level in RMS units
+  // grainH: the surface granulating pigment settles and rolls on. A physical sheet's is its relief low-passed at a
+  // length in millimetres (grain-field.mjs), its hollows measured in that field's own RMS; a sheet without units uses its height.
+  const G = RF ? grainSurface(height, w, h, physMm, { seed, relief }, grainMm > 0 ? { grainMm } : {}) : { grainH: height, unit: 0 };
+  // surface: the height the water levels over, the valley plus the wet sheet's cockle (cockle.mjs) in height units. A
+  // physical sheet buckles by default (cockle.rmsMm 0.03 mm, 0 for a flat sheet; at 0.05 Mittens' mid-tones dried 2.5 L* darker); a sheet without units stays flat.
+  const ck = physMm > 0 ? cockleField(w, h, physMm, { seed, rmsMm: 0.03, ...cockle }) : null;
+  let surface = null;
+  if (ck && ck.some(v => v !== 0)) { surface = new Float32Array(n); for (let i = 0; i < n; i++) surface[i] = valley[i] + ck[i] / SURFACE_MM; }
+  return { w, h, n, height, grainH: G.grainH, capacity, valley, ...(surface ? { surface } : {}), proud, tooth: toothH, toothLo, toothSpan, fdx, fdy, grain, relief: reliefSpread, subRelief, mmPerCell: physMm, ...toothHollow(G.grainH, toothH, toothLo, toothSpan, G.unit), ...(RF ? { zUm: RF.zUm, reliefUm: RF.rmsUm, reliefOf: { seed, relief } } : {}) };
 }
 
 /**
- * A cold-press sheet's surface, 0..1: rounded domes (1 - r^2)^2 at uniformly random places, sized in millimetres,
- * over sparser broad swells. `bumpMm` [min, max] diameters, `cover` mean overlap, `swell` the swells' share.
+ * How deep each cell lies below the tooth level under it (the height's mean over about a millimetre), in units of
+ * `unit` (height units; the relief's own RMS about that mean): the bias settling pigment has towards a hollow (B = 1 +
+ * gamma hollow, settling.mjs). A physical sheet passes its relief's unit, fixed in micrometres, so a coarser grid sees
+ * shallower hollows of the same paper; a paper without units (unit 0) is measured against its own RMS. The GPU works
+ * the same expression out from the tooth, height and the three numbers (gpu/stepfull.wgsl settleShareG).
  */
-// pits p: this share of the bumps are pressed in instead of raised, so settling paint collects in pits as dark
-// grains on a lighter ground. 0: domes only.
-export function coldPressField(w, h, mmPerCell, seed = 1, { bumpMm = [0.5, 2], cover = 2.2, swell = 0.3, swellMm = [3, 6], pits = 0 } = {}) {
-  const n = w * h, f = new Float32Array(n);
-  let s = (Math.imul(seed | 0, 2654435761) >>> 0) || 1;
-  const rnd = () => { s ^= s << 13; s >>>= 0; s ^= s >>> 17; s ^= s << 5; s >>>= 0; return s / 4294967296; };
-  const drop = (dMin, dMax, cov, amp, pitShare = 0) => {
-    const rMean = (dMin + dMax) / 4 / mmPerCell, count = Math.max(1, Math.round((cov * n) / (Math.PI * rMean * rMean)));
-    for (let c = 0; c < count; c++) {
-      const cx = rnd() * w, cy = rnd() * h, R = Math.max(0.6, ((dMin + (dMax - dMin) * rnd()) / 2) / mmPerCell), a = amp * (0.55 + 0.45 * rnd()) * (pitShare > 0 && rnd() < pitShare ? -1 : 1);
-      const e = 0.75 + 0.5 * rnd(), th = rnd() * Math.PI, ct = Math.cos(th), st = Math.sin(th), Ru = R * e, Rv = R / e, reach = Math.ceil(Math.max(Ru, Rv)) + 1;
-      const x0 = Math.max(0, Math.floor(cx - reach)), x1 = Math.min(w - 1, Math.ceil(cx + reach)), y0 = Math.max(0, Math.floor(cy - reach)), y1 = Math.min(h - 1, Math.ceil(cy + reach));
-      for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
-        const dx = x + 0.5 - cx, dy = y + 0.5 - cy, u = (dx * ct + dy * st) / Ru, v = (-dx * st + dy * ct) / Rv, r2 = u * u + v * v;
-        if (r2 < 1) { const q = 1 - r2; f[y * w + x] += a * q * q; }
-      }
-    }
-  };
-  drop(bumpMm[0], bumpMm[1], cover, 1, pits);
-  if (swell > 0) drop(swellMm[0], swellMm[1], 1.2, swell * 2.5);
-  let lo = Infinity, hi = -Infinity; for (let i = 0; i < n; i++) { lo = Math.min(lo, f[i]); hi = Math.max(hi, f[i]); }
-  for (let i = 0; i < n; i++) f[i] = (f[i] - lo) / (hi - lo || 1);
-  return f;
+export function toothHollow(height, tooth, toothLo, toothSpan, unit = 0) {
+  const n = height.length, d = new Float64Array(n);
+  for (let i = 0; i < n; i++) d[i] = toothLo + toothSpan * tooth[i] - height[i];
+  if (!(unit > 0)) { let v = 0; for (let i = 0; i < n; i++) v += d[i] * d[i]; unit = Math.sqrt(v / n) || 1; }
+  const hollow = new Float32Array(n); for (let i = 0; i < n; i++) hollow[i] = Math.max(0, d[i] / unit);
+  return { hollow, hollowUnit: unit };
+}
+
+/** The blurred tooth's own range, [lo, span]: the tooth level under cell i in the height's own units is
+ *  lo + span x tooth[i], what a hair riding the tooth is measured against. */
+export function toothRange(paper) {
+  if (!(paper.toothSpan > 0) || !Number.isFinite(paper.toothLo)) throw new Error('paper: no tooth range (toothLo, toothSpan); make it with makePaper or the scan paper');
+  return [paper.toothLo, paper.toothSpan];
 }
 
 function box(src, w, h, r) {

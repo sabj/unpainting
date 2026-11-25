@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Stroke bench · Paint Lab</title>
+<style>
+:root{color-scheme:light;--paper:#f6f3eb;--ink:#39362f;--muted:#7b7166;--line:#39362f30;--accent:#99543a}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);font:16px/1.4 'EB Garamond',Garamond,Georgia,serif}
+main{max-width:1500px;margin:auto;padding:16px}
+nav{display:flex;gap:16px;align-items:baseline;flex-wrap:wrap;font-size:15px;color:var(--muted)}
+nav a{color:inherit}
+h1{font-weight:500;font-size:28px;margin:8px 0}
+.bar{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:8px 0 16px}
+.bar button,.bar select{min-height:40px;padding:4px 12px;font:inherit;background:transparent;color:var(--ink);border:1px solid var(--line);border-radius:3px;cursor:pointer}
+.bar button:disabled{opacity:.45;cursor:default}
+#state{color:var(--muted);font-variant-numeric:tabular-nums}
+.wrap{overflow-x:auto}
+table{border-collapse:collapse;width:100%}
+th,td{border-top:1px solid var(--line);padding:8px;vertical-align:top;text-align:left}
+thead th{font-weight:400;color:var(--muted);font-size:14px}
+th[scope=row]{width:260px}
+th[scope=row] b{display:block;font-weight:600}
+th[scope=row] span{display:block;font-weight:400;font-size:13px;color:var(--muted)}
+td canvas{display:block;width:100%;max-width:420px;height:auto;image-rendering:auto;background:#fff}
+td small{display:block;color:var(--muted);font-size:12px;font-variant-numeric:tabular-nums}
+#speeds{color:var(--muted);font-size:13px}
+@media(max-width:700px){th[scope=row]{width:auto}}
+</style>
+</head>
+<body>
+<main>
+<nav><a href="../">Paint Lab</a><a href="../../">All demos</a><span>0.4.0-rc.5</span></nav>
+<h1>Stroke bench</h1>
+<div class="bar">
+  <label>Cell <select id="cell"></select></label>
+  <button id="run">Paint again</button>
+  <button id="export" disabled>Export PNG</button>
+  <span id="state" role="status"></span>
+</div>
+<div class="wrap"><table>
+<thead><tr><th>Stroke</th><th>CPU</th><th id="gpu-head">WebGPU</th></tr></thead>
+<tbody id="rows"></tbody>
+</table></div>
+<p id="speeds"></p>
+</main>
+<script type="module" src="./strokes.js"></script>
+</body>
+</html>

@@ -1,7 +1,8 @@
 // Pipeline: inking, stage 4 (hand plan: strokes from the line file).
-// --drawingfile <base>: the first pen draws exactly the lines of work/lines/<base>-lines.json (tools/seg/select-drawing.py),
+// --drawingfile <base>: the first pen draws exactly the lines of work/lines/<base>-lines.json,
 // whole, in file order, at the outline tier's pressure; no walker gestures, ink filter or silhouette pass.
 // Each line is split into strokes of --drawstroke (share of the short side), one dip each, so the pen does not run dry.
+import { linesByRole } from './family-roles.mjs';
 import fs from 'node:fs';
 import { hasLines, loadLines, linePaths, readLineText } from '../../crop/lines.mjs';
 import { pathLength } from '../../crop/inktiers.mjs';
@@ -31,7 +32,7 @@ export function noDrawingDeclared(doc, { first = true } = {}) {
 // --drawinglast <base>: the closing pen (--drawing both|last, over the dry sheet) draws only lines of weight at least
 // --drawinglastmin, so the darks and features stay crisp over the glazes.
 // `prune` (pen and wash, pen-wash-lines.mjs) thins the opening pen's planned lines before they are split into strokes.
-export function selectedDrawing({ first, fine = false, w, h, opt, num, log, walked, D = null, want = null, cells = 0, K = 1, walker = null, field = null, style = null, prune = null }) {
+export function selectedDrawing({ first, fine = false, w, h, opt, num, log, walked, D = null, want = null, cells = 0, K = 1, style = null, prune = null, families = null }) {
   const lastPass = !first && !fine && opt('drawinglast', '');
   if (!(first && opt('drawingfile', '')) && !lastPass) return null;
   const b = first ? opt('drawingfile', '') : opt('drawinglast', '');
@@ -39,7 +40,8 @@ export function selectedDrawing({ first, fine = false, w, h, opt, num, log, walk
   if (first && opt('preparationbinding','')) return boundPreparation({bindingFile:opt('preparationbinding',''),base:b,image:opt('image',''),guide:opt('penpencil',''),w,h,num,log});
   // A declared no-drawing file is read before the logic branch and the line loader, for both pens, so --drawinglogic,
   // --drawinglastlogic, --finishmasses and the loader's target check of an empty file add or refuse nothing.
-  const declared = noDrawingDeclared(JSON.parse(readLineText(linePaths(b).lines)), { first });
+  const rawDoc = JSON.parse(readLineText(linePaths(b).lines));
+  const declared = noDrawingDeclared(rawDoc, { first });
   if (declared) {
     log(first ? `drawing: no opening ink, since ${declared}; the walker's ${walked} gestures are not used` : `drawing, closing pen: no closing ink, since ${declared}`);
     return [];
@@ -47,12 +49,17 @@ export function selectedDrawing({ first, fine = false, w, h, opt, num, log, walk
   // --drawinglogic 1: rank, budget, filter, connect and shape the file's lines (drawing-logic.mjs)
   // --drawinglastlogic: the closing pen's own logic (default --drawinglogic); linked stages set it to 0, since the
   // finish-ink file is already the closing drawing
-  if (num(first ? 'drawinglogic' : 'drawinglastlogic', num('drawinglogic', 0)) > 0) return drawingLogic({ base: b, first, w, h, opt, num, log, D, want, cells, K, walker, field, style });
+  if (num(first ? 'drawinglogic' : 'drawinglastlogic', num('drawinglogic', 0)) > 0) return drawingLogic({ base: b, first, w, h, opt, num, log, D, want, cells, K, style });
   // --drawingskip: comma list of line roles left out of both pens ('dark fill' drops hatching, leaving contours)
   const skip = new Set(opt('drawingskip', '').split(',').map(r => r.trim()).filter(Boolean));
   // the plan's choice (drawing-plan.mjs planLines): --drawshare's strongest share, --drawregions' subject-first ranking
   // and --drawmax's cap
-  const candidates = loadLines(b, w, h, { keepOrder: true }).filter(g => !skip.has(g.role)), min = num('drawinglastmin', 0.6);
+  const loaded = loadLines(b, w, h, { keepOrder: true }).filter(g => !skip.has(g.role)), min = num('drawinglastmin', 0.6);
+  // the plan's drawingRole per family (family-roles.mjs): a family with role none gets no line, scaffold no closing line;
+  // when the file has already been decided by semantic SAM regions (inkDecided), family bounding boxes do not clip it again
+  const byRole = rawDoc.inkDecided === true ? { lines: loaded, dropped: {} } : linesByRole(loaded, families, { w, h, stage: first ? 'opening' : 'closing' }), candidates = byRole.lines;
+  if (Object.keys(byRole.dropped).length) log(`drawing: ${loaded.length - candidates.length} of ${loaded.length} lines left out by the plan's drawing roles (${Object.entries(byRole.dropped).map(([r, c]) => `${c} under ${r}`).join(', ')})`);
+  if (loaded.length && !candidates.length) { log(first ? 'drawing: no opening line, the plan\'s drawing roles leave every line to the wash' : 'drawing, closing pen: no closing line, the plan\'s drawing roles leave every line out'); return []; }
   const planned = planLines(candidates, num), all = first && prune ? prune(planned) : planned;
   if (skip.size) log(`drawing: lines with role ${[...skip].join(', ')} left out`);
   if (all.length < candidates.length) log(`drawing: ${all.length} of ${candidates.length} lines kept (--drawshare ${num('drawshare', 1)}, --drawregions ${num('drawregions', 0)}, --drawmax ${num('drawmax', Infinity)})`);
@@ -60,7 +67,7 @@ export function selectedDrawing({ first, fine = false, w, h, opt, num, log, walk
   const file = linePaths(b).lines;
   // Linked stages can explicitly omit prep ink; pure-watercolor plans declare medium none.
   // Recognize medium none only for an empty source file, not malformed or filtered-out paths.
-  const doc = first && !candidates.length ? JSON.parse(readLineText(file)) : null;
+  const doc = first && !candidates.length ? rawDoc : null;
   const empty = doc?.empty || (doc?.medium === 'none' && Array.isArray(doc.lines) && doc.lines.length === 0
     ? 'the drawing explicitly declares medium none' : null);
   if (empty) { log(`drawing: no opening ink, since ${empty}; the walker's ${walked} gestures are not used`); return []; }
@@ -70,7 +77,7 @@ export function selectedDrawing({ first, fine = false, w, h, opt, num, log, walk
   // --inkbleed d: a line the target shows soft and spread (ink-lines.mjs marks it `soft`) is drawn on paper d damp
   const bleed = num('inkbleed', 0);
   if (!(bleed >= 0 && bleed <= 1)) throw new Error('--inkbleed: a dampness from 0 to 1');
-  const strokesOf = g => { const L = num('drawstroke', 0.12) * Math.min(w, h), out = []; let cur = [g.points[0]], d = 0; for (let k = 1; k < g.points.length; k++) { const s = Math.hypot(g.points[k].x - g.points[k - 1].x, g.points[k].y - g.points[k - 1].y); d += s; cur.push(g.points[k]); if (d >= L && k < g.points.length - 1) { out.push(cur); cur = [g.points[k]]; d = 0; } } if (cur.length >= 2) out.push(cur); return out.map(points => ({ points, length: pathLength(points), tier: 1, weight: g.weight ?? 1, ...(g.soft && bleed > 0 ? { damp: bleed } : {}) })); };
+  const strokesOf = g => { const L = num('drawstroke', 0.12) * Math.min(w, h), out = []; let cur = [g.points[0]], d = 0; for (let k = 1; k < g.points.length; k++) { const s = Math.hypot(g.points[k].x - g.points[k - 1].x, g.points[k].y - g.points[k - 1].y); d += s; cur.push(g.points[k]); if (d >= L && k < g.points.length - 1) { out.push(cur); cur = [g.points[k]]; d = 0; } } if (cur.length >= 2) out.push(cur); return out.map(points => ({ points, length: pathLength(points), tier: 1, weight: g.weight ?? 1, ...(g.subjectLine ? { subjectLine: g.subjectLine } : {}), ...(g.soft && bleed > 0 ? { damp: bleed } : {}) })); };
   // Per-point `width` (px) and `weight` (0..1) set the pen along the stroke: contact = width x --drawwidthgain
   // - --drawwidthmargin cells (see GAIN), pressure = weight x --drawwant. Points without them are unchanged.
   // The flexible drawing nib's high-concentration dry line is approximately
@@ -88,6 +95,10 @@ export function selectedDrawing({ first, fine = false, w, h, opt, num, log, walk
       strokeLength: num('drawstroke', .35) * Math.min(w, h),
       base, gain, margin:margin*handScale, minNib:minNib*handScale, inLen: num('drawtaperin', 3) * handScale,
       outLen: num('drawtaperout', 5) * handScale, start: num('drawtaperstart', .45), end: num('drawtaperend', .3),
+      // a sharp corner is a turn of 60 degrees or more within 0.8 mm either way; an end piece under 1.2 mm past one is a hook
+      corner: { span: 0.8 / (num('sheetmm', 152.4) / w), deg: 60, spur: 1.2 / (num('sheetmm', 152.4) / w) },
+      // a hand lands firm, eases off by a quarter along the stroke and lifts over its last third; the nib opens and closes with the pressure
+      relax: 0.25, liftShare: 0.33, flex: 0.7,
       detailScale: num('drawdetailscale', 1), detailWidth: num('drawdetailwidth', 1), flickCells: num('drawflickmm', 0) / (num('sheetmm', 152.4) / w), D, w, h, lit: num('drawlit', 0), reach: num('drawlitreach', 2) * handScale });
     log(`drawing hand: ${lines.length} reviewed lines, ${r.joined} joins, ${r.gestures} ordered gestures, ${r.runs} light-edge runs, ${r.strokes.length} tapered strokes`);
     // --inkhand 1: the hand's speed along each stroke (slower on curves, which lays a wider, darker line, faster on straights)

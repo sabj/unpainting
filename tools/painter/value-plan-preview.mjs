@@ -9,7 +9,7 @@ import {execFileSync} from 'node:child_process';
 
 import {brushedWashPaths} from '../../src/media/wash.mjs';
 import {loadLines,hasLines} from '../../src/crop/lines.mjs';
-import {selectValueInk} from '../../src/paint/methods/light-to-dark.mjs';
+import {selectValueInk} from '../../src/paint/methods/value-shared.mjs';
 import {DEFAULT_SHEET_MM} from '../../src/media/sheet-size.mjs';
 const esc=s=>String(s).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('"','&quot;');
 export async function writeValuePreview({plan,out,w,h,pigments,paperRGB,target,photo,subject='subject',name=subject,root,opening='',closing='',version='W4',variant='lighttodark',date,compilePaths=true,sheetMm=DEFAULT_SHEET_MM}){
@@ -43,8 +43,7 @@ export async function writeValuePreview({plan,out,w,h,pigments,paperRGB,target,p
   }
   await panel(`${band} ${band===1?'light wash':band<=3?'dry middle values':'LAST dry-base cross-region shadow glaze'}; value band ${band}/5`);
  }
- // The planned sheet without any ink: every compiled wash mark, no drawing overlay, no caption. Consumed by
- // tools/judge/ink-wash-consistency.mjs as the proposed wash.
+ // The planned sheet without any ink: every compiled wash mark, no drawing overlay, no caption.
  await sharp(Buffer.from(marks.pixels()),{raw:{width:w,height:h,channels:3}}).png().toFile(path.join(out,'planned-wash.png'));
  drawings=[...open,...close];await panel(`closing ink: ${close.length} selective paths; dry paint required`);
  const pw=Math.max(540,w),ph=Math.round(h*pw/w)+88,cols=4,head=54;

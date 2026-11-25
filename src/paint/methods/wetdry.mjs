@@ -1,82 +1,12 @@
 import { certifyZeroPaper, hasZeroPaperCertificate, validWetReachCertificate, queryWetReach } from '../../media/paper-certificate.mjs';
 import { census } from '../../media/census.mjs';
-// Shadow technique choice (wet blend or dry layer) from measured edge widths, and paper-state gates that hold a
-// stroke until its paper is dry or moist enough. No physics overrides.
-import { gaussian } from '../../keyframes/density.mjs';
+// Paper-state gates that hold a stroke until its paper is dry or moist enough. No physics overrides.
 import { DEFAULTS } from '../../media/sheet.mjs';
 import { check } from '../../media/checks.mjs';
 
-export const PAPER_STATE = Object.freeze({ dryWater: 0.004, drySaturation: 0.02,
+const PAPER_STATE = Object.freeze({ dryWater: 0.004, drySaturation: 0.02,
   moistWater: 0.015, moistSaturation: 0.6, glossyWater: 0.15, moistShare: 0.7 });
 const quantile = (a, q) => a.length ? a[Math.min(a.length - 1, Math.floor(q * a.length))] : null;
-
-// Shadow boundaries only: both ends of the profile must remain inside the canopy.
-// A 20 to 80% transition width, sampled along the local luminance gradient. Expressed in
-// millimetres so downsampling a reference does not turn a soft shadow into a hard one.
-export function shadowEdges(L, mask, w, h, mmCell, threshold = null, thresholdField = null) {
-  // Suppress sub-millimetre paper grain before measuring the shadow, not the tooth.
-  const B = gaussian(L, w, h, Math.max(0.7, 0.6 / mmCell)), reach = Math.max(4, Math.ceil(3 / mmCell));
-  const widths = [], gradients = [];
-  const at = (x, y) => {
-    const X = Math.round(x), Y = Math.round(y);
-    return X < 0 || X >= w || Y < 0 || Y >= h ? -1 : Y * w + X;
-  };
-  for (let y = 2; y < h - 2; y++) for (let x = 2; x < w - 2; x++) {
-    const i = y * w + x; if (!mask[i]) continue;
-    const gx = (B[i + 1] - B[i - 1]) / 2, gy = (B[i + w] - B[i - w]) / 2;
-    const g = Math.hypot(gx, gy); if (g < 3 * mmCell) continue;
-    const ux = gx / g, uy = gy / g;
-    const a = at(x - ux, y - uy), b = at(x + ux, y + uy);
-    const contour = thresholdField ?? B;
-    if (threshold !== null && !(contour[a] <= threshold && contour[b] > threshold)) continue;
-    const profile = [];
-    for (let t = -reach; t <= reach; t += 0.5) {
-      const j = at(x + ux * t, y + uy * t);
-      if (j < 0 || !mask[j]) { profile.length = 0; break; }
-      profile.push(B[j]);
-    }
-    if (!profile.length) continue;
-    // Bound one transition by its adjacent plateaus. A fixed-window contrast
-    // confuses a sharp edge on a lighting ramp (or two hard edges) with a blend.
-    const slope = profile.map((_, j) => j > 1 && j < profile.length - 2 ?
-      (profile[j + 2] - profile[j - 2]) / 2 : 0);
-    const mid = Math.floor(profile.length / 2);
-    let peak = mid;
-    const peakReach = Math.max(2, Math.round(0.75 / mmCell));
-    for (let j = mid - peakReach; j <= mid + peakReach; j++) if (slope[j] > slope[peak]) peak = j;
-    if (slope[peak] < 5 * mmCell) continue;
-    let left = peak, right = peak;
-    while (left > 2 && slope[left - 1] >= slope[peak] * 0.2) left--;
-    while (right < profile.length - 3 && slope[right + 1] >= slope[peak] * 0.2) right++;
-    // The measured contour must belong to this edge, not its neighbour.
-    if (mid < left - 1 || mid > right + 1) continue;
-    const lo = profile[Math.max(0, left - 1)], hi = profile[Math.min(profile.length - 1, right + 1)];
-    if (hi - lo < 12) continue;
-    const local = profile.slice(Math.max(0, left - 1), Math.min(profile.length, right + 2));
-    let backward = 0; for (let j = 1; j < local.length; j++) backward += Math.max(0, local[j - 1] - local[j]);
-    if (backward > (hi - lo) * 0.2) continue;
-    const crossing = level => {
-      for (let j = 1; j < local.length; j++) if (local[j] >= level && local[j - 1] < level)
-        return (j - 1 + (level - local[j - 1]) / (local[j] - local[j - 1])) * 0.5;
-      return null;
-    };
-    const t20 = crossing(lo + 0.2 * (hi - lo)), t80 = crossing(lo + 0.8 * (hi - lo));
-    if (t20 === null || t80 === null || t80 <= t20) continue;
-    widths.push((t80 - t20) * mmCell); gradients.push(slope[peak] / mmCell);
-  }
-  widths.sort((a, b) => a - b); gradients.sort((a, b) => a - b);
-  return { samples: widths.length, widthMm: quantile(widths, 0.5), gradientPerMm: quantile(gradients, 0.5) };
-}
-
-export function chooseShadowTechnique(measurement, fallback = null) {
-  const evidence = measurement.samples >= 4 ? measurement : fallback?.samples >= 4 ? fallback : null;
-  // Edge width in mm that separates blended shadows (wider) from layered ones.
-  const soft = evidence && evidence.widthMm >= 1.3;
-  return { technique: soft ? 'wet blend' : 'dry layer', paperState: soft ? 'moist, not glossy' : 'fully dry',
-    edge: soft ? 'soft' : 'hard', measurement, evidence: !evidence ? 'insufficient edges: conservative dry layer' :
-      evidence === measurement ? 'layer shadow edges' : 'region shadow edges',
-    ...(evidence !== measurement && evidence ? { fallbackMeasurement: evidence } : {}) };
-}
 
 const STROKE_STAMP = Symbol('strokeCellsStamp');
 
@@ -140,7 +70,7 @@ export function measurePaper(sheet, cells, paperOnly = false, options = {}) {
   finally { census.measurePaper.ms += performance.now() - t; }
 }
 function measurePaperImpl(sheet, cells, paperOnly = false, { uniform = false, stats = 'full', bounds = null, fresh = false } = {}) {
-  if (!cells.length) return { cells: 0, waterMax: 0, saturationMax: 0, ...(stats === 'gate' ? {} : {waterP95: 0}), moistShare: 0, dry: true };
+  if (!cells.length) return { cells: 0, waterMax: 0, saturationMax: 0, ...(stats === 'gate' ? {} : {waterP95: 0, waterP50: 0}), moistShare: 0, dry: true };
   const sw = sheet.w;
   let x0 = sw, x1 = 0, y0 = sheet.h, y1 = 0;
   if (bounds) [x0, y0, x1, y1] = bounds;
@@ -149,9 +79,9 @@ function measurePaperImpl(sheet, cells, paperOnly = false, { uniform = false, st
     if (x < x0) x0 = x; if (x > x1) x1 = x;
     if (y < y0) y0 = y; if (y > y1) y1 = y;
   }
-  if (hasZeroPaperCertificate(sheet)) return {cells:cells.length, bounds:[x0,y0,x1,y1], waterMax:0, saturationMax:0, ...(stats === 'gate' ? {} : {waterP95:0}), moistShare:0, dry:true};
+  if (hasZeroPaperCertificate(sheet)) return {cells:cells.length, bounds:[x0,y0,x1,y1], waterMax:0, saturationMax:0, ...(stats === 'gate' ? {} : {waterP95:0, waterP50:0}), moistShare:0, dry:true};
   const reach = queryWetReach(sheet, cells, [x0, y0, x1, y1]);
-  if (reach?.allZero) return {cells:cells.length, bounds:[x0,y0,x1,y1], waterMax:0, saturationMax:0, ...(stats === 'gate' ? {} : {waterP95:0}), moistShare:0, dry:true};
+  if (reach?.allZero) return {cells:cells.length, bounds:[x0,y0,x1,y1], waterMax:0, saturationMax:0, ...(stats === 'gate' ? {} : {waterP95:0, waterP50:0}), moistShare:0, dry:true};
   // Flushes queued GPU strokes and reads fresh water/saturation planes over the footprint.
   const freshRect = reach?.rect ?? [x0, y0, x1 - x0 + 1, y1 - y0 + 1];
   if(stats==='gate'&&!fresh&&sheet._gpu?.measurePaperGate){
@@ -200,7 +130,7 @@ function measurePaperImpl(sheet, cells, paperOnly = false, { uniform = false, st
     if (water >= PAPER_STATE.moistWater || saturation >= PAPER_STATE.moistSaturation) moist++;
   }
   if (waters) waters.sort((a, b) => a - b);
-  return { cells: cells.length, bounds: [x0, y0, x1, y1], waterMax, saturationMax, ...(stats === 'gate' ? {} : { waterP95: waters ? quantile(waters, 0.95) : firstWater }), moistShare: moist / cells.length,
+  return { cells: cells.length, bounds: [x0, y0, x1, y1], waterMax, saturationMax, ...(stats === 'gate' ? {} : { waterP95: waters ? quantile(waters, 0.95) : firstWater, waterP50: waters ? quantile(waters, 0.5) : firstWater }), moistShare: moist / cells.length,
     dry: waterMax <= PAPER_STATE.dryWater && saturationMax <= PAPER_STATE.drySaturation };
 }
 
@@ -323,20 +253,4 @@ export function measureBrush(brush, { settle = true } = {}) {
   if (!Number.isFinite(water) || water < 0 || pigment.some(p => !Number.isFinite(p) || p < 0))
     throw new Error('Invalid measured brush load');
   return { waterMass: water, pigmentMass: pigment, pigmentConcentration: pigment.map(p => water > 0 ? p / water : 0) };
-}
-
-export function describeLayer(layer, index) {
-  const blended = layer.technique === 'wet blend';
-  return { ...layer,
-    move: blended ? 'dry on wet' : 'wet on dry',
-    referenceCue: layer.evidence,
-    intendedResult: blended ? 'connected soft shadow within the wet canopy' : 'separate bounded shadow preserving the lighter layer',
-    startingState: layer.paperState,
-    brush: { ...layer.brush, shape: 'round', size: [12, 8, 4, 4][index],
-      management: blended ? 'fresh concentrated load, blotted water level, measure remaining load before each stroke' : 'fresh premixed load; measure remaining load before each stroke' },
-    pigment: 'up to three palette pigments fitted to reference colour and calibrated on the same paper',
-    protectedLights: 'masked paper flecks and lighter shoulders outside this reference shadow threshold',
-    failureSigns: blended ? ['hard shadow boundary', 'flooded lights', 'puddled rim'] : ['bleeding silhouette', 'lost light shoulders', 'disturbed underlayer'],
-    operations: blended ? ['preserve predecessor moisture', 'measure paper and brush', 'dry on wet'] : ['dry', 'measure paper and brush', 'wet on dry'],
-  };
 }

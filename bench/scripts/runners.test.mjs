@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { museUsage, agyUsage, agyConversation, command, turnCommand } from './runners.mjs';
+import { museUsage, agyUsage, agyConversation, turnCommand } from './runners.mjs';
 import { benchmarkProfile } from './profiles.mjs';
 
 const usageLine = (input, output, family = 'provider') => JSON.stringify({
@@ -54,18 +54,6 @@ test('museUsage is null without a session id or a matching log', () => {
 const agy = { key: 'argon', name: 'Gemini 4 Argon', id: 'gemini-4-argon-high', effort: 'high', runner: 'agy' };
 const agyResult = (input, output, thinking) => JSON.stringify({ event: 'result', result: { conversation_id: 'c-1', usage: { input_tokens: input, output_tokens: output, thinking_tokens: thinking } } });
 
-test('agy: V1 names the target images for the file viewer and adds their folder', () => {
-  const c = command(agy, { ws: '/ws', viewDir: '/view', raw: '/raw', crops: ['hills', 'mittens'], text: 'Read the brief.', sessionCapMin: 85 });
-  assert.equal(c.cmd, 'agy');
-  assert.equal(c.stdinFile, undefined);
-  const text = c.args[c.args.indexOf('-p') + 1];
-  assert.match(text, /\/view\/hills\.png/);
-  assert.match(text, /\/view\/mittens\.png/);
-  assert.deepEqual(c.args.slice(c.args.indexOf('--add-dir'), c.args.indexOf('--add-dir') + 2), ['--add-dir', '/view']);
-  for (const f of ['--output-format', 'stream-json', '--dangerously-skip-permissions', '--print-timeout', '0']) assert.ok(c.args.includes(f));
-  assert.ok(!c.args.includes('--disable-slash-commands'), 'V2 skills need slash commands');
-});
-
 test('agy: a later turn resumes the conversation', () => {
   const first = turnCommand(agy, { ws: '/ws', raw: '/raw', text: 'paint', images: ['/raw/view/hills.png'], sessionId: null, resume: false });
   assert.ok(!first.args.includes('--conversation'));
@@ -98,4 +86,21 @@ test('agy: conversation id from init; tokens counted once across resumed turns',
   assert.equal(agyUsage(ev(2)).tokens, 640);
   fs.writeFileSync(ev(3), JSON.stringify({ event: 'step_update' }) + '\n');
   assert.equal(agyUsage(ev(3)).tokens, null);
+});
+
+test('a Claude turn runs with the operator\'s auto-memory folder switched off, on a first turn and a resumed one', () => {
+  const claude = { key: 'c', name: 'C', id: 'claude-x', effort: 'n/a', runner: 'claude' };
+  const first = turnCommand(claude, { ws: '/ws', raw: os.tmpdir(), text: 'paint', sessionId: 's-1', resume: false });
+  const again = turnCommand(claude, { ws: '/ws', raw: os.tmpdir(), text: 'fix', sessionId: 's-1', resume: true });
+  for (const c of [first, again]) assert.equal(c.env.CLAUDE_CODE_DISABLE_AUTO_MEMORY, '1');
+});
+
+test('a Claude turn is offered no MCP server: strict MCP config, an empty server list, and every MCP tool denied', () => {
+  const claude = { key: 'c', name: 'C', id: 'claude-x', effort: 'medium', runner: 'claude' };
+  for (const resume of [false, true]) {
+    const { args } = turnCommand(claude, { ws: '/ws', raw: os.tmpdir(), text: 'paint', sessionId: 's-1', resume });
+    assert.ok(args.includes('--strict-mcp-config'));
+    assert.deepEqual(JSON.parse(args[args.indexOf('--mcp-config') + 1]), { mcpServers: {} });
+    assert.equal(args[args.indexOf('--disallowedTools') + 1], 'mcp__*');
+  }
 });

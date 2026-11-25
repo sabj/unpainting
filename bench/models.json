@@ -1,5 +1,5 @@
 {
- "note": "Models the harness knows how to run. runner: claude (Claude Code CLI), codex (Codex CLI), muse (Muse Code CLI), agy (Antigravity CLI) or together (bench/v2/runners/oss_loop.py on Together). effort is the reasoning setting sent, or n/a.",
+ "note": "Models the harness knows how to run. runner: claude (Claude Code CLI), codex (Codex CLI), muse (Muse Code CLI), agy (Antigravity CLI) or together (bench/v2/runners/oss_loop.py on Together). effort is the reasoning setting sent, or n/a. The -m keys are models at medium effort under the same key, id and effort as tools/paint/authors.json, so a model's level 1 results (run here) and its level 2 to 4 results carry one key; the ten of the 0.4 roster are named in bench/run-sets.json \"roster\"; argonmed, neonmed and sonnetmed are the same models under the keys the earlier rounds' records use.",
  "models": [
   { "key": "fable", "name": "Fable 5.1", "id": "claude-fable-5-1", "effort": "xhigh", "runner": "claude" },
   { "key": "fable52", "name": "Fable 5.2", "id": "claude-fable-5-2", "effort": "xhigh", "runner": "claude" },
@@ -18,6 +18,19 @@
   { "key": "spark", "name": "Muse Spark 1.3", "id": "muse-spark-1.3", "effort": "xhigh", "runner": "muse" },
   { "key": "argon", "name": "Gemini 4 Argon (High)", "id": "gemini-4-argon-high", "effort": "high", "runner": "agy" },
   { "key": "argonmed", "name": "Gemini 4 Argon (Medium)", "id": "gemini-4-argon-medium", "effort": "medium", "runner": "agy" },
+  { "key": "neonmed", "name": "Gemini 4 Neon (Medium)", "id": "gemini-4-neon-medium", "effort": "medium", "runner": "agy" },
+  { "key": "sonnetmed", "name": "Sonnet 5.5 (Medium)", "id": "claude-sonnet-5-5", "effort": "medium", "runner": "claude" },
+  { "key": "argon-m", "name": "Gemini 4 Argon (medium)", "id": "gemini-4-argon-medium", "effort": "medium", "runner": "agy" },
+  { "key": "neon-m", "name": "Gemini 4 Neon (medium)", "id": "gemini-4-neon-medium", "effort": "medium", "runner": "agy" },
+  { "key": "hydrogen-m", "name": "Gemini 4 Hydrogen (medium)", "id": "gemini-4-hydrogen-medium", "effort": "medium", "runner": "agy" },
+  { "key": "carbon-m", "name": "Gemini 4 Carbon (medium)", "id": "gemini-4-carbon-medium", "effort": "medium", "runner": "agy" },
+  { "key": "sonnet-m", "name": "Claude Sonnet 5.5 (medium)", "id": "claude-sonnet-5-5", "effort": "medium", "runner": "claude" },
+  { "key": "astra-m", "name": "Codex Astra (medium)", "id": "gpt-6-astra", "effort": "medium", "runner": "codex" },
+  { "key": "sol-m", "name": "Codex Sol (medium)", "id": "gpt-6.1-sol", "effort": "medium", "runner": "codex" },
+  { "key": "terra-m", "name": "Codex Terra (medium)", "id": "gpt-6.1-terra", "effort": "medium", "runner": "codex" },
+  { "key": "fable-m", "name": "Claude Fable 5.2 (medium)", "id": "claude-fable-5-2", "effort": "medium", "runner": "claude" },
+  { "key": "opus-m", "name": "Claude Opus 5.5 (medium)", "id": "claude-opus-5-5", "effort": "medium", "runner": "claude" },
+  { "key": "wonderfull-m", "name": "Muse Wonder Full (medium)", "id": "muse-wonder-full-1.0", "effort": "medium", "runner": "muse" },
   { "key": "gflash", "name": "Gemini 3.8 Flash", "id": "gemini-3.8-flash-high", "effort": "high", "runner": "agy" }
  ]
 }

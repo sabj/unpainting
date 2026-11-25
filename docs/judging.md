@@ -1,48 +1,17 @@
 # Judging
 
-A judge scores a finished painting and its saved stages. Judges are advisory. No vision judge's verdict is fed back into the painter. A few repeatable image measurements, such as color difference, are also used inside planning.
+Measurements and judges score a finished painting and the frames saved on the way. Nothing they say is fed back to the painter ([honesty](honesty.md)). The benchmark's judges are in [scoring](../bench/docs/scoring.md).
 
-## Classic measures
+- `node tools/judge/judge-plate.mjs --image TARGET --painted PAINTING.jpg`: measures one painting with the code in `src/eval/`. It checks tone levels and how much paper is left bare (`values.mjs`), how well tones and lines match by region (`fidelity.mjs`) and colour difference (`colour.mjs`).
+- `node tools/judge/stage-check.mjs RUN_DIR`: checks whether the saved frames follow the order a painter would use (`src/eval/stages.mjs`). It flags three things. One is big shapes that are under half their final darkness a third of the way in. Another is speckle in the first half. The last is more than 70% of the final tone already down a quarter of the way in.
+- `tools/judge/rounds/`: blind comparisons of stages. `run.mjs` mixes a new run with a control, a copy of the control, a known good run and a known bad run, under shuffled letters. `tally.mjs` drops any judge that ranks the controls wrongly.
 
-The repeatable image measurements are code in `src/eval/`. They give the same numbers every time for the same images.
+## Stroke sizes
 
-| module | measures | compares at |
-|---|---|---|
-| `values.mjs` | how many tone levels, large areas of uniform darkness, paper left between marks | the painting alone |
-| `linequality.mjs` | line continuity, steadiness and placement | lines |
-| `legibility.mjs` | silhouette at a blur of about 4 cells, and recall of form edges | shapes |
-| `fidelity.mjs` | tone over cells about 16 px wide, and line recall within 2 cells | regions |
-| `ink.mjs` | ink precision and recall within 2 cells | lines |
-| `colour.mjs` | color difference (CIEDE2000, a standard color-difference measure), mean and 90th percentile | pixels |
-| `stages.mjs` | the frames in order (see below) | stages |
+`tools/stroke-stats.mjs` and `tools/stroke-gate.mjs` flag large plain areas filled with tiny dabs or narrow sweeps. A dab is tiny if it is under 1 mm wide or 3 mm long. Tiny dabs or narrow sweeps may cover at most 30% of such an area. Detail work, pen lines and the 1 mm band along an edge are exempt.
 
-`score.mjs` scores seven dimensions from 0 to 10, such as line quality, value structure and tone agreement. Its scoring curves join fixed calibration points from a collection of real watercolors. They do not map every median or percentile to an exact score. `composite.mjs` keeps groups of related measures apart and never averages them. `tools/judge/judge-plate.mjs` runs the composite on one painting.
-
-Some measures compare pixel by pixel, such as `colour.mjs` and the end-result group of measurements in `composite.mjs`. Under the [honesty rules](honesty.md), comparisons with the target are made at the shape level. Use per-pixel scores only for diagnosis.
-
-## Stage checks
-
-`src/eval/stages.mjs` checks that the frames follow the order a person paints in. It reads them in order and flags:
-
-- big shapes still under half their final level a third of the way in;
-- speckle in the first half;
-- more than 70% of the final tone already down a quarter of the way in, which is too dark too early;
-- steps backward, color that drifts, and, for line-first styles, too little line early.
-
-`tools/judge/stage-check.mjs` and `tools/judge/concert-judge.mjs` print these flags.
-
-## Vision judges
-
-Vision judges, AI models that score images, are optional. `tools/judge/rounds/` runs a blind evaluation of saved stages:
-
-- It packs the stages of five runs: the candidate, a control (a comparison run with known settings), a duplicate of the control, a known good example and a known bad example.
-- Each judge sees its own shuffled letters, and scores each stage from 1 to 5 plus process and finish.
-- Claude judges are fresh agents you start by hand. GPT judges run through `codex exec`.
-- `tools/judge/rounds/tally.mjs` drops a judge that ranks the known bad example above the known good one, or scores the duplicates more than 1 point apart.
-- A candidate wins when at least 4 valid judges prefer it and those votes make up at least two thirds of all valid judges.
-
-The benchmark scores paintings with its own judges; [bench/docs/scoring.md](../bench/docs/scoring.md) describes them.
-
-## Why advisory
-
-Judges disagree with each other and with people. A judge gives a fast first read, and the person looking at the painting decides.
+```sh
+node tools/stroke-stats.mjs RUN_DIR --out PANEL
+node tools/stroke-gate.mjs RUN_DIR --mode reject
+node tools/run-plan.mjs plan.json --stroke-gate reject --out work/plan
+```

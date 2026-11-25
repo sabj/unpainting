@@ -6,7 +6,6 @@ import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { TARGET_SELF_SCORE, CROP_ORDER, compositeTargets, loadCrops, BENCH, REPO, V2, loadRuns, validateRun, cheatRisk, bootstrapMean, mean, readJson, fmtCost, inPublishedScope, writeJson, ROUNDS, RUNS, groupByPainter, paintingScores } from './lib.mjs';
-import { brief, prompt, command, installSkills } from './runners.mjs';
 import { findingsData } from './findings-data.mjs';
 
 const runs = loadRuns();
@@ -175,17 +174,6 @@ test('cheatRisk reproduces the published V1 and V2 cheat-risk scores', () => {
   assert.ok(n >= 30);
 });
 
-test('the published crop brief and prompt agree with current inputs', () => {
-  const all = ['hills', 'south-france', 'sargent', 'mittens', 'trumbull'];
-  for (const round of ['naive', 'skill']) {
-    const frozen = fs.readFileSync(path.join(V2, round, 'BRIEF.md'), 'utf8').replaceAll('TARGET_DIR', '/x/view');
-    assert.equal(brief(round, all, '/x/view'), frozen);
-  }
-  assert.equal(prompt(all), 'Read bench/BRIEF.md in this directory and do what it says. The five target crops are attached in order: Hills, France, Ships, Mittens, Trumbull. Work without asking questions; nobody will answer.');
-  const two = brief('naive', ['sargent', 'trumbull'], '/x/view');
-  assert.ok(!two.includes('`hills`') && two.includes('`sargent`') && two.startsWith('# Paint two small crops'));
-});
-
 test('repo skill discovery uses one directory through a relative Claude symlink', () => {
   const skills = path.join(REPO, '.agents', 'skills');
   const claude = path.join(REPO, '.claude', 'skills');
@@ -194,26 +182,6 @@ test('repo skill discovery uses one directory through a relative Claude symlink'
   for (const name of ['painting-planner', 'watercolor-technique']) {
     assert.ok(fs.readFileSync(path.join(skills, name, 'SKILL.md'), 'utf8').startsWith('---'));
   }
-});
-
-test('trial skill discovery copies the published guides for V2 and leaves V1 without skills', () => {
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'bench-skills-'));
-  try {
-    installSkills('naive', tmp);
-    assert.ok(!fs.existsSync(path.join(tmp, '.agents')));
-    assert.ok(!fs.existsSync(path.join(tmp, '.claude')));
-    installSkills('skill', tmp);
-    const source = path.join(V2, 'skill', 'skills');
-    const skills = path.join(tmp, '.agents', 'skills');
-    const claude = path.join(tmp, '.claude', 'skills');
-    assert.equal(fs.readlinkSync(claude), '../.agents/skills');
-    assert.equal(fs.realpathSync(claude), fs.realpathSync(skills));
-    const files = fs.readdirSync(source, { recursive: true }).filter(f => fs.statSync(path.join(source, f)).isFile());
-    for (const file of files) {
-      assert.deepEqual(fs.readFileSync(path.join(skills, file)), fs.readFileSync(path.join(source, file)), file);
-      assert.deepEqual(fs.readFileSync(path.join(claude, file)), fs.readFileSync(path.join(source, file)), file);
-    }
-  } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
 });
 
 test('results.json, the leaderboard, the findings and the chart regenerate unchanged from runs/', () => {
@@ -240,28 +208,6 @@ test('every image the gallery links to exists and is under 60 KB', () => {
   for (const f of srcs) assert.ok(fs.existsSync(f) && fs.statSync(f).size < 60_000, f);
 });
 
-test('the Together runner can read targets while a model-authored script cannot', () => {
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'together-guard-'));
-  try {
-    const viewDir = path.join(tmp, 'view');
-    fs.mkdirSync(viewDir);
-    const png = path.join(viewDir, 'hills.png');
-    fs.writeFileSync(png, 'x');
-    const guardDir = path.join(V2, 'kit', 'py');
-    // The environment run.mjs builds for every child, then the runner overrides on top.
-    const base = { ...process.env, PYTHONPATH: guardDir, BENCH_PYGUARD: guardDir, BENCH_VIOLATIONS: path.join(tmp, 'v.jsonl') };
-    const c = command({ runner: 'together', id: 'm' }, { ws: tmp, viewDir, raw: tmp, crops: ['hills'], text: '', sessionCapMin: 10 });
-    const runnerEnv = { ...base, ...c.env };
-    const read = `import pathlib; print(len(pathlib.Path(r"${png}").read_bytes())); print(len(open(r"${png}", "rb").read()))`;
-    // The runner process reads the target to attach it to the prompt.
-    assert.equal(execFileSync('python3', ['-c', read], { env: runnerEnv }).toString().trim(), '1\n1');
-    // A model-authored script runs with PYTHONPATH=BENCH_PYGUARD (oss_loop.py's bash tool) and is blocked.
-    const modelEnv = { ...runnerEnv, PYTHONPATH: runnerEnv.BENCH_PYGUARD };
-    assert.throws(() => execFileSync('python3', ['-c', `open(r"${png}", "rb")`], { env: modelEnv, stdio: 'pipe' }), /reading image files is not allowed/);
-    assert.ok(fs.existsSync(path.join(tmp, 'v.jsonl')));
-  } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
-});
-
 test('judge versions validate and never share a result group', () => {
   const run = runs[0].run;
   for (const judgeVersion of [undefined, 'J0', 'Jx', 1])
@@ -272,15 +218,22 @@ test('judge versions validate and never share a result group', () => {
 
 test('explicit benchmark budgets, density, route and judge profiles never share a result group', () => {
   const source = runs.find(e => e.run.round === 'V4').run;
-  const base = { ...source, judgeVersion: 'J2', judgeProfile: 'J2-lite', judgeRoute: 'together', settings: { ...source.settings, benchmarkProfile: 'lite-v1', modelMinutesCap: 5, paintWidth: { hills: 540 } } };
+  const base = { ...source, judgeVersion: 'J2', judgeProfile: 'J2-lite', judgeRoute: 'together', settings: { ...source.settings, benchmarkProfile: 'lite-v2', modelMinutesCap: 5, paintWidth: { hills: 306 } } };
   const variants = [base,
     { ...base, judgeProfile: 'J2-full' },
     { ...base, judgeRoute: 'openrouter' },
-    { ...base, settings: { ...base.settings, paintWidth: { hills: 1200 } } },
-    { ...base, settings: { ...base.settings, benchmarkProfile: 'full-v1', modelMinutesCap: 85 } }];
+    // painted enlarged, as the subjects were until 0.3.3: the width alone separates it, and so does the profile id
+    { ...base, settings: { ...base.settings, paintWidth: { hills: 1224 } } },
+    { ...base, settings: { ...base.settings, benchmarkProfile: 'lite-v1', paintWidth: { hills: 540 } } },
+    { ...base, settings: { ...base.settings, benchmarkProfile: 'lite-v1' } },
+    { ...base, settings: { ...base.settings, benchmarkProfile: 'full-v2', modelMinutesCap: 85 } }];
   const groups = groupByPainter(variants.map(run => ({ run })));
-  assert.equal(groups.length, 5);
+  assert.equal(groups.length, 7);
   assert.ok(groups.every(g => g.entries.length === 1 && g.evaluation));
+  // a published V096 record carries no profile and keeps its own group, apart from every new run
+  assert.equal(source.settings.benchmarkProfile, undefined);
+  const withPublished = groupByPainter([{ run: source }, { run: { ...base, painterVersion: source.painterVersion, simVersion: source.simVersion, judgeVersion: source.judgeVersion } }]);
+  assert.equal(withPublished.length, 2, 'same painter, sim and judge versions, yet the published record stands alone');
 });
 
 test('Mittens is public with the native self-score, and the CPU Ships rerender is scored', () => {

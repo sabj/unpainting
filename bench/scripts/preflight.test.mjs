@@ -5,7 +5,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { preflight, scorePython, verifyComparisonRun, verifyTearsheetContract } from './preflight.mjs';
 import { parseRerenderArgs, discoverStoredPlans, runRerender, rerenderGate } from './rerender.mjs';
-import { resolvePlan } from './pipeline/plan-args.mjs';
+import { resolvePlan, pngSize } from './pipeline/plan-args.mjs';
 
 test('scorer interpreter prefers CLI, then environment, then PATH', () => {
   assert.equal(scorePython('cli', {BENCH_SCORE_PYTHON: 'env'}), 'cli');
@@ -19,43 +19,63 @@ test('preflight rejects missing environments and failed dependencies before laun
   assert.deepEqual(calls.map(c => c[0]), ['seg', 'score']);
   for (const patch of [{state: {git: true, dirty: true}}, {env: {}}, {exists: () => false}, {run: () => ({status: 1, stderr: 'missing module'})}]) assert.throws(() => preflight({...options, ...patch}));
 });
-test('verifyComparisonRun and verifyTearsheetContract reject CPU fallbacks, missing/300px widths, non-SAM segments, duplicate playback stages, and incomplete model/stage sets', () => {
+test('verifyComparisonRun and verifyTearsheetContract reject CPU fallbacks, enlarged or unrecorded sources, non-SAM segments, duplicate playback stages, and incomplete model/stage sets', () => {
+  // a plate at source scale: a 300 px target painted 300 cells wide
+  const card = (dimensions = { sourceWidth: 300, sourceHeight: 263, paintWidth: 300, paintHeight: 263, enlargement: 1, sheetWidth: 300, sourceScale: 1, sourceScaleAllowed: 1 }) => JSON.stringify({ gpuBackend: { backend: 'gpu', fallback: false }, dimensions });
+  const gpu = JSON.stringify({ backend: { backend: 'gpu', fallback: false }, width: 300 });
   const files = {
-    '/ok/paint-speed-summary.json': JSON.stringify({ backend: { backend: 'gpu', fallback: false }, width: 1200 }),
+    '/ok/run-card.json': card(),
+    '/ok/paint-speed-summary.json': gpu,
     '/ok/segments.json': JSON.stringify({ backend: 'sam', status: 'ok' }),
     '/ok/stages/stage-010.jpg': 's10',
     '/ok/stages/stage-025.jpg': 's25',
     '/ok/stages/stage-050.jpg': 's50',
     '/ok/stages/stage-075.jpg': 's75',
     '/ok/stages/stage-100.jpg': 's100',
-    '/cpu/paint-speed-summary.json': JSON.stringify({ backend: { backend: 'cpu', fallback: true }, width: 1200 }),
-    '/thumb/paint-speed-summary.json': JSON.stringify({ backend: { backend: 'gpu', fallback: false }, width: 300 }),
+    '/cpu/run-card.json': card(),
+    '/cpu/paint-speed-summary.json': JSON.stringify({ backend: { backend: 'cpu', fallback: true }, width: 300 }),
     '/nowidth/paint-speed-summary.json': JSON.stringify({ backend: { backend: 'gpu', fallback: false } }),
-    '/noseg/paint-speed-summary.json': JSON.stringify({ backend: { backend: 'gpu', fallback: false }, width: 1200 }),
+    '/nosource/paint-speed-summary.json': JSON.stringify({ backend: { backend: 'gpu', fallback: false }, width: 1200 }),
+    '/noseg/run-card.json': card(),
     '/noseg/segments.json': JSON.stringify({ mode: 'off' }),
-    '/kmeans/paint-speed-summary.json': JSON.stringify({ backend: { backend: 'gpu', fallback: false }, width: 1200 }),
+    '/kmeans/run-card.json': card(),
     '/kmeans/segments.json': JSON.stringify({ backend: 'kmeans' }),
-    '/missingseg/paint-speed-summary.json': JSON.stringify({ backend: { backend: 'gpu', fallback: false }, width: 1200 }),
-    '/dupstage/paint-speed-summary.json': JSON.stringify({ backend: { backend: 'gpu', fallback: false }, width: 1200 }),
+    '/missingseg/paint-speed-summary.json': gpu,
+    '/missingseg/run-card.json': JSON.stringify({ dimensions: JSON.parse(card()).dimensions }),
+    '/dupstage/run-card.json': card(),
     '/dupstage/stages/stage-010.jpg': 's10',
     '/dupstage/stages/stage-025.jpg': 's25',
     '/dupstage/stages/stage-050.jpg': 's50',
     '/dupstage/stages/stage-075.jpg': 's50',
     '/dupstage/stages/stage-100.jpg': 's100',
-    '/enlarged/run-card.json': JSON.stringify({ gpuBackend: { backend: 'gpu' }, dimensions: { sourceWidth: 300, paintWidth: 1200, enlargement: 4 } }),
+    // the old benchmark width: a 300 px target painted 1200 cells wide, as a card of the time recorded it
+    '/enlarged/run-card.json': card({ sourceWidth: 300, paintWidth: 1200, enlargement: 4 }),
+    // a run that stated --sourcescale 2 and painted twice its source
+    '/twice/run-card.json': card({ sourceWidth: 300, paintWidth: 600, enlargement: 2, sheetWidth: 600, sourceScale: 2, sourceScaleAllowed: 2 }),
+    // pens on a fine sheet (--inkres 4): the output is four times the sheet, which is at source scale
+    '/inkres/run-card.json': card({ sourceWidth: 300, paintWidth: 1200, enlargement: 4, sheetWidth: 300, sourceScale: 1, sourceScaleAllowed: 1 }),
+    // painted smaller than its source
+    '/small/run-card.json': card({ sourceWidth: 1600, paintWidth: 1200, enlargement: 0.75, sheetWidth: 1200, sourceScale: 0.75, sourceScaleAllowed: 1 }),
   };
   const io = { exists: p => p in files, readFile: p => files[p], readBytes: p => Buffer.from(files[p]) };
-  assert.equal(verifyComparisonRun('/ok', { ...io, requireSegments: true, requireStages: true }).ok, true);
+  const ok = verifyComparisonRun('/ok', { ...io, requireSegments: true, requireStages: true, width: 300 });
+  assert.deepEqual([ok.ok, ok.width, ok.sourceWidth, ok.sourceScale], [true, 300, 300, 1]);
   assert.throws(() => verifyComparisonRun('/cpu', io), /GPU hardware is required/);
-  assert.throws(() => verifyComparisonRun('/thumb', io), /300px crop thumbnails/);
-  assert.throws(() => verifyComparisonRun('/nowidth', io), /rendered at width 0px/);
+  // source scale: both widths recorded, the sheet no wider than the source, and exactly the subject's width when one is given
+  assert.throws(() => verifyComparisonRun('/enlarged', io), /painted 1200 cells wide from a 300 px source, 4 cells for each source pixel \(at most 1\); the render width never exceeds the source width/);
+  assert.throws(() => verifyComparisonRun('/nowidth', io), /records no render width/);
+  assert.throws(() => verifyComparisonRun('/nosource', io), /records no source width/);
+  assert.throws(() => verifyComparisonRun('/twice', io), /2 cells for each source pixel \(at most 1\)/);
+  assert.equal(verifyComparisonRun('/twice', { ...io, maxSourceScale: 2 }).sourceScale, 2);
+  assert.equal(verifyComparisonRun('/inkres', io).width, 300, 'the pens\' fine sheet widens the output, not the sheet');
+  assert.equal(verifyComparisonRun('/small', io).sourceScale, 0.75);
+  assert.throws(() => verifyComparisonRun('/small', { ...io, width: 1600 }), /painted 1200 cells wide, not the 1600 its subject specifies/);
+  assert.throws(() => verifyComparisonRun('/ok', { ...io, width: 1200 }), /painted 300 cells wide, not the 1200 its subject specifies/);
   assert.throws(() => verifyComparisonRun('/noseg', { ...io, requireSegments: true }), /--segments off/);
   assert.throws(() => verifyComparisonRun('/kmeans', { ...io, requireSegments: true }), /--segments kmeans/);
   assert.throws(() => verifyComparisonRun('/missingseg', { ...io, requireSegments: true }), /missing segmentation evidence/);
   assert.throws(() => verifyComparisonRun('/dupstage', { ...io, requireStages: true }), /duplicate consecutive playback stages/);
   assert.throws(() => verifyComparisonRun('/cpu', { ...io, requireGpu: false, requireStages: true }), /missing progressive stage images/);
-  assert.throws(() => verifyComparisonRun('/enlarged', { ...io, minSourceWidth: 1000 }), /300px source target/);
-  assert.throws(() => verifyComparisonRun('/ok', { ...io, minSourceWidth: 300 }), /0px source target/);
   assert.equal(verifyTearsheetContract({ models: ['argon', 'astra', 'opus'], stages: ['10%', '25%', '50%', '75%', '100%'] }).ok, true);
   assert.throws(() => verifyTearsheetContract({ models: ['opus'], stages: ['100%'] }), /missing required model families/);
   assert.throws(() => verifyTearsheetContract({ models: ['argon', 'astra', 'opus'], stages: ['100%'] }), /progressive stages required/);
@@ -100,9 +120,20 @@ test('rerender discovers all 60 stored V4 plans with gzipped line files and enfo
     fs.rmSync(tmpOut, { recursive: true, force: true });
   }
 });
-test('the rerender source gate admits every published target', () => {
-  for (const [spec, sourceWidth] of [[1224, 300], [1224, 306], [1216, 304], [1200, 300]]) {
-    assert.ok(sourceWidth >= rerenderGate({ width: spec }).minSourceWidth, `${sourceWidth}px source at ${spec}px`);
+test('the comparison gate has no size floor: it admits every target in bench/v2/targets at its subject width and refuses each one enlarged', () => {
+  const subjects = JSON.parse(fs.readFileSync(new URL('../v4v5/subjects.json', import.meta.url), 'utf8')).subjects;
+  const dir = new URL('../v2/targets/', import.meta.url);
+  const targets = fs.readdirSync(dir).filter(f => f.endsWith('.png'));
+  assert.ok(targets.includes('h34a.png') && targets.includes('h36a.png'), 'the 300 px Yale crops are among the targets');
+  for (const file of targets) {
+    const id = file.slice(0, -4), spec = subjects[id], [sourceWidth, sourceHeight] = pngSize(new URL(file, dir));
+    assert.ok(spec, `${id} has a subject`);
+    const run = paintWidth => { const card = JSON.stringify({ gpuBackend: { backend: 'gpu', fallback: false }, dimensions: { sourceWidth, sourceHeight, paintWidth, sheetWidth: paintWidth } }); return { exists: p => p === '/r/run-card.json', readFile: () => card }; };
+    assert.equal(verifyComparisonRun('/r', { ...run(spec.width), ...rerenderGate(spec) }).sourceScale, 1, `${id}: ${sourceWidth} px painted ${spec.width} wide`);
+    assert.throws(() => verifyComparisonRun('/r', { ...run(4 * sourceWidth), ...rerenderGate({ width: 4 * sourceWidth }) }), /the render width never exceeds the source width/, `${id} at four times its width`);
   }
-  assert.ok(rerenderGate({ width: 1224 }).minSourceWidth > 200, 'a thumbnail-sized source still fails');
+  // a smaller source is no reason to refuse: a thumbnail painted at its own width passes, and fails only when enlarged
+  const tiny = w => { const card = JSON.stringify({ gpuBackend: { backend: 'gpu' }, dimensions: { sourceWidth: 120, paintWidth: w, sheetWidth: w } }); return { exists: p => p === '/t/run-card.json', readFile: () => card }; };
+  assert.equal(verifyComparisonRun('/t', tiny(120)).ok, true);
+  assert.throws(() => verifyComparisonRun('/t', tiny(300)), /2\.5 cells for each source pixel/);
 });

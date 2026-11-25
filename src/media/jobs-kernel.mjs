@@ -1,5 +1,6 @@
 // Whole-sheet jobs the thread pool (sheet-par.mjs) splits by cells or rows: layer compositing (km.mjs) and the flow
 // field passes (wash.mjs). Each thread runs the serial code on its share. No Node imports: the workers load it.
+import { curvedEdgeFlux } from './contact-distance.mjs';
 import { renderCells } from './km.mjs';
 import { gradRows, tensorRows } from './flow-kernel.mjs';
 import { unmixRange } from '../crop/unmix-kernel.mjs';
@@ -24,6 +25,31 @@ export function runJob(a, c, nC) {
   } else if (a.kind === 'unmix') {
     const i0 = Math.floor((a.n * c) / nC), i1 = Math.floor((a.n * (c + 1)) / nC);
     if (i1 > i0) unmixRange(a.D, a.A, a.k, a.Gf, a.P0, a.P1, a.P2, a.L, a.iterations, i0, i1);
+  } else if (a.kind === 'pressureRestrict') {
+    const lo = Math.floor(a.n * c / nC), hi = Math.floor(a.n * (c + 1) / nC);
+    const { b, x, diag, nb, off, children, out } = a;
+    for (let parent = lo; parent < hi; parent++) {
+      let sum = 0;
+      for (let slot = 4 * parent; slot < 4 * parent + 4; slot++) {
+        const k = children[slot];
+        if (k < 0) break;
+        let residual = b[k] - diag[k] * x[k];
+        if (off) {
+          for (let e = 9 * k; e < 9 * k + 9; e++) {
+            const j = nb[e]; if (j >= 0) residual -= off[e] * x[j];
+          }
+        } else {
+          for (let e = 4 * k; e < 4 * k + 4; e++) {
+            const j = nb[e]; if (j >= 0) residual += x[j];
+          }
+        }
+        sum += residual;
+      }
+      out[parent] = sum;
+    }
+  } else if (a.kind === 'edgeFlux') {
+    const lo = Math.floor(a.n * c / nC), hi = Math.floor(a.n * (c + 1) / nC);
+    for (let i = lo; i < hi; i++) a.out[i] = curvedEdgeFlux(a.samples, 9 * i, 3, a.mm, a.edgeMm);
   } else if (a.kind === 'tiles') {
     // sheet.mjs wetBoxes' scan of the whole sheet for tiles holding water or damp, by rows of tiles
     const { M, s, capacity, on, w, h, tw, th, TILE } = a, t0 = Math.floor((th * c) / nC), t1 = Math.floor((th * (c + 1)) / nC);

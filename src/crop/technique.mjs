@@ -94,7 +94,7 @@ export function chooseTechnique(D, mask, w, h, { peak = 1, soft = null, wetEdge 
   if (depth > 0.55) {
     return {
       name: 'glazed', edge, tooth: tooth.share, depth,
-      water: 0.58, wetMix: 0.3, bridge: 0.82, bridgeSoft: 2.4, intoWet: false, dryAfter: true, passes: 2,
+      water: 0.58, wetMix: 0.3, bridge: 0.82, bridgeSoft: 2.4, intoWet: false, dryAfter: true, passes: 1,
     };
   }
   return {

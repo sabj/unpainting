@@ -6,7 +6,7 @@ function host({resident=true,persistent=false,dampOnly=false}={}) {
   const events=[];
   const pass={setPipeline(name){events.push(name);},setBindGroup(){},dispatchWorkgroups(){},dispatchWorkgroupsIndirect(){},end(){}};
   const h=Object.assign(Object.create(GpuSheet.prototype),{
-    resident,persistent,cap:4,workers:2,ntiles:4,K:1,act:[0],o:{edgeWidth:2,flowIters:2,slide:1},
+    timeChunks:1,flowTime:{iters:2},poreTime:{iters:1},resident,persistent,cap:4,workers:2,ntiles:4,K:1,act:[0],o:{edgeWidth:2,flowIters:2,slide:1},
     dryS:dampOnly?{dampOnly:true}:null,b:{CTR:{},ARGS:{}},
     p:new Proxy({}, {get:(_,key)=>key}),bg:{},timestamps:{begin(){return pass;}},
     device:{createCommandEncoder(){return {clearBuffer(_,offset,size){events.push(['clear',offset,size]);},finish(){return {};}};},queue:{submit(){events.push('submit');}}}

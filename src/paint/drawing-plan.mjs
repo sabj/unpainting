@@ -7,21 +7,18 @@
 const MEDIA = Object.freeze(['none', 'graphite', 'ink', 'auto']);
 const INK_COLOURS = Object.freeze(['sepia', 'black']);
 const LINE_SETS = Object.freeze(['all', 'contours', 'subject', 'regions']);
-// drawing.linework "auto": the universal linework stage (src/paint/methods/linework-stage.mjs) picks the source, cleans
-// the lines and gates whether to draw, the medium and how much; "off" (the default) leaves the source to drawing.source.
-const LINEWORK = Object.freeze(['auto', 'off']);
-// Where the line set comes from (--linesource, src/paint/methods/linework-plan.mjs).
-const LINE_SOURCES = Object.freeze(['auto', 'none', 'photo-sketch', 'source-ink', 'structure-lines', 'structure-combine', 'line-map']);
+// Plan fields that chose a line source the painter traced from the subject: removed in 0.4 (src/paint/line-source.mjs).
+const REMOVED_FIELDS = Object.freeze(['linework', 'source', 'map', 'mapSmoothing']);
+const REMOVED_WHY = "removed in 0.4 with the painter's own line extraction (last at commit 49447027); give the plan a prepared drawing file instead";
 // The linked stages (src/paint/methods/drawing-stages.mjs) and the few choices each takes.
 const STAGES = Object.freeze(['prep', 'prepInk', 'finishInk']);
-const PREP_INK_METHODS = Object.freeze(['contour', 'connected', 'scribble']);
+const PREP_INK_METHODS = Object.freeze(['contour', 'scribble']);
 const FINISH_METHODS = Object.freeze(['accent', 'architecture']);
 const FINISH_SELECT = Object.freeze(['edges', 'darks', 'both']);
 const FINISH_MASSES = Object.freeze(['none', 'scribble']);
-// prepInk.method: contour draws the stage's lines as planned; connected lays the walker's connected gestures on them
-// (--drawinglogic 2); scribble joins them into fewer, longer strokes, opens the lit edges and scribbles the dark masses
-// (--drawinglogic 3).
-const METHOD_LOGIC = Object.freeze({ connected: '2', scribble: '3' });
+// prepInk.method: contour draws the stage's lines as planned; scribble joins them into fewer, longer strokes, opens the
+// lit edges and scribbles the dark masses (--drawinglogic 3). "connected" (--drawinglogic 2) was removed.
+const METHOD_LOGIC = Object.freeze({ scribble: '3' });
 // finishInk.method "architecture": the Y1 / V096 closing pen. Traced lines restated whole at full pressure, widths from
 // the target's darkness, a wide nib and strong ink. (--inkofftrees is left out: its tree detector read 64% of h36-a's
 // stone as trees and removed 148 of 171 opening lines.) For buildings drawn from photographs or pen sheets.
@@ -118,6 +115,7 @@ function stageFlags(stages, { inkColor = null } = {}) {
     unitFlag(prepInk, 'prepInk', 'add', '--prepinkadd');
     unitFlag(prepInk, 'prepInk', 'amount', '--prepinkamount');
     unitFlag(prepInk, 'prepInk', 'deviate', '--prepinkdeviate');
+    if (prepInk.method === 'connected') throw new Error('drawing.stages.prepInk.method "connected" was removed: it laid the walker\'s gestures on the drawing file and no plan used it; use contour or scribble');
     const method = stageChoice(prepInk, 'prepInk', 'method', PREP_INK_METHODS);
     if (METHOD_LOGIC[method]) flags.push('--drawinglogic', METHOD_LOGIC[method]);
     // a plan that asks for scribble gets it, whatever the style's ink share (logic 3 otherwise falls back to logic 1
@@ -129,12 +127,7 @@ function stageFlags(stages, { inkColor = null } = {}) {
     if (from === 'prepInk' && !prepInk) throw new Error('drawing.stages.finishInk.from "prepInk" needs a prepInk stage');
     if (from === 'prep' && !prep) throw new Error('drawing.stages.finishInk.from "prep" needs a prep stage');
     if (from) flags.push('--finishfrom', from);
-    for (const [key, flag] of [['hatch', 'finishhatch'], ['fur', 'finishfur']]) {
-      const v=finishInk[key];
-      if (v == null || v === false) continue;
-      if (typeof v !== 'object' || Array.isArray(v)) throw Error(`drawing.stages.finishInk.${key}: an object`);
-      flags.push('--'+flag, JSON.stringify(v));
-    }
+    for (const key of ['hatch', 'fur']) if (finishInk[key] != null && finishInk[key] !== false) throw new Error(`drawing.stages.finishInk.${key} was removed in 0.4: it drew texture lines read from the subject's density (last at commit 49447027)`);
     const select = stageChoice(finishInk, 'finishInk', 'select', FINISH_SELECT);
     if (select) flags.push('--finishselect', select);
     unitFlag(finishInk, 'finishInk', 'restate', '--finishrestate');
@@ -176,29 +169,28 @@ export function drawingFlags(drawing) {
   const medium = choice(drawing, 'medium', MEDIA);
   if (medium === 'none') return ['--drawing', 'none'];
   const flags = [];
-  if (drawing.linework != null) {
-    if (!LINEWORK.includes(drawing.linework)) throw new Error(`drawing.linework: one of ${LINEWORK.join(', ')}, not ${JSON.stringify(drawing.linework)}`);
-    flags.push('--linework', drawing.linework);
-  }
+  for (const k of REMOVED_FIELDS) if (drawing[k] != null && !(k === 'source' && drawing[k] === 'none')) throw new Error(`drawing.${k} was ${REMOVED_WHY}`);
   if (drawing.resolution != null) {
     if (![1,2].includes(drawing.resolution)) throw Error('drawing.resolution: 1 or 2');
     flags.push('--inkres', String(drawing.resolution));
   }
-  if (drawing.map != null) {
-    if (typeof drawing.map !== 'string' || !drawing.map) throw Error('drawing.map: prepared line map path');
-    flags.push('--sketchmap', drawing.map);
+  if (drawing.hand != null) {
+    if (typeof drawing.hand !== 'boolean') throw Error('drawing.hand: expected boolean');
+    flags.push('--drawinghand', drawing.hand ? '1' : '0');
   }
-  if (drawing.mapSmoothing != null) {
-    if (!Number.isFinite(drawing.mapSmoothing) || drawing.mapSmoothing < 0 || drawing.mapSmoothing > 2) throw Error('drawing.mapSmoothing: 0..2 cells');
-    flags.push('--mapsmoothing', String(drawing.mapSmoothing));
+  if (drawing.joinGap != null) {
+    if (!Number.isFinite(drawing.joinGap) || drawing.joinGap < 0 || drawing.joinGap > 20) throw Error('drawing.joinGap: 0..20 cells');
+    flags.push('--drawjoingap', round(drawing.joinGap));
+  }
+  if (drawing.damp != null) {
+    if (!Number.isFinite(drawing.damp) || drawing.damp < 0 || drawing.damp > 1) throw Error('drawing.damp: 0..1');
+    flags.push('--inkdamp', round(drawing.damp));
   }
   if (medium) flags.push('--outlinemedium', medium);
   const colour = choice(drawing, 'inkColor', INK_COLOURS);
   if (colour) flags.push('--inkprofile', `${colour}-ink`);
   const ink = inkFlags(drawing.ink, colour);
   flags.push(...ink.flags);
-  const source = drawing.source === 'auto' ? 'auto' : choice(drawing, 'source', LINE_SOURCES);
-  if (source) flags.push('--linesource', source);
   const amount = unit(drawing, 'amount');
   if (amount != null) flags.push('--openinglines', UNCAPPED, '--closinglines', UNCAPPED, '--drawshare', round(amount));
   const lines = choice(drawing, 'lines', LINE_SETS);

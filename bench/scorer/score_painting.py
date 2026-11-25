@@ -22,6 +22,11 @@ Every profile keeps the same three judges and strict full-image retries. Results
 valid call counts, valid samples and attempts. A single call per judge leaves repeatability unmeasured, not zero.
 
 JUDGE_ROUTE explicitly selects together (default) or openrouter (zero-data-retention providers). Each result records the route and serving providers. --no-vision runs the classic part only and needs no key.
+
+JUDGE_ROUTE=local is judge version J3 and nothing else: the panel is served by Ollama at JUDGE_LOCAL_URL (this
+machine, another machine or a rented GPU pod; see local_route.py), needs no key, and makes one call per judge, one
+model at a time. J1 and J2 do not run on the local route and J3 does not run on the remote ones, so their numbers
+cannot be mixed. A J3 result records the endpoint host and each model's digest.
 """
 import argparse, base64, io, json, math, os, re, sys, time, urllib.error, urllib.request
 from concurrent.futures import ThreadPoolExecutor
@@ -31,18 +36,28 @@ from PIL import Image
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import classic  # noqa: E402
+import local_route  # noqa: E402
 from common import Pair, load_rgb  # noqa: E402
 
 RUBRIC_VERSION = "bench-v3-median5"
 PROVIDER = os.environ.get("JUDGE_ROUTE", "together")
-if PROVIDER not in ("together", "openrouter"):
-    sys.exit(f"JUDGE_ROUTE must be together or openrouter, not {PROVIDER}")
-KEY = {"together": "TOGETHER_API_KEY", "openrouter": "OPENROUTER_API_KEY"}[PROVIDER]
+if PROVIDER not in ("together", "openrouter", "local"):
+    sys.exit(f"JUDGE_ROUTE must be together, openrouter or local, not {PROVIDER}")
+KEY = {"together": "TOGETHER_API_KEY", "openrouter": "OPENROUTER_API_KEY", "local": None}[PROVIDER]
 URL = "https://openrouter.ai/api/v1/chat/completions" if PROVIDER == "openrouter" else "https://api.together.xyz/v1/chat/completions"
 ROUTER_MODELS = {"moonshotai/Kimi-K3":"moonshotai/kimi-k3", "zai-org/GLM-5.3-Flash":"z-ai/glm-5.3-flash", "Qwen/Qwen3.5-9B":"qwen/qwen3.5-9b"}
 JUDGES = ["moonshotai/Kimi-K3", "zai-org/GLM-5.3-Flash", "Qwen/Qwen3.5-9B"]
 JUDGE_VERSIONS = ("J1", "J2")
 DEFAULT_JUDGE = os.environ.get("BENCH_JUDGE_VERSION", "J1")
+LOCAL = None  # the local route's endpoint, panel and parallelism; set only when JUDGE_ROUTE=local
+if PROVIDER == "local":
+    try:
+        LOCAL = local_route.settings()
+    except ValueError as e:
+        sys.exit(str(e))
+    JUDGES = list(LOCAL["panel"])
+    JUDGE_VERSIONS = (local_route.JUDGE_VERSION,)  # J1 and J2 are remote-only, J3 is local-only
+    DEFAULT_JUDGE = os.environ.get("BENCH_JUDGE_VERSION", local_route.JUDGE_VERSION)
 J2_PROFILES = {"lite": 1, "standard": 3, "full": 5}
 J2_ATTEMPTS, J2_TOPUP_ROUNDS = 3, 2
 J2_MAX_TOKENS, J2_MAX_TOKENS_CAP = 8000, 16000
@@ -63,6 +78,10 @@ def sampling_plan(judge, profile=None):
     """Resolve a budget before doing any scoring or network work. Preserve J1's legacy call-count override."""
     if judge not in JUDGE_VERSIONS:
         raise ValueError(f"unknown judge version {judge}; known: {', '.join(JUDGE_VERSIONS)}")
+    if judge == local_route.JUDGE_VERSION:
+        if profile is not None:
+            raise ValueError("--profile applies only to J2")
+        return {"profile": "J3-local", "calls": 1, "minValid": 1}  # temperature 0 on fixed weights: a repeat adds nothing
     raw = os.environ.get("BENCH_SCORE_CALLS")
     try:
         calls = int(raw) if raw is not None else 5
@@ -126,6 +145,8 @@ def data_uri(img, max_side=768):
 
 
 def _post(model, messages, max_tokens=8000, timeout=150, retries=3):
+    if PROVIDER == "local":
+        return local_route.post(LOCAL, model, messages, max_tokens=max_tokens)
     payload = {"model": ROUTER_MODELS[model] if PROVIDER == "openrouter" else model, "messages": messages, "max_tokens": max_tokens, "temperature": 0}
     if PROVIDER == "openrouter":
         payload["provider"] = {"zdr": True, "data_collection": "deny"}
@@ -314,6 +335,31 @@ def vision_scores_j2(target, image, style, calls=5, max_side=768):
     return out
 
 
+def vision_scores_j3(target, image, style, calls=1, max_side=768, post=None):
+    """J3: the local panel, one model after another so the server keeps one model loaded. A reply that does not
+    parse is asked again with both images, up to 3 calls; there is no text-only repair."""
+    content = _content(target, image, style, max_side)
+    post = post or _post
+    samples = {m: [] for m in JUDGES}; errors = {m: [] for m in JUDGES}
+    for m in JUDGES:
+        for _ in range(calls):
+            err = "no reply"
+            for _attempt in range(3):
+                try:
+                    raw, _usage = post(m, [{"role": "user", "content": content}])
+                except RuntimeError as e:
+                    err = str(e)[:200]
+                    continue
+                d = _parse(raw)
+                if d:
+                    samples[m].append({**d, "_provider": "local"})
+                    break
+                err = "no valid JSON"
+            else:
+                errors[m].append(err)
+    return _aggregate(samples, errors, calls)
+
+
 def score(target, image, style, vision=True, judge=None, profile=None, resolution="legacy", plate_mm=200.0):
     judge = judge or DEFAULT_JUDGE
     sampling = sampling_plan(judge, profile)
@@ -325,7 +371,7 @@ def score(target, image, style, vision=True, judge=None, profile=None, resolutio
     work_w = p.width if resolution == "native" else 720
     max_side = max(p.size) if resolution == "native" else 768
     cl = classic_scores(target, image, work_w, plate_mm)
-    vi = (vision_scores_j2 if judge == "J2" else vision_scores)(target, image, style, calls=sampling["calls"], **({"max_side": max_side} if resolution == "native" else {})) if vision else \
+    vi = (vision_scores_j2 if judge == "J2" else vision_scores_j3 if judge == local_route.JUDGE_VERSION else vision_scores)(target, image, style, calls=sampling["calls"], **({"max_side": max_side} if resolution == "native" else {})) if vision else \
         {"per_judge": {}, "errors": {}, "complete": False, "callCounts": {}, "minValidCalls": None}
     complete = vi.get("complete", False) and cl["mean"] is not None
     return {
@@ -347,6 +393,7 @@ def score(target, image, style, vision=True, judge=None, profile=None, resolutio
         "rubric": RUBRIC_VERSION,
         "judgeVersion": judge, "provider": PROVIDER, "judgeRoute": PROVIDER if vision else None,
         **({"judgeProviders": vi.get("providers", {})} if vision and PROVIDER == "openrouter" else {}),
+        **({k: v for k, v in local_route.record(LOCAL).items() if k not in ("judgeVersion", "judgeRoute")} if vision and PROVIDER == "local" else {}),
         "judgeProfile": sampling["profile"],
         "sampling": {"judges": list(JUDGES), "requestedCallsPerJudge": sampling["calls"],
                      "requiredValidCallsPerJudge": sampling["minValid"], "aggregation": "mean of per-judge medians"},
@@ -369,7 +416,7 @@ def main():
         sampling_plan(a.judge, a.profile)
     except ValueError as e:
         ap.error(str(e))
-    if not a.no_vision and not os.environ.get(KEY):
+    if not a.no_vision and KEY and not os.environ.get(KEY):
         sys.exit(f"{KEY} is not set (JUDGE_ROUTE={PROVIDER}); pass --no-vision for the classic part only")
     r = score(a.target, a.image, a.style, not a.no_vision, a.judge, a.profile, a.resolution, a.plate_mm)
     s = json.dumps(r, indent=1)

@@ -5,6 +5,7 @@ import { hasZeroPaperCertificate, isFootprintDryCertified } from './paper-certif
 import { createPen, dipPen, penStroke, penRect } from './pen.mjs';
 import { step, dry } from './sheet.mjs';
 import { check } from './checks.mjs';
+import { penContact } from './brush-kit.mjs';
 import { hessianRidges } from '../crop/layers.mjs';
 import { gaussian } from '../keyframes/density.mjs';
 
@@ -28,7 +29,7 @@ export function lineField(D, residual, w, h, { sigmas = [0.8, 1.2, 1.8] } = {}) 
  * @param opts.ink  concentration per pigment of the ink in the pen, as dipPen takes it
  * @param opts.peak the want that means a full-pressure line; defaults to the 95th percentile of the gestures' own
  */
-export function drawGestures(sheet, gestures, want, w, h, { ink, peak = null, pen: penOpts = {}, low = 0.25, allowStarvation = false, flowEvery = 60, O, beforeStroke = null, afterStroke = null } = {}) {
+export function drawGestures(sheet, gestures, want, w, h, { ink, peak = null, pen: penOpts = {}, low = 0.25, allowStarvation = false, flowEvery = 60, O, beforeStroke = null, afterStroke = null, afterSegment = null } = {}) {
   const at = (x, y) => want[Math.max(0, Math.min(h - 1, Math.round(y))) * w + Math.max(0, Math.min(w - 1, Math.round(x)))];
   if (peak == null) {
     const v = [];
@@ -42,14 +43,14 @@ export function drawGestures(sheet, gestures, want, w, h, { ink, peak = null, pe
   for (const g of gestures) {
     if (g.points.length < 2) continue;
     // `dip` on a gesture re-dips at its start; a number is the load. `low` is how empty the pen may run before a
-    // re-dip inside the gesture (--drawinglogic 2)
+    // re-dip inside the gesture (--drawinglogic 3)
     const refillBelow = allowStarvation ? (g.low ?? low) : Math.max(g.low ?? low, Math.min(.9, pen.starve * 1.2));
     if (pen.ink <= 0 || g.dip || pen.ink < pen.capacity * refillBelow) { dipPen(pen, ink, typeof g.dip === 'number' ? g.dip : 1); dips++; }
     // a point may carry its own pressure share `s`, contact width `nw`, speed `v`, and a `dwell` where ink pools
-    // (--drawinglogic 2)
+    // (--drawinglogic 3)
     const path = g.points.map(p => {
       const s = p.s != null ? Math.min(1, p.s) : Math.min(1, at(p.x, p.y) / peak);
-      const q = { x: p.x + 0.5, y: p.y + 0.5, p: p.p != null ? Math.max(0,Math.min(1,p.p)) : 0.25 + 0.6 * s, v: p.v ?? 1.9 - 1.1 * s };
+      const c = penContact(s), q = { x: p.x + 0.5, y: p.y + 0.5, p: p.p != null ? Math.max(0,Math.min(1,p.p)) : c.p, v: p.v ?? c.v };
       if (p.nw != null) q.nw = p.nw;
       if (p.dwell) q.dwell = p.dwell;
       return q;
@@ -58,7 +59,9 @@ export function drawGestures(sheet, gestures, want, w, h, { ink, peak = null, pe
     pen.damp = g.damp != null ? Math.max(0, Math.min(1, g.damp)) : dryDamp;
     if (beforeStroke) beforeStroke({ sheet, pen, path, gesture: g, footprint: penRect(pen, sheet, path), index: drawn });
     const startDips = dips;
-    penStroke(pen, sheet, path, { refillBelow, refill: p => { dipPen(p, ink); dips++; }, gpuBetween: true, flowEvery: O ? flowEvery : 0, between: n => { if (O && n % flowEvery === 0) step(sheet, O); } });
+    penStroke(pen, sheet, path, { refillBelow, refill: p => { afterSegment?.({pen:p,gesture:g,reason:'refill'}); dipPen(p, ink); dips++; }, gpuBetween: true, flowEvery: O ? flowEvery : 0, between: n => { if (O && n % flowEvery === 0) step(sheet, O); } });
+    // A refill ends one deposited tape segment; gesture audits still run once.
+    afterSegment?.({pen,gesture:g,reason:'gesture-end'});
     afterStroke?.({pen, gesture:g, reloads:dips-startDips});
     drawn++;
   }

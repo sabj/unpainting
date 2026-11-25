@@ -8,8 +8,11 @@ import { GpuOpticalComposite } from './optical-gpu.mjs';
 import { createHash } from 'node:crypto';
 import { observeFrontier } from './frontier-layout.mjs';
 import { instrumentDispatches } from './dispatch-profile.mjs';
-import { watchDevice, markBroken } from './device-health.mjs';
+import { watchDevice, markBroken, assertHealthy } from './device-health.mjs';
 
+// Direct library callers may choose one thread. The pool starts on the first large curved edge or pressure grid.
+const edgePool = workerData.edgeThreads > 1 ? await import('../sheet-par.mjs') : null;
+edgePool?.useEdgeThreads(workerData.edgeThreads);
 const keepAlive = setInterval(() => {}, 1000);
 if (process.env.GPU_STROKES === 'capdebug') globalThis.GPU_CAP_DEBUG = true; // say when a step in a stroke had more active tiles than it was sized for
 const RING_FLOATS = 6144; // must match link.mjs
@@ -76,8 +79,13 @@ const flushSteps = async () => {
 };
 
 async function handle(m) {
+  // An error can wake the painter before this queued message starts. Do not create
+  // more Dawn promises on the broken device while the painter closes the worker.
+  if (m.op === 'close') return handleOp(m);
+  assertHealthy(workerData.health);
   if (m.op === 'step') { pendingSteps += m.n; return; }
-  if (m.op !== 'init') await flushSteps();
+  if (m.op !== 'init') { if (gpu?.device.dispatchProfile) gpu.device.dispatchProfile.op = 'step'; await flushSteps(); }
+  if (gpu?.device.dispatchProfile) gpu.device.dispatchProfile.op = m.op;
   if (SERIAL_PROF && m.op !== 'init' && m.op !== 'prof') {
     const t = performance.now();
     if (m.op === 'stroke' || m.op === 'splat') {
@@ -180,6 +188,7 @@ async function handleOp(m) {
     case 'lowerDown': { await gpu.readArchive(m.id, layerData); break; }
     case 'topDownRect': { await gpu.readTopRect(layerData, m.rect, m.mask); break; }
     case 'topDown': { await gpu.readTop(layerData, m.mask); break; }
+    case 'topSums': { await gpu.readTopAndSums(layerData, sumData, m.mask, m.sumMask); break; }
     case 'fixedBedUp': { gpu.flushStrokes(); gpu.device.queue.writeBuffer(gpu.b.DEP,gpu.n*8,m.bed); break; }
     case 'topUp': { fullBrushPigments ||= signedZero(layerData); if(asyncDry){workerTopMask=m.mask??0;gpu.setAct(workerWetMask|workerTopMask);} const K = gpu.K, n = gpu.n; gpu.uploadTop(layerData.subarray(0, K * n)); break; }
     case 'resist': { gpu.setResist(m.mask); break; }
@@ -191,6 +200,8 @@ async function handleOp(m) {
       brushPigments(m); strokeMask(m);
       // not awaited: the next message is handled while the GPU lays this one; its brush state lands in the ring when it is done
       (m.op === 'stroke' ? gpu.runStroke(m.data, {...m.info,slot:m.slot,seq:m.seq}) : gpu.runSplat(m.data, m.info)).then(out => { if(out===null) return; ring.set(out, m.slot * RING_FLOATS); Atomics.store(done, m.slot, m.seq); Atomics.notify(done, m.slot); }).catch(e => { console.error('gpu worker error', e); fail(e.stack ?? e.message); });
+      // a stroke laid in parts (its flows wait for the edge feed's geometry, stepfull.mjs strokeEncoding) holds the next message
+      if (gpu.encoding) await gpu.encoding;
       return;
     }
     case 'idle': await gpu.idle(); break;
@@ -214,7 +225,7 @@ async function handleOp(m) {
       new Uint8Array(rectData.buffer).set(data);ctrl[1]=data.length;break;
     }
     case 'dryStats': {const m=gpu.dryTelemetry??{};ctrl[1]=m.calls??0;ctrl[4]=m.fastChunk??50;ctrl[6]=m.lastWetCounter??-1;ctrl[12]=m.counterReads??0;ctrl[13]=Math.min(2147483647,Math.round((m.counterReadMs??0)*1000));ctrl[14]=m.fastIterations??0;ctrl[15]=m.fastChunks??0;break;}
-    case 'prof': { gpu.flushStrokes(); const b = new TextEncoder().encode(JSON.stringify({ ...(PROF ?? {}), dryTelemetry: gpu.dryTelemetry ?? null, capabilities: { wetCounterPolicy: 'on-demand; frontier maintained every step', fastDryChunkPolicy: 'adaptive 50/150/200; explicit override supported', maxStorageBuffersPerShaderStage: gpu.device.limits.maxStorageBuffersPerShaderStage, fusedWetScan: process.env.GPU_FUSE_WETSCAN !== '0' && gpu.device.limits.maxStorageBuffersPerShaderStage >= 10 }, timingScope: SERIAL_PROF ? 'legacy serialized worker wall time' : 'worker handling wall time; data-dependent readbacks include queued GPU work; unawaited stroke execution excluded', dispatchBatches: gpu.device.dispatchProfile?.snapshot(), timestamps: await gpu.timestamps.result(), optical: gpu.optical ? { ...gpu.optical.stats, timestamps: await gpu.optical.timestamps.result() } : null })); new Uint8Array(rectData.buffer).set(b); ctrl[1] = b.length; break; }
+    case 'prof': { gpu.flushStrokes(); const b = new TextEncoder().encode(JSON.stringify({ ...(PROF ?? {}), levelStats: gpu.levelStats?.() ?? null, dryTelemetry: gpu.dryTelemetry ?? null, gpuDistanceBoxes: gpu.gpuDistanceBoxes ?? 0, edgeFluxThreads: edgePool?.threads() ?? 1, edgeFluxJobs: edgePool?.stats()?.edgeFlux ?? 0, pressureRestricts: edgePool?.stats()?.pressureRestricts ?? 0, capabilities: { wetCounterPolicy: 'on-demand; frontier maintained every step', fastDryChunkPolicy: 'adaptive 50/150/200; explicit override supported', maxStorageBuffersPerShaderStage: gpu.device.limits.maxStorageBuffersPerShaderStage, fusedWetScan: process.env.GPU_FUSE_WETSCAN !== '0' && gpu.device.limits.maxStorageBuffersPerShaderStage >= 10 }, timingScope: SERIAL_PROF ? 'legacy serialized worker wall time' : 'worker handling wall time; data-dependent readbacks include queued GPU work; unawaited stroke execution excluded', dispatchBatches: gpu.device.dispatchProfile?.snapshot(), timestamps: await gpu.timestamps.result(), optical: gpu.optical ? { ...gpu.optical.stats, timestamps: await gpu.optical.timestamps.result() } : null })); new Uint8Array(rectData.buffer).set(b); ctrl[1] = b.length; break; }
     case 'close': clearInterval(keepAlive); process.exit(0);
   }
   if (m.wait !== false) ack();

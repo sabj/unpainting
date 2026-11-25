@@ -5,21 +5,22 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 
-test('a native CPU canary stops after one real paint pass', () => {
+// (time limit: a hang is still caught; on a busy machine the same run takes five times its idle time)
+test('a native CPU canary stops after one real paint pass', { timeout: 660_000 }, () => {
   const root = path.resolve(import.meta.dirname, '../..');
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'paint-canary-'));
   const out = path.join(tmp, 'plate');
   try {
     const run = spawnSync(process.execPath, [
-      'tools/paint-plate.mjs', '--allowdirty', '1', '--image', 'examples/targets/white-ships.jpg',
+      'tools/paint-plate.mjs', '--allowdirty', '1', '--image', 'examples/targets/white-ships.jpg', '--washplan', 'examples/targets/white-ships.jpg',
       '--out', out, '--width', '96', '--scale', '1', '--sheetmm', '152.4',
       '--recipe', 'none', '--mode', 'fast', '--gpu', 'off',
       '--drawing', 'none', '--draw', '0', '--video', '0', '--frames', '1',
       '--targetguard', 'strict', '--canarystop', '1',
       // segmentation is not under test: off keeps the run free of the SAM python and checkpoint (src/crop/segment-prep.mjs)
       '--segments', 'off',
-    ], { cwd: root, encoding: 'utf8', timeout: 60_000 });
-    assert.equal(run.status, 0, run.stderr || run.stdout);
+    ], { cwd: root, encoding: 'utf8', timeout: 600_000 });
+    assert.equal(run.status, 0, run.error?.message ?? (run.stderr || run.stdout));
     assert.match(run.stdout, /canary checkpoint after pass 1/);
     const report = JSON.parse(fs.readFileSync(path.join(out, 'canary.json'), 'utf8'));
     assert.equal(report.pass, 1);

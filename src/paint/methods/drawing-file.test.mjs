@@ -110,3 +110,47 @@ test('a no-medium declaration cannot hide malformed or filtered-out drawing path
     }
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });
+
+test('the plan\'s drawing roles keep or leave out each line whole, per pen', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'drawing-file-'));
+  try {
+    const ear = { points: [[10, 70], [20, 80], [30, 90]], weight: 1 }, body = { points: [[50, 30], [70, 30], [90, 30]], weight: 1 };
+    fs.writeFileSync(path.join(dir, 'd-lines.json'), JSON.stringify({ image: { w: 100, h: 100 }, lines: [ear, body] }));
+    const families = [{ id: 'dog', bounds: [0, 0, 1, 1], drawingRole: 'structural' }, { id: 'ear', bounds: [0, 0.6, 0.4, 1], drawingRole: 'none' }];
+    const logs = [], f = flagsOf(['--drawingfile', path.join(dir, 'd'), '--drawinglast', path.join(dir, 'd'), '--drawinglastmin', '0']);
+    const first = selectedDrawing({ first: true, w: 100, h: 100, ...f, log: m => logs.push(m), walked: 0, families });
+    assert.ok(first.length >= 1 && first.every(g => g.points.every(q => q.x >= 50)), 'only the body line, in its strokes');
+    assert.ok(logs.some(m => /1 of 2 lines left out by the plan's drawing roles \(1 under none\)/.test(m)));
+    const all = selectedDrawing({ first: true, w: 100, h: 100, ...f, log: () => {}, walked: 0, families: [{ id: 'dog', bounds: [0, 0, 1, 1] }] });
+    assert.ok(all.some(g => g.points.some(q => q.x < 40)), 'a plan that states no role draws as before');
+    const none = selectedDrawing({ first: false, w: 100, h: 100, ...f, log: () => {}, walked: 0, families: [{ id: 'dog', bounds: [0, 0, 1, 1], drawingRole: 'scaffold' }] });
+    assert.deepEqual(none, [], 'a scaffold family gets no closing line, and that is not a failure');
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('an inkDecided line file is not clipped again by coarse value-plan family drawingRole boxes', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'drawing-file-'));
+  try {
+    const ear = { points: [[10, 70], [20, 80], [30, 90]], weight: 1 }, body = { points: [[50, 30], [70, 30], [90, 30]], weight: 1 };
+    fs.writeFileSync(path.join(dir, 'decided-lines.json'), JSON.stringify({ image: { w: 100, h: 100 }, inkDecided: true, lines: [ear, body] }));
+    const families = [{ id: 'bg', bounds: [0, 0, 1, 1], drawingRole: 'none' }, { id: 'mid', bounds: [0.4, 0, 1, 1], drawingRole: 'structural' }];
+    const logs = [], f = flagsOf(['--drawingfile', path.join(dir, 'decided')]);
+    const res = selectedDrawing({ first: true, w: 100, h: 100, ...f, log: m => logs.push(m), walked: 0, families });
+    assert.ok(res.some(g => g.points.some(q => q.x < 40)), 'the decided line outside the family box stays');
+    assert.ok(!logs.some(m => /left out by the plan's drawing roles/.test(m)), 'no linesByRole drop logged on inkDecided file');
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('a stroke keeps the measure of the subject line its line was read against', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'drawing-file-'));
+  try {
+    fs.writeFileSync(path.join(dir, 'pool-lines.json'), JSON.stringify({ image: { w: 100, h: 100 }, inkDecided: true, lines: [
+      { points: [[5, 10], [50, 10], [95, 10]], subjectLine: { drop: 14, widthMm: 0.5 } }, { points: [[5, 60], [95, 60]] }] }));
+    const f = flagsOf(['--drawingfile', path.join(dir, 'pool'), '--drawstroke', '0.3']);
+    const strokes = selectedDrawing({ first: true, w: 100, h: 100, ...f, log: () => {}, walked: 0 });
+    const top = strokes.filter(g => g.points[0].y === 10), bottom = strokes.filter(g => g.points[0].y === 60);
+    assert.ok(top.length >= 2, 'the long line is split into strokes');
+    for (const g of top) assert.deepEqual(g.subjectLine, { drop: 14, widthMm: 0.5 });
+    for (const g of bottom) assert.equal('subjectLine' in g, false);
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+});

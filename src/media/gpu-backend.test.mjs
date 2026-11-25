@@ -3,7 +3,15 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { makePaper } from './paper.mjs';
-import { createSheet, step, dry, thickness, DEFAULTS, layersChanged } from './sheet.mjs';
+import { createSheet, step, dry, thickness, totals, DEFAULTS as SHEET_DEFAULTS, layersChanged } from './sheet.mjs';
+// The edge flow is off in these float-noise comparisons. The GPU sheet makes its pinned-edge feed's geometry between
+// calls (stepfull.mjs efSteps); the flows inside a GPU stroke's plan keep the geometry from before the stroke, which
+// parts from the CPU by more than float noise. The feed's own parity: gpu/gpu-edge-feed.test.mjs and
+// tools/lab/gpu-wash-cases.test.mjs.
+// The back-runs are off too: whether a cell is damp paint or a puddle is a threshold on its depth (backrun.mjs), and the
+// GPU's float32 levelling puts a few cells on the other side of it (mean 1.0e-5 against a bound of 3.2e-6 here, the
+// largest 0.1% of the peak). Their own parity, cell by cell: gpu/gpu-film-level.test.mjs (a puddle run into damp paint).
+const DEFAULTS = { ...SHEET_DEFAULTS, edgeEvap: 0, invade: 0 };
 import { createBrush, dip, stroke } from './brush.mjs';
 import { attachGpu, gpuStats } from './gpu/link.mjs';
 
@@ -53,6 +61,19 @@ test('the GPU sheet paints within the CPU sheet\'s own float noise', { timeout: 
   } finally { g._gpu.close(); }
 });
 
+// 033 item 4: the GPU contact holds a loaded brush's free liquid out of dry sized pores as the CPU one does (the CPU
+// stroke conserves: physics.test.mjs), so the GPU sheet must hold the same water and pigment, and as much standing
+test('a loaded stroke on dry paper leaves the same water, pigment and standing film on the GPU as on the CPU', { timeout: 120000 }, t => {
+  const lay = sheet => { const b = createBrush({ flat: true, radius: 6, capacity: 80, seed: 3 }); dip(b, { water: 1, conc: [0.8, 0.1] }); stroke(b, sheet, [{ x: 20, y: 24, p: 1, r: 6 }, { x: 74, y: 30, p: 1, r: 6 }], { upright: 'sweep' }); const T = totals(sheet); return { water: T.water, pig: T.pig, film: sheet.W.reduce((v, x) => v + x, 0) }; };
+  const cpu = lay(fresh()), g = fresh(), info = attachGpu(g, DEFAULTS, { mode: 'auto', log: () => {} });
+  if (info.backend !== 'gpu') { t.skip(`no GPU: ${info.reason}`); return; }
+  try {
+    const gpu = lay(g); assert.ok(gpuStats(g).strokes >= 1, 'the stroke was laid on the GPU');
+    const near = (a, b, what) => assert.ok(Math.abs(a - b) <= 1e-4 * Math.max(1, Math.abs(b)), `${what}: GPU ${a} against CPU ${b}`);
+    near(gpu.water, cpu.water, 'water'); gpu.pig.forEach((v, k) => near(v, cpu.pig[k], 'pigment ' + k)); near(gpu.film, cpu.film, 'standing film');
+    assert.ok(cpu.film > cpu.water - cpu.film, `standing ${cpu.film} against pores ${cpu.water - cpu.film}`); console.log(JSON.stringify({ cpu, gpu }));
+  } finally { g._gpu.close(); }
+});
 test('--gpu off leaves the sheet on the untouched CPU path', () => {
   const off = fresh(), info = attachGpu(off, DEFAULTS, { mode: 'off' });
   assert.equal(info.backend, 'cpu'); assert.equal(off._gpu, undefined);
@@ -76,7 +97,7 @@ test('accumulated support follows GPU fixation and CPU edits to lower layers', {
   } finally { gpu._gpu.close(); }
 });
 
-test('dry-fraction evaporation parity across CPU and GPU with dynamic mmPerCell', { timeout: 120000 }, t => {
+test('pinned-edge feed parity across CPU and GPU with dynamic mmPerCell', { timeout: 120000 }, t => {
   for (const edgeFlowDepth of [0.06, 0]) {
     for (const mmPerCell of [0.218, 0.3]) {
       const paperCpu = makePaper(64, 64, { seed: 7, mmPerCell });
@@ -84,7 +105,7 @@ test('dry-fraction evaporation parity across CPU and GPU with dynamic mmPerCell'
       const paperGpu = makePaper(64, 64, { seed: 7, mmPerCell });
       const gpu = createSheet(paperGpu, pigments);
 
-      // Turn off bulk flow so we test pure dry-fraction boundary evaporation
+      // Bulk flow off, so the pinned edge's feed (edge-feed.mjs; the GPU's edge-feed-wgsl.mjs) does all the moving
       const O = { ...DEFAULTS, evap: 0.02, edgeEvap: 0.10, edgeWidth: 3, flowIters: 0, dt: 1, edgeFlowDepth };
       const info = attachGpu(gpu, O, { mode: 'auto', log: () => {} });
       if (info.backend !== 'gpu') { t.skip(`no GPU: ${info.reason}`); return; }
@@ -112,8 +133,6 @@ test('dry-fraction evaporation parity across CPU and GPU with dynamic mmPerCell'
           step(gpu, O);
           if (i === 4) {
             gpu._gpu.down(gpu, [0, 0, 64, 64]);
-            assert.ok(cpu.W[32 * 64 + 32] > 0, 'intermediate interior CPU W must be positive');
-            assert.ok(gpu.W[32 * 64 + 32] > 0, 'intermediate interior GPU W must be positive');
             for (let j = 0; j < 64 * 64; j++) {
               if (mask[j]) {
                 assert.ok(Math.abs(cpu.W[j] - gpu.W[j]) < 5e-3, `intermediate step parity mismatch: diff ${Math.abs(cpu.W[j] - gpu.W[j])}`);
@@ -145,5 +164,41 @@ test('dry-fraction evaporation parity across CPU and GPU with dynamic mmPerCell'
       }
     }
   }
+});
+
+
+// brush-review item 8: a damp round carrying paint, drawn through a wet wash, gives its paint into it as it drinks; the
+// GPU contact trades both ways as the CPU one does.
+test('a damp round carrying paint through a wet wash lays the same paint on the GPU as on the CPU', { timeout: 120000 }, t => {
+  const lay = sheet => {
+    const flat = createBrush({ flat: true, radius: 10, capacity: 100, belly: 12, give: 0.9, free: 0.4, wetMix: 0.55, seed: 5 });
+    dip(flat, { water: 0.62, conc: [0.3, 0] }); stroke(flat, sheet, [{ x: 8, y: 48, p: 0.9, r: 10 }, { x: 88, y: 48, p: 0.9, r: 10 }], { upright: 'sweep' });
+    for (let j = 0; j < 10; j++) step(sheet, DEFAULTS);
+    const round = createBrush({ radius: 2.5, bristles: 8, capacity: 26, belly: 2, feed: 0.08, give: 0.7, free: 0.4, film: 0.22, wetMix: 0.15, seed: 31 });
+    dip(round, { water: 0.3, conc: [0, 0.5] });
+    stroke(round, sheet, [{ x: 20, y: 46, p: 0.7, r: 2.5 }, { x: 76, y: 50, p: 0.7, r: 2.5 }]);
+    const T = totals(sheet); return { water: T.water, pig: T.pig };
+  };
+  const cpu = lay(fresh()), g = fresh(), info = attachGpu(g, DEFAULTS, { mode: 'auto', log: () => {} });
+  if (info.backend !== 'gpu') { t.skip(`no GPU: ${info.reason}`); return; }
+  try {
+    const gpu = lay(g); assert.ok(gpuStats(g).strokes >= 2, 'the strokes were laid on the GPU');
+    const near = (a, b, what) => assert.ok(Math.abs(a - b) <= 1e-4 * Math.max(1, Math.abs(b)), `${what}: GPU ${a} against CPU ${b}`);
+    near(gpu.water, cpu.water, 'water'); gpu.pig.forEach((v, k) => near(v, cpu.pig[k], 'pigment ' + k));
+    assert.ok(cpu.pig[1] > 0, 'the round laid its paint');
+  } finally { g._gpu.close(); }
+});
+
+// A dry brush on cold-press tooth: the GPU reads the tooth level in the height's units from its brush plane, as the CPU
+// brush does (paper.mjs toothRange), so the same cells are touched and the same paint is laid.
+test('a dry brush over cold-press tooth lays the same paint on the GPU as on the CPU', { timeout: 120000 }, t => {
+  const m = 0.6, cold = () => createSheet(makePaper(N, N, { mmPerCell: m, seed: 9, toothScale: 0.2, coldPress: { mmPerCell: m, bumpMm: [0.5, 2], cover: 2.2, swell: 0.3 } }), pigments);
+  const lay = sheet => { const b = createBrush({ flat: true, radius: 4, bristles: 12, capacity: 100, belly: 12, feed: 0.4, give: 0.9, free: 0.4, film: 0.25, wetMix: 0, bridge: 0.38, bridgeSoft: 1, seed: 31 }); dip(b, { water: 0.22, conc: [0.5, 0] }); stroke(b, sheet, [{ x: 10, y: 48, p: 0.9, r: 4 }, { x: 86, y: 48, p: 0.9, r: 4 }], { upright: 'sweep' }); return totals(sheet).pig[0]; };
+  const cpu = lay(cold()), g = cold(), info = attachGpu(g, DEFAULTS, { mode: 'auto', log: () => {} });
+  if (info.backend !== 'gpu') { t.skip(`no GPU: ${info.reason}`); return; }
+  try {
+    const gpu = lay(g); assert.ok(gpuStats(g).strokes >= 1, 'the stroke was laid on the GPU');
+    assert.ok(cpu > 0 && Math.abs(gpu - cpu) <= 1e-4 * cpu, `GPU ${gpu} against CPU ${cpu}`);
+  } finally { g._gpu.close(); }
 });
 

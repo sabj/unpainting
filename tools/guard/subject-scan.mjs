@@ -1,7 +1,9 @@
 #!/usr/bin/env node
 // Static scan for code that could tell one benchmark subject from another: a subject name, a target hash, or a
-// branch on an image or sheet size. Comments are ignored. Hits must be listed in tools/guard/subject-scan-allow.json
-// with a reason; a new hit or a stale entry fails src/paint/overfit-scan.test.mjs.
+// branch on an image or sheet size. It reads every JavaScript and Python file under src/ and tools/ (and the bench
+// harness scripts), except tests, fixtures and this file. Comments are ignored. Hits must be listed in
+// tools/guard/subject-scan-allow.json with a reason (a benchmark target list, a judge or report script); a new hit or a
+// stale entry fails src/paint/overfit-scan.test.mjs.
 //
 //   node tools/guard/subject-scan.mjs [--json]
 import fs from 'node:fs';
@@ -9,9 +11,9 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 // Names that only mean a benchmark subject.
-const DISTINCT = 'trumbull|mittens|h3[46]-?a|overlook|flatiron';
+const DISTINCT = 'trumbull|mittens|rembrandt|h3[46]-?a|overlook|flatiron|dog-?(?:paint|ink|coats?)';
 // Names that are also plain words or short ids: matched only as a quoted whole string, or with a subject-x prefix.
-const QUOTED = 'hills|south-france|sargent|Yale|SF|Cape|Jones|[YG][1-4]|subject-[a-e]';
+const QUOTED = 'hills|south-france|sargent|tramp|dog|Yale|SF|Cape|Jones|[YG][1-4]|subject-[a-e]';
 const SIZE_VAR = '(?:w|h|W|H|width|height|sheetmm|sheetWidthMm|sheetw)';
 export const RULES = [
   { id: 'name', re: [new RegExp(`\\b(?:${DISTINCT})\\b`, 'i'), new RegExp(`(['"\`])(?:${QUOTED})\\1|['"\`]subject-[a-e][.\\-_/]`)],
@@ -47,31 +49,50 @@ export function stripComments(text) {
   return out;
 }
 
+// Python source with comments and triple-quoted strings (docstrings) blanked out, line breaks kept.
+export function stripPythonComments(text) {
+  let out = '', i = 0, quote = null;
+  while (i < text.length) {
+    const c = text[i], three = text.slice(i, i + 3);
+    if (quote) {
+      if (quote.length === 3) { if (three === quote) { quote = null; i += 3; } else { if (c === '\n') out += '\n'; i++; } continue; }
+      out += c;
+      if (c === '\\') { out += text[i + 1] ?? ''; i += 2; continue; }
+      if (c === quote || c === '\n') quote = null;
+      i++;
+    } else if (three === '"""' || three === "'''") { quote = three; i += 3; }
+    else if (c === '#') { while (i < text.length && text[i] !== '\n') i++; }
+    else { if (c === '"' || c === "'") quote = c; out += c; i++; }
+  }
+  return out;
+}
+
 /** Hits in one source text: [{line, rule, snippet}]. One hit per rule per line. */
-export function scanSource(text) {
+export function scanSource(text, { python = false } = {}) {
   const hits = [];
-  stripComments(text).split('\n').forEach((line, k) => {
+  (python ? stripPythonComments(text) : stripComments(text)).split('\n').forEach((line, k) => {
     for (const r of RULES) if (r.re.some(re => re.test(line))) hits.push({ line: k + 1, rule: r.id, snippet: line.trim().slice(0, 160) });
   });
   return hits;
 }
 
 const SKIP_DIR = /(^|\/)(node_modules|fixtures|\.git)(\/|$)/;
-const ROOTS = ['src', 'tools/paint-plate.mjs', 'tools/speed', 'tools/painter', 'tools/guard', 'bench/scripts', 'bench/v4v5'];
+const ROOTS = ['src', 'tools', 'bench/scripts', 'bench/v4v5'];
 // The scan itself and tests name subjects on purpose.
-const SKIP_FILE = f => /\.test\.mjs$/.test(f) || f === 'tools/guard/subject-scan.mjs';
+const SKIP_FILE = f => /\.test\.m?js$|(^|\/)test_[^/]*\.py$|[-_]test\.py$/.test(f) || f === 'tools/guard/subject-scan.mjs';
+const SOURCE = /\.(mjs|js|py)$/;
 
 function files(root, rel) {
   const full = path.join(root, rel);
   if (!fs.existsSync(full) || SKIP_DIR.test(rel)) return [];
-  if (fs.statSync(full).isFile()) return /\.mjs$/.test(rel) && !SKIP_FILE(rel) ? [rel] : [];
+  if (fs.statSync(full).isFile()) return SOURCE.test(rel) && !SKIP_FILE(rel) ? [rel] : [];
   return fs.readdirSync(full).sort().flatMap(n => files(root, path.join(rel, n)));
 }
 
 /** Every hit in the painting and harness code: [{file, line, rule, snippet}]. */
 export function scanRepo(root) {
   return ROOTS.flatMap(r => files(root, r)).flatMap(file =>
-    scanSource(fs.readFileSync(path.join(root, file), 'utf8')).map(h => ({ file, ...h })));
+    scanSource(fs.readFileSync(path.join(root, file), 'utf8'), { python: file.endsWith('.py') }).map(h => ({ file, ...h })));
 }
 
 export function loadAllow(root) {

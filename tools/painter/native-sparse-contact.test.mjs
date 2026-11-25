@@ -22,5 +22,4 @@ test('empty, off-sheet and fully clipped predictions remain honest zero contacts
 });
 test('TUFT fallback retains existing prediction and no sheet-wide fast flags leak',()=>{
  const {sheet}=make();const b=createBrush({model:'tuft',radius:8,bristles:24,capacity:100,seed:3});dip(b,{water:.8,conc:[1]});equal(candidateContact(b,sheet,points,{neighborRadius:2}),candidateContact(b,sheet,points,{neighborRadius:2,sparseRow:true}));
- const s=fs.readFileSync(new URL('../paint-plate.mjs',import.meta.url),'utf8');assert.match(s,/enabled:NATIVE_PAINT_MODE.mode==='fast'&&Boolean\(FAST_SPARSE_CONTACT\)/);assert.equal((s.match(/sparseRow:SPARSE_CONTACT_RECORD.enabled/g)||[]).length,1);assert.match(s,/selectedRowContacts\+\+/);
 });

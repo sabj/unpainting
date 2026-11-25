@@ -1,0 +1,118 @@
+// Native optical observations, never a second execution of the physics.
+import fs from 'node:fs';
+import path from 'node:path';
+import crypto from 'node:crypto';
+import {Worker, isMainThread, parentPort, workerData} from 'node:worker_threads';
+import sharp from 'sharp';
+const hash = b => crypto.createHash('sha256').update(b).digest('hex');
+const FLOOR = 10 * 1024 ** 3, CAP = 512 * 1024 ** 2;
+
+/** The synchronous painter cannot queue unbounded raw frames. One shared slot, one acknowledgement. */
+export function createNativeOperationRecorder({directory,width,height,provenance={},resumeFrom=null,byteCap=CAP,diskFloor=FLOOR,timeoutMs=120000}) {
+ if(!Number.isInteger(width)||!Number.isInteger(height)||width<1||height<1)throw Error('Invalid native recording dimensions');
+ const pixels=new SharedArrayBuffer(width*height*3),control=new SharedArrayBuffer(8),error=new SharedArrayBuffer(8192);
+ const state=new Int32Array(control);let closed=false;
+ const worker=new Worker(new URL(import.meta.url),{execArgv:[],workerData:{nativeRecorder:true,directory,width,height,provenance,resumeFrom,byteCap,diskFloor,pixels,control,error}});
+ worker.unref();worker.on('error',()=>{}); // Fatal startup is also bounded by the acknowledgement timeout.
+ function send(message,rgb){
+  if(closed)throw Error('Native recording already closed');
+  if(rgb){if(rgb.length!==pixels.byteLength)throw Error('Native recording dimensions changed');new Uint8Array(pixels).set(rgb);}
+  Atomics.store(state,0,0);worker.postMessage(message);
+  const deadline=Date.now()+timeoutMs;
+  while(Atomics.load(state,0)===0){const left=deadline-Date.now();if(left<=0){closed=true;worker.terminate();throw Error('Native recording worker timed out');}Atomics.wait(state,0,0,left);}
+  if(Atomics.load(state,0)<0){closed=true;worker.terminate();throw Error(Buffer.from(error).subarray(0,Atomics.load(state,1)).toString());}
+ }
+ send({kind:'start'});
+ return {
+  capture(rgb,event={}){send({kind:'capture',event},rgb);},
+  checkpoint(destination){send({kind:'checkpoint',destination});},
+  finish(rgb,event={}){send({kind:'finish',event},rgb);closed=true;worker.terminate();},
+  abort(reason='Painting did not complete'){if(!closed){send({kind:'abort',reason});closed=true;worker.terminate();}},
+ };
+}
+
+// A complete film must account for every executed mark in the existing physical tape.
+export function verifyNativeMarkCoverage(tape,observed){
+ const expected={brush:0,ink:0,graphite:0},names={s:'brush',P:'ink',g:'graphite'};
+ for(const mark of tape??[])if(names[mark.k])expected[names[mark.k]]++;
+ for(const name of Object.keys(expected))if(expected[name]!==observed[name])throw Error(`Incomplete native recording: ${name} tape=${expected[name]} captured=${observed[name]}`);
+ return expected;
+}
+
+if(!isMainThread&&workerData?.nativeRecorder){
+ const {directory,width,height,provenance,resumeFrom,byteCap,diskFloor,pixels,control,error}=workerData,state=new Int32Array(control);
+ let previous=null,previousHash=null,used=0,overheadBytes=0,events=[],started=false,elapsedOffset=0;const began=Date.now();
+ const manifest={version:1,kind:'native-operation-recording',width,height,provenance,complete:false,events};
+ function room(n){const s=fs.statfsSync(directory);if(used+overheadBytes+n>byteCap)throw Error('Native recording byte cap exceeded');if(s.bavail*s.bsize-n<diskFloor)throw Error('Native recording disk floor reached');}
+ function write(name,b){room(b.length);fs.writeFileSync(path.join(directory,name),b);used+=b.length;}
+ function save(){const b=Buffer.from(JSON.stringify({...manifest,payloadAndEventBytes:used},null,2));room(b.length);fs.writeFileSync(path.join(directory,'operations.json'),b);overheadBytes=b.length;}
+ const png=(b,w,h)=>sharp(b,{raw:{width:w,height:h,channels:3}}).png({compressionLevel:6}).toBuffer();
+ async function capture(event,final=false,rgb=Buffer.from(pixels),at=Date.now()){
+  const key=!previous||final;let rect=null,payload=null,encoding='replace';
+  if(key){rect={x:0,y:0,width,height};payload=await png(rgb,width,height);}
+  else {
+   // The box of the pixels that changed. A row is compared whole first (most rows of a frame are as they were), and
+   // only a changed row is walked, from each end to its first changed byte: the same box as comparing every pixel.
+   let x0=width,y0=height,x1=-1,y1=-1;const row=width*3;
+   for(let y=0;y<height;y++){
+    const o=y*row;if(rgb.compare(previous,o,o+row,o,o+row)===0)continue;
+    let a=o;while(rgb[a]===previous[a])a++;let b=o+row-1;while(rgb[b]===previous[b])b--;
+    x0=Math.min(x0,((a-o)/3)|0);x1=Math.max(x1,((b-o)/3)|0);y0=Math.min(y0,y);y1=y;
+   }
+   if(x1>=0){rect={x:x0,y:y0,width:x1-x0+1,height:y1-y0+1};const plain=Buffer.alloc(rect.width*rect.height*3),xor=Buffer.alloc(plain.length);
+    for(let y=0;y<rect.height;y++){const offset=((rect.y+y)*width+rect.x)*3;rgb.copy(plain,y*rect.width*3,offset,offset+rect.width*3);for(let x=0;x<rect.width*3;x++)xor[y*rect.width*3+x]=rgb[offset+x]^previous[offset+x];}
+    const a=await png(plain,rect.width,rect.height),b=await png(xor,rect.width,rect.height);if(b.length<a.length){payload=b;encoding='xor';}else payload=a;
+   }
+  }
+  let file=null,payloadSHA256=null;
+  if(payload){payloadSHA256=hash(payload);file=payloadSHA256+'.png';if(!fs.existsSync(path.join(directory,file)))write(file,payload);}
+  const record={...event,elapsedMs:elapsedOffset+at-began,index:events.length,keyframe:key,rectangle:rect,encoding,file,payloadSHA256,previousSHA256:previous?previousHash:null,pixelSHA256:hash(rgb)};
+  const line=Buffer.from(JSON.stringify(record)+'\n');room(line.length);fs.appendFileSync(path.join(directory,'events.jsonl'),line);used+=line.length;events.push(record);
+  // the frame is kept for the next one's comparison with its hash, which the next record names (not hashed again); a
+  // capture's pixels are this worker's own copy already, the final frame's are the shared slot's and are copied
+  previous=final?Buffer.from(rgb):rgb;previousHash=record.pixelSHA256;
+ }
+ function copyPrefix(source,destination){
+  fs.mkdirSync(destination,{recursive:true});
+  for(const file of fs.readdirSync(source)){
+   if(file==='resume-frame.png'||file==='film.json')continue;
+   const a=path.join(source,file),b=path.join(destination,file);
+   if(!file.endsWith('.png')&&!['operations.json','events.jsonl'].includes(file))throw Error('Unexpected native prefix file');
+   const bytes=fs.readFileSync(a);room(bytes.length);
+   if(fs.existsSync(b)){if(hash(fs.readFileSync(b))!==hash(bytes))throw Error('Native prefix output differs from saved boundary');continue;}
+   if(file.endsWith('.png'))fs.linkSync(a,b);else fs.copyFileSync(a,b);
+  }
+ }
+ async function restorePrefix(){
+  const saved=JSON.parse(fs.readFileSync(path.join(resumeFrom,'operations.json')));
+  if(saved.complete||saved.kind!==manifest.kind||saved.width!==width||saved.height!==height||JSON.stringify(saved.provenance)!==JSON.stringify(provenance)||!saved.events.length)throw Error('Native recording prefix mismatch');
+  previous=await sharp(path.join(resumeFrom,'resume-frame.png')).removeAlpha().raw().toBuffer();
+  previousHash=hash(previous);
+  if(previous.length!==width*height*3||previousHash!==saved.events.at(-1).pixelSHA256)throw Error('Native recording prefix pixels mismatch');
+  // Verify every admitted payload before copying a prefix; no dangling provenance.
+  for(const event of saved.events)if(event.file&&hash(fs.readFileSync(path.join(resumeFrom,event.file)))!==event.payloadSHA256)throw Error('Native prefix payload mismatch');
+  copyPrefix(resumeFrom,directory);elapsedOffset=saved.events.at(-1).elapsedMs??0;events=saved.events;manifest.events=events;
+  used=fs.statSync(path.join(directory,'events.jsonl')).size;
+  for(const file of new Set(events.filter(e=>e.file).map(e=>e.file)))used+=fs.statSync(path.join(directory,file)).size;
+  overheadBytes=fs.statSync(path.join(directory,'operations.json')).size;room(0);
+ }
+ // A capture is acknowledged once its pixels are copied: the painter goes on while the frame is compared and encoded
+ // here, one after another in order. At most two wait; a failure is reported to the next message.
+ let queue=Promise.resolve(),waiting=0,failed=null;
+ const later=(event,rgb,at)=>{waiting++;queue=queue.then(()=>failed?null:capture(event,false,rgb,at)).catch(e=>{failed??=e;}).finally(()=>{waiting--;});};
+ const settle=async()=>{await queue;if(failed)throw failed;};
+ parentPort.on('message',async m=>{
+  try{
+   if(failed)throw failed;
+   if(m.kind!=='capture')await settle();
+   if(m.kind==='capture'){later(m.event,Buffer.from(new Uint8Array(pixels)),Date.now());if(waiting>2)await settle();}
+   else if(m.kind==='start'){fs.mkdirSync(directory,{recursive:true});if(resumeFrom){await restorePrefix();started=true;}else{if(fs.existsSync(path.join(directory,'operations.json')))throw Error('Native recording output already exists');room(width*height*3+65536);started=true;save();}}
+   else if(m.kind==='checkpoint'){if(!previous)throw Error('No native prefix to save');save();copyPrefix(directory,m.destination);const frame=await png(previous,width,height);room(frame.length);fs.writeFileSync(path.join(m.destination,'resume-frame.png'),frame);}
+   else if(m.kind==='finish'){await capture({...m.event,operation:'final'},true);manifest.seconds=(elapsedOffset+Date.now()-began)/1000;const keys=events.filter(e=>e.keyframe);write('film.json',Buffer.from(JSON.stringify({operations:'operations.json',frames:keys.map(e=>e.file),frameNumbers:keys.map(e=>e.index),aspect:width/height,seconds:manifest.seconds,keyframes:keys.map(e=>({fraction:e.index/(events.length-1),image:e.file})),nativeWidth:width,nativeHeight:height,operationCount:events.length})));manifest.complete=true;save();}
+   else if(m.kind==='abort'){manifest.error=m.reason;save();}
+   else throw Error('Unknown native recording command');
+   Atomics.store(state,0,1);
+  }catch(e){manifest.complete=false;manifest.error=String(e.message);try{if(started)save();}catch{}const b=Buffer.from('Native recording failed: '+e.message);new Uint8Array(error).set(b.subarray(0,error.byteLength));Atomics.store(state,1,Math.min(b.length,error.byteLength));Atomics.store(state,0,-1);}
+  Atomics.notify(state,0);
+ });
+}

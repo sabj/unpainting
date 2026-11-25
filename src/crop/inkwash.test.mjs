@@ -79,3 +79,43 @@ test('ink share of candidates falls when the picture is washes rather than lines
   assert.ok(a.inkShareOfCandidates > c.inkShareOfCandidates + 0.3,
     `lines ${a.inkShareOfCandidates.toFixed(2)} vs washes ${c.inkShareOfCandidates.toFixed(2)}`);
 });
+
+// Read as drawn lines (the medium measure's reading): a mark is judged by its own contrast over its flanks, its width
+// on the sheet, and whether it runs.
+const SEPIA = [176, 142, 108];   // a pale sepia pen line on cream: plainly visible, far lighter than walnut black
+
+test('read as drawn lines, a pale sepia line is ink however it is curved or wide', () => {
+  for (const wide of [2, 3, 4]) {
+    const b = blank();
+    vline(b, 46, 12, 84, SEPIA, wide);
+    const plain = separate(b, W, H, PAPER), drawn = separate(b, W, H, PAPER, { asDrawn: true });
+    assert.ok(rowsCovered(drawn.ink, 40, 20, 56, 76) > 0.9, `${wide} cells: read as ink along ${rowsCovered(drawn.ink, 40, 20, 56, 76).toFixed(2)} (plain reading ${rowsCovered(plain.ink, 40, 20, 56, 76).toFixed(2)})`);
+  }
+});
+
+test('read as drawn lines, a line as wide as the widest nib is ink and its width is the width on the sheet', () => {
+  const b = blank();
+  vline(b, 44, 12, 84, INK, 5);
+  const s = separate(b, W, H, PAPER, { asDrawn: true });
+  assert.ok(rowsCovered(s.ink, 38, 20, 56, 76) > 0.9, `read as ink along ${rowsCovered(s.ink, 38, 20, 56, 76).toFixed(2)}`);
+  const widths = []; for (let i = 0; i < N; i++) if (s.candidates[i] && (i / W | 0) > 20 && (i / W | 0) < 76) widths.push(s.width[i]);
+  widths.sort((a, c) => a - c);
+  assert.ok(Math.abs(widths[widths.length >> 1] - 5) <= 1, `median width ${widths[widths.length >> 1]}`);
+});
+
+test('read as drawn lines, scattered dark specks (tooth, granulation) are not line', () => {
+  const b = blank();
+  rect(b, 0, 0, W, H, PALE);
+  let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  // a dark grain every 10 cells or so, jittered, as the tooth of a dry brush or a granulating wash lays it
+  for (let gy = 4; gy < H - 4; gy += 10) for (let gx = 4; gx < W - 4; gx += 10) { const x = gx + Math.floor(rnd() * 4), y = gy + Math.floor(rnd() * 4); rect(b, x, y, x + 2, y + 2, INK); }
+  const s = separate(b, W, H, PAPER, { asDrawn: true });
+  assert.equal(s.stats.ink, 0, `${s.stats.ink} speck cells read as pen line`);
+});
+
+test('without asDrawn the separator is the plain reading every other caller uses', () => {
+  const b = blank();
+  vline(b, 46, 12, 84, SEPIA, 3);
+  const a = separate(b, W, H, PAPER), c = separate(b, W, H, PAPER, { asDrawn: false });
+  assert.deepEqual(a.stats, c.stats);
+});

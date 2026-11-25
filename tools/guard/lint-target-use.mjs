@@ -7,8 +7,10 @@
 //   b  per-stroke or per-cell colour fitted to target pixels
 //   c  residual or error driven: lay more where the sheet lacks the target's per-cell plan, keep-if-closer loops
 //   review  a lowest-error fit: allowed for palette or mix choice from box pigments, never for marks
-//   d  target pixels read during the paint step (tools/paint-plate.mjs, from the line that calls TARGET_GUARD.beginPaint()
-//      to phaseMark('painting'), the same span the runtime guard closes)
+//   d  the target or a map made from it read or handed on during the paint step: the span the runtime guard closes,
+//      from the line that calls TARGET_GUARD.beginPaint() (tools/plate/drawing.mjs) through tools/plate/paint.mjs to
+//      phaseMark('painting') in tools/plate/finish.mjs (PAINT_SPANS). The names are the guard's sealed maps
+//      (pen.mjs and tools/guard/seal-maps.mjs).
 // Findings without an allow entry fail the check. Each entry requires a reason and reviewer.
 // It reads source text, so it also flags code that the runtime guard already refuses or that no default run reaches.
 // Use it as a review aid next to the runtime guard, not in place of it.
@@ -38,21 +40,29 @@ export const RULES = [
   { id: 'cell-colour-fit', cat: 'b', re: /\btarget\s*=\s*\[\s*r\s*,\s*g\s*,\s*b\s*\]|\berr\s*=\s*target\.reduce\(/,
     why: 'pigment shares grid-searched per cell against that cell\'s target RGB' },
 ];
-// target reads inside the paint step of paint-plate.mjs
-const PAINT_FILE = /tools[\\/]paint-plate\.mjs$/;
-const PX_READ = /\bpx\s*\[|\brgb\s*:\s*px\b|[,{(]\s*px\s*[,})]/;
+// The paint step, file by file: where it starts (a line, or the top of the file) and where it ends (a line, or the end).
+// The painter's stages were one script, tools/paint-plate.mjs; its span is kept for older trees.
+export const PAINT_SPANS = [
+  { file: /tools[\\/]plate[\\/]drawing\.mjs$/, start: /^TARGET_GUARD\.beginPaint\(\)/, end: null },
+  { file: /tools[\\/]plate[\\/]paint\.mjs$/, start: null, end: null },
+  { file: /tools[\\/]plate[\\/]finish\.mjs$/, start: null, end: /^phaseMark\('painting'\)/ },
+  { file: /tools[\\/]paint-plate\.mjs$/, start: /^TARGET_GUARD\.beginPaint\(\)/, end: /^phaseMark\('painting'\)/ },
+];
+// the target (px) and the maps made from it that the guard seals (pen.mjs, tools/guard/seal-maps.mjs)
+const MAPS = 'PX_RAW|PX_SOURCE|D_SOURCE|D_AIM|HP|TARGET_DRAW_EDGE|SKY_WARM_RB|DRAW_DENSITY';
+const PX_READ = new RegExp(`\\bpx\\s*\\[|\\brgb\\s*:\\s*px\\b|[,{(]\\s*px\\s*[,})]|\\b(${MAPS})\\s*\\[|ctx\\.(px|A|AL|SRC|D_SOURCE)\\s*\\[|:\\s*(${MAPS})\\b|\\(\\s*(${MAPS})\\s*[,)]|\\bSEP\\.\\w+\\s*\\[`);
 
 export function lintSource(file, text) {
   const out = [], lines = text.split('\n');
-  let inPaint = false;
-  const paintFile = PAINT_FILE.test(file);
+  const span = PAINT_SPANS.find(s => s.file.test(file));
+  let inPaint = Boolean(span && !span.start);
   lines.forEach((line, k) => {
-    if (paintFile && /^TARGET_GUARD\.beginPaint\(\)/.test(line)) inPaint = true;
-    if (paintFile && /^phaseMark\('painting'\)/.test(line)) inPaint = false;
+    if (span?.start?.test(line)) inPaint = true;
+    if (span?.end?.test(line)) inPaint = false;
     const code = line.replace(/^\s*\/\/.*$/, '');
     if (!code.trim()) return;
     for (const r of RULES) if (r.re.test(code)) out.push(finding(file, k + 1, r.id, r.cat, r.why, code));
-    if (inPaint && PX_READ.test(code) && !/TARGET_GUARD/.test(code)) out.push(finding(file, k + 1, 'target-at-paint', 'd', 'target pixels (px) read or handed on during the paint step', code));
+    if (inPaint && PX_READ.test(code) && !/TARGET_GUARD/.test(code)) out.push(finding(file, k + 1, 'target-at-paint', 'd', 'the target or a map made from it read or handed on during the paint step', code));
   });
   return out;
 }

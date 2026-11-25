@@ -1,0 +1,76 @@
+// A session's counted look, painted for real: the model's present choice goes through the 0.4 painter on the GPU,
+// through drying, on a sheet of fewer cells so that it takes minutes, and the dried sheet is what the model is shown
+// (session.mjs counts it; cli.mjs runs it; plan-data.mjs measures and draws it). Pure: nothing is read or run here.
+//
+// The size. Every look is painted on half the cells across. A script is written in millimetres, so the same script on
+// half the cells is the same plan painted coarser. The code planner reads its shapes on the cell grid, so its plan
+// (as it stands, tuned by settings, or edited wash by wash) is never planned again for the small sheet: the look is
+// painted from the plan the choice was planned with at the final size, brought onto the look's cells
+// (src/paint/methods/plan-file.mjs, plan-shrink.mjs). The same washes, the same edit, a quarter of the cells.
+
+/** The share of the run's cells across a look is painted at, and the least cells a sheet is painted on. */
+export const LOOK_SHARE = 0.5, LEAST_CELLS = 16;
+/** Look paintings at once in one command; with the machine's other GPU paintings they wait for a place (--jobs). */
+export const LOOK_JOBS = 2;
+/** Plans, looks and paintings at once in one plan-mode command: each holds 13 to 18 GB. */
+export const HEAVY_JOBS = 4;
+
+/** The cells across of a look's sheet on a run of `cells`, whatever the kind of choice. */
+export function lookCells(cells) {
+  return Math.max(LEAST_CELLS, Math.round(cells * LOOK_SHARE));
+}
+
+/** Whether a look at a choice of this kind ('settings' | 'script' | 'plan') is painted from the plan file of its full-size plan. */
+export const lookFromPlan = kind => kind !== 'script';
+
+/**
+ * What a look records of its making. A look is shown as its dried sheet and the sheet at 10, 25, 50, 75 and 100% of
+ * the strokes (the stage strip, made from the kept checkpoint frames); it needs no film. So no video is encoded (with
+ * --video 1 every frame is also kept lossless and carried back from the worker) and the recording is light: native
+ * frames at the start and the end only and at most 40 film frames, enough to place the stages
+ * (tools/plate/recording.mjs). Recording only reads the sheet: the look's painting is the same.
+ */
+const LOOK_RECORDING = Object.freeze([['video', '0'], ['recording', 'light']]);
+const RECORDING_KEYS = new Set(LOOK_RECORDING.map(([k]) => k));
+
+/**
+ * The run's --set list for a look's painting: the same, with the cells across of the look and, when the look is smaller
+ * than the painting, the painting's own cells (finalwidth: the painter then reckons what it reckons from the cells
+ * across, its swatches first, as the final painting will; src/paint/methods/look-scale.mjs), recorded lightly
+ * (LOOK_RECORDING), whatever the run records of its final.
+ */
+export function lookSets(sets, cells) {
+  const small = lookCells(cells);
+  return [...sets.filter(([k]) => k !== 'width' && k !== 'finalwidth' && !RECORDING_KEYS.has(k)), ['width', String(small)], ...(small < cells ? [['finalwidth', String(cells)]] : []), ...LOOK_RECORDING];
+}
+
+/**
+ * Why a painting cannot be shown as a look, or null when it can. `done` {exit, signal} is how the painter ended;
+ * `results` what it left (run.mjs collectResults). A painting that did not stay on the GPU is not shown: no silent
+ * fallback.
+ */
+export function lookFault(done, results) {
+  if (done.exit !== 0 && done.exit !== 3) return `the painter ended with exit ${done.exit ?? done.signal} before the sheet was dry`;
+  if (results.state !== 'finished' || !results.painting) return 'the painter ended without a finished, dried sheet';
+  const b = results.backend;
+  if (!b || b.backend !== 'gpu' || b.fallback !== false) return `the painting did not stay on the GPU (${b ? `backend ${b.backend}, fallback ${b.fallback}` : 'no backend record'}), so it is not shown`;
+  return null;
+}
+
+/** How the look was painted, in words for its numbers and the record: its size against the final sheet's. */
+export function lookSizeNote({ cells, fullCells, cellMm, kind }) {
+  if (cells === fullCells) return `painted at the final size, ${cells} cells across`;
+  return `painted small, ${cells} cells across (${cellMm} mm a cell) where the final painting has ${fullCells}: the same sheet in millimetres, coarser grain${lookFromPlan(kind) ? '; the washes are the final plan\'s own, wash for wash' : ''}`;
+}
+
+/**
+ * Why a look that stopped partway cannot be shown, or null when it can. A painter stopped at a stage writes no
+ * backend.json (that is written when a painting ends), so the backend is read from what it said when it started:
+ * `log` is its log. It is shown only when the sheet ran on the GPU and nothing in the log says it left it.
+ */
+export function stoppedLookFault(log) {
+  const line = /^sheet backend: (\S+)/m.exec(log ?? '');
+  if (!line) return 'the painter did not say which backend its sheet ran on, so the look is not shown';
+  if (line[1] !== 'gpu' || /fall(s|ing|en)? back to the CPU|fell back|backend: cpu/i.test(log)) return `the painting did not stay on the GPU (the painter's log: ${line[0]}), so it is not shown`;
+  return null;
+}

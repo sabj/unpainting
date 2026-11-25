@@ -2,7 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { BOX, boxPigment } from './box.mjs';
-import { chooseBox, boxPalette } from './boxpick.mjs';
+import { chooseBox, boxPalette, warmthFix, darkWarmth, sampleSource } from './boxpick.mjs';
 import { renderLayers } from '../media/km.mjs';
 
 const W = 72, H = 60, N = W * H, PAPER = [247, 244, 236];
@@ -46,3 +46,26 @@ test('the chosen paints come back as a palette the painter can use', () => {
   assert.ok(Number.isFinite(pal.paintChroma));
   for (const p of pal.pigments) assert.ok(p.K.length === 3 && p.S.length === 3 && p.name, JSON.stringify(p));
 });
+
+// ginger and tan above bare paper and a dark band: the band is the picture's darkest tenth
+const darkPicture = dark => {
+  const w = 60, h = 60, n = w * h, px = new Uint8ClampedArray(n * 3);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) px.set(y < 30 ? (x < 30 ? [214, 150, 90] : [200, 170, 120]) : y < 48 ? [243, 240, 232] : dark, (y * w + x) * 3);
+  return sampleSource(px, w, h, PAPER, { stride: 3 });
+};
+
+test('a warm dark pan in the box does not stand for a neutral dark: the darkest tenth gets the pan that matches its warmth, any pan', () => {
+  const warm = ['sepia', 'rawsienna', 'sapgreen'].map(paint), sample = darkPicture([52, 52, 53]);
+  const gap = paints => Math.abs(darkWarmth(sample, paints) - darkWarmth(sample, null));
+  assert.ok(gap(warm) > 1.5, `three warm earths leave the neutral dark ${gap(warm).toFixed(1)} b* warm`);
+  const fix = warmthFix(sample, warm, BOX, 4);
+  assert.ok(fix && !warm.includes(fix), 'a pan outside the three is added');
+  assert.ok(gap([...warm, fix]) < gap(warm) / 2, `${fix.key} brings the dark to ${gap([...warm, fix]).toFixed(1)} b* from ${gap(warm).toFixed(1)}`);
+  assert.equal(warmthFix(sample, warm, BOX, 3), null, 'no room in the palette, no pan');
+});
+
+test('a dark that is warm already needs no pan', () => {
+  const warm = ['sepia', 'rawsienna', 'sapgreen'].map(paint), sample = darkPicture([62, 43, 22]);
+  assert.equal(warmthFix(sample, warm, BOX, 4), null);
+});
+

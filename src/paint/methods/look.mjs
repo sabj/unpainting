@@ -25,7 +25,7 @@ export function residualOf(want, have, n, { slack = 0.05 } = {}) {
 }
 
 /** A quantile of a field over the cells above `floor` (and inside `mask` if given). */
-export function quantileOver(F, q, { floor = 1e-4, mask = null } = {}) {
+function quantileOver(F, q, { floor = 1e-4, mask = null } = {}) {
   const v = [];
   for (let i = 0; i < F.length; i++) if (F[i] > floor && (!mask || mask[i])) v.push(F[i]);
   if (!v.length) return 0;

@@ -1,0 +1,9 @@
+{
+  "note": "Named variants of a registered subject, for `npm run paint -- <subject>:<variant>`. A variant is a list of --set values and the reason; paths are relative to the folder SUBJECTS.json lives in. The run prints every value that differs from the record.",
+  "h36": {
+    "approved": {
+      "why": "the approved Rosewalk reference (plates/paint-211e9d9c/h36): the recovered original drawing, 1224 cells on 280 mm, the line medium left to the painter as that run left it",
+      "set": { "drawing": "replay/vectors/h36-regress211e", "width": "1224", "sheetmm": "280", "outlinemedium": "default" }
+    }
+  }
+}

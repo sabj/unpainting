@@ -9,29 +9,27 @@
   },
   "scripts": {
     "test": "node --test --test-timeout=300000 \"src/**/*.test.mjs\" \"tools/**/*.test.mjs\"",
+    "unpaint": "node tools/unpaint.mjs",
+    "paint": "node tools/paint/cli.mjs",
     "example": "node tools/run-plan.mjs examples/plans/graded-wash.json",
-    "example:portrait": "node tools/paint-plate.mjs --image examples/targets/sargent-a-tramp.jpg --width 360 --mode fast --out work/sargent-a-tramp",
-    "example:drawing": "node tools/paint-plate.mjs --image examples/targets/tiepolo-punchinello-sweets.jpg --width 360 --mode fast --out work/tiepolo-punchinello-sweets",
-    "example:animal": "node tools/paint-plate.mjs --image examples/targets/tiepolo-punchinello-camel.jpg --width 360 --mode fast --out work/tiepolo-punchinello-camel",
-    "example:architecture": "node tools/paint-plate.mjs --image examples/targets/trumbull.jpg --width 360 --mode fast --sheetmm 381 --valueplan examples/plans/trumbull-values.json --out work/trumbull",
+    "example:portrait": "node tools/paint-plate.mjs --image examples/targets/sargent-a-tramp.jpg --washplan examples/studies/sargent-a-tramp-study.png --drawing none --width 360 --mode fast --out work/sargent-a-tramp",
+    "example:animal": "node tools/paint-plate.mjs --image examples/targets/tiepolo-punchinello-camel.jpg --drawingfile examples/drawings/tiepolo-punchinello-camel --washplan examples/studies/tiepolo-punchinello-camel-study.png --inkrecipe wash --width 360 --sheetmm 152.4 --mode fast --out work/tiepolo-punchinello-camel",
     "example:plan": "node tools/run-plan.mjs examples/plans/graded-wash.json",
-    "bench:run": "node bench/scripts/run.mjs",
     "bench:score": "node bench/scripts/score.mjs",
+    "bench:score04": "node bench/scripts/score04.mjs",
+    "bench:summary04": "node bench/scripts/summary04.mjs",
     "bench:build": "node bench/scripts/build-results.mjs && node bench/scripts/build-leaderboard.mjs && node bench/scripts/build-findings.mjs && node bench/scripts/build-chart.mjs && node bench/scripts/build-overview.mjs && node bench/scripts/build-rounds-table.mjs",
-    "bench:test": "node --test bench/scripts/*.test.mjs",
+    "bench:test": "node --test bench/scripts/*.test.mjs bench/v6/*.test.mjs",
+    "bench:render": "node tools/render-bench/render-bench.mjs",
     "quick-start": "npm run example:plan",
     "doctor": "node tools/doctor.mjs",
-    "bench:add-target": "node bench/scripts/add-target.mjs",
-    "bench:suite": "node bench/scripts/suite.mjs",
-    "bench:lite": "node bench/scripts/suite.mjs --profile lite",
-    "bench:rerender": "node bench/scripts/rerender.mjs",
-    "parity:test": "node tools/speed/class-a-gate.mjs"
+    "bench:add-target": "node bench/scripts/add-target.mjs"
   },
   "dependencies": {
     "sharp": "^0.35.4",
     "webgpu": "^0.6.1"
   },
-  "version": "0.3.2",
+  "version": "0.4.0",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/sabj/unpainting.git"

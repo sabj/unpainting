@@ -2,6 +2,7 @@
 import { drawingFlags } from './drawing-plan.mjs';
 import { readSubjectOrder } from './methods/subject-order.mjs';
 import { BOX } from '../crop/box.mjs';
+import { DEFAULTS as SHEET } from '../media/sheet.mjs';
 
 function object(v, name) {
   if (!v || typeof v !== 'object' || Array.isArray(v)) throw Error(`${name}: expected an object`);
@@ -19,15 +20,6 @@ function paints(v) {
   if (!Array.isArray(v) || !v.length || v.some(k => !keys.includes(k))) throw Error(`washes.paints: expected box keys from ${keys.join(", ")}`);
   return [...v];
 }
-// washes.deepAccent {max, grow, families}: cells whose darkest channel is under max (0..255) inside the named
-// families are restated last as dark accents, two dried layers (nose, eye rims), grown by grow cells.
-function deepAccent(v, families) {
-  if (v == null) return null;
-  object(v, 'washes.deepAccent');
-  const ids = families.map(f => f.id);
-  if (!Array.isArray(v.families) || !v.families.length || v.families.some(id => !ids.includes(id))) throw Error(`washes.deepAccent.families: expected family ids from ${ids.join(', ')}`);
-  return { max: number(v.max, 0, 1, 255, 'washes.deepAccent.max'), grow: number(v.grow, 0, 0, 4, 'washes.deepAccent.grow'), families: [...v.families] };
-}
 function choice(v, fallback, choices, name) {
   v ??= fallback;
   if (!choices.includes(v)) throw Error(`${name}: expected ${choices.join(', ')}`);
@@ -36,34 +28,39 @@ function choice(v, fallback, choices, name) {
 export function resolvePipeline(plan = {}) {
   const drawing = structuredClone(plan.drawing ?? {});
   object(drawing, 'drawing');
+  drawingFlags(drawing);
   const washes = object(plan.washes ?? {}, 'washes');
   const order = plan.order && typeof plan.order === 'object' && !Array.isArray(plan.order) ? plan.order : {};
   if (plan.subjectOrder && order.subjects) throw Error('use order.subjects, not both order.subjects and subjectOrder');
   const subjects = order.subjects ?? plan.subjectOrder ?? null;
   readSubjectOrder(subjects, plan.families ?? []);
+  if (washes.darkGain != null) throw Error('washes.darkGain was removed in 0.3.3: the painter delivers the value the plan states, so a plan sets values, not gains');
+  if (washes.deepAccent != null) throw Error('washes.deepAccent was removed in 0.3.3: it restated every cell darker than a threshold as two late dark layers, a rule over target pixels; the plan names its last darks');
+  // the wash fields that set the light-to-dark value plan (removed in 0.4, last at commit 49447027): a plan naming one fails
+  for (const k of ['colour', 'charge', 'carryMm', 'paleLimit', 'skyOneLayer', 'lanes', 'edgeFadeMm', 'edgeWobbleMm', 'smallMarks', 'joinSmall', 'furReserves'])
+    if (washes[k] != null) throw Error(`washes.${k} was removed in 0.4 with the light-to-dark value plan (last at commit 49447027); the washes come from a block-in study (--washplan)`);
   const physics = object(washes.physics ?? {}, 'washes.physics');
   const resolved = {
     drawing,
     washes: {
-      furReserves: washes.furReserves == null ? null : object(washes.furReserves, 'washes.furReserves'),
       paints: paints(washes.paints),
-      darkGain: washes.darkGain == null ? null : number(washes.darkGain, 1, .5, 3, 'washes.darkGain'),
-      deepAccent: deepAccent(washes.deepAccent, plan.families ?? []),
-      colour: choice(washes.colour, 'family', ['family', 'layered'], 'washes.colour'),
       sessions: choice(washes.sessions, 'passage', ['dry', 'passage', 'connected'], 'washes.sessions'),
-      inkAware: washes.inkAware ?? (['source-ink', 'line-map'].includes(drawing.source) && drawing.medium !== 'none'),
-      charge: number(washes.charge, .5, 0, 1, 'washes.charge'),
-      carryMm: number(washes.carryMm, 2, 0, 10, 'washes.carryMm'),
-      paleLimit: number(washes.paleLimit, .16, 0, 1, 'washes.paleLimit'),
+      inkAware: washes.inkAware ?? false,
+      soften: washes.soften == null ? null : (typeof washes.soften === 'boolean' ? { enabled: washes.soften } : object(washes.soften, 'washes.soften')),
       physics: {
         holeRimMm: number(physics.holeRimMm, 0, 0, 3, 'washes.physics.holeRimMm'),
         marangoni: number(physics.marangoni, 0, 0, 1, 'washes.physics.marangoni'),
-        slope: number(physics.slope, 0, -1, 1, 'washes.physics.slope'),
+        // the sheet's own: water levels its surface over the paper's grain (sheet.mjs slope), unless a plan says otherwise
+        slope: number(physics.slope, SHEET.slope, -1, 1, 'washes.physics.slope'),
       },
     },
     order: { subjects, strength: number(order.strength, subjects ? .5 : 0, 0, 1, 'order.strength') },
   };
   if (typeof resolved.washes.inkAware !== 'boolean') throw Error('washes.inkAware: expected boolean');
+  if (resolved.washes.soften) {
+    if (resolved.washes.soften.enabled != null && typeof resolved.washes.soften.enabled !== 'boolean') throw Error('washes.soften.enabled: expected boolean');
+    if (resolved.washes.soften.maxArcMm != null) number(resolved.washes.soften.maxArcMm, 25, 0, 200, 'washes.soften.maxArcMm');
+  }
   if (!subjects && resolved.order.strength) throw Error('order.strength needs order.subjects');
   return resolved;
 }
@@ -73,33 +70,15 @@ export function pipelineFlags(plan, { onlyAuthored = false } = {}) {
   const rawW = plan?.washes ?? {};
   const rawOrder = plan?.order && typeof plan.order === 'object' && !Array.isArray(plan.order) ? plan.order : {};
   const rawPhysics = rawW.physics ?? {};
-  if (w.furReserves && (!onlyAuthored || rawW.furReserves != null)) add('furreserves', JSON.stringify(w.furReserves));
   if (w.paints && (!onlyAuthored || rawW.paints != null)) add('paints', w.paints.join(','));
-  // washes.darkGain: shadow glazes (bands 4-5) are charged at this multiple of their fitted demand. The physical
-  // wash delivers about 70% of a planned dark, so a dark subject names the gain it needs to reach its value.
-  if (w.darkGain != null && (!onlyAuthored || rawW.darkGain != null)) add('darkgain', w.darkGain);
-  if (w.deepAccent && (!onlyAuthored || rawW.deepAccent != null)) { add('deepaccent', w.deepAccent.max); add('deepgrow', w.deepAccent.grow); add('deepaccentin', w.deepAccent.families.join(',')); }
   if (!onlyAuthored || rawW.sessions != null) add('washsession', { dry:0, passage:1, connected:2 }[w.sessions]);
-  // Honour the authored wash mode: colour-family splitting changes the passage plan. Layered
-  // washes still keep light colour families apart, split on perceptual chroma, so a neutral
-  // foundation cannot pool its sepia charge across a saturated orange passage.
-  // Layered washes split at Lab chroma 20: the cat's broad orange (C20-30) then gets its own connected light and
-  // middle washes instead of pooling with muted warm and grey neighbours. Family mode keeps RGB range 30.
-  if (!onlyAuthored || rawW.colour != null) {
-    add('huechroma', w.colour === 'layered' ? 20 : 30);
-    if (w.colour === 'layered') add('huechromalab', 1);
-    if (w.colour === 'layered') add('shadowfamilies', 1);
-    add('maskmm', w.colour === 'family' ? w.carryMm : 0);
-    add('lightfamilies', 1);
-    add('palelights', w.colour === 'family' ? w.paleLimit : 0);
-  }
-  // Both modes charge each passage at the washes.charge quantile of its demand and carry the rest into the next
-  // band, so the darkest cells of a shadow get a smaller, darker restatement instead of the shape's flat mean.
-  if (!onlyAuthored || rawW.charge != null) add('passcap', w.charge);
-  if (onlyAuthored && rawW.carryMm != null && rawW.colour == null) add('maskmm', w.colour === 'family' ? w.carryMm : 0);
-  if (onlyAuthored && rawW.paleLimit != null && rawW.colour == null) add('palelights', w.colour === 'family' ? w.paleLimit : 0);
-  if (!onlyAuthored || rawW.inkAware != null || (plan?.drawing?.source && ['source-ink', 'line-map'].includes(plan.drawing.source))) add('washinkfree', +w.inkAware);
+  if (!onlyAuthored || rawW.inkAware != null) add('washinkfree', +w.inkAware);
   if (!onlyAuthored || rawOrder.strength != null || rawOrder.subjects != null || plan?.subjectOrder != null) add('subjectorder', p.order.strength);
+  if (w.soften != null) {
+    const on = w.soften.enabled ?? true;
+    add('softsplit', +on);
+    if (w.soften.maxArcMm != null) add('softmm', w.soften.maxArcMm);
+  }
   if (!onlyAuthored || rawPhysics.holeRimMm != null) add('holerim', w.physics.holeRimMm);
   if (!onlyAuthored) {
     add('physics', `marangoni=${w.physics.marangoni},slope=${w.physics.slope}`);

@@ -1,0 +1,29 @@
+{
+ "about": "Settings of the unattended benchmark run on the Mac mini. Paths are relative to the mini's home folder.",
+ "runRef": "v0.4.0-rc.8",
+ "runRefNote": "the code the sessions paint with: the rc8 tag (6a54d50e). To use the levels branch head instead: \"claude/04-levels\". Run install.sh after a change.",
+ "bench": "work/unpainting-mini-bench",
+ "ops": "work/unpainting-mini-ops",
+ "repo": "work/unpainting-04-worker",
+ "base": "jobs/unpainting-run",
+ "subjects": "jobs/unpainting-paint/inputs/SUBJECTS.json",
+ "keys": ".config/unpainting",
+ "sshKey": ".ssh/runpod_bench",
+ "python": "work/unpainting-04-worker/.venv-seg/bin/python",
+ "linesVenv": "work/unpainting-04-worker/.venv-lines",
+ "samCheckpoint": ".cache/sam/sam_vit_b_01ec64.pth",
+ "concurrency": 6,
+ "idleMinutes": 20,
+ "lookPlaces": 3,
+ "diskFloorGB": 25,
+ "pods": {
+  "cap": 6,
+  "maxAgeMinutes": 180,
+  "dayUSD": 40,
+  "minBatch": 6,
+  "maxWaitMinutes": 20
+ },
+ "scoreEveryMinutes": 10,
+ "progressPort": 8796,
+ "progressHttpsPort": 8448
+}

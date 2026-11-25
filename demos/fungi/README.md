@@ -1,6 +1,6 @@
 # Spore Studies
 
-Mushroom plates in ink and watercolour, painted live. **[Open it](https://sabj.github.io/unpainting/demos/fungi/)**
+Mushroom plates in ink and watercolour, painted live: [open it](https://sabj.github.io/unpainting/demos/fungi/).
 
 | Random paints a new plate | Drag to turn | Morph |
 | --- | --- | --- |
@@ -17,4 +17,4 @@ The palette button opens the plate in [Paint Lab](https://sabj.github.io/unpaint
 
 Code: `mushrooms.mjs`. Tests: `node --test demos/fungi/mushrooms.test.mjs`.
 
-0.3.0 validation passed all 210 mushroom tests. Browser checks also completed Amanita, Morel and Coral with seed `release-030-holdout` and `paint=fast`, producing dry 1200 × 1000 plates from the native 512 × 427 simulation. These checks establish compatibility. This browser painter uses a different path from the CLI's GPU implementation, so the CLI speedup is not a mushroom speedup.
+`npm run bench:render` paints six seeded plates on the CPU and GPU sheets and reports time, memory, CPU against GPU agreement and a fingerprint per plate (`tools/render-bench/`).

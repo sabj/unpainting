@@ -18,19 +18,24 @@ function buildRunCard({
   provenance = null,
   provenanceHistory = [],
   args = [],
+  expandedArgs = null,
   subject = null,
   imageFile = null,
   planFile = null,
   drawingFile = null,
   drawingOrder = "first",
   drawingMedium = "graphite",
+  subjectMedium = null,
+  mediumDecision = null,
   code = null,
   segments = null,
   linework = null,
+  methods = null,
   gpu = null,
   dimensions = null,
   palette = null,
   phases = [],
+  caption = null,
   seconds = 0,
   exitCode = 0,
 } = {}) {
@@ -54,6 +59,7 @@ function buildRunCard({
     exit: exitCode ?? 0,
     seconds: Math.round(seconds),
     args,
+    ...(expandedArgs ? { expandedArgs } : {}),
     targetSHA256: fileSha256(targetPath),
     planSHA256: fileSha256(planPath),
     linesSHA256: fileSha256(lineJsonPath),
@@ -61,6 +67,10 @@ function buildRunCard({
     drawing: {
       order: drawingOrder,
       medium: drawingMedium,
+      // --subjectmedium and, when it turned an ink drawing into graphite, what was asked for
+      ...(subjectMedium ? { subjectMedium } : {}),
+      // what decided ink on or off, with its evidence (src/paint/methods/medium-decision.mjs)
+      ...(mediumDecision ? { mediumDecision } : {}),
       file: drawingFile || null,
       stage: linework ?? null,
     },
@@ -68,6 +78,8 @@ function buildRunCard({
       ? {
           backend: segments.backend,
           model: segments.model ?? null,
+          device: segments.device ?? null,
+          deviceChoice: segments.deviceChoice ?? null,
           regions: segments.regions,
           foreground: segments.foreground,
           cached: segments.cached,
@@ -88,11 +100,20 @@ function buildRunCard({
           paintWidth: dimensions.paintWidth ?? null,
           paintHeight: dimensions.paintHeight ?? null,
           enlargement: dimensions.enlargement ?? null,
+          // the sheet's cells across, the cells for each source pixel, and the most the run accepted (--sourcescale,
+          // tools/plate/source-scale.mjs). paintWidth is the output's pixels, wider than the sheet with --inkres.
+          sheetWidth: dimensions.sheetWidth ?? null,
+          sourceScale: dimensions.sourceScale ?? null,
+          sourceScaleAllowed: dimensions.sourceScaleAllowed ?? null,
         }
       : null,
     // the box paints painted with, and the paint guard's decision on a forced box (null when it did not run)
     palette,
     phases,
+    // what made this plate: line source, wash plan, legacy routes (src/paint/run-methods.mjs)
+    methods,
+    // what this output is, so its image can be labelled on the image: subject, code, mode, sizes, sheet and date
+    caption,
     continuedChecks: continuedSummary(),
   };
 }

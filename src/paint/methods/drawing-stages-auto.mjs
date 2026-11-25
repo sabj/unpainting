@@ -32,12 +32,10 @@ const argValue = (args, name) => {
 
 /** Caller-owned drawing inputs, separated from recipe/plan and generated arguments. */
 export function drawingStageIntent({ argv0 = [], expandedArgv = argv0, pipeline = null, outlineMedium = null }) {
-  const lineworkAuto = argValue(expandedArgv, 'linework') === 'auto';
   return {
     explicitStages: expandedArgv.includes('--stages'),
     explicitAuto: argValue(argv0, 'drawingstages') === 'auto',
-    // Universal linework replaces the opening source; a closing file remains independently caller-authored.
-    authoredOpening: !lineworkAuto && Boolean(argValue(argv0, 'drawingfile')),
+    authoredOpening: Boolean(argValue(argv0, 'drawingfile')),
     authoredClosing: Boolean(argValue(argv0, 'drawinglast')),
     planMedium: pipeline?.drawing?.medium ?? outlineMedium ?? null,
   };
@@ -61,15 +59,15 @@ export async function chooseDrawingStages({ opt, argv, image, root, out, rgb, w,
   }
   const hasAuthoredFile = (intent.authoredOpening ?? false) || (intent.authoredClosing ?? false);
   if (!intent.explicitAuto && hasAuthoredFile) return null;
-  const style = Number(opt('penwash', 0)) > 0 ? 'penwash' : null;
+  const style = null;
   const ev = edgeEvidence(rgb, w, h, { margin: Math.max(2, Math.round(0.04 * Math.min(w, h))) });
   let edges = 0; for (const v of ev.edge) edges += v;
   const python = resolveLinePython({ flag: opt('sketchpython', '') }).path;
   const features = { edgeShare: +(edges / (w * h)).toFixed(4), penLine: +penLine.toFixed(4), perspective: perspectiveOf(python, root, image, w) };
   // One reading of "a pen source": the threshold that asks for ink also allows the ink prep, or a run could ask for ink
   // and be refused it (--penprepmin, per cent, moves the gate alone for comparisons).
-  const penThreshold = Number(opt('penfirst', 0.5)) / 100;
-  const rule = ruleChoice(features, { penSource: Number(opt('penprepmin', opt('penfirst', 0.5))) / 100 });
+  const penThreshold = Number(opt('penfirst', 0.40)) / 100;
+  const rule = ruleChoice(features, { penSource: Number(opt('penprepmin', opt('penfirst', 0.40))) / 100 });
   const model = await plannerChoice({ image, root, model: opt('drawingplanner', PLANNER_MODEL), fetcher, log });
   const gated = gateChoice(model.choice ?? null, rule, { style });
   const { verdicts } = gated;

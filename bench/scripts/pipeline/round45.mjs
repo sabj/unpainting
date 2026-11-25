@@ -18,8 +18,10 @@ import { verifyComparisonRun } from '../preflight.mjs';
 import { makeWorktree, keepScripts, runTurn, minutes } from './harness.mjs';
 import { PaintSession, planSnapshot, variantIn } from './session.mjs';
 import { checkPlan } from './check.mjs';
-import { pngSize } from './plan-args.mjs';
+import { pngSize, SUBJECT_MEDIA } from './plan-args.mjs';
 import { writeFeedback } from './feedback.mjs';
+import { copyRecord } from './copy.mjs';
+import { costRecord } from './preview.mjs';
 
 import { benchmarkProfile, profileSubject } from '../profiles.mjs';
 import { tokenStop } from '../budget.mjs';
@@ -27,18 +29,40 @@ import { tokenStop } from '../budget.mjs';
 const V45 = path.join(BENCH, 'v4v5');
 const PIPE = path.join(BENCH, 'scripts', 'pipeline');
 const REPAIR_MINUTES = 60;   // wall-clock safety limits of a session and of a repair turn
-const PROMPT = 'Read bench/TASK.md and do the task: prepare your plan, then paint it with bench/paint.sh, looking at it as you like.';
+const PROMPT = 'Read bench/TASK.md and do the task: prepare your plan, then paint it with bench/paint.sh; you may step back and look at it three times while it paints.';
 const LITE_PROMPT = 'Read bench/TASK.md, prepare the plan deliverables and stop. This is planning only: do not run checks or the painter; the harness does both after your process exits.';
 const WORDS = ['zero', 'one', 'two', 'three', 'four', 'five', 'six'];
 const STAGE_PCT = [10, 25, 50, 75, 100];
-const SEEDED = /^bench\/(TASK\.md|frozen\.json|TOKENS\.md|PAINT\.md|check\.(sh|mjs)|plan-args\.mjs|paint\.(sh|mjs)|dry-planner\.mjs|skills\/|example\/|tools\/|paint-io\/|looks\/|feedback\/|check-out\/|plan\/target\.png)|^node_modules$/;
+const SEEDED = /^bench\/(TASK\.md|frozen\.json|TOKENS\.md|PAINT\.md|check\.(sh|mjs)|check-log\.jsonl|plan-args\.mjs|copy\.mjs|preview\.mjs|paint\.(sh|mjs)|dry-planner\.mjs|skills\/|example\/|tools\/|paint-io\/|looks\/|feedback\/|check-out\/|plan\/target\.png)|^node_modules$/;
+// How a model plans: config.json + recipe tokens + painter settings over BASE (TASK.md).
+const PLAN_FORM = Object.freeze({ brief: 'TASK.md', planFile: 'config.json', check: checkPlan, example: 'example' });
 
-export const loadSubjects = () => readJson(path.join(V45, 'subjects.json')).subjects;
+/** The model's own runs of `bash bench/check.sh`, one line each in bench/check-log.jsonl. */
+const modelChecks = ws => { const f = path.join(ws, 'bench', 'check-log.jsonl'); return fs.existsSync(f) ? fs.readFileSync(f, 'utf8').split('\n').filter(Boolean).map(l => JSON.parse(l)) : []; };
+
+/** The V4/V5 subjects. Every subject must name its drawing medium (none, pencil or pen); a missing one is an error. */
+export const loadSubjects = () => {
+  const subjects = readJson(path.join(V45, 'subjects.json')).subjects;
+  for (const [id, s] of Object.entries(subjects)) if (!SUBJECT_MEDIA.includes(s.medium)) throw new Error(`bench/v4v5/subjects.json: ${id} needs "medium": ${SUBJECT_MEDIA.join(', ')}`);
+  return subjects;
+};
+// What the brief says about the target's drawing medium.
+const MEDIUM_TEXT = {
+  pen: 'the target is drawn in pen and ink, so an ink drawing suits it',
+  pencil: 'the target has faint pencil lines under the paint and no pen lines, so draw in graphite or not at all',
+  none: 'the target shows no drawn lines, so draw in graphite, lightly, or not at all',
+};
 
 // What the brief says about unread settings and dropped passages: kept as notes, or failures under --strict-verdict.
 const VERDICT_TEXT = {
   notes: { UNREAD_OPTION: 'is recorded against your plan in the result', AFTER_PAINTING: 'Recorded against your plan after painting (the painting still counts): passages that end up with\nno brush path, a setting nobody read.' },
   strict: { UNREAD_OPTION: 'fails the painting', AFTER_PAINTING: 'Also failed after painting (no score): passages that end\nup with no brush path, a setting nobody read.' },
+};
+
+// What a look shows: target beside sheet by default; the sheet only in a strict run (--notargetlooks 1).
+const LOOK_TEXT = {
+  default: { LOOK_VIEW: '`bench/looks/<n>-compare.jpg` (the target and your sheet so far, side by side) and\n  `bench/looks/<n>-sheet.jpg`', STRICT_NOTE: '' },
+  strict: { LOOK_VIEW: '`bench/looks/<n>-sheet.jpg` (your sheet so far)', STRICT_NOTE: '\n- This is a strict run: no target view after planning. No look shows the target, and `bench/plan/target.png` is\n  removed from this tree when the painting starts (`bash bench/check.sh` then has no target; `revise` still checks).' },
 };
 
 /** The brief for one try: TASK.md with the round's rules and, in V5 after try 1, the feedback section. */
@@ -48,32 +72,38 @@ export function renderTask({ round, n, tries, spec, strictVerdict = false, profi
   let rules = !v5 ? bf('round-V4.md').replace('Each of the three V4 tries', `Each of the ${WORDS[tries] ?? tries} V4 tries`)
     : n === 1 ? bf('round-V5-first.md').replace('try 1 of 3', `try 1 of ${tries}`) : bf('round-V5-next.md').replace('{TRY}', String(n)).replace(` of 3:`, ` of ${tries}:`);
   const feedback = v5 && n > 1 ? bf('feedback-section.md').replace('{PREV}', String(n - 1)) : '';
-  const vals = { ...VERDICT_TEXT[strictVerdict ? 'strict' : 'notes'], SUBJECT_NAME: spec.name, ROUND: round.id, TRY: String(n), TRIES: String(tries), TASK_STYLE: spec.taskStyle, WIDTH: String(spec.width), SHEETMM: String(+spec.sheetmm.toFixed(2)) };
-  let t = fs.readFileSync(path.join(V45, 'TASK.md'), 'utf8').replace('{ROUND_RULES}', rules).replace('{FEEDBACK}', feedback);
+  if (!MEDIUM_TEXT[spec.medium]) throw new Error(`the brief needs the subject's medium (${SUBJECT_MEDIA.join(', ')}), not ${JSON.stringify(spec.medium)}`);
+  const vals = { ...VERDICT_TEXT[strictVerdict ? 'strict' : 'notes'], ...LOOK_TEXT[spec.noTargetLooks === true ? 'strict' : 'default'], MEDIUM: spec.medium, MEDIUM_TEXT: MEDIUM_TEXT[spec.medium], SUBJECT_NAME: spec.name, ROUND: round.id, TRY: String(n), TRIES: String(tries), TASK_STYLE: spec.taskStyle, WIDTH: String(spec.width), SHEETMM: String(+spec.sheetmm.toFixed(2)) };
+  let t = fs.readFileSync(path.join(V45, PLAN_FORM.brief), 'utf8').replace('{ROUND_RULES}', rules).replace('{FEEDBACK}', feedback);
   for (const [k, v] of Object.entries(vals)) t = t.replaceAll(`{${k}}`, v);
   if (profile?.planOnly) {
     t = t.replace(/You are preparing[\s\S]*?## The task/, `Prepare one painting plan, then stop. This is the lite planning screen: at most ${profile.modelMinutes} minutes. The harness checks and renders after your process exits. Do not start the painter, run checks or wait for images.\n\n## The task`);
-    t = t.replace(/## Before you paint[\s\S]*/, '## Deliver and stop\n\nSave bench/plan/config.json, bench/variant.txt and bench/PLAN.md, plus any drawing files and extra-args.json you choose. The harness makes one admission check and one render; there are no repair turns or model reviews. The target, physical size, painter and guards remain fixed.\n');
+    const files = 'bench/plan/config.json, bench/variant.txt and bench/PLAN.md, plus any drawing files and extra-args.json you choose';
+    t = t.replace(/## Before you paint[\s\S]*/, `## Deliver and stop\n\nSave ${files}. The harness makes one admission check and one render; there are no repair turns or model reviews. The target, physical size, painter and guards remain fixed.\n`);
   }
   return t;
 }
 
 /** The model's worktree: the brief, the target, the check and paint commands, the skills, the tools and the example. */
-function seed({ ws, crop, spec, round, n, tries, dry, strictVerdict, profile }) {
+function seed({ ws, crop, target, spec, round, n, tries, dry, strictVerdict, profile, skills = null }) {
   const b = path.join(ws, 'bench');
   for (const d of ['plan', 'paint-io', 'looks', 'tools']) fs.mkdirSync(path.join(b, d), { recursive: true });
-  fs.copyFileSync(path.join(V2, 'targets', `${crop}.png`), path.join(b, 'plan', 'target.png'));
+  fs.copyFileSync(target, path.join(b, 'plan', 'target.png'));
+  fs.copyFileSync(path.join(BENCH, 'designed-paths.json'), path.join(b, 'designed-paths.json'));
   writeJson(path.join(b, 'frozen.json'), { subject: crop, ...spec, targetPixels: pngSize(path.join(b, 'plan', 'target.png')) });
   fs.writeFileSync(path.join(b, 'TASK.md'), renderTask({ round, n, tries, spec, strictVerdict, profile }));
   for (const f of ['check.sh', 'TOKENS.md', 'paint.sh', 'paint.mjs', 'PAINT.md']) fs.copyFileSync(path.join(V45, f), path.join(b, f));
-  for (const f of ['check.mjs', 'plan-args.mjs']) fs.copyFileSync(path.join(PIPE, f), path.join(b, f));
+  for (const f of ['check.mjs', 'plan-args.mjs', 'copy.mjs', 'preview.mjs']) fs.copyFileSync(path.join(PIPE, f), path.join(b, f));
   if (profile?.planOnly) {
     fs.writeFileSync(path.join(b, 'check.mjs'), "console.error('Lite: admission runs once, after the model exits. Save your plan and stop.'); process.exitCode = 2;\n");
     fs.writeFileSync(path.join(b, 'PAINT.md'), 'Lite planning only. Save the deliverables listed in TASK.md, then stop. The harness runs the check and painter after your process exits. No looking, waiting or repairs.\n');
   }
   for (const f of fs.readdirSync(path.join(V45, 'tools'))) fs.copyFileSync(path.join(V45, 'tools', f), path.join(b, 'tools', f));
-  fs.cpSync(path.join(V45, 'example'), path.join(b, 'example'), { recursive: true });
-  fs.cpSync(path.join(V2, 'skill', 'skills'), path.join(b, 'skills'), { recursive: true });
+  const ex = PLAN_FORM.example;
+  fs.cpSync(path.join(V45, ex), path.join(b, ex), { recursive: true });
+  // the repository's current skills (.agents/skills), not the frozen V2 copy, unless the run names a skills folder
+  fs.cpSync(skills ?? path.join(REPO, '.agents', 'skills'), path.join(b, 'skills'), { recursive: true });
+  for (const f of fs.readdirSync(path.join(b, 'skills'))) if (!fs.statSync(path.join(b, 'skills', f)).isDirectory()) fs.rmSync(path.join(b, 'skills', f));
   if (dry && profile?.planOnly) {
     fs.writeFileSync(path.join(b, 'dry-planner.mjs'), `import fs from 'node:fs';
 fs.writeFileSync('bench/plan/config.json',JSON.stringify({subject:'dry',name:'Dry lite plan',styleSelection:{style:'ink-and-wash',reason:'offline fixture'},families:[],reserves:[]}));
@@ -101,16 +131,21 @@ function previousTry({ outRoot, round, model, n, crop }) {
 }
 
 /** One try of one target: the model's session, its repair turns, the painting and the record. */
-async function paintTarget({ model, round, n, tries, crop, spec, rawTry, prev, dry, gpu, log, strictVerdict, profile }) {
+async function paintTarget({ model, round, n, tries, crop, spec, rawTry, prev, dry, gpu, log, strictVerdict, profile, skills = null }) {
+  const form = PLAN_FORM;
   const raw = path.join(rawTry, crop);
   fs.mkdirSync(raw, { recursive: true });
-  const target = path.join(V2, 'targets', `${crop}.png`);
-  const { ws, cleanup } = makeWorktree();
+  const source = path.join(V2, 'targets', `${crop}.png`);
+  const target = dry ? path.join(raw, 'target.png') : source;
+  const { ws, scratch, cleanup } = makeWorktree();
   const record = { turns: [], repairTurns: [], tokens: 0, costUSD: 0, wallSeconds: 0, usageComplete: true, costComplete: true, budgetStopped: false };
   const targetStarted = Date.now();
   let session = null;
   try {
-    seed({ ws, crop, spec, round, n, tries, dry, strictVerdict, profile });
+    // Offline planning, admission and playback share one fixture at the requested
+    // native width; real sessions keep the original source and full render size.
+    if (dry) await sharp(source).resize({ width: spec.width, withoutEnlargement: true }).png().toFile(target);
+    seed({ ws, crop, target, spec, round, n, tries, dry, strictVerdict, profile, skills });
     let feedbackFiles = null;
     if (prev) feedbackFiles = await writeFeedback({ dest: path.join(ws, 'bench', 'feedback'), prev, prevRaw: prev.raw, prevOut: prev.out, target });
     session = new PaintSession({ repo: REPO, ws, raw, spec, target, modelMinutes: profile.modelMinutes, gpu, log, planOnly: profile.planOnly });
@@ -119,11 +154,12 @@ async function paintTarget({ model, round, n, tries, crop, spec, rawTry, prev, d
     const selfReview = path.join(ws, 'bench', 'SELF-REVIEW.md');
     const turn = async (text, repair) => {
       const k = record.turns.length + 1, events = path.join(raw, `events-${k}.jsonl`), stderr = path.join(raw, `stderr-${k}.log`);
+      fs.writeFileSync(path.join(raw, `prompt-${k}.txt`), text + '\n');
       const c = dry ? { cmd: process.execPath, args: ['bench/dry-planner.mjs', repair ? 'repair' : 'start'] }
         : turnCommand(model, { ws, raw, text, sessionId: sessionId ?? thread, resume: repair && model.runner !== 'together', turn: k, briefFile: path.join(ws, 'bench', 'TASK.md'), logFile: events, minutes: repair ? REPAIR_MINUTES : profile.wallMinutes, done: 'any', budget: profile });
       let finT = null;
       const r = await runTurn(c, {
-        cwd: ws, events, stderr, capMs: (repair ? REPAIR_MINUTES : profile.wallMinutes) * 60000, killGraceMs: profile.planOnly ? 1000 : 20000, cleanupGroup: profile.planOnly,
+        cwd: ws, env: { TMPDIR: scratch }, events, stderr, capMs: (repair ? REPAIR_MINUTES : profile.wallMinutes) * 60000, killGraceMs: profile.planOnly ? 1000 : 20000, cleanupGroup: profile.planOnly,
         tick: ({ stop }) => {
           session.tick();
           if (profile.planOnly && session.planReady) session.end('lite plan delivered');
@@ -161,19 +197,20 @@ async function paintTarget({ model, round, n, tries, crop, spec, rawTry, prev, d
     const harnessCheck = async () => {
       const dir = path.join(raw, 'checks', 'final'); fs.rmSync(dir, { recursive: true, force: true });
       const snap = planSnapshot(ws, path.join(dir, 'plan'));
-      const chk = await checkPlan({ repo: REPO, spec, planDir: snap, variant: variantIn(snap), target, work: path.join(dir, 'work'), timeoutMs: spec.checkTimeoutMs ?? 900000 });
+      const chk = await form.check({ repo: REPO, spec, planDir: snap, variant: variantIn(snap), target, work: path.join(dir, 'work'), timeoutMs: spec.checkTimeoutMs ?? 900000 });
       writeJson(path.join(dir, 'check.json'), { ok: chk.ok, failures: chk.failures, layering: chk.layering, palette: chk.palette });
+      session.checkLog.push({ seconds: chk.seconds, previewSeconds: chk.previewSeconds });
       return { chk, snap };
     };
     // The session ended without a painting: check the plan files as they are and paint them without stops. One repair
     // turn (the same session) is given for a missing or refused plan while the model has time.
     const finalize = async () => {
-      if (!fs.existsSync(path.join(ws, 'bench', 'plan', 'config.json')) && repairAllowed()) {
-        await repair('no plan', 'The harness check refused your preparation: no plan was written (bench/plan/config.json is missing), so nothing can be painted.\n'
+      if (!fs.existsSync(path.join(ws, 'bench', 'plan', form.planFile)) && repairAllowed()) {
+        await repair('no plan', `The harness check refused your preparation: no plan was written (bench/plan/${form.planFile} is missing), so nothing can be painted.\n`
           + 'Write every deliverable listed under "What you deliver" in bench/TASK.md, run `bash bench/check.sh` yourself until it ends with ADMITTED, then stop.');
         if (session.started) return;
       }
-      if (!fs.existsSync(path.join(ws, 'bench', 'plan', 'config.json'))) { outcome = 'no-plan'; refusal = ['the session ended without writing bench/plan/config.json']; return; }
+      if (!fs.existsSync(path.join(ws, 'bench', 'plan', form.planFile))) { outcome = 'no-plan'; refusal = [`the session ended without writing bench/plan/${form.planFile}`]; return; }
       let { chk, snap } = await harnessCheck();
       if (!chk.ok && repairAllowed()) {
         await repair('plan refused', `The harness check refused your preparation:\n${chk.refusal.join('\n')}\nFix only what is needed, run \`bash bench/check.sh\` yourself until it prints ok, then stop. (Or start the painting yourself with \`bash bench/paint.sh start\`.)`);
@@ -208,7 +245,7 @@ async function paintTarget({ model, round, n, tries, crop, spec, rawTry, prev, d
   } finally {
     if (session?.painting) session.painting.kill();
     keepScripts(ws, path.join(raw, 'scripts'), SEEDED);
-    for (const f of ['PLAN.md', 'SELF-REVIEW.md', 'variant.txt']) if (fs.existsSync(path.join(ws, 'bench', f))) fs.copyFileSync(path.join(ws, 'bench', f), path.join(raw, f));
+    for (const f of ['TASK.md', 'PLAN.md', 'SELF-REVIEW.md', 'variant.txt']) if (fs.existsSync(path.join(ws, 'bench', f))) fs.copyFileSync(path.join(ws, 'bench', f), path.join(raw, f));
     if (fs.existsSync(path.join(ws, 'bench', 'feedback'))) fs.cpSync(path.join(ws, 'bench', 'feedback'), path.join(raw, 'feedback'), { recursive: true });
     cleanup();
   }
@@ -224,7 +261,7 @@ export async function collect({ crop, spec, raw, rawTry, ws, session, record, ou
     const last = p.segments.at(-1);
     fs.rmSync(path.join(raw, 'plan-final'), { recursive: true, force: true });
     fs.cpSync(last.planDir, path.join(raw, 'plan-final'), { recursive: true });
-    if (!outcome) outcome = v.exit === 0 ? 'painted' : p.planningRefused ? 'plan-refused' : 'render-failed';
+    if (!outcome) outcome = v.exit === 0 ? 'painted' : p.planningRefused && !p.paintBegan ? 'plan-refused' : 'render-failed';
   }
   let verifyError = null;
   if (verifyRun && outcome === 'painted' && p && fs.existsSync(path.join(p.out, 'painting.png'))) {
@@ -234,7 +271,7 @@ export async function collect({ crop, spec, raw, rawTry, ws, session, record, ou
         requireSegments: spec.segments !== 'off',
         requireStages: true,
         requireDistinctStages: true,
-        minWidth: spec.width || 540,
+        width: spec.width,
       });
       if (spec.noTargetLooks) {
         const guardFile = path.join(p.out, 'target-guard.json');
@@ -260,8 +297,10 @@ export async function collect({ crop, spec, raw, rawTry, ws, session, record, ou
     outcome, paintedBy, tokens: variantIn(p ? p.segments.at(-1).planDir : path.join(ws, 'bench')),
     starts: count('start'), looks: count('look'), revisions: count('revise'), revisionsRefused: count('revise-refused'),
     modelMinutes: +(session.modelS() / 60).toFixed(1), cappedAtModelTime: Boolean(session.capped), sessionEnd: session.ended,
-    repairTurns: record.repairTurns, turns: record.turns, layering: v?.layering ? { applied: v.layering.applied, skipped: v.layering.skipped } : null,
-    optionCheck: v?.optionCheck ?? null, notes: v?.notes ?? [], strictVerdict, droppedPassages: v ? Number([...text.matchAll(/(\d+) passages yielded no brush path/g)].at(-1)?.[1] ?? 0) : null,
+    repairTurns: record.repairTurns, turns: record.turns, layering: v?.layering ? { applied: v.layering.applied, skipped: v.layering.skipped } : null, mediumOverride: v?.layering?.mediumOverride ?? null,
+    // the painter's own copy measurement of the finished sheet, with the plan's line sources beside it; for the record only
+    copy: outcome === 'painted' && p ? copyRecord(fs.existsSync(path.join(p.out, 'cheat-risk.json')) ? readJson(path.join(p.out, 'cheat-risk.json')) : null, v?.layering?.lines) : null,
+    optionCheck: v?.optionCheck ?? null, notes: v?.notes ?? [], strictVerdict, clean: v?.clean ?? false, continuedChecks: v?.continuedChecks ?? null, droppedPassages: v ? Number([...text.matchAll(/(\d+) passages yielded no brush path/g)].at(-1)?.[1] ?? 0) : null,
     paintExit: p ? p.segments.at(-1).exit : null, segments: p ? p.segments.length : 0,
     warnings: v?.warnings?.length ? v.warnings : undefined,
     failure: outcome === 'painted' ? null : { failures: verifyError ? [...(v?.failures ?? []), { reason: verifyError }] : (v?.failures?.length ? v.failures : (refusal ?? []).map(reason => ({ reason }))) },
@@ -269,6 +308,8 @@ export async function collect({ crop, spec, raw, rawTry, ws, session, record, ou
     selfReviewModelMinute: selfReviewAt,
     modelSessionSeconds: record.wallSeconds, elapsedSeconds: record.totalSeconds ?? null,
     renderSeconds: p ? p.segments.reduce((a, s) => a + (s.seconds || 0), 0) : 0,
+    // what the try cost besides the model: admission checks (the model's own, its starts' and revisions', the harness's) with their CPU preview time, and painter runs
+    cost: costRecord({ checks: [...modelChecks(ws), ...session.checkLog], renders: session.paintings, renderSeconds: p ? p.segments.reduce((a, s) => a + (s.seconds || 0), 0) : 0 }),
     usageComplete: record.usageComplete ?? false, costComplete: record.costComplete ?? false, budgetStopped: record.budgetStopped ?? false,
   };
   const painted = outcome === 'painted' && fs.existsSync(path.join(p.out, 'painting.png'));
@@ -310,7 +351,11 @@ export async function tryEntry({ tryDir, r }) {
 }
 
 /** Run V4 or V5 for one model: tries 1..tries over the targets, in order (V5 tries learn from the one before). */
-export async function runPipeline({ round, model, tries, crops, dry, outRoot, force, gpu = 'auto', dryWidth = 96, fromTry = 1, strictVerdict = false, basePalette = true, noTargetLooks = false, profile = benchmarkProfile('full'), python = process.env.BENCH_SCORE_PYTHON || 'python3' }) {
+export const RETIRED_V45 = 'the V4 and V5 tasks ran on painter 0.2.x and 0.3.x and cannot run on 0.4 (their plans use the light-to-dark value plan and options removed in 0.4): check out tag v0.3.2 to replay them. The next task is bench/v6 (a draft, not yet run).';
+export async function runPipeline({ round, model, tries, crops, dry, outRoot, force, gpu = 'auto', dryWidth = 96, fromTry = 1, strictVerdict = false, noTargetLooks = false, profile = benchmarkProfile('full'), python = process.env.BENCH_SCORE_PYTHON || 'python3', skills = null }) {
+  // V4 and V5 ran on painter 0.2.x and 0.3.x: their plans select a style (the light-to-dark value plan) and recipe tokens
+  // that 0.4 removed. They replay from that code, not this one.
+  if (['V4', 'V5'].includes(round.id)) throw new Error(RETIRED_V45);
   const subjects = loadSubjects();
   if (profile.planOnly && (round.id !== 'V4' || tries !== 1 || fromTry !== 1)) throw new Error('lite requires V4 try 1 only; use full for repeated trials');
   const log = msg => console.error(`bench:run: ${msg}`);
@@ -324,16 +369,16 @@ export async function runPipeline({ round, model, tries, crops, dry, outRoot, fo
     fs.mkdirSync(rawTry, { recursive: true });
     fs.rmSync(tryDir, { recursive: true, force: true }); fs.mkdirSync(tryDir, { recursive: true });
     const cropsOut = {}, unpainted = {}, t0 = Date.now();
-    let tokens = 0, cost = 0, wall = 0, modelMin = 0, renderSeconds = 0, usageComplete = true, costComplete = true, budgetStopped = false, guardViolations = 0;
+    let tokens = 0, cost = 0, wall = 0, modelMin = 0, renderSeconds = 0, checks = 0, previewSeconds = 0, renders = 0, usageComplete = true, costComplete = true, budgetStopped = false, guardViolations = 0;
     for (const crop of crops) {
       // A dry run checks the harness, not segmentation: it paints with --segments off, so it needs no SAM python or
       // checkpoint (src/crop/segment-prep.mjs). Real runs keep the painter's default (SAM) and add nothing.
-      const spec = { ...profileSubject(subjects[crop], profile, dry ? dryWidth : null), ...(dry ? { segments: 'off', offlineFixture: true } : {}), ...(basePalette ? {} : { basePalette: false }), noTargetLooks };
+      const spec = { ...profileSubject(subjects[crop], profile, dry ? dryWidth : null), ...(dry ? { segments: 'off', offlineFixture: true } : {}), noTargetLooks };
       const prev = round.learning && n > 1 ? previousTry({ outRoot, round, model, n, crop }) : null;
       log(`${model.name}, ${round.id}, try ${n} of ${tries}, ${crop}${dry ? ' (dry run)' : ''}`);
       let r, e;
       try {
-        r = await paintTarget({ model, round, n, tries, crop, spec, rawTry, prev, dry, gpu, log, strictVerdict, profile });
+        r = await paintTarget({ model, round, n, tries, crop, spec, rawTry, prev, dry, gpu, log, strictVerdict, profile, skills });
         e = await tryEntry({ tryDir, r });
       }
       catch (error) {
@@ -343,7 +388,7 @@ export async function runPipeline({ round, model, tries, crops, dry, outRoot, fo
         continue;
       }
       if (e.entry) cropsOut[crop] = e.entry; else unpainted[crop] = e.unpainted;
-      renderSeconds += r.pipeline.renderSeconds; usageComplete &&= r.record.usageComplete; costComplete &&= r.record.costComplete; budgetStopped ||= r.record.budgetStopped;
+      renderSeconds += r.pipeline.renderSeconds; checks += r.pipeline.cost.checks; previewSeconds += r.pipeline.cost.previewSeconds; renders += r.pipeline.cost.renders; usageComplete &&= r.record.usageComplete; costComplete &&= r.record.costComplete; budgetStopped ||= r.record.budgetStopped;
       tokens += r.record.tokens; cost += r.record.costUSD; wall += r.record.wallSeconds; modelMin += r.pipeline.modelMinutes; guardViolations += r.guardViolations;
       log(`${crop}: ${r.pipeline.outcome}, ${r.pipeline.looks} looks, ${r.pipeline.revisions} revisions, ${r.pipeline.modelMinutes} model minutes`);
     }
@@ -353,8 +398,8 @@ export async function runPipeline({ round, model, tries, crops, dry, outRoot, fo
       painter: { key: model.key, name: model.name, id: model.id, effort: model.effort, runner: model.runner },
       planner: null, evaluators: { scoreJudges: [], progressionJudges: [] }, try: n,
       settings: { mode: 'gentle', strokeBudget: null, minutesPerCrop: null, sessionCapMin: profile.modelMinutes, modelMinutesCap: profile.modelMinutes, lookBudget: profile.planOnly ? 0 : null, selfView: profile.planOnly ? 'none' : 'gentle', targetGuard: 'gentle',
-        crops, learnsBetweenTries: round.learning, strictVerdict, basePalette, noTargetLooks, benchmarkProfile: profile.id, budget: profile, judgeProfile: `${profile.judgeVersion}-${profile.judgeProfile}`, judgeRoute: process.env.JUDGE_ROUTE || 'together', scoreProtocol: 'native-v1', paintWidth: Object.fromEntries(crops.map(c => [c, profileSubject(subjects[c], profile, dry ? dryWidth : null).width])), painter: 'tools/paint-plate.mjs', machine: 'local' },
-      session: { minutes: minutes(wall), modelMinutes: +modelMin.toFixed(1), tokens: usageComplete ? tokens : null, observedTokens: tokens || null, usageComplete, costUSD: costComplete && !dry ? +cost.toFixed(6) : null, modelSessionSeconds: wall, elapsedSeconds: (Date.now() - t0) / 1000, renderSeconds, exitCode: null, killedAtCap: budgetStopped },
+        crops, learnsBetweenTries: round.learning, strictVerdict, noTargetLooks, skills: skills ? path.basename(skills) : 'repository', benchmarkProfile: profile.id, budget: profile, judgeProfile: `${profile.judgeVersion}-${profile.judgeProfile}`, judgeRoute: process.env.JUDGE_ROUTE || 'together', scoreProtocol: 'native-v1', paintWidth: Object.fromEntries(crops.map(c => [c, profileSubject(subjects[c], profile, dry ? dryWidth : null).width])), painter: 'tools/paint-plate.mjs', machine: 'local' },
+      session: { minutes: minutes(wall), modelMinutes: +modelMin.toFixed(1), tokens: usageComplete ? tokens : null, observedTokens: tokens || null, usageComplete, costUSD: costComplete && !dry ? +cost.toFixed(6) : null, modelSessionSeconds: wall, elapsedSeconds: (Date.now() - t0) / 1000, renderSeconds, checks, previewSeconds: +previewSeconds.toFixed(1), renders, exitCode: null, killedAtCap: budgetStopped },
       guard: { blockedImageReads: guardViolations, kitRejections: 0, auditHits: [] },
       crops: cropsOut, ...(Object.keys(unpainted).length ? { unpainted } : {}),
       score: { status: dry ? 'dry-run' : 'unscored', composite: null, complete: false },

@@ -9,7 +9,9 @@ import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import sharp from 'sharp';
 import { BENCH, REPO, V2, readJson, writeJson } from './lib.mjs';
+import { reportDesignedPaths } from '../../tools/designed-paths-check.mjs';
 import { resolvePlan, renderVerdict } from './pipeline/plan-args.mjs';
+import { painterFailure } from './pipeline/painting.mjs';
 import { STAGES, thumb, stageStrip } from './images.mjs';
 import { verifyComparisonRun } from './preflight.mjs';
 import { runDoctor } from '../../src/paint/doctor.mjs';
@@ -17,9 +19,9 @@ import { codeState } from '../../src/paint/code-state.mjs';
 import { versionStamp } from '../../src/painter-version.mjs';
 
 const list = v => v ? v.split(',').map(s => s.trim()).filter(Boolean) : null;
-// Published targets start at 300 px, so a fixed floor admits them all and still refuses thumbnails.
-const MIN_SOURCE_WIDTH = 300;
-export const rerenderGate = spec => ({ minWidth: spec.width, minSourceWidth: MIN_SOURCE_WIDTH });
+// A rerender is painted exactly as wide as its subject specifies, and never wider than its source (preflight.mjs).
+// No least width: the subjects are their 300 px targets at one cell a pixel.
+export const rerenderGate = spec => ({ width: spec.width, maxSourceScale: 1 });
 
 export function parseRerenderArgs(argv = process.argv.slice(2)) {
   const o = {
@@ -166,9 +168,17 @@ async function renderJob(opts, job, { run, verify }) {
     dropped: dm ? Number(dm[1]) : 0,
     droppedPct: dm ? Number(dm[2]) : 0,
     finished,
+    continued: fs.existsSync(path.join(jobOut, 'continued-checks.json')) ? readJson(path.join(jobOut, 'continued-checks.json')) : null,
   });
+  if (!opts.compileOnly) {
+    verdict.designedPaths = reportDesignedPaths(jobOut);
+    if (!verdict.designedPaths.ok) { verdict.exit ||= 4; verdict.failures.push({ code: 4, reason: 'required designed paths did not run; see designed-paths-check.txt' }); }
+  }
   const painted = verdict.exit === 0 && finished;
   const problems = [...verdict.failures.map(f => f.reason)];
+  // A stored plan that names an option removed since it was written (src/paint/removed-options.mjs) is not migrated: the
+  // painter refuses it before painting, and the record carries that refusal (each option and why it went), not only an exit code.
+  if (child.status !== 0 && child.status != null) problems.push(painterFailure(logText, child.status));
   if (opts.strictPlan && plan.problems?.length) problems.push(...plan.problems);
   let stagesFile = null;
   if (!opts.compileOnly && painted) {

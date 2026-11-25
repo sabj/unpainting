@@ -7,18 +7,11 @@
 * You can stop or rewind a painting at any point between blank page and finished product. At every point it should look as if a human painted it, in the painting behavior as well as the pixels. In theory.
 * It doesn't actually make the painting! It only unmakes them, so you can't start with a photo. It will almost always make something worse than where you started, but it's about the journey.
 
-How the pen drawing and the washes are made, stage by stage: [Pipelines](docs/pipelines.md).
+<p align="center"><img src="docs/img/hero-rosewalk.webp" alt="Yale Rosewalk: original photo, stylized target, and the painting building from blank paper through ink drawing and washes to the finished painting"></p>
 
-**0.3.0: less time waiting for paint to dry.** During development, the three-workload M4 reference suite fell from 12.1 minutes on the frozen control to 4.7 minutes with warm caches. A fresh final-engine run with run caching off took 6.6 minutes. The final engine retains 98.75%–99.76% local RGB SSIM on those paintings. See the [release notes](CHANGELOG.md#030--2026-11-07) for timing charts, full images, amplified differences and the exact commits. Paint Lab and Spore Studies use different browser paths; the CLI speedup is not a browser speed claim.
+<p align="center">Yale Rosewalk.</p>
 
-Want to help? The [open problems](docs/future-ideas.md) need work: linework, washes, judging and more. Issues and pull requests welcome.
-
-<p align="center"><img src="docs/img/hero-trumbull.webp" alt="Trumbull College: original photo, stylized target, and the painting building from blank paper to the finished painting"></p>
-
-<p align="center">Trumbull College, painted with release 0.1.0 (painter V096, sim 100).</p>
-
-
-Try the [quick start](#try-it), paint by hand in [Paint Lab](https://sabj.github.io/unpainting/demos/lab/), watch mushrooms paint themselves in [Spore Studies](https://sabj.github.io/unpainting/demos/fungi/), or take a painting apart [layer by layer](https://sabj.github.io/unpainting/demos/layers/). This is a side experiment, so caveat emptor. The code is 99.9% AI-written and the docs 99%, so expect some slop and odd overfitting.
+Try the [quick start](#try-it), paint by hand in [Paint Lab](https://sabj.github.io/unpainting/demos/lab/), watch mushrooms paint themselves in [Spore Studies](https://sabj.github.io/unpainting/demos/fungi/), or take a painting apart [layer by layer](https://sabj.github.io/unpainting/demos/layers/). This is just a side experiment, so caveat emptor. And apologies for some Git repo slop, stale claims, or weird overfittings -- this is 99.9% AI code and 99% AI documentation so, you know, good luck.
 
 ## Why model paint drying
 
@@ -37,54 +30,19 @@ Try the [quick start](#try-it), paint by hand in [Paint Lab](https://sabj.github
 
 </div>
 
-## What's included
+## How it works
 
-```text
-unpainting/
-├── docs/           guides and plan format
-├── demos/          Paint Lab, the layers page and other browser demos
-├── bench/          unpaint-bench: protocol, run records, scores, gallery
-├── examples/       public-domain targets and runnable stroke plans
-├── src/
-│   ├── media/      paper, water, pigment, brush, pen and pencil physics (CPU + WebGPU)
-│   ├── paint/
-│   │   ├── methods/     generic watercolor methods: washes, glazes, layers, drawing order
-│   │   ├── techniques/  techniques for a kind of problem: faces, dark fur, foliage, skies, sea, buildings
-│   │   └── tuned/       settings fitted to specific benchmark images
-│   └── crop/       target analysis: regions, value masses, palette fitting
-├── tools/
-│   ├── paint-plate.mjs   paint an image with target-pixel reads blocked
-│   ├── run-plan.mjs      execute a JSON stroke plan
-│   └── seg/              line and contour proposals (Python)
-├── .agents/skills/ watercolor technique and painting planner, for agents
-└── .claude/skills  symlink to ../.agents/skills for Claude Code
-```
-
-## How does it work
-
-The pipeline has seven steps: instructions, planning tools, plan execution, tool preparation, tool use, judgment and practice between attempts. It takes a painting-style image and prepares paper, colors and brushes. It plans the painting, executes the plan, then judges the result and improves on it.
-
-A drawing goes down first and dries before any wash, a layer of diluted paint. Washes then build from light to dark. The drawing medium defaults to pencil. A plan, `--outlinemedium ink` or the [automatic stage choice](docs/ink.md#automatic-drawing-stages) can add ink.
+A painting needs three things: the picture, a line drawing of it, and simplified versions of it. An image model makes the line drawing. Code traces it and puts the lines in the order a hand would draw them. An image model also makes the simplified versions, which show the picture as flat patches of colour, from coarse to fine. The drawing goes down first and dries. Then the paint goes on in washes, which are thin layers of diluted paint, from light to dark.
 
 <p align="center"><a href="docs/how-it-paints.md"><img src="docs/img/pipeline-map.png" alt="The painting pipeline: plan, prepare the sheet, paint, review. Cards 1, 3 and 4 show the Part 1 beach study; card 2 shows a White Ships run with a pencil drawing"></a></p>
 
-<p align="center">Card 2 is a White Ships run from release 0.1.0 (painter V096, sim 100).</p>
+While a painting runs, a guard stops the code from reading the target's pixels: [how it paints](docs/how-it-paints.md), [the guard](docs/honesty.md).
 
-The Part 1 post walks through the [full painting pipeline](https://samjackson.org/writing/whats-a-painting-anyway-part-1/#suffering-xl-pipeline) with pictures of each stage. Locally, [how it paints](docs/how-it-paints.md) covers the materials, and [the plan format](docs/plan-format.md) defines the commands a planner can issue. While a painting runs, the guard blocks reads of the target's pixels. The painter works from its plan and what it sees on the sheet.
-
-[Rules, records and limits](docs/honesty.md).
-
-<p align="center"><img src="docs/img/cheat-white-ships.webp" width="912" alt="Sargent's White Ships four times: the target; cheat #1, a hill-climber that keeps random dabs only when they match the photo better; cheat #2, the painter's own strokes replayed with their paint taken from the photo's pixels, with an inset heat map of where it read the photo; and the painter's run building up stroke by stroke. The same brush outline moves over cheat #2 and the painter, and rings mark each new hill-climb dab. Both cheats get a red X near the end."></p>
-
-<p align="center">The painter's run in the last panel was made with release 0.1.0 (painter V096, sim 100).</p>
-
-More recorded paintings are in the [painting sequences](docs/examples.md).
+<p align="center"><img src="docs/img/cheat-white-ships.webp" width="912" alt="Sargent's White Ships four times: the target; cheat #1, a hill-climber that keeps random dabs only when they match the photo better; cheat #2, the painter's own strokes replayed with their paint taken from the photo's pixels, with an inset heat map of where it read the photo; and the 0.4 painter building up stroke by stroke."></p>
 
 ## Try it
 
-Start with a picture already in watercolor or ink-and-wash style. A photo gives poor results.
-
-Requires [Node.js](https://nodejs.org/en/download) 25 or later.
+Start with a picture already in watercolor or ink-and-wash style. A photo gives poor results. Requires [Node.js](https://nodejs.org/en/download) 25 or later.
 
 ```sh
 git clone https://github.com/sabj/unpainting.git
@@ -93,70 +51,64 @@ npm ci
 npm run quick-start
 ```
 
-Open `work/plan-graded-wash/result.png` to see a blue wash fade from dark to light. It takes about five seconds on an Apple M3.
-
-To paint one of the bundled public-domain targets, or your own:
+Open `work/plan-graded-wash/result.png`: a blue wash fading from dark to light, in about five seconds. Then the bundled public-domain examples:
 
 ```sh
-npm run example:portrait    # Sargent, A Tramp
-node tools/paint-plate.mjs --image path/to/painting.jpg --width 540 --mode fast --out work/mine
+npm run example:animal      # Tiepolo, Punchinello Riding a Camel: a drawing and one simplified picture
+npm run example:portrait    # Sargent, A Tramp: one simplified picture, no drawing
 ```
 
-<p align="center"><img src="docs/img/build-white-ships.webp" width="560" alt="Sargent's White Ships beside a benchmark painting by Sol, built from blank paper with the brush outline following each recorded stroke, then rewound"></p>
+<p align="center"><img src="docs/img/build-white-ships.webp" width="840" alt="Sargent's White Ships beside two paintings building from blank paper and rewinding: 0.3 and prior (middle) beside 0.4 onwards (right)"></p>
 
-Sargent's White Ships, left, and Sol's benchmark painting, right, made with painter V096 and sim 100 (release 0.1.0). The outline is the brush; paint shows up at the next saved frame.
+[Getting started](docs/running.md) covers your own image, the benchmark's pictures and model painters. `ffmpeg` is needed for MP4 videos (`--video 0` skips them). Python 3 is needed for tracing a drawing, finding regions and scoring.
 
-Unless told otherwise, the painter runs its default recipe, a preset of painter settings (`src/paint/recipe.mjs`). [Methods, techniques and tuned settings](docs/techniques.md) lists every part of the painter, which settings were fitted to benchmark images, and how to turn each one off.
+`npm run unpaint` is one command for painting, benchmark runs, cloud GPUs and scoring ([benchmark](bench/README.md#run-it)):
 
-[Running the painter](docs/running.md) covers the recipe, sheet size, saved stages, animations and Paint Lab. Supporting tools need more:
+```sh
+npm run unpaint -- --help
+npm run unpaint -- paint mittens-closeup-qs plan              # plan or paint one of the shipped pictures
+npm run unpaint -- benchmark --out work/bench-04 --set core   # lists every session; --start runs them
+npm run unpaint -- status work/bench-04                       # progress of the runs
+```
 
-- `ffmpeg` on your `PATH` for animations of the painting. Pass `--video 0` to skip them.
-- Python 3 for the optional scoring and segmentation tools. The scorer lists its packages in [bench/scorer/requirements.txt](bench/scorer/requirements.txt).
+## How long it takes
 
-Everything runs on a basic machine. A GPU, including a local one through WebGPU, runs faster and in parallel. That helps when you steer towards an outcome.
+A painting takes about 13 minutes on a Mac mini with 16 GB. A quick preview takes about 5. Rented cloud GPUs are slower per painting but run many at once.
+
+The pictures that ship with the repo are ready to paint. To add your own, an open image model (Qwen-Image-Edit, run locally) first makes a few studies of it: a pencil lay-in and three simplified colour versions. The painter and the models plan from those. See [preparing a picture](tools/prepare/README.md).
 
 ## Benchmark
 
-[unpaint-bench](bench/README.md) tests how well AI models paint, in five rounds, V1 to V5, with more help each time.
+[unpaint-bench](bench/README.md) tests how well AI models paint with the simulator's brush and pen. Each score is measured against Auto, which is the code's own planner working alone. Version 0.4 starts a new series, so its scores do not compare with rounds V1 to V5.
 
-- V1 to V3: the model writes scripts that lay every stroke, within about 15 minutes and 2,500 strokes. V2 adds technique guides, V3 the model's earlier attempts.
-- V4 and V5: the model writes a plan and the painter turns it into strokes. V5 adds feedback from the previous try.
+There are fifteen pictures: twelve from museums and three generated ([credits](bench/PICTURES.md)). Five are core pictures. Auto and all four levels paint those. The other ten get Auto and level 2.
 
-The leaderboard uses painter V096, sim 100 and judges J1, from releases 0.1.0 and 0.1.1 ([changelog](CHANGELOG.md), [versions](docs/versions.md)). It has not been rerun for 0.3.0. The 0.2.0 and 0.2.1 releases replayed only the Opus 5.5 V5 plans ([0.2.0 comparison](docs/release-performance-0.2.0.md)).
+Every level is a fresh, independent session. The model hands in its own painting script. The anti-cheat guard is on, so its code cannot read the original's pixels. It gets no feedback from the judges. It can try its script on test paintings, with a budget of 3.0 units, and has 60 minutes.
 
-Models ran at their highest reasoning setting.
+- L1: the picture, the script format and painting tips.
+- L2: adds the prepared drawing, simplified colour versions of the picture, named parts and their outlines. Nothing from Auto.
+- L3: adds Auto's plan to read and Auto's finished painting to improve on.
+- L4: gives the same as L3, in an open session with a shell, Python tools and the painter's commands. Every model gets the same tools.
 
-| Round | What the model gets | Subjects | Top model | Score (% of target) | Raw / 10 |
-|---|---|---:|---|---:|---:|
-| V1 | Tools | 5 | [Gemini 4 Argon (High)](bench/models.json) | 64.1% | 5.50 |
-| V2 | Tools and technique guides | 5 | Gemini 4 Argon (High) | 64.5% | 5.53 |
-| V3 | Tools, guides, and practice between tries | 3 | Codex Astra | 67.5% | 5.77 |
-| V4 | Full pipeline: planner, painter presets and scoring tools | 5 | Gemini 4 Argon (High) | 70.9% | 6.09 |
-| V5 | Full pipeline and practice between tries | 5 | Opus 5.5 | 71.0% | 6.10 |
+A model that hands in Auto's plan or the planner's settings is refused at every level.
 
-A try is one model session that paints the requested targets. Scores are a percentage of each target scored against itself. V3 uses three subjects, without Mittens and Trumbull; compare it with V1 and V2 on the [shared subjects](bench/results/FINDINGS.md).
+Three open-weight models judge each painting. They score how human it looks from ten stills of the video, and how good it is next to the original. Human-ness counts twice as much.
 
-Gemini 4 Argon paints best on its own: it ranks first in V1 and V2. With the harness it is level with Opus 5.5. Argon leads V4 and Opus edges V5, both within the margin of error.
+<p align="center"><a href="docs/what-the-model-gets.md"><img src="docs/img/auto-vs-model-auto-cut.webp" width="720" alt="Mittens: a study, the outline of every wash Auto cuts from it, and a close up of the head"></a></p>
+
+[What the model gets](docs/what-the-model-gets.md), [script format](docs/painting-script.md), [rules](bench/docs/rules.md), [scoring](bench/docs/scoring.md), [changelog](CHANGELOG.md).
+
+Rounds V1 to V5 are kept as a record: [leaderboard](bench/results/leaderboard.md), [gallery](bench/results/gallery.md), [findings](bench/results/FINDINGS.md). Tag `v0.3.2` replays V4 and V5.
 
 <p align="center"><a href="bench/results/leaderboard.md"><img src="docs/img/bench-chart.svg" width="800" alt="Mean score per model and round as a percentage of each target's own score, with 95% intervals"></a></p>
 
 <p align="center"><a href="bench/results/gallery.md"><img src="docs/img/benchmark-overview.webp" width="1200" alt="Two rows of paintings. Top: each model's best painting from any round, sorted by score, with the five targets at left. Bottom: each model's best Ships painting from V1 to V3, with the Ships target at left."></a></p>
 
-The harness helped Sonnet, Haiku and Luna most: they trailed with only the tools and caught up with the full pipeline.
-
-Scores are relative and coarse. [Leaderboard](bench/results/leaderboard.md), [gallery](bench/results/gallery.md), [scoring](bench/docs/scoring.md).
-
-## Credits and references
+## References and license
 
 - [The essay about how this was built](https://samjackson.org/writing/whats-a-painting-anyway-part-1/)
-- [The docs](docs/README.md): paints, paper, ink, stroke plans and code
-- [Prior work and credits](docs/reading-list.md)
-- [Working on the code](CONTRIBUTING.md)
+- [Reading list](docs/reading-list.md)
+- [Contributing](CONTRIBUTING.md)
+- Code: MIT ([LICENSE](LICENSE)). Painter output from public-domain inputs: CC BY 4.0. Bundled photos and third-party credits: [NOTICE](NOTICE) and [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
-## License
-
-Code: MIT ([LICENSE](LICENSE)). Painter output from public-domain inputs: CC BY 4.0. My photos: noncommercial use. Details: [NOTICE](NOTICE), [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
-
-[Image sources](NOTICE)
-
-[^nn]: Pretrained models are used only to guide painting: optional prep tools use them to find lines and regions in the target. See the [reading list](docs/reading-list.md).
+[^nn]: Pretrained models are used only before painting starts: image models make the line drawing and block-in studies, and SAM finds regions in the target ([reading list](docs/reading-list.md)).

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {drawsWholeFile,selectValueInk,valueInkVerdict} from './light-to-dark.mjs';
+import {drawsWholeFile,selectValueInk,valueInkVerdict} from './value-shared.mjs';
 import {prepareDrawing,sourceDrawingCaps,CLOSING_PRESSURE_MAX} from './material-profiles.mjs';
 
 const w=12,h=12,density=new Float32Array(w*h),line={points:[{x:1,y:6},{x:10,y:6}]};

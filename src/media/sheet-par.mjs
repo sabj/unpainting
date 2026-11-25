@@ -1,13 +1,19 @@
+import { slideRate, reposeStep } from './grain-field.mjs';
+import { flowTime, poreTime } from './flow-time.mjs';
 // Threads for the sheet's step (sheet.mjs): a persistent worker pool on SharedArrayBuffers runs each large box in row
 // bands through the phases in sheet-kernel.mjs, bit-identical to the serial step. Whole-sheet jobs use the same pool
 // (jobs-kernel.mjs). Node only: sheet.mjs loads this on setThreads(n > 1).
+import { settleSpeed, settleDiffusion } from './settling.mjs';
 import { Worker, MessageChannel } from 'node:worker_threads';
 import os from 'node:os';
 import { useRenderThreads, useRenderCellsThreads } from './km.mjs';
 import { useFlowThreads } from './wash.mjs';
 import { useUnmixThreads } from '../crop/pigments.mjs';
 import { useBlurThreads } from '../keyframes/density.mjs';
+import { usePressureThreads } from './pressure-mg.mjs';
+import { useEdgeFluxThreads } from './contact-distance.mjs';
 import { runJob } from './jobs-kernel.mjs';
+import { SIZING } from './sizing.mjs';
 import {
   runChunk, claim, openPhase, PH, GEN, PHASE, SHEET, DONE, ERR, NT, READY, NCH, BOX, IT, ITERS, LAST, NA, N3, NGROUP, BAND, MAXT, MAXC,
   ACT, ACT3, GROUP, GREP, MV, AF, DF, TF, CTRL_LEN, MAXK, P, PK, PKS, PRM_LEN,
@@ -48,8 +54,9 @@ export function start(n, { opticsOnly = false } = {}) {
   // the workers start on their own threads; wait for each to be listening before the first step can need it
   const t0 = Date.now(); let r;
   while ((r = Atomics.load(ctrl, READY)) < T - 1) { if (Date.now() - t0 > 30000) throw new Error(`sheet: ${r} of ${T - 1} workers started`); Atomics.wait(ctrl, READY, r, 100); }
-  POOL = { T, ctrl, prm, workers, gen: Atomics.load(ctrl, GEN), ctxs: new WeakMap(), live: [], nextId: 1, stats: { par: 0, serial: 0, render: 0, flow: 0, tiles: 0, thick: 0 } };
+  POOL = { T, ctrl, prm, workers, gen: Atomics.load(ctrl, GEN), ctxs: new WeakMap(), live: [], nextId: 1, stats: { par: 0, serial: 0, render: 0, flow: 0, tiles: 0, thick: 0, edgeFlux: 0, pressureRestricts: 0 } };
   if (T > 1) {
+    if (!opticsOnly) useEdgeThreads(T);
     useRenderThreads(renderLayers);
     if (process.env.KM_PARALLEL_CELLS === '1') useRenderCellsThreads(renderCellsParallel);
     if (!opticsOnly) { useFlowThreads(flowField); useUnmixThreads(unmix); useBlurThreads(blur); }
@@ -58,6 +65,8 @@ export function start(n, { opticsOnly = false } = {}) {
 }
 
 export function stop() {
+  useEdgeFluxThreads(null); usePressureThreads(null);
+  BUFS.delete('edge.samples'); BUFS.delete('edge.flux');
   if (!POOL) return;
   const { ctrl } = POOL;
   ctrl[PHASE] = PH.QUIT; Atomics.store(ctrl, GEN, (POOL.gen + 1) | 0); Atomics.notify(ctrl, GEN);
@@ -105,8 +114,9 @@ function ctxFor(sheet, H) {
 const PAPERS = new WeakMap(), PERMS = new WeakMap();
 function paperShared(paper) {
   if (PAPERS.has(paper)) return PAPERS.get(paper);
-  const h = paper.valley || paper.height;
-  const out = { capacity: sharedCopy(paper.capacity), fdx: sharedCopy(paper.fdx), fdy: sharedCopy(paper.fdy), grain: sharedCopy(paper.grain), height: sharedCopy(h), fibreH: sharedCopy(paper.height), tooth: paper.tooth ? sharedCopy(paper.tooth) : null };
+  const h = paper.surface || paper.valley || paper.height;
+  if (!paper.grainH) throw new Error('sheet threads: the paper has no grainH (make it with makePaper or scanPaper)');
+  const out = { capacity: sharedCopy(paper.capacity), fdx: sharedCopy(paper.fdx), fdy: sharedCopy(paper.fdy), grain: sharedCopy(paper.grain), height: sharedCopy(h), fibreH: sharedCopy(paper.grainH), tooth: paper.tooth ? sharedCopy(paper.tooth) : null, hollow: sharedCopy(paper.hollow) };
   PAPERS.set(paper, out); return out;
 }
 const set = (C, key, value) => { C[key] = value; post({ t: 'set', id: C.id, key, value }); };
@@ -169,6 +179,36 @@ function buf(key, Ctor, n) {
   return b;
 }
 const into = (key, a) => { if (isShared(a)) return a; const b = buf(key, a.constructor, a.length); b.set(a); return b; };
+
+// The painter shares its existing pool. The GPU worker starts its own helpers only at the first
+// large curved-edge integral or pressure grid.
+export function useEdgeThreads(n) {
+  if (n <= 1) return;
+  const ready = () => { if (!POOL) start(n); };
+  useEdgeFluxThreads((...args) => { ready(); return edgeFlux(...args); });
+  usePressureThreads({
+    shared,
+    restrict(args) { ready(); job({ kind: 'pressureRestrict', ...args }); POOL.stats.pressureRestricts++; },
+  });
+}
+
+// Share just the 3 x 3 half-cell distances at each curved edge. A sparse mark on a large sheet
+// never copies its interior or the sheet-wide pressure arrays to the workers.
+function edgeFlux(distance, width, bases, mm, edgeMm) {
+  const n = bases.length, capacity = Math.max(BUFS.get('edge.flux')?.length ?? 0, 2 ** Math.ceil(Math.log2(n)));
+  const samples = buf('edge.samples', Float64Array, 9 * capacity);
+  const out = buf('edge.flux', Float64Array, capacity);
+  for (let j = 0; j < n; j++) {
+    const base = bases[j];
+    for (let y = 0; y < 3; y++) {
+      const to = 9 * j + 3 * y, from = base + width * y;
+      samples[to] = distance[from]; samples[to + 1] = distance[from + 1]; samples[to + 2] = distance[from + 2];
+    }
+  }
+  job({ kind: 'edgeFlux', samples, out, n, mm, edgeMm });
+  POOL.stats.edgeFlux++;
+  return out;
+}
 
 /** km.mjs renderLayers in shares of cells; null where it declines. */
 function renderLayers(layers, pigments, paperRGB, n, scale) {
@@ -248,13 +288,14 @@ function flowField(field, w, h, rng = {}) {
 
 function params(C, sheet, o) {
   const prm = POOL.prm, pigments = sheet.pigments, K = sheet.K, dt = o.dt ?? 1;
+  const { fraction } = flowTime(sheet, o);
   const v = {
-    dt, edgeWidth: o.edgeWidth, evap: o.evap, edgeEvap: o.edgeEvap, absorb: o.absorb, film: o.film,
+    dt, fraction, edgeWidth: o.edgeWidth, evap: o.evap, edgeEvap: o.edgeEvap, absorb: o.absorb, film: o.film,
     ff: o.fibreFlow ?? 0.6, flowDepth: o.flowDepth ?? 0.12, flow: o.flow, slope: o.slope, mar: o.marangoni ?? 0,
-    diffuse: Math.min(0.25, Math.max(0, o.diffuse)), cd: o.carryDepth ?? 0.08, filmDiff: Math.max(0, o.filmDiffuse ?? 0), filmDepth: o.filmDepth ?? 0.03, gran: o.gran ?? 1, liftDepth: o.liftDepth ?? 0.15,
-    scour: o.scour ?? 0, holdCap: o.hold ?? Infinity, settle: o.settle, lift: o.lift, looseLift: o.looseLift, rewetLift: o.rewetLift,
-    granFill: o.granFill ?? 0, slide: o.slide ?? 0, fill: o.slideFill ?? 1, repose: o.repose ?? 0,
-    capStep: Math.min(2 / 3, Math.max(0, o.capRate * dt * 10)), sizing: o.sizing ?? 0.85, filter: o.wickFilter ?? 0.2,
+    diffuse: Math.min(0.25, Math.max(0, o.diffuse * fraction)), cd: o.carryDepth ?? 0.08, filmDiff: Math.max(0, (o.filmDiffuse ?? 0) * fraction), filmDepth: o.filmDepth ?? 0.03, gran: o.gran ?? 1, liftDepth: o.liftDepth ?? 0.15,
+    scour: o.scour ?? 0, holdCap: o.hold ?? Infinity, holdDepth: o.holdDepth ?? o.film, coSettle: o.coSettle ?? 0, settle: o.settle, lift: o.lift, looseLift: o.looseLift, rewetLift: o.rewetLift,
+    granFill: o.granFill ?? 0, slide: slideRate(o.slide ?? 0, sheet.paper.mmPerCell), fill: o.slideFillNow ?? o.slideFill ?? 1, repose: reposeStep(o.repose ?? 0, sheet.paper.mmPerCell),
+    capStep: poreTime(sheet, o).fraction, sizing: o.sizing ?? SIZING, filter: o.wickFilter ?? 0.2,
     capEps: o.capEps, capDelta: o.capDelta, wetEps: o.wetEps, paperDry: o.paperDry, capSigma: o.capSigma, spill: o.spill,
     spillHeight: o.spillHeight, dampEase: o.dampEase, pinning: o.pinning ?? 0, pinFibre: o.pinFibre ?? 0,
     hasTop: C.top ? 1 : 0, hasResist: C.resist ? 1 : 0, enclose: o.encloseEase ?? 0, slideCap: o.slideCap ?? 0,
@@ -269,7 +310,7 @@ function params(C, sheet, o) {
     f32[0] = pg.wick ?? Math.max(0.05, Math.min(0.9, 1 - pg.gamma)); f32[1] = pg.floc ?? 0;
     const rho = +pg.rho, omega = +pg.omega, gamma = +pg.gamma, gg = gamma * v.gran;
     prm[b] = f32[0]; prm[b + 1] = rho; prm[b + 2] = omega; prm[b + 3] = gamma; prm[b + 4] = gg;
-    prm[b + 5] = (rho / omega) * v.lift * v.looseLift; prm[b + 6] = v.scour / omega; prm[b + 7] = v.repose / gg; prm[b + 8] = f32[1];
+    prm[b + 5] = (rho / omega) * v.lift * v.looseLift; prm[b + 6] = v.scour / omega; prm[b + 7] = v.repose / gg; prm[b + 8] = f32[1]; prm[b + 9] = settleSpeed(pg); prm[b + 10] = settleDiffusion(pg);
   }
   return v;
 }
@@ -277,11 +318,15 @@ function params(C, sheet, o) {
 /** Step one box in bands. Returns false, having changed nothing, where the box is better stepped serially. */
 export function stepBox(sheet, o, box, H) {
   if (!POOL || POOL.T < 2) return false;
+  // The fused worker pore/front kernel performs one pass. Use the same
+  // serial CPU reference for a subcycled pore step until that kernel is split;
+  // never substitute its old clipped-rate approximation.
+  if (poreTime(sheet, o).iters > 1) { POOL.stats.serial++; return false; }
   const [x0, y0, x1, y1] = box, { ctrl, T } = POOL, K = sheet.K;
   if ((x1 - x0 + 1) * (y1 - y0 + 1) < MIN_AREA || K > MAXK || !(o.flowIters >= 1) || !Number.isFinite(o.edgeWidth) || o.edgeWidth > 16) return false;
   const C = ctxFor(sheet, H); if (!C || !sync(C, sheet, H)) { POOL.stats.serial++; return false; }
   CUR = C;
-  const v = params(C, sheet, o), iters = o.flowIters;
+  const v = params(C, sheet, o), { iters } = flowTime(sheet, o);
   ctrl[SHEET] = C.id; ctrl[BOX] = x0; ctrl[BOX + 1] = y0; ctrl[BOX + 2] = x1; ctrl[BOX + 3] = y1;
   const rows = y1 - y0 + 1;
   run(PH.A, Math.min(rows, MAXC, CHUNKS * T));

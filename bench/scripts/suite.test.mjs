@@ -8,24 +8,7 @@ import os from 'node:os';
 import sharp from 'sharp';
 import { suitePlan } from './suite.mjs';
 import { benchmarkProfile } from './profiles.mjs';
-
-test('offline lite completes one plan/check/render with no self-view or repair, keeping stages and compact stroke counts', () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'lite-e2e-'));
-  let raw;
-  try {
-    const result = spawnSync(process.execPath, [path.join(BENCH, 'scripts', 'run.mjs'), '--dry-run', '--round', 'V4', '--crops', 'hills', '--out', root],
-      { encoding: 'utf8', timeout: 120000 });
-    assert.equal(result.status, 0, result.stderr);
-    const r = readJson(path.join(root, 'v4-pipeline', 'dry-run', '1', 'run.json'));
-    raw = path.join(BENCH, r.raw);
-    assert.equal(r.settings.benchmarkProfile, 'lite-v1'); assert.equal(r.complete, true);
-    assert.equal(r.session.tokens, null); assert.equal(r.session.usageComplete, false);
-    const c = r.crops.hills, p = c.pipeline;
-    assert.equal(p.paintedBy.startsWith('harness'), true); assert.equal(p.looks, 0); assert.equal(p.revisions, 0);
-    assert.deepEqual(p.repairTurns, []); assert.equal(p.renderBackend, 'cpu'); assert.ok(c.strokes > 0);
-    for (const n of [10, 25, 50, 75, 100]) assert.ok(fs.existsSync(path.join(raw, 'out', 'hills', 'frames', `stage-${n}.png`)));
-  } finally { fs.rmSync(root, { recursive: true, force: true }); if (raw) fs.rmSync(raw, { recursive: true, force: true }); }
-});
+import { pngSize } from './pipeline/plan-args.mjs';
 
 test('only a harness spec chooses the segmentation backend: dry runs paint with --segments off, real runs add nothing', async () => {
   const { resolvePlan } = await import('./pipeline/plan-args.mjs');
@@ -38,30 +21,15 @@ test('only a harness spec chooses the segmentation backend: dry runs paint with 
   assert.deepEqual(dry.args.filter((_, i) => dry.args[i] !== '--segments' && dry.args[i - 1] !== '--segments'), real.args);
 });
 
-test('a model launch failure is saved as an unpainted target and returns failure without a retry', () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'lite-failure-'));
-  let raw;
-  try {
-    const source = `import {runPipeline} from ${JSON.stringify(new URL('./pipeline/round45.mjs', import.meta.url).href)};
-import {ROUNDS} from ${JSON.stringify(new URL('./lib.mjs', import.meta.url).href)};
-import {benchmarkProfile} from ${JSON.stringify(new URL('./profiles.mjs', import.meta.url).href)};
-await runPipeline({round:ROUNDS.find(r=>r.id==='V4'),model:{key:'fixture',name:'Fixture',id:'offline',effort:'n/a',runner:'invalid'},tries:1,crops:['hills'],dry:false,outRoot:process.argv[1],force:false,gpu:'off',profile:benchmarkProfile('lite')});`;
-    const result = spawnSync(process.execPath, ['--input-type=module', '-e', source, root], { encoding: 'utf8', timeout: 30000 });
-    assert.equal(result.status, 1, result.stderr);
-    const r = readJson(path.join(root, 'v4-pipeline', 'fixture', '1', 'run.json')); raw = path.join(BENCH, r.raw);
-    assert.equal(r.complete, false); assert.deepEqual(Object.keys(r.crops), []);
-    assert.equal(r.unpainted.hills.pipeline.outcome, 'harness-error'); assert.equal(r.session.tokens, null);
-  } finally { fs.rmSync(root, { recursive: true, force: true }); if (raw) fs.rmSync(raw, { recursive: true, force: true }); }
-});
-
 test('the routine suite fixes seven targets and six models; all remains opt-in', () => {
   const plan = suitePlan();
   assert.equal(plan.targets.length, 7); assert.equal(plan.models.length, 6);
-  assert.equal(plan.profile.id, 'lite-v1');
+  assert.equal(plan.profile.id, 'lite-v2');
   assert.ok(suitePlan({ selection: 'all' }).models.length > 6);
 });
 
-test('the run CLI refuses missing preflight dependencies before starting a model', () => {
+// V4 and V5 were retired in 0.4: the CLI refuses them before preflight, with the way to replay them (bench/docs/older-rounds.md)
+test('the run CLI refuses the retired V4 round before starting a model, and says how to replay it', () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'lite-no-plan-'));
   let raw;
   try {
@@ -70,7 +38,7 @@ test('the run CLI refuses missing preflight dependencies before starting a model
     const result = spawnSync(process.execPath, [path.join(BENCH, 'scripts', 'run.mjs'), '--round', 'V4', '--model', 'opus', '--crops', 'hills', '--out', root, '--gpu', 'off'],
       { encoding: 'utf8', timeout: 30000, env: { ...process.env, PAINTER_SEG_PYTHON: '', PATH: `${bin}${path.delimiter}${process.env.PATH}` } });
     assert.equal(result.status, 2, result.stderr);
-    assert.match(result.stderr, /PAINTER_SEG_PYTHON|clean git checkout/);
+    assert.match(result.stderr, /V4 and V5 tasks ran on painter 0\.2\.x and 0\.3\.x.*tag v0\.3\.2/);
     assert.ok(!fs.existsSync(path.join(root, 'v4-pipeline')));
   } finally { fs.rmSync(root, { recursive: true, force: true }); if (raw) fs.rmSync(raw, { recursive: true, force: true }); }
 });
@@ -82,7 +50,7 @@ test('scoring caches exact inputs, but missing progression stages and failed jud
     const crop = source.crops.hills;
     Object.assign(source, { judgeVersion: 'J2', judgeProfile: 'J2-lite', judgeRoute: 'together', complete: true,
       crops: { hills: { ...crop, score: null, progression: null } }, unpainted: {},
-      settings: { ...source.settings, crops: ['hills'], benchmarkProfile: 'lite-v1', budget: benchmarkProfile('lite'), judgeProfile: 'J2-lite', judgeRoute: 'together' } });
+      settings: { ...source.settings, crops: ['hills'], benchmarkProfile: 'lite-v2', budget: benchmarkProfile('lite'), judgeProfile: 'J2-lite', judgeRoute: 'together' } });
     const dir = path.join(root, 'try'), raw = path.join(root, 'raw'), frames = path.join(raw, 'out', 'hills', 'frames');
     fs.mkdirSync(frames, { recursive: true });
     fs.copyFileSync(path.join(BENCH, 'v2', 'targets', 'hills.png'), path.join(raw, 'out', 'hills', 'final.png'));
@@ -129,7 +97,7 @@ test('lite results retain the planned denominator and do not rank a partial succ
     const targets = suitePlan().targets;
     Object.assign(r, { try: 1, judgeVersion: 'J2', judgeProfile: 'J2-lite', judgeRoute: 'together', complete: false,
       crops: { hills: r.crops.hills }, unpainted: Object.fromEntries(targets.filter(c => c !== 'hills').map(c => [c, { pipeline: { outcome: 'no-plan' } }])),
-      settings: { ...r.settings, crops: targets, benchmarkProfile: 'lite-v1', budget: benchmarkProfile('lite') }, score: { ...r.score, complete: false } });
+      settings: { ...r.settings, crops: targets, benchmarkProfile: 'lite-v2', budget: benchmarkProfile('lite') }, score: { ...r.score, complete: false } });
     writeJson(path.join(root, 'runs', 'run.json'), r);
     const out = path.join(root, 'results.json');
     execFileSync(process.execPath, [path.join(BENCH, 'scripts', 'build-results.mjs'), '--runs', path.join(root, 'runs'), '--out', out], { stdio: 'pipe' });

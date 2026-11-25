@@ -1,0 +1,294 @@
+{
+ "_about": "Level 1's own targets: full-size subjects of the 0.4 rounds, painted freehand with the toolkit (bench/scripts/v3.mjs). They are NOT part of the public suite (bench/v2/crops.json), its leaderboard or its routine runs. Files are relative to bench/v3/. A benchmark picture's target is made by bench/scripts/add-level-one-target.mjs from its registered source on the standard sheet (`subject`); `unit` is the automatic painting's counted work, for the runaway guard: a target without one is not run.",
+ "crops": [
+  {
+   "task": "mittens-closeup",
+   "name": "Mittens close-up",
+   "width": 300,
+   "height": 400,
+   "coarse": {
+    "cols": 24,
+    "rows": 32
+   },
+   "style": "watercolor sketch over faint pencil, no ink: an orange cat's face, close up",
+   "medium": "pencil",
+   "source": "a photograph by Sam Jackson, modified with an image generator (Nano Banana, Google, or the image generator in Codex, OpenAI; which one was not recorded for this picture)",
+   "distributed": true,
+   "file": "targets/mittens-closeup.png",
+   "coarseFile": "targets/mittens-closeup-coarse.json",
+   "licence": "noncommercial use; (c) Sam Jackson; see NOTICE",
+   "unit": {
+    "sweeps": 952,
+    "dryings": 3,
+    "waterSteps": 4442,
+    "from": "prepared mittens-closeup at f58e226f (v0.4.0-rc.2): one full look of the automatic plan",
+    "cellsAcross": 543
+   }
+  },
+  {
+   "task": "mittens-closeup-full",
+   "name": "Mittens close-up, full size",
+   "width": 1086,
+   "height": 1448,
+   "coarse": {
+    "cols": 24,
+    "rows": 32
+   },
+   "style": "watercolor sketch over faint pencil, no ink: an orange cat's face, close up",
+   "medium": "pencil",
+   "source": "a photograph by Sam Jackson, modified with an image generator (Nano Banana, Google, or the image generator in Codex, OpenAI; which one was not recorded for this picture)",
+   "distributed": true,
+   "file": "targets/mittens-closeup-full.png",
+   "coarseFile": "targets/mittens-closeup-full-coarse.json",
+   "licence": "noncommercial use; (c) Sam Jackson; see NOTICE",
+   "unit": {
+    "sweeps": 952,
+    "dryings": 3,
+    "waterSteps": 4442,
+    "from": "prepared mittens-closeup at f58e226f (v0.4.0-rc.2): one full look of the automatic plan; its full-size painting (1086 across) counted the same 952 sweeps and 4442 water steps",
+    "cellsAcross": 543
+   }
+  },
+  {
+   "task": "white-ships-full",
+   "name": "White Ships, full size",
+   "width": 768,
+   "height": 548,
+   "coarse": {
+    "cols": 24,
+    "rows": 17
+   },
+   "style": "pure watercolor, no ink: white sailing ships moored side by side, masts, rigging and reflections (after Sargent)",
+   "medium": "pencil",
+   "source": "John Singer Sargent, White Ships, 1908, Brooklyn Museum; public domain",
+   "distributed": true,
+   "file": "targets/white-ships-full.png",
+   "coarseFile": "targets/white-ships-full-coarse.json",
+   "licence": "public domain",
+   "unit": {
+    "sweeps": 1584,
+    "dryings": 38,
+    "waterSteps": 11314,
+    "from": "prepared white-ships at 3b5366fe (v0.4.0-rc.3; none was prepared at rc.2): one full look of the automatic plan",
+    "cellsAcross": 384
+   }
+  },
+  {
+   "task": "h36-full",
+   "name": "Yale Rosewalk, full size",
+   "width": 1224,
+   "height": 816,
+   "coarse": {
+    "cols": 24,
+    "rows": 16
+   },
+   "style": "loose ink-and-watercolor field sketch, ink led: a college walk with a gate and dappled shade",
+   "medium": "pen",
+   "source": "ink-and-watercolour picture made by the image generator in Codex (OpenAI) from Carol M. Highsmith's photograph of Yale University (Library of Congress, LC-DIG-highsm-19255)",
+   "distributed": true,
+   "file": "targets/h36-full.png",
+   "coarseFile": "targets/h36-full-coarse.json",
+   "licence": "follows its source: Carol M. Highsmith's photograph, Library of Congress (LC-DIG-highsm-19255), \"No known restrictions on publication\"; modified with the image generator in Codex (OpenAI); see NOTICE"
+  },
+  {
+   "task": "homer-daughter",
+   "name": "A Fisherman's Daughter, full size",
+   "width": 1462,
+   "height": 1082,
+   "coarse": {
+    "cols": 24,
+    "rows": 18
+   },
+   "style": "watercolor and gouache over faint pencil, no ink: three girls in straw hats seated on a stone wall looking at a lobster, an upturned boat and grass behind, a sandy shore in front (Winslow Homer)",
+   "medium": "pencil",
+   "source": "Winslow Homer, A Fisherman's Daughter, 1873, Cleveland Museum of Art 1943.660; CC0",
+   "distributed": true,
+   "file": "targets/homer-daughter.png",
+   "coarseFile": "targets/homer-daughter-coarse.json",
+   "licence": "CC0 (public domain)",
+   "unit": {
+    "sweeps": 5302,
+    "dryings": 15,
+    "waterSteps": 11320,
+    "from": "prepared homer-daughter at f58e226f (v0.4.0-rc.2): one full look of the automatic plan; its full-size painting counted 11321 water steps",
+    "cellsAcross": 731
+   }
+  },
+  {
+   "task": "fragonard",
+   "name": "Rinaldo in the Enchanted Forest, full size",
+   "width": 1462,
+   "height": 1068,
+   "coarse": {
+    "cols": 24,
+    "rows": 18
+   },
+   "style": "brown wash over chalk on buff paper, no ink: a helmeted knight with sword and shield fighting monsters in a forest, a winged figure and clouds above (Fragonard)",
+   "medium": "pencil",
+   "source": "Jean-Honore Fragonard, Rinaldo in the Enchanted Forest, brown wash over chalk; public domain",
+   "distributed": true,
+   "file": "targets/fragonard.png",
+   "coarseFile": "targets/fragonard-coarse.json",
+   "licence": "public domain",
+   "unit": {
+    "sweeps": 1028,
+    "dryings": 37,
+    "waterSteps": 8506,
+    "from": "prepared fragonard at 3b5366fe (v0.4.0-rc.3; none was prepared at rc.2): one full look of the automatic plan",
+    "cellsAcross": 731
+   }
+  },
+  {
+   "task": "manet-morisot-fan-crop-full",
+   "name": "Morisot with a Fan (detail), full size",
+   "width": 1367,
+   "height": 1150,
+   "coarse": {
+    "cols": 24,
+    "rows": 20
+   },
+   "style": "watercolor over traces of graphite on cream paper, no ink: a dark-haired woman in black, head and shoulders, leaning on one hand, against a green ground (Manet)",
+   "medium": "pencil",
+   "source": "Edouard Manet, Portrait of Berthe Morisot with a Fan, 1874 (a detail: head, shoulders and hand), Art Institute of Chicago 1963.812; CC0",
+   "distributed": true,
+   "file": "targets/manet-morisot-fan-crop-full.png",
+   "coarseFile": "targets/manet-morisot-fan-crop-full-coarse.json",
+   "licence": "CC0 (public domain)",
+   "subject": {
+    "id": "manet-morisot-fan-crop",
+    "sourceSha256": "9415a39d36460608767735eb62ebf76a64a94c378a1c62913b9c8360ddfd364e",
+    "sourcePx": [
+     2100,
+     1767
+    ],
+    "sheet": {
+     "rule": "quarter-sheet-area",
+     "widthMm": 355.42,
+     "heightMm": 299.06,
+     "cellMm": 0.26
+    }
+   },
+   "unit": {
+    "sweeps": 2133,
+    "dryings": 3,
+    "waterSteps": 2455,
+    "from": "prepared manet-morisot-fan-crop at bb0ac067: one full look of the automatic plan, 731 cells across at half size, on the sheet registered before the standard-sheet rule; for the runaway guard only. Read it again (--unit) from the folder prepared at the release tag",
+    "cellsAcross": 731
+   }
+  },
+  {
+   "task": "prout-laundresses-full",
+   "name": "Laundresses before the Wasserturm, full size",
+   "width": 1063,
+   "height": 1478,
+   "coarse": {
+    "cols": 24,
+    "rows": 33
+   },
+   "style": "watercolor with a broken brown pen line: a tall stone tower and half-timbered houses over a river arch, laundresses at the water's edge in front (Samuel Prout)",
+   "medium": "pen",
+   "source": "Samuel Prout, Laundresses before the Wasserturm, Nuremberg, National Gallery of Art, Washington 1988.20.35; public domain",
+   "distributed": true,
+   "file": "targets/prout-laundresses-full.png",
+   "coarseFile": "targets/prout-laundresses-full-coarse.json",
+   "licence": "public domain",
+   "subject": {
+    "id": "prout-laundresses",
+    "sourceSha256": "000bc08afc03f5403120227212ce47d4bc1c5978f45e396a7f629ed38af14715",
+    "sourcePx": [
+     2902,
+     4036
+    ],
+    "sheet": {
+     "rule": "quarter-sheet-area",
+     "widthMm": 276.38,
+     "heightMm": 384.38,
+     "cellMm": 0.26
+    }
+   },
+   "unit": {
+    "sweeps": 1730,
+    "dryings": 9,
+    "waterSteps": 4598,
+    "from": "prepared prout-laundresses-qs at 32698365: one full look of the automatic plan, 532 cells across",
+    "cellsAcross": 532
+   }
+  },
+  {
+   "task": "turner-esseillon-full",
+   "name": "The Fort of L'Esseillon, full size",
+   "width": 1515,
+   "height": 1037,
+   "coarse": {
+    "cols": 24,
+    "rows": 16
+   },
+   "style": "pure watercolor, no drawing: a fort on a mountain ridge above a deep gorge, snow peaks behind, in soft graded washes (Turner)",
+   "medium": "pencil",
+   "source": "J. M. W. Turner, The Fort of L'Esseillon, Val de la Maurienne, France, 1835-36, The Metropolitan Museum of Art 1972.118.293; CC0",
+   "distributed": true,
+   "file": "targets/turner-esseillon-full.png",
+   "coarseFile": "targets/turner-esseillon-full-coarse.json",
+   "licence": "CC0 (public domain)",
+   "subject": {
+    "id": "turner-esseillon",
+    "sourceSha256": "388de84e49931f6c757309c9d961f522956c8b1661a7f3b053f81df412ea8b76",
+    "sourcePx": [
+     3451,
+     2363
+    ],
+    "sheet": {
+     "rule": "quarter-sheet-area",
+     "widthMm": 393.9,
+     "heightMm": 269.71,
+     "cellMm": 0.26
+    }
+   },
+   "unit": {
+    "sweeps": 1301,
+    "dryings": 4,
+    "waterSteps": 2995,
+    "from": "prepared turner-esseillon at bb0ac067: one full look of the automatic plan, 731 cells across at half size, on the sheet registered before the standard-sheet rule; for the runaway guard only. Read it again (--unit) from the folder prepared at the release tag",
+    "cellsAcross": 731
+   }
+  },
+  {
+   "task": "white-ships-1488-full",
+   "name": "White Ships, full size (the larger file)",
+   "width": 1488,
+   "height": 1057,
+   "coarse": {
+    "cols": 24,
+    "rows": 17
+   },
+   "style": "pure watercolor, no ink: white sailing ships moored side by side, masts, rigging and reflections (after Sargent)",
+   "medium": "pencil",
+   "source": "John Singer Sargent, White Ships, 1908, Brooklyn Museum 09.846; public domain",
+   "distributed": true,
+   "file": "targets/white-ships-1488-full.png",
+   "coarseFile": "targets/white-ships-1488-full-coarse.json",
+   "licence": "public domain",
+   "subject": {
+    "id": "white-ships-1488",
+    "sourceSha256": "9049016f7929f49a78a15082ada6d73282c9ceaa12cfce93618c34ef0c7c3b77",
+    "sourcePx": [
+     1488,
+     1057
+    ],
+    "sheet": {
+     "rule": "quarter-sheet-area",
+     "widthMm": 386.88,
+     "heightMm": 274.82,
+     "cellMm": 0.26
+    }
+   },
+   "unit": {
+    "sweeps": 3233,
+    "dryings": 21,
+    "waterSteps": 12859,
+    "from": "prepared white-ships-1488-qs at 32698365: one full look of the automatic plan, 744 cells across",
+    "cellsAcross": 744
+   }
+  }
+ ]
+}

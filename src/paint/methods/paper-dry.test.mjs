@@ -11,7 +11,7 @@ test('whole-sheet dry certificate matches full measurements and reads only paper
     assert.equal(target, sheet); assert.deepEqual(rect, [0, 0, 3, 2]); assert.equal(paperOnly, true); reads++;
   }, ensureFresh() { assert.fail('pigment readback'); } };
   const actual = measurePaperDry(sheet);
-  const { waterP95, ...gate } = expected;
+  const { waterP95, waterP50, ...gate } = expected;
   assert.deepEqual(actual, gate);
   assert.equal(actual.dry, false, 'pore saturation must still reject a dry surface');
   sheet.s.fill(0);

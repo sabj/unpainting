@@ -1,6 +1,8 @@
 // Sheet physics kernels adapted from src/media/gpu/stepfull.wgsl.
 // Buffers are the sheet's fields, resident on the GPU; see gpu-sheet.js for the bindings and dispatch.
-export const WGSL = String.raw`// A whole stepBox (sheet.mjs) as gathers on 16x16 tiles: edge distance, drying and absorption, flow with pigment
+import { edgeFeedWgsl } from '../media/gpu/edge-feed-wgsl.js';
+import { filmLevelWgsl } from '../media/gpu/film-level-wgsl.js';
+export const WGSL = String.raw`// A whole stepBox (sheet.mjs) as gathers on 16x16 tiles: the pinned-edge feed, drying and absorption, flow with pigment
 // transport, pigment exchange, slide, capillary spread, wet fronts. The JS driver prepends 'struct U' and the
 // uniform binding (see gpu-sheet.js). Tiles that hold or border water are listed each step (tiles_*), the other kernels
 // run on that list by indirect dispatch, so a small wet passage costs a small dispatch. marangoni and slope are 0.
@@ -17,8 +19,6 @@ export const WGSL = String.raw`// A whole stepBox (sheet.mjs) as gathers on 16x1
 @group(0) @binding(8) var<storage, read> PAPER: array<vec4<f32>>;   // capacity, grain, fdx, fdy
 @group(0) @binding(9) var<storage, read> PAPER2: array<vec4<f32>>;  // perm +x, perm +y, unused, unused
 @group(0) @binding(10) var<storage, read> PAPER3: array<vec4<f32>>; // tooth, throat, valley-or-height, height
-@group(0) @binding(11) var<storage, read_write> EA: array<f32>;
-@group(0) @binding(12) var<storage, read_write> EB: array<f32>;
 @group(0) @binding(13) var<storage, read_write> G: array<f32>;
 @group(0) @binding(14) var<storage, read_write> P: array<f32>;
 @group(0) @binding(15) var<storage, read_write> D: array<f32>;
@@ -41,7 +41,6 @@ export const WGSL = String.raw`// A whole stepBox (sheet.mjs) as gathers on 16x1
 @group(0) @binding(32) var<storage, read_write> FLAGS2: array<atomic<u32>>;
 @group(0) @binding(33) var<storage, read_write> CTR: array<atomic<u32>, 12>;
 @group(0) @binding(34) var<storage, read_write> ARGS: array<u32, 9>;
-@group(0) @binding(35) var<storage, read_write> EDGE: array<f32>;  // the final edge distance: bound to whichever of EA, EB the last pass wrote
 
 @group(0) @binding(40) var<storage, read_write> PIG: array<atomic<u32>>;
 
@@ -66,7 +65,8 @@ fn tiles_build(@builtin(global_invocation_id) g: vec3<u32>) {
   let t = g.x; if (t >= u.ntiles) { return; }
   let tx = i32(t % u.tw); let ty = i32(t / u.tw);
   var on = false;
-  for (var dy = -1; dy <= 1; dy++) { for (var dx = -1; dx <= 1; dx++) {
+  let radius = i32(u.poreHalo);   // pore subcycles reach further than a tile
+  for (var dy = -radius; dy <= radius; dy++) { for (var dx = -radius; dx <= radius; dx++) {
     let xx = tx + dx; let yy = ty + dy;
     if (xx < 0 || yy < 0 || xx >= i32(u.tw) || yy >= i32(u.th)) { continue; }
     if (FLAGS[u32(yy) * u.tw + u32(xx)] != 0u) { on = true; }
@@ -129,7 +129,8 @@ fn pigment_masks(@builtin(global_invocation_id) g: vec3<u32>) {
   if (g.x >= u.ntiles) { return; }
   let tx = i32(g.x % u.tw); let ty = i32(g.x / u.tw); var bits = 0u;
   // A whole tile halo covers all neighbour gathers and both flow iterations.
-  for (var dy = -1; dy <= 1; dy++) { for (var dx = -1; dx <= 1; dx++) {
+  let radius = i32(u.poreHalo);
+  for (var dy = -radius; dy <= radius; dy++) { for (var dx = -radius; dx <= radius; dx++) {
     let x = tx + dx; let y = ty + dy;
     if (x >= 0 && y >= 0 && x < i32(u.tw) && y < i32(u.th)) { bits |= atomicLoad(&PIG[u32(y) * u.tw + u32(x)]); }
   } }
@@ -137,83 +138,14 @@ fn pigment_masks(@builtin(global_invocation_id) g: vec3<u32>) {
 }
 fn hasPigment(c: Cx, k: u32) -> bool { return u.p2 == 0u || (TL[u.ntiles + 1u + (c.y / 16u) * u.tw + c.x / 16u] & (1u << k)) != 0u; }
 
-// ---- edge distance ---------------------------------------------------------------------------------------------
-fn edgeAt(j: u32, prev: u32) -> f32 {   // prev: 0 = first pass (nothing computed yet), 1 = read EA, 2 = read EB
-  if (M[j] == 1u) { if (prev == 0u) { return u.capE; } if (prev == 1u) { return EA[j]; } return EB[j]; }
-  return select(0.0, u.capE, EVER[j] == 1u);
-}
-fn edgeNew(c: Cx, prev: u32) -> f32 {
-  var e = u.capE;
-  if (prev != 0u) { if (prev == 1u) { e = EA[c.i]; } else { e = EB[c.i]; } }
-  e = min(e, select(0.0, edgeAt(c.i - 1u, prev), c.x > 0u) + 1.0);
-  e = min(e, select(0.0, edgeAt(c.i - u.w, prev), c.y > 0u) + 1.0);
-  e = min(e, select(0.0, edgeAt(c.i + 1u, prev), c.x < u.w - 1u) + 1.0);
-  e = min(e, select(0.0, edgeAt(c.i + u.w, prev), c.y < u.h - 1u) + 1.0);
-  return e;
-}
-@compute @workgroup_size(16, 16)
-fn edge_first(@builtin(workgroup_id) wid: vec3<u32>, @builtin(local_invocation_id) lid: vec3<u32>) {
-  let c = cx(wid, lid); if (!c.ok || M[c.i] != 1u) { return; }
-  EB[c.i] = edgeNew(c, 0u);
-}
-@compute @workgroup_size(16, 16)
-fn edge_a2b(@builtin(workgroup_id) wid: vec3<u32>, @builtin(local_invocation_id) lid: vec3<u32>) {
-  let c = cx(wid, lid); if (!c.ok || M[c.i] != 1u) { return; }
-  EB[c.i] = edgeNew(c, 1u);
-}
-@compute @workgroup_size(16, 16)
-fn edge_b2a(@builtin(workgroup_id) wid: vec3<u32>, @builtin(local_invocation_id) lid: vec3<u32>) {
-  let c = cx(wid, lid); if (!c.ok || M[c.i] != 1u) { return; }
-  EA[c.i] = edgeNew(c, 2u);
-}
-// The chain is first -> EB, then b2a -> EA, a2b -> EB, ... ; 'EDGE' names whichever holds the last result
-
-// 1. drying and absorption: local dry-fraction edge scaling
-fn localDryFraction(cx: u32, cy: u32, r: i32) -> f32 {
-  var dryCount = 0.0;
-  var totalCount = 0.0;
-  let r2 = r * r;
-  let icx = i32(cx);
-  let icy = i32(cy);
-  for (var dy = -r; dy <= r; dy++) {
-    let dy2 = dy * dy;
-    let py = icy + dy;
-    let inY = py >= 0 && py < i32(u.h);
-    let row = select(0u, u32(py) * u.w, inY);
-    for (var dx = -r; dx <= r; dx++) {
-      if (dx * dx + dy2 <= r2) {
-        totalCount += 1.0;
-        let px = icx + dx;
-        if (!inY || px < 0 || px >= i32(u.w) || M[row + u32(px)] == 0u) {
-          dryCount += 1.0;
-        }
-      }
-    }
-  }
-  return select(0.0, dryCount / totalCount, totalCount > 0.0);
-}
-
 // ---- 1. drying and absorption ------------------------------------------------------------------------------------
 @compute @workgroup_size(16, 16)
 fn phase1(@builtin(workgroup_id) wid: vec3<u32>, @builtin(local_invocation_id) lid: vec3<u32>) {
   let c = cx(wid, lid); if (!c.ok || M[c.i] != 1u) { return; }
   let i = c.i;
-  let e = EDGE[i];
-  var near = 0.0;
-  if (e <= u.edgeWidth) {
-    let geomNear = 1.0 - (e - 1.0) / u.edgeWidth;
-    let mmPerCell = select(0.3, u.mmPerCell, u.mmPerCell > 0.0);
-    let r = i32(clamp(round(2.0 / mmPerCell), 2.0, 8.0));
-    let dryFrac = localDryFraction(c.x, c.y, r);
-    let fMin = select(0.18, 0.10, r <= 2);
-    let fMax = select(0.42, 0.28, r <= 2);
-    let u_step = clamp((dryFrac - fMin) / (fMax - fMin), 0.0, 1.0);
-    let dryFactor = u_step * u_step * (3.0 - 2.0 * u_step);
-    let edgeFlowDepth = u.edgeFlowDepth;
-    let depthFactor = select(1.0, clamp(W[i] / max(1e-5, edgeFlowDepth), 0.0, 1.0), edgeFlowDepth > 0.0);
-    near = geomNear * dryFactor * depthFactor;
-  }
-  let wv = max(0.0, W[i] - u.dt * (u.evap + u.edgeEvap * near));
+  WENT[i] = 0.0;
+  // the faster drying at a pinned edge is the edge feed's (media/gpu/edge-feed-wgsl.js), run before
+  let wv = max(0.0, W[i] - u.dt * u.evap);
   let a = min(min(u.dt * u.absorb, max(0.0, PAPER[i].x - S[i])), max(0.0, wv - u.film));
   var wn = wv;
   if (a > 0.0) {
@@ -272,7 +204,9 @@ fn pflux(f: f32, wi: f32, wj: f32, gi: f32, gj: f32, si: f32, sj: f32) -> f32 {
   let carryI = select(mi * mi, 1.0, mi >= 1.0); let carryJ = select(mj * mj, 1.0, mj >= 1.0);
   let carryM = min(carryI, carryJ);
   let ci = select(0.0, gi / wi, wi > 1e-6); let cj = select(0.0, gj / wj, wj > 1e-6);
-  return sgn * amt * select(cj * carryJ, ci * carryI, f > 0.0) + u.diffuse * (ci - cj) * mw * carryM;
+  // paint mixes out into a standing film (sheet.js filmDiffuse); the current carries the donor's concentration
+  var fd = 0.0; if (u.filmDiff > 0.0) { fd = min(0.2, u.filmDiff * min(1.0, mw / u.filmDepth)); }
+  return sgn * amt * select(cj, ci, f > 0.0) + (u.diffuse * carryM + fd) * (ci - cj) * mw;
 }
 @compute @workgroup_size(16, 16)
 fn pflux_k(@builtin(workgroup_id) wid: vec3<u32>, @builtin(local_invocation_id) lid: vec3<u32>) {
@@ -322,11 +256,11 @@ fn apply_water(c: Cx, first: bool) {
   if (M[i] != 1u) { return; }
   var dw = 0.0; var v = 0.0;
   var f = FX[i];
-  if (f != 0.0) { dw -= select(-1.0, 1.0, f > 0.0) * abs(f) * select(WSC[i + 1u], WSC[i], f > 0.0); v += abs(f); }
+  if (f != 0.0) { dw -= select(-1.0, 1.0, f > 0.0) * abs(f) * select(WSC[i + 1u], WSC[i], f > 0.0); v += abs(f) * select(WSC[i + 1u], WSC[i], f > 0.0); }
   f = FY[i];
-  if (f != 0.0) { dw -= select(-1.0, 1.0, f > 0.0) * abs(f) * select(WSC[i + u.w], WSC[i], f > 0.0); v += abs(f); }
-  if (c.x > 0u && M[i - 1u] == 1u) { f = FX[i - 1u]; if (f != 0.0) { dw += select(-1.0, 1.0, f > 0.0) * abs(f) * select(WSC[i], WSC[i - 1u], f > 0.0); v += abs(f); } }
-  if (c.y > 0u && M[i - u.w] == 1u) { f = FY[i - u.w]; if (f != 0.0) { dw += select(-1.0, 1.0, f > 0.0) * abs(f) * select(WSC[i], WSC[i - u.w], f > 0.0); v += abs(f); } }
+  if (f != 0.0) { dw -= select(-1.0, 1.0, f > 0.0) * abs(f) * select(WSC[i + u.w], WSC[i], f > 0.0); v += abs(f) * select(WSC[i + u.w], WSC[i], f > 0.0); }
+  if (c.x > 0u && M[i - 1u] == 1u) { f = FX[i - 1u]; if (f != 0.0) { dw += select(-1.0, 1.0, f > 0.0) * abs(f) * select(WSC[i], WSC[i - 1u], f > 0.0); v += abs(f) * select(WSC[i], WSC[i - 1u], f > 0.0); } }
+  if (c.y > 0u && M[i - u.w] == 1u) { f = FY[i - u.w]; if (f != 0.0) { dw += select(-1.0, 1.0, f > 0.0) * abs(f) * select(WSC[i], WSC[i - u.w], f > 0.0); v += abs(f) * select(WSC[i], WSC[i - u.w], f > 0.0); } }
   W[i] = max(0.0, W[i] + dw);
   WENT[i] = select(WENT[i] + 0.5 * v, 0.5 * v, first);
 }
@@ -349,27 +283,40 @@ fn apply_g(@builtin(workgroup_id) wid: vec3<u32>, @builtin(local_invocation_id) 
 }
 
 // ---- 3. pigment exchange ---------------------------------------------------------------------------------------
+// settling (src/media/settling.mjs): 1 - exp(-(v B / h + D / l^2) dt), B = 1 + gamma hollow, l = min(h, 0.02 mm)
+fn hollowAt(i: u32) -> f32 { let p = PAPER3[i]; return max(0.0, (u.toothLo + u.toothSpan * p.x - p.w) / u.hollowUnit); }
+fn settleShareG(v: f32, df: f32, gg: f32, hol: f32, Wi: f32) -> f32 {
+  let h = max(0.001, Wi); let l = min(h, 0.02);
+  let x = (v * (1.0 + gg * hol) / h + df / (l * l)) * u.dt;
+  if (x < 0.01) { return x * (1.0 - x * (0.5 - x / 6.0)); }
+  return 1.0 - exp(-x);
+}
 @compute @workgroup_size(16, 16)
 fn p3a(@builtin(workgroup_id) wid: vec3<u32>, @builtin(local_invocation_id) lid: vec3<u32>) {
   let c = cx(wid, lid); if (!c.ok || M[c.i] != 1u || RESIST[c.i] != 0u) { return; }
-  let i = c.i; let Wi = W[i]; let hh = PAPER3[i].z;
-  let thin = min(3.0, 0.12 / max(0.04, Wi));
+  let i = c.i; let Wi = W[i]; let hh = PAPER3[i].z; let hol = hollowAt(i);
   let ld = Wi / u.liftDepth; let wetting = select(ld * ld, 1.0, ld >= 1.0);
   let rewet = u.hasTop != 0u && Wi > u.film;
-  let turnover = select(0.0, min(1.0, WENT[i] / Wi), Wi > 1e-6);
+  let turnover = select(0.0, min(1.0, WENT[i] / Wi * (u.mmPerCell / 0.25)), Wi > 1e-6);   // scour per mm the water travels
   var settled = 0.0;
   if (u.granFill > 0.0) { for (var k = 0u; k < u.K; k++) { if (!hasPigment(c, k)) { continue; } settled += D[k * u.n + i]; } }
+  // the suspension's mean Stokes speed by mass (sheet.js coSettle: a mix's fine particles ride down on the coarse ones)
+  var vMix = 0.0;
+  if (u.coSettle > 0.0) {
+    var gm = 0.0;
+    for (var k = 0u; k < u.K; k++) { if (!hasPigment(c, k)) { continue; } let g = G[k * u.n + i]; vMix += g * pigB(k).x; gm += g; }
+    vMix = select(0.0, vMix / gm, gm > 0.0);
+  }
   for (var k = 0u; k < u.K; k++) { if (!hasPigment(c, k)) { continue; }
     let q = k * u.n + i;
     var Gk = G[q]; var Dk = D[q]; var top = 0.0;
     if (rewet) { top = TOP[q]; }
     if (Gk == 0.0 && Dk == 0.0 && !(rewet && top != 0.0)) { continue; }
-    let pa = pigA(k); let pb = pigB(k);   // pa: gg, liftOf, scourOf, rep;  pb: rho, omega, floc, mobility
-    let filled = select(hh, min(1.0, hh + settled * u.granFill), u.granFill > 0.0);
+    let pa = pigA(k); let pb = pigB(k);   // pa: gg, liftOf, scourOf, rep;  pb: Stokes speed (mm/s, times settle), omega, floc, mobility
     let gg = pa.x;
-    let down = Gk * max(0.0, 1.0 - filled * gg) * pb.x * u.settle * thin * u.dt;
+    let down = Gk * settleShareG(select(pb.x, (1.0 - u.coSettle) * pb.x + u.coSettle * vMix, u.coSettle > 0.0), pigC(k).x, gg, select(hol, hol * max(0.0, 1.0 - settled * u.granFill), u.granFill > 0.0), Wi);
     let shape = max(0.0, 1.0 + (hh - 1.0) * gg);
-    let up = Dk * shape * (pa.y * wetting * u.dt + pa.z * turnover * wetting);
+    let up = Dk * shape * (pa.y * wetting * u.dt + pa.z * turnover);
     let dn = min(Gk, max(0.0, down)); let uu = min(Dk, max(0.0, up));
     Dk += dn - uu; Gk += uu - dn;
     if (rewet) { let r = min(top, (top * u.rewetLift * u.dt) / pb.y); TOP[q] = top - r; Gk += r; }
@@ -378,7 +325,7 @@ fn p3a(@builtin(workgroup_id) wid: vec3<u32>, @builtin(local_invocation_id) lid:
   var gs = 0.0;
   for (var k = 0u; k < u.K; k++) { if (!hasPigment(c, k)) { continue; } gs += G[k * u.n + i]; }
   let hold = u.holdCap * Wi;
-  if (u.holdOn != 0u && gs > hold) {
+  if (u.holdOn != 0u && Wi < u.holdDepth && gs > hold) {   // only a film thinner than holdDepth strands its paint
     let f = 1.0 - hold / gs;
     for (var k = 0u; k < u.K; k++) { if (!hasPigment(c, k)) { continue; } let q = k * u.n + i; let q2 = G[q] * f; G[q] -= q2; D[q] += q2; }
   }
@@ -387,9 +334,9 @@ fn p3a(@builtin(workgroup_id) wid: vec3<u32>, @builtin(local_invocation_id) lid:
 fn dep_k(@builtin(workgroup_id) wid: vec3<u32>, @builtin(local_invocation_id) lid: vec3<u32>) {
   let c = cx(wid, lid); if (!c.ok || M[c.i] != 1u) { return; }
   var d = 0.0; for (var k = 0u; k < u.K; k++) { if (!hasPigment(c, k)) { continue; } d += D[k * u.n + c.i]; }
-  DEP[c.i] = u.slideFill * d;
+  DEP[c.i] = d;   // the deposit's height, unscaled: the slide scales it by its box's fill (fillAt)
 }
-fn surf(j: u32, fl: f32) -> f32 { return (1.0 - fl) * PAPER3[j].w + fl * PAPER3[j].x + DEP[j]; }
+fn surf(j: u32, fl: f32, fill: f32) -> f32 { return (1.0 - fl) * PAPER3[j].w + fl * PAPER3[j].x + fill * DEP[j]; }
 @compute @workgroup_size(16, 16)
 fn slide_out(@builtin(workgroup_id) wid: vec3<u32>, @builtin(local_invocation_id) lid: vec3<u32>) {
   let c = cx(wid, lid); if (!c.ok || !hasPigment(c, c.z) || M[c.i] != 1u) { return; }
@@ -399,12 +346,12 @@ fn slide_out(@builtin(workgroup_id) wid: vec3<u32>, @builtin(local_invocation_id
   let gg = pa.x;
   if (Wi <= 0.0 || gg <= 0.0 || Dk <= 0.0) { return; }
   let film = min(3.0, 0.12 / max(0.04, Wi)) * select(Wi / u.film, 1.0, Wi > u.film);
-  let here = surf(i, pb.z); let rep = pa.w;
+  let fill = fillAt(i); let here = surf(i, pb.z, fill); let rep = pa.w;
   var ex = vec4<f32>(0.0);
-  if (c.x < u.w - 1u && M[i + 1u] == 1u) { ex.x = max(0.0, here - surf(i + 1u, pb.z) - rep); }
-  if (c.x > 0u && M[i - 1u] == 1u) { ex.y = max(0.0, here - surf(i - 1u, pb.z) - rep); }
-  if (c.y < u.h - 1u && M[i + u.w] == 1u) { ex.z = max(0.0, here - surf(i + u.w, pb.z) - rep); }
-  if (c.y > 0u && M[i - u.w] == 1u) { ex.w = max(0.0, here - surf(i - u.w, pb.z) - rep); }
+  if (c.x < u.w - 1u && M[i + 1u] == 1u) { ex.x = max(0.0, here - surf(i + 1u, pb.z, fill) - rep); }
+  if (c.x > 0u && M[i - 1u] == 1u) { ex.y = max(0.0, here - surf(i - 1u, pb.z, fill) - rep); }
+  if (c.y < u.h - 1u && M[i + u.w] == 1u) { ex.z = max(0.0, here - surf(i + u.w, pb.z, fill) - rep); }
+  if (c.y > 0u && M[i - u.w] == 1u) { ex.w = max(0.0, here - surf(i - u.w, pb.z, fill) - rep); }
   let sum = ex.x + ex.y + ex.z + ex.w;
   if (sum <= 0.0) { return; }
   let moved = Dk * min(0.2, u.slide * gg * film * sum * u.dt);
@@ -451,11 +398,10 @@ fn pmove(a: u32, b: u32, dir: u32, base: u32, out: ptr<function, f32>, inn: ptr<
   if (ds <= 0.0) { return; }
   let q = P[base + a] * min(1.0, ds / S[a]);
   if (q == 0.0) { return; }
-  if (asDonor) { *out += q; }
-  else {
-    let catchF = select(u.wickFilter, 0.0, S[b] > u.capDelta * PAPER[b].x);
-    *inn += q * (1.0 - catchF); *dep += q * catchF;
-  }
+  // the fibres catch pore pigment at a dry front and it stays on the wet side, where the water left it
+  let catchF = select(u.wickFilter, 0.0, EVER[b] != 0u && S[b] > u.capDelta * PAPER[b].x);
+  if (asDonor) { *out += q; *dep += q * catchF; }
+  else { *inn += q * (1.0 - catchF); }
 }
 @compute @workgroup_size(16, 16)
 fn cap_p(@builtin(workgroup_id) wid: vec3<u32>, @builtin(local_invocation_id) lid: vec3<u32>) {
@@ -475,11 +421,10 @@ fn pmove_flux(a: u32, b: u32, ds: f32, base: u32, out: ptr<function, f32>, inn: 
   if (ds <= 0.0) { return; }
   let q = P[base + a] * min(1.0, ds / S[a]);
   if (q == 0.0) { return; }
-  if (asDonor) { *out += q; }
-  else {
-    let catchF = select(u.wickFilter, 0.0, S[b] > u.capDelta * PAPER[b].x);
-    *inn += q * (1.0 - catchF); *dep += q * catchF;
-  }
+  // the fibres catch pore pigment at a dry front and it stays on the wet side, where the water left it
+  let catchF = select(u.wickFilter, 0.0, EVER[b] != 0u && S[b] > u.capDelta * PAPER[b].x);
+  if (asDonor) { *out += q; *dep += q * catchF; }
+  else { *inn += q * (1.0 - catchF); }
 }
 @compute @workgroup_size(16, 16)
 fn cap_sp(@builtin(workgroup_id) wid: vec3<u32>, @builtin(local_invocation_id) lid: vec3<u32>) {
@@ -524,7 +469,7 @@ fn p5a(@builtin(workgroup_id) wid: vec3<u32>, @builtin(local_invocation_id) lid:
   var s = max(0.0, S2[i]);
   if (W[i] <= u.wetEps && s > 0.0 && (M[i] == 1u || nearWet(c.x, c.y))) {
     var d = min(s, u.dt * u.paperDry);
-    if (s - d <= 0.02 * PAPER[i].x) { d = s; }
+    if (d > 0.0 && s - d <= 0.02 * PAPER[i].x) { d = s; }   // as sheet.mjs: with no drying (paperDry 0) a trace stays
     let f = d / s; s -= d;
     for (var k = 0u; k < u.K; k++) { if (!hasPigment(c, k)) { continue; } let q = k * u.n + i; let qq = P[q] * f; P[q] -= qq; D[q] += qq; }
   }
@@ -634,4 +579,19 @@ fn unpack_rect(@builtin(global_invocation_id) g: vec3<u32>) {
   }
   if (M[i] == 1u || S[i] > 0.02 * PAPER[i].x) { atomicOr(&FLAGS2[(y / 16u) * u.tw + x / 16u], 1u); }
 }
-`;
+
+// ---- pore subcycles: publish one pass before the next gathers it (no drying or wet fronts here) ------------------
+@compute @workgroup_size(16, 16)
+fn cap_commit(@builtin(workgroup_id) wid: vec3<u32>, @builtin(local_invocation_id) lid: vec3<u32>) {
+  let c = cx(wid, lid); if (!c.ok) { return; }
+  let i = c.i;
+  for (var k = 0u; k < u.K; k++) { if (!hasPigment(c, k)) { continue; } let q = k * u.n + i; P[q] = max(0.0, PN[q]); D[q] += DD[q]; DD[q] = 0.0; }
+  S[i] = max(0.0, S2[i]);
+}
+// a latched surface batch (surface_boundary) leaves the rest of its queued steps alone, the edge feed's too
+fn efHalted() -> bool { return atomicLoad(&CTR[8]) != 0u && atomicLoad(&CTR[11]) != 0u; }
+// what the boxes and levelling (media/gpu/film-level-wgsl.js) ask of the sheet: the lab keeps OUT4 whole and no fixed bed
+fn o4get(q: u32) -> vec4<f32> { return OUT4[q]; }
+fn o4set(q: u32, v: vec4<f32>) { OUT4[q] = v; }
+const FIXED_BED: bool = false;
+` + edgeFeedWgsl({ channel: 'physicalChannel', count: 'u.p3' }) + filmLevelWgsl({ channel: 'physicalChannel', count: 'u.p3' });

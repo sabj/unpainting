@@ -3,7 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { paperOf, pickPalette } from './palettepick.mjs';
 import { paletteOf } from './palette.mjs';
-import { widePalette, localColours, kmeans, splitByPuddle, puddleLabels, coverKeyHues, keyHueCoverage } from './palettewide.mjs';
+import { widePalette, localColours, kmeans, splitByPuddle, puddleLabels, mergeCloseColours, coverKeyHues, keyHueCoverage } from './palettewide.mjs';
 import { sampleSource } from './boxpick.mjs';
 import { BOX } from './box.mjs';
 
@@ -76,6 +76,37 @@ test('splitByPuddle cuts a component by colour and folds slivers into a neighbou
   assert.equal(r.areas[1] + r.areas[2], w * h);
   assert.equal(r.labels[0], r.labels[1]);
   assert.notEqual(r.labels[0], r.labels[9]);
+});
+
+test('splitByPuddle never leaves a piece a wash would drop: a sliver too thin to hold a wash joins its neighbour', () => {
+  // a 24 x 12 component of three colours; the middle colour is a strip two cells wide, long but thin
+  const w = 24, h = 12, labels = new Int32Array(w * h).fill(1), puddles = new Uint8Array(w * h);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) puddles[y * w + x] = x < 11 ? 0 : x < 13 ? 1 : 2;
+  const keep = (r, thin) => { // every piece: area at least `small` and twice its area over its boundary cells at least `thin`
+    const area = new Map(), edge = new Map();
+    for (let i = 0; i < w * h; i++) { const p = r.labels[i]; if (!p) continue; area.set(p, (area.get(p) ?? 0) + 1); const x = i % w; if ([x ? i - 1 : -1, x < w - 1 ? i + 1 : -1, i >= w ? i - w : -1, i + w < w * h ? i + w : -1].some(j => j < 0 || r.labels[j] !== p)) edge.set(p, (edge.get(p) ?? 0) + 1); }
+    return [...area].every(([p, a]) => a >= 6 && 2 * a / edge.get(p) >= thin);
+  };
+  const plain = splitByPuddle(labels, puddles, w, h, 6);
+  assert.equal(plain.count, 3, 'without the thin rule the strip is a piece of its own');
+  assert.equal(keep(plain, 4), false);
+  const merged = splitByPuddle(labels, puddles, w, h, 6, { thin: 4 });
+  assert.equal(merged.count, 2);
+  assert.ok(keep(merged, 4));
+  let covered = 0; for (let i = 0; i < w * h; i++) if (merged.labels[i]) covered++;
+  assert.equal(covered, w * h, 'every cell of the uncut wash is covered by exactly one cut wash');
+});
+
+test('puddles the eye cannot tell apart are one wash, and a different colour stays its own', () => {
+  const pigments = [{ K: [0.05, 0.6, 0.5], S: [0.02, 0.02, 0.02] }, { K: [0.5, 0.2, 0.05], S: [0.02, 0.02, 0.02] }], paper = [252, 251, 248];
+  // three puddles over 6 cells: a rose, the same rose with a hair of the other pan, and a blue
+  const centres = [[0.97, 0.03], [0.96, 0.04], [0.05, 0.95]], labels = Uint8Array.of(0, 0, 0, 1, 1, 2), A = new Float32Array(12);
+  labels.forEach((c, i) => { A[i * 2] = centres[c][0] * 0.8; A[i * 2 + 1] = centres[c][1] * 0.8; });
+  const r = mergeCloseColours({ labels, centres }, A, 2, pigments, paper);
+  assert.equal(r.merged, 1);
+  assert.equal(r.labels[3], r.labels[0], 'the near rose joins the larger puddle');
+  assert.notEqual(r.labels[5], r.labels[0], 'the blue is its own wash');
+  assert.equal(mergeCloseColours({ labels, centres }, A, 2, pigments, paper, { de: 0 }).merged, 0);
 });
 
 test('puddle labels follow the amounts', () => {

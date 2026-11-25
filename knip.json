@@ -7,9 +7,8 @@
     "bench/v4v5/**/*.mjs",
     "demos/lab/lab.js",
     "demos/lab/worker.js",
-    "src/paint/techniques/passages/*.mjs",
-    "src/media/gpu/batch-server.mjs",
-    "src/media/gpu/web-brush.mjs"
+    "demos/lab/strokes/strokes.js",
+    "demos/lab/strokes/bench-worker.js"
   ],
   "project": [
     "src/**/*.mjs",
@@ -19,11 +18,13 @@
   ],
   "ignore": [
     "bench/v2/kit/**",
-    "bench/scripts/dry-painter.mjs"
+    "bench/scripts/dry-painter.mjs",
+    "bench/v3/tips/**"
   ],
   "ignoreBinaries": [
     "codex",
-    "ffmpeg"
+    "ffmpeg",
+    "sandbox-exec"
   ],
   "ignoreIssues": {
     "src/media/sheet-size.mjs": [

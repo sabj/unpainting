@@ -1,168 +1,91 @@
-# Running the painter
+# Getting started
 
-You need [Node.js](https://nodejs.org/en/download) 25 or later; check with `node --version`. Install ffmpeg with your package manager to write the animation, or pass `--video 0` to paint without it. The painter uses WebGPU when an adapter is available and falls back to the CPU otherwise. Install the dependencies in the repository root with `npm ci`.
+Needs [Node.js](https://nodejs.org/en/download) 25 or later and `npm ci`. `ffmpeg` makes the MP4 videos (`--video 0` skips them). The painter uses WebGPU when there is an adapter; `--gpu auto` falls back to the CPU.
 
 ## Examples
 
-Each image example needs an empty output folder. On a repeat run, move the previous folder aside or pass a fresh `--out`.
-
-| Command | Input |
-|---|---|
-| `npm run example` / `npm run quick-start` / `npm run example:plan` | the stroke plan `examples/plans/graded-wash.json` |
-| `npm run example:drawing` | Tiepolo, Punchinello's Children Begging for Sweets, 360 px |
-| `npm run example:portrait` | Sargent, A Tramp, 360 px |
-| `npm run example:animal` | Tiepolo, Punchinello Riding a Camel, 360 px |
-| `npm run example:architecture` | Trumbull College, 360 px |
-
-The image planner is experimental. The stroke plan is the small, reproducible demonstration of brushwork and drying. The paintings in the README come from separate whole-painting plans; see [Painting sequences](examples.md).
-
-The default recipe, a preset of painter settings, opens with a light pencil drawing and has no closing pen. `--inkrecipe wash` draws a pen-and-wash drawing, and `--inkrecipe auto` uses it only when the target shows pen line ([Ink](ink.md#pen-and-wash-ink)); both are off by default. `--outlinemedium ink|graphite|auto` sets the medium; `auto` picks ink when the target shows its own pen line (0.5% of cells or more, `--penfirst`). `--drawing first|last|both|none|detect` sets the order.
-
-Line models extract candidate lines. The trained line models in `tools/seg/` are optional: without them the painter finds lines with its own ink separator and line tracer ([ink.md](ink.md#where-the-lines-come-from)). The plan chooses whether and how to draw them. A value plan, which describes regions and painting styles, has a `drawing` section that sets the medium, ink colour, amount, line set, weight and closing lines ([plan-format.md](plan-format.md#value-plans-the-drawing-section)), and a flag on the command line still overrides it.
-
-The default physical sheet fits the target inside a 6 x 4 in postcard turned to its orientation. Width and height follow the target's proportions within that box. `--sheetmm 152.4` explicitly fixes the width at 152.4 mm instead. `--width` sets the planning grid width in cells, the simulation grid squares. A larger export does not change the physical paper size. The paper is cold-press, with a textured surface and physical fibers by default; `--paper flat` and `--paperphysical 0` turn them off.
-
-The image examples write to ignored `work/<name>/` folders:
-
-- `painting.jpg` and `painting.png`: the dried sheet
-- `painting.mp4` and `f0000.jpg` onward: the animation
-- `plan.jpg`: the plan
-- `ink.jpg` and `wash.jpg`: the drawing snapshot and its positive difference from the final sheet; with `--drawing both`, closing ink remains in `wash.jpg` ([ink.md](ink.md))
-- `frames.json` and JSON records of what the brush did
-- `target-guard.json` and `cheat-risk.json`: the record of blocked target-pixel reads and the cheat-risk score ([honesty.md](honesty.md))
-
-The stroke-plan example writes `result.png` and `run.json` to `work/plan-graded-wash/`, with no animation. To choose its output folder:
-
 ```sh
-node tools/run-plan.mjs examples/plans/graded-wash.json --out work/plan-graded-wash
+npm run quick-start        # a stroke plan: work/plan-graded-wash/result.png, five seconds, no GPU needed
+npm run example:animal     # Tiepolo, Punchinello Riding a Camel: a pen drawing and one simplified picture
+npm run example:portrait   # Sargent, A Tramp: one simplified picture, no drawing
 ```
 
-`npm run example`, `npm run quick-start` and `npm run example:plan` paint the same plan:
-
-```sh
-node tools/run-plan.mjs examples/plans/graded-wash.json
-```
-
-It uses five paths: one clean-water preparation and four paint strokes in one connected wet wash, followed by drying. It checks the paper before each command and writes no animation; ffmpeg is not needed.
+A run does not overwrite an earlier run's folder: name a new `--out`. Finished examples are in `examples/output/`. Stroke plans are described in [plan format](plan-format.md).
 
 ## Your own image
 
-Use a JPEG or PNG as the target:
+A painting needs the picture, a line drawing file and one or more studies. A study is a simplified version of the picture in flat colours.
+
+1. Ask an image model for a clean line drawing of the picture, black on white, at its proportions. Trace and order it ([tools/seg](../tools/seg/README.md); needs Python with numpy and OpenCV):
+
+   ```sh
+   python3 tools/seg/trace-drawing.py drawing.png --out work/lines/picture-traced --target picture.jpg --sheetmm 152 --medium ink
+   node tools/seg/order-strokes.mjs work/lines/picture-traced-lines.json work/lines/picture --sheetmm 152
+   ```
+2. Ask an image model for the picture simplified to flat shapes at the same proportions: one study, or several from coarse to fine.
+3. Paint:
+
+   ```sh
+   node tools/paint-plate.mjs --image picture.jpg --width 540 --mode fast \
+     --drawingfile work/lines/picture --inkrecipe wash \
+     --washplan study.png --out work/my-picture --video 0
+   ```
+
+The painter first splits the picture into regions. This needs a model called SAM and its Python ([setup](../tools/seg/README.md#segmentation)). `npm run doctor` says what is missing. That Python also runs the benchmark's scorer: `export BENCH_SCORE_PYTHON=$PWD/.venv-seg/bin/python`. The painter refuses to paint from uncommitted source changes unless `--allowdirty 1`.
+
+- `--drawingfile STEM`: the lines, drawn as they are. Without it no line is drawn. `--inkrecipe wash` draws them in pen; the default is pencil ([ink](ink.md)).
+- `--washplan STUDY.png[:MIN[:glaze]],...`: the studies, coarse to fine. `MIN` is the smallest shape in mm² that study lays; each later study adds only what is darker.
+- `--width` is the sheet's width in cells, the small squares the simulator tracks. It cannot be more than the picture's width in pixels. `--sheetmm` is the sheet's width in millimetres. The default sheet is a 6 × 4 inch postcard.
+
+`--out` gets `painting.png`, the video (`painting.mp4`, the frames `f0000.jpg` onward, and `frames.json`), `ink.jpg`, `wash.jpg` and the guard's records ([honesty](honesty.md)). Every run also records the versions and commit it used ([src/painter-version.mjs](../src/painter-version.mjs)).
+
+## The benchmark's pictures
+
+`npm run unpaint -- paint` (the same as `npm run paint`) paints one of the benchmark's pictures on a quarter-size sheet, on the GPU. The pictures are listed in `SUBJECTS.json`, in a folder of inputs that is not in the repository. [bench/inputs-manifest.json](../bench/inputs-manifest.json) lists every file in it with its checksum.
 
 ```sh
-node tools/paint-plate.mjs --image path/to/picture.jpg --width 540 \
-  --mode fast --out work/my-picture --video 0
+export UNPAINT_SUBJECTS=<inputs folder>/SUBJECTS.json
+node tools/prepare/manifest.mjs verify bench/inputs-manifest.json --root <inputs folder>
+npm run doctor                               # clean checkout, Python environments, SAM checkpoint, 20 GB free
+node tools/paint/run-sets.mjs check core     # are all the pictures and their inputs there?
+
+npm run unpaint -- paint mittens-closeup-qs plan                             # Auto's plan, on the CPU
+npm run unpaint -- paint mittens-closeup-qs paint --out work/mittens-auto    # Auto's painting
 ```
 
-Open `work/my-picture/painting.png`. Choose a fresh output folder for each run. The painter refuses to run from uncommitted source changes unless you pass `--allowdirty 1`. To save an animation too, install ffmpeg and remove `--video 0`.
+A run folder holds `run.json`, `plate/` (the painting and its video), `usage.json` and `sheet.jpg`. Run `npm run paint` with no arguments to see every option. A full-size painting takes about 13 minutes on a Mac mini.
 
-The painter runs its default recipe unless told otherwise: light-to-dark value planning with shaped marks, a pencil drawing first, and two passes of touch-up glazes on physical cold-press paper. `--recipe none` paints with the settings used without a preset. A value plan (`--valueplan`) names the subject and its regions; Trumbull's is `examples/plans/trumbull-values.json`. The default uses no setting fitted to one benchmark image. A plan opts into fitted settings with `"presets"`, for example `["architecture"]`; Trumbull's plan names `architecture` and `glaze-gains`. Its `washes.paints` fixes a palette of seven paints. `--recipe default+architecture` does the same from the command line. `--recipe v096` is painter V096's recipe, which runs the fitted settings on every subject. A plan selecting `ink-and-wash` uses a lean fitted palette, source-toned paper and nested value washes. [Tuned settings](techniques.md#tuned-settings) lists every preset and fitted item.
+## A model as the painter
 
-`tools/paint-plate.mjs` has many experimental flags documented in the modules that read them. `--areahelp` prints only the area-plan contract. The main controls are listed below. Try `--width 240` for a quick run. `examples/output/` holds saved outputs from the examples, made with release 0.1.0 (painter V096, sim 100). Release 0.3.0 is painter V102, sim 103, and the 0.3.1 candidate is V104, sim 104; those saved images retain their original version stamps.
-
-## Main command-line controls
-
-Flags use `--name value`. The last repeated flag wins. Recipe flags come first, value-plan drawing flags next, and explicit command-line flags last. `--recipe none` removes recipe flags but still applies the plan's drawing section. An area plan with no named recipe also uses bare defaults.
-
-| Flag | Values | Bare default | Default recipe |
-|---|---|---|---|
-| `--image` | target image path | required | required |
-| `--out` | output directory | `work/plate` | same |
-| `--width` | planning width in cells | 700 | same |
-| `--mode` | `fast`, `full` | `fast` | same |
-| `--recipe` | `default`, `penwash`, `v096`, `person`, `none`, each optionally followed by `+<preset>` | omitted selects `default` | `default` |
-| `--order` | `painter` (light-to-dark shapes), `ladder` (successive value layers), `legacy-painter` (region-by-region order) | `painter` (value planner) | same |
-| `--valueplan` | JSON path; see [plan-format.md](plan-format.md#value-plan-input) | none | none |
-| `--areaplan` | JSON path; `--areahelp` prints its contract | none | none |
-| `--drawing` | `first`, `last`, `both`, `none`, `detect` | `first` | `first`; `--recipe v096` uses `both` |
-| `--outlinemedium` | `auto`, `ink`, `graphite`, or a material profile name | `graphite` | same; plan may override |
-| `--drawingstages` | `auto`, `off`: per-image pencil and ink stages when there is no prepared drawing | `auto` | same |
-| `--inkprofile` | `sepia-ink`, `black-ink` | style ink or sepia | same; plan may override |
-| `--inkk`, `--inkkscale` | three positive comma-separated absorption values; scale factor | profile absorption; scale 1 | same; plan may override |
-| `--sheetmm` | physical width in mm | 152.4; physical brushes fit to postcard if omitted | postcard fit if omitted |
-| `--physical` | `0`, `1` | `0` | `1` |
-| `--gpu` | `auto`, `on`, `off` | `auto` | same |
-| `--gpustrokes` | `0`, `check`; omit for normal GPU dispatch | normal dispatch | same; see [CLOUD.md](CLOUD.md#cpu-or-gpu) |
-| `--runcache` | `0`, `1`: reuse matching deterministic preparation | `1` | same |
-| `--speedvaluecache` | `0`, `1`: reuse matching value-plan preparation | `1` | same |
-| `--washsession` | `0`: dry before each shape; `1`: keep a pass wet; `2`: also join compatible passes | `1` in fast mode with `--valueplan`, otherwise `0` | same |
-| `--video` | `0`, `1` | `1` | same |
-| `--frames` | target wash frame count | 40 | 8 |
-| `--marks` | `0`, `1` | `0` | `1` |
-| `--canarystop` | `0`, or a planned pass number N: save `canary-pass-N.png` and `canary.json` after pass N and stop before `painting.png` | `0` | same |
-| `--notargetlooks` | `0`, `1`: paint with the charges frozen at planning and no painting-time reference look ([plan-format.md](plan-format.md)) | `0` | same |
-| `--washinkfile` | line-file base: the target's own ink removed from wash demand under `--washinkfree 1`, when the pen draws a different (cleaner) file | the `--drawingfile` | same |
-| `--paintguard` | dE00 threshold; `0` is off. It checks a box forced with `--paints` or `washes.paints`. A box this much worse than the painter's own pick is changed as `--paintguardmode` says. `run-card.json` records the decision | `0` | same |
-| `--paintguardmode` | `add` (add the own pick's paints; merge if that cannot close the gap), `merge` (the own pick plus the forced paints that still fit), `replace` (the own pick) | `add` | same |
-| `--paintguardmax` | most paints after `add` or `merge` | `8` | same |
-| `--paintsextend` | `0`, `1`: a box named with `--paints` gains up to two pans for a hue cluster of at least 2% of the picture that it cannot reach; `0` keeps the box as named | `1` | same |
-| `--instrumentcal` | `0`, `1`: a dry-paper passage whose brush water or pass count differs from its stock technique is charged from a scrap swatch laid with its own water and passes; `0` charges it from the stock swatch of its technique's name | `0` (off; the glaze fix delivers the full charge, and the base recipe's dark and cool gains of 1.3 were not removed, so it paints too dark with them) | same |
-| `--techcal` | `0`, `1`: charge each technique in the dark bands for what the sheet showed it lays | `0` | same |
-| `--techcalfrom`, `--techcalmax`, `--techcalmin` | first value band calibrated; factor clamp | `4`, `2.5`, `0.8` | same |
-| `--deliveryreport` | `0`, `1`: write `delivery-by-band.json`, pigment delivered over booked by booked amount | `0` | same |
-
-`fast` approximates the final part of ordinary drying; `full` keeps the full drying schedule. They need not produce the same pixels. [techniques.md](techniques.md) lists the other recipe flags and off switches. There is no complete reference for every experimental flag. Unknown recipe names stop with an error.
-
-In 0.3.0, run caches reuse preparation keyed by source inputs, relevant code and options. They do not replace painting with a saved final image. Use `--runcache 0` for a cold comparison. For a value plan, also set `--speedvaluecache 0` if you want to disable its separate preparation cache.
-
-Fast value-plan runs keep a pass wet by default (`--washsession 1`). This changes drying boundaries and can change pixels; `--washsession 0` starts each shape dry. Compare the same mode, seed and wash-session setting when measuring an implementation change.
-
-Use `--gpu on` when a GPU is required. Inspect the adapter identity in `backend.json`: the word `gpu` alone does not exclude a software adapter such as llvmpipe. [Cloud rendering](CLOUD.md#cpu-or-gpu) covers NVIDIA/Vulkan setup.
-
-Source-line extraction is an explicit choice (`--linesource auto` or `source-ink`), and final darks need `--finaldarks 1`. Without a prepared drawing or these options, the bounded drawing path runs.
-
-## Agent skills
-
-The [painting-planner](../.agents/skills/painting-planner/SKILL.md) and [watercolor-technique](../.agents/skills/watercolor-technique/SKILL.md) skills live in `.agents/skills/`. Read both before planning a painting. Claude Code reads the same files through the `.claude/skills` symlink.
-
-## Tests
+`--author KEY` names a model from [tools/paint/authors.json](../tools/paint/authors.json). The model is called through its own command-line tool (`claude`, `codex`, `agy` or `muse`), which must be installed and signed in. `--level` sets what it is given ([rules](../bench/docs/rules.md)).
 
 ```sh
-npm test
+npm run unpaint -- prepare mittens-closeup-qs --pool local    # once per commit: makes Auto's plan, the traced shapes and Auto's painting
+S=mittens-closeup-qs M=neon-m
+npm run unpaint -- paint $S paint --author $M --level L1 --work rounds --wallminutes 60 --out work/$M-L1
+npm run unpaint -- paint $S paint --author $M --level L2 --work rounds --wallminutes 60 --out work/$M-L2
+npm run unpaint -- paint $S paint --author $M --level L3 --work rounds --wallminutes 60 --out work/$M-L3
+npm run unpaint -- paint $S preflight --author $M             # before L4: can its tool open a picture and write a file?
+npm run unpaint -- paint $S paint --author $M --level L4 --wallminutes 60 --out work/$M-L4
 ```
 
-CI runs the Node suite and `npm run bench:test`. Both fail on any test failure.
+- L1 to L3 are a fixed back-and-forth conversation with no shell. `--author dry-rounds` is a script that calls no model, for testing.
+- L4 is an open session in a sandboxed folder, with a shell and tools. It needs macOS, for `sandbox-exec`.
+- Add `--dry-run` to print what would run. The full-size final is painted after the model hands in.
+- `--author script:FILE.json` paints a kept script without calling a model (add `--lines standard` to use the picture's own drawing); `--from DIR` paints what an earlier run's sessions handed in.
 
-## Paint Lab
+Scoring and the whole benchmark at once: [bench/README.md](../bench/README.md#run-it).
 
-Paint Lab is the browser version of the paper, brushes, pen and pencil. It is a static page in [demos/lab/](../demos/lab/), live at <https://sabj.github.io/unpainting/demos/lab/>. Serve `demos/` with any static server:
+## Your own picture and your own model
 
-```sh
-python3 -m http.server 8000 --directory demos
-# Open the server address printed in the terminal.
-```
+A picture: [tools/prepare](../tools/prepare/README.md) makes its drawing, simplified versions and named parts, and adds it to the list. It then paints by its id like the others.
 
-The picker offers blank paper, technique demonstrations and two recorded paintings, the Yale gateway (h36-a) and White Ships, listed in `demos/lab/examples/recorded.json`. Live mode re-runs a recording's material events in the simulator, and Carry on painting keeps that sheet. No image upload is offered. `?example=<id>` opens an example. `?physics=cpu` or `?nowebgpu=1` uses the CPU sheet instead of WebGPU.
+A model: add `{"key", "name", "id", "effort", "cli"}` to `tools/paint/authors.json`, with `cli` one of `claude`, `codex`, `agy` or `muse`. A tool of another provider needs its call in `tools/paint/rounds-call.mjs` (fixed rounds) and `tools/paint/session.mjs` (the open session), and its hosts in `tools/paint/session-net.mjs`. Run `preflight` before the first real session.
 
-Paint Lab paints with the painter's own paper, sheet, brush, pen and pencil: `node tools/lab/sync-site-media.mjs` copies them from `src/media/` into `demos/lab/media/`. Run it after changing `src/media/`; `npm test` fails while the copy is stale.
+## More than one machine
 
-The full live tapes are rebuilt as described below.
+`UNPAINT_RENDER=pool` sends test and final paintings to a pool of machines. The pool can be this Mac, a Mac mini over ssh or rented RunPod GPUs. Manage the rented GPUs with `npm run unpaint -- pods status|dry-run|start|stop`, which needs `RUNPOD_API_KEY`. `npm run unpaint -- status` shows the pool.
 
-## Unused-code checks
+On Linux, WebGPU needs an NVIDIA Vulkan driver. Run with `DAWN_FLAGS=backend=vulkan --gpu on`. Then check that `backend.json` names a real GPU, not `llvmpipe`.
 
-Run `npx knip` from the repository root. The configuration includes benchmark commands copied into temporary worktrees: `bench/v4v5/paint.mjs`, `bench/v4v5/tools/*.mjs`, and `bench/scripts/pipeline/dry-planner.mjs`.
-
-Paint Lab copies `src/media` through `tools/lab/sync-site-media.mjs`. The source `permeability` export is used by the browser GPU sheet through that copy. Generated `cpu-stroke-dirty.js` keeps the source exports for synchronization. The generated sheet's optional `sheet-par.mjs` import is Node-only; Paint Lab does not enable CPU threads. `ffmpeg` and `codex` are external executables, not npm dependencies.
-
-### Complete stroke-budget studies
-
-`--strokebudget 250` (or `2500`) plans a complete picture within that many
-physical brush, pen and graphite strokes, including clean-water brush marks.
-The default is `0` (off).
-Budgets must be integers of at least 25. Use `--marks 1 --video 0` to save the
-full material tape and stage frames without encoding a movie.
-
-The planner reduces drawing share and value layers, keeps the colour channels
-of each selected passage together, and covers passages with fewer, broader
-lanes. Optional touch-ups and edge-softening marks yield to that budget.
-It does not stop an ordinary painting after its first N marks. Small passages
-and exhausted drawing candidates can finish slightly below the requested limit.
-`stroke-budget.json` records the actual counts; exceeding the limit fails the run.
-
-Paint Lab's complete study tapes retain native resolution, physical paper,
-pigments, full-precision geometry, flow timing and drying/fixing. The final
-checkpoint includes trailing drying and mask removal. Rebuild with
-`tools/lab/build-live-examples.mjs` (four run directories) followed by
-`tools/lab/build-live-checkpoints.mjs`. `tools/lab/compare-live.mjs RUN OUT`
-compares the shared Live executor to the painter's `painting.png` in RGB units
-from 0 to 255, writing numerical results and a side-by-side PNG.
+[Paint Lab](../demos/lab/README.md) runs the paper, brushes and pen in the browser: `python3 -m http.server 8000 --directory demos`.

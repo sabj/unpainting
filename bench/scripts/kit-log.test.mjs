@@ -26,21 +26,21 @@ kit.dryAll(sheet, O);
 await kit.finish('test');
 `;
 
-function paint(noLog) {
+function paint(noLog, script = SCRIPT, film = false) {
   const ws = fs.mkdtempSync(path.join(os.tmpdir(), 'kitlog-'));
   try {
-    fs.symlinkSync(path.join(REPO, 'src'), path.join(ws, 'src'));
+    fs.symlinkSync(path.join(REPO, 'src'), path.join(ws, 'src')); fs.symlinkSync(path.join(REPO, 'tools'), path.join(ws, 'tools'));
     fs.symlinkSync(path.join(REPO, 'node_modules'), path.join(ws, 'node_modules'));
     fs.copyFileSync(path.join(REPO, 'package.json'), path.join(ws, 'package.json'));
     const wb = path.join(ws, 'bench'); fs.mkdirSync(path.join(wb, 'tasks'), { recursive: true });
     for (const f of ['kit.mjs', 'guard.mjs']) fs.copyFileSync(path.join(V2, 'kit', f), path.join(wb, f));
     fs.copyFileSync(path.join(V2, 'targets', 'sargent-coarse.json'), path.join(wb, 'tasks', 'sargent-coarse.json'));
-    fs.writeFileSync(path.join(wb, 'paint.mjs'), SCRIPT);
-    const env = { ...process.env, BENCH_SEED: '7' }; delete env.BENCH_NO_STROKELOG; if (noLog) env.BENCH_NO_STROKELOG = '1';
-    execFileSync('node', ['paint.mjs'], { cwd: wb, env, stdio: 'pipe' });
+    fs.writeFileSync(path.join(wb, 'paint.mjs'), script);
+    const env = { ...process.env, BENCH_SEED: '7' }; delete env.BENCH_NO_STROKELOG; if (noLog) env.BENCH_NO_STROKELOG = '1'; if (film) delete env.BENCH_NO_FILM;
+    const said = execFileSync('node', ['paint.mjs'], { cwd: wb, env, stdio: 'pipe' });
     const out = path.join(wb, 'out', 'sargent');
     const read = f => (fs.existsSync(path.join(out, f)) ? fs.readFileSync(path.join(out, f)) : null);
-    return { final: read('final.png'), log: read('strokes.jsonl.gz'), stats: JSON.parse(read('stats.json')) };
+    return { final: read('final.png'), log: read('strokes.jsonl.gz'), stats: JSON.parse(read('stats.json')), said: said.toString(), film: read('film/frames.json') };
   } finally { fs.rmSync(ws, { recursive: true, force: true }); }
 }
 
@@ -67,10 +67,33 @@ test('logging does not change what is painted, and the log is complete', () => {
   assert.equal(on.stats.strokeLog, 'strokes.jsonl.gz');
 });
 
+test('the pencil and the eraser are counted strokes, logged and filmed; the eraser refuses a wet sheet', () => {
+  const run = paint(false, `
+import * as kit from './kit.mjs';
+const { sheet, O } = await kit.open('sargent', { gpu: false });
+const soft = kit.createPencil({ grade: '2B' }), b = kit.createBrush({ radius: 8, bristles: 16, capacity: 60 });
+kit.pencilStroke(soft, sheet, [{ x: 20, y: 30, p: 1 }, { x: 120, y: 30, p: 1 }]);
+kit.pencilStroke(soft, sheet, [{ x: 20, y: 50, p: 0.3 }, { x: 120, y: 50, p: 0.3 }]);
+kit.erase(sheet, [{ x: 20, y: 30, p: 1 }, { x: 60, y: 30, p: 1 }], { width: 10 });
+kit.dip(b, { water: 0.8, conc: kit.mix({ ochre: 0.3 }) }); kit.stroke(b, sheet, [{ x: 10, y: 40, p: 1 }, { x: 130, y: 40, p: 1 }]);
+try { kit.erase(sheet, [{ x: 20, y: 40, p: 1 }, { x: 60, y: 40, p: 1 }]); console.log('RUBBED'); } catch (e) { console.log(e.message); }
+for (const bad of [() => kit.createPencil({ grade: '6B' }), () => kit.pencilStroke({}, sheet, [])]) try { bad(); console.log('TOOK'); } catch (e) { console.log(e.message); }
+kit.dryAll(sheet, O); await kit.finish('pencil');`, true);
+  assert.match(run.said, /the sheet is wet \(\d+ cells hold water\)/); assert.ok(!/RUBBED|TOOK/.test(run.said)); assert.match(run.said, /grade must be one of HB, 2B/);
+  const strokes = zlib.gunzipSync(run.log).toString().trim().split('\n').map(l => JSON.parse(l)).filter(l => l.tool);
+  assert.deepEqual(strokes.map(s => s.tool), ['pencil', 'pencil', 'eraser', 'brush']);
+  assert.deepEqual(strokes.map(s => s.i), [1, 2, 3, 4]);
+  assert.equal(strokes[0].pencil.grade, '2B'); assert.equal(strokes[2].eraser.width, 10); assert.ok(strokes[2].lifted.graphiteShare > 0.5);
+  assert.deepEqual([run.stats.pencilStrokes, run.stats.eraserStrokes, run.stats.brushStrokes, run.stats.strokes], [2, 1, 1, 4]);
+  assert.deepEqual(JSON.parse(run.film).frames.map(f => [f.stage, f.strokes]), [['paper', 0], ['painting', 2], ['painting', 4], ['dried', 4], ['finished', 4]]);
+  // each frame counts the brush strokes on the sheet it shows: two pencil lines are drawing, the first wash is the frame after
+  assert.deepEqual(JSON.parse(run.film).frames.map(f => f.brush), [0, 0, 1, 1, 1]);
+});
+
 test('the kit takes its targets from the coarse maps installed next to it', () => {
   const ws = fs.mkdtempSync(path.join(os.tmpdir(), 'kittasks-'));
   try {
-    fs.symlinkSync(path.join(REPO, 'src'), path.join(ws, 'src'));
+    fs.symlinkSync(path.join(REPO, 'src'), path.join(ws, 'src')); fs.symlinkSync(path.join(REPO, 'tools'), path.join(ws, 'tools'));
     fs.symlinkSync(path.join(REPO, 'node_modules'), path.join(ws, 'node_modules'));
     fs.copyFileSync(path.join(REPO, 'package.json'), path.join(ws, 'package.json'));
     const wb = path.join(ws, 'bench'); fs.mkdirSync(path.join(wb, 'tasks'), { recursive: true });
@@ -81,5 +104,27 @@ test('the kit takes its targets from the coarse maps installed next to it', () =
     fs.writeFileSync(path.join(wb, 'tasks.mjs'), "import * as kit from './kit.mjs'; console.log(JSON.stringify(kit.TASKS));");
     const tasks = JSON.parse(execFileSync('node', ['tasks.mjs'], { cwd: wb }).toString());
     assert.deepEqual(tasks, ['harbour', 'mittens']);
+  } finally { fs.rmSync(ws, { recursive: true, force: true }); }
+});
+
+test('paintings opened at the same moment share the render slots: a slot freed while another process looks at it stops nobody', async () => {
+  // more processes than slots, each ending as soon as its sheet is open: slots are freed while the others are looking
+  const { spawn } = await import('node:child_process');
+  const ws = fs.mkdtempSync(path.join(os.tmpdir(), 'kitslots-'));
+  try {
+    fs.symlinkSync(path.join(REPO, 'src'), path.join(ws, 'src')); fs.symlinkSync(path.join(REPO, 'tools'), path.join(ws, 'tools'));
+    fs.symlinkSync(path.join(REPO, 'node_modules'), path.join(ws, 'node_modules'));
+    fs.copyFileSync(path.join(REPO, 'package.json'), path.join(ws, 'package.json'));
+    const ends = [];
+    for (let k = 0; k < 9; k++) {
+      // a kit folder each (its own out/), all under one parent, so all nine share one set of slots
+      const wb = path.join(ws, `b${k}`); fs.mkdirSync(path.join(wb, 'tasks'), { recursive: true });
+      for (const f of ['kit.mjs', 'guard.mjs']) fs.copyFileSync(path.join(V2, 'kit', f), path.join(wb, f));
+      fs.copyFileSync(path.join(V2, 'targets', 'sargent-coarse.json'), path.join(wb, 'tasks', 'sargent-coarse.json'));
+      fs.writeFileSync(path.join(wb, 'open.mjs'), "import * as kit from './kit.mjs';\nawait kit.open('sargent', { gpu: false });\nprocess.exit(0);\n");
+      ends.push(new Promise(resolve => { let err = ''; const c = spawn('node', ['open.mjs'], { cwd: wb, env: { ...process.env, BENCH_SEED: '7', BENCH_NO_FILM: '1' }, stdio: ['ignore', 'ignore', 'pipe'] }); c.stderr.on('data', d => { err += d; }); c.on('close', code => resolve({ code, err })); }));
+    }
+    const got = await Promise.all(ends);
+    assert.deepEqual(got.filter(g => g.code !== 0).map(g => g.err.split('\n').find(l => /Error/.test(l)) ?? g.err.slice(-200)), [], 'every painting opened');
   } finally { fs.rmSync(ws, { recursive: true, force: true }); }
 });

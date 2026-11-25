@@ -9,7 +9,9 @@ function fixture(withBed=true) {
   if(withBed){const fixed=new Float32Array(25);fixed.fill(.5);fixed[12]=0;s.layers.push([fixed]);}
   return s;
 }
-const O={...DEFAULTS,flow:0,diffuse:0,evap:0,edgeEvap:0,absorb:0,settle:0,lift:0,scour:0,rewetLift:0,capRate:0,paperDry:0,dt:.1};
+// slideFill 2: the fixture's hollow is sized so the deposit fills it at the fill this was written with; fillRef 0 keeps that
+// fill (the bed's mean of 0.48 would otherwise scale it to 1.25, sheet.mjs slideFillFor)
+const O={...DEFAULTS,flow:0,diffuse:0,evap:0,edgeEvap:0,absorb:0,settle:0,lift:0,scour:0,rewetLift:0,capRate:0,paperDry:0,dt:.1,slideFill:2,fillRef:0};
 test('fixed pigment fills the support hollows without changing bound pigment',()=>{
  const old=fixture(),next=fixture();const fixed=next.layers[0][0].slice();
  step(old,O);step(next,{...O,fixedBed:1});

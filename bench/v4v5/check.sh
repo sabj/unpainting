@@ -6,4 +6,4 @@
 #    cannot paint (for example straight reserve or region edges that no target edge supports).
 # The last line is ADMITTED or REFUSED.
 cd "$(dirname "$0")/.." || exit 2
-exec node bench/check.mjs
+exec node bench/check.mjs "$@"
