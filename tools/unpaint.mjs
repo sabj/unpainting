@@ -6,7 +6,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync, spawn } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
-import { loadRunSets } from './paint/run-sets.mjs';
+import { loadRunSets, picturesAt } from './paint/run-sets.mjs';
+import { planRuns, needsAutoPainting } from './paint/run-benchmark.mjs';
+import { BENCHMARK_LEVELS } from './paint/levels.mjs';
+import { preparedRoot, preparedKey } from './paint/prepared.mjs';
+import { registryPath } from './paint/subjects.mjs';
 import { poolDir, claims, podsDaemon, daemonProcessAlive } from './paint/render-pool.mjs';
 
 const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
@@ -25,7 +29,7 @@ Commands:
                                       Options: --out DIR (required), --set core|extended (default core),
                                                --models a,b (default roster), --levels L1,L2,L3,L4,
                                                --pictures a,b, --pool mini,pod (default mini,pod),
-                                               --cap N (default 8), --with-pods (start pod renter if needed), --start
+                                               --cap N (default 8), --with-pods (start pod renter after pre-checks), --resume, --start
   pods <status|dry-run|start|stop>    Inspect, dry-check, start, or stop the cloud GPU pod renter
                                       Options (start): --cap N (default 10), --hours H (default 8),
                                                        --limit-min M (default 240), --end-min M (default 0)
@@ -189,23 +193,57 @@ function cmdPods(argv) {
   throw new Error(`pods: expected status, dry-run, start, or stop (got "${sub}")`);
 }
 
+/** Validate benchmark --start inputs, git cleanliness, output folder safety, and Auto prep BEFORE starting any pods. */
+export function validateBenchmarkStart(argv, { root = ROOT, git = (...a) => execFileSync('git', a, { cwd: root, encoding: 'utf8' }).trim() } = {}) {
+  const o = { set: 'core', models: null, levels: [...BENCHMARK_LEVELS], pictures: null, pool: 'mini,pod', cap: '8', out: null, resume: false };
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i], v = () => { const x = argv[++i]; if (x == null) throw new Error(`${a} needs a value`); return x; };
+    if (a === '--start' || a === '--with-pods') continue;
+    else if (a === '--resume') o.resume = true;
+    else if (a === '--out') o.out = path.resolve(v());
+    else if (a === '--set') o.set = v();
+    else if (a === '--pool') o.pool = v();
+    else if (a === '--cap') o.cap = v();
+    else if (a === '--models') o.models = v().split(',');
+    else if (a === '--levels') o.levels = v().split(',');
+    else if (a === '--pictures') o.pictures = v().split(',');
+    else throw new Error(`unknown benchmark option: ${a}`);
+  }
+  if (!o.out) throw new Error('--out DIR: where the sessions and the manifest are written');
+  const runSets = loadRunSets(), models = o.models ?? runSets.roster;
+  const runs = planRuns({ models, levels: o.levels, pictures: level => picturesAt(o.set, level, runSets).map(p => p.id).filter(id => !o.pictures || o.pictures.includes(id)) });
+  if (git('status', '--porcelain')) throw new Error('the checkout has uncommitted changes: the pool paints committed code only');
+  const commit = git('rev-parse', 'HEAD');
+  const existingLaunch = readJson(path.join(o.out, 'launch.json'));
+  if (existingLaunch) {
+    if (!o.resume) throw new Error(`${o.out} already has a launch.json: use a fresh --out folder (or pass --resume to continue the same commit)`);
+    if (existingLaunch.commit && existingLaunch.commit !== commit) {
+      throw new Error(`--resume refused: ${o.out}/launch.json is for commit ${existingLaunch.commit.slice(0, 8)}, not HEAD ${commit.slice(0, 8)}`);
+    }
+  }
+  const prepRoot = preparedRoot(path.dirname(registryPath()));
+  const missing = needsAutoPainting(runs).filter(subject => !fs.existsSync(path.join(prepRoot, preparedKey({ id: subject, commit }), 'painting', 'run.json')));
+  if (missing.length) throw new Error(`Auto's painting is not prepared at commit ${commit.slice(0, 8)} for ${missing.join(', ')}: run prepare first; nothing started`);
+  return { ...o, commit, runs };
+}
+
 function cmdBenchmark(argv) {
   const withPods = argv.includes('--with-pods');
   const start = argv.includes('--start');
-  const pass = argv.filter(a => a !== '--with-pods');
-  const poolIdx = pass.indexOf('--pool');
-  const poolVal = poolIdx >= 0 ? pass[poolIdx + 1] ?? 'mini,pod' : 'mini,pod';
-  const wantsPod = poolVal.split(',').includes('pod');
-  if (start && wantsPod) {
-    const dir = poolDir(process.env, ROOT);
-    const s = poolSummary(dir);
-    if (!s.processAlive) {
-      if (withPods) {
-        const capIdx = pass.indexOf('--cap');
-        const cap = capIdx >= 0 ? pass[capIdx + 1] : null;
-        cmdPods(['start', ...(cap ? ['--cap', cap] : [])]);
-      } else {
-        throw new Error('benchmark --start with --pool including pod needs the pod renter running. Pass --with-pods to start it, or use --pool mini.');
+  const pass = argv.filter(a => a !== '--with-pods' && a !== '--resume');
+  if (start) {
+    // Validate args, clean checkout, output folder safety, and Auto prep BEFORE touching pods
+    const checked = validateBenchmarkStart(argv);
+    const wantsPod = checked.pool.split(',').includes('pod');
+    if (wantsPod) {
+      const dir = poolDir(process.env, ROOT);
+      const s = poolSummary(dir);
+      if (!s.processAlive) {
+        if (withPods) {
+          cmdPods(['start', ...(checked.cap ? ['--cap', checked.cap] : [])]);
+        } else {
+          throw new Error('benchmark --start with --pool including pod needs the pod renter running. Pass --with-pods to start it, or use --pool mini.');
+        }
       }
     }
   }
