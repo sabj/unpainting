@@ -45,13 +45,14 @@ export function lvxWords(w, h, ntiles) {
 // State: 0 inactive, 1 running CG, 3 converged, 4 failed (never transported).
 export const filmLevelWgsl = ({ channel = 'klAt', count = 'u.nAct' } = {}) => `
 ${filmMobilityWgsl()}
+struct LvQuad { x: f32, y: f32, z: f32, w: f32 }
 @group(0) @binding(51) var<storage, read_write> LVT: array<u32>;
 @group(0) @binding(52) var<storage, read_write> LVX: array<u32>;
 @group(0) @binding(53) var<storage, read_write> LVS: array<atomic<u32>>;
-@group(0) @binding(54) var<storage, read_write> LVA: array<vec4<f32>>;   // H, conductance of the west face, of the north face, diagonal
-@group(0) @binding(55) var<storage, read_write> LVB: array<vec4<f32>>;   // d, r, z, q
+@group(0) @binding(54) var<storage, read_write> LVA: array<LvQuad>;   // H, conductance of the west face, of the north face, diagonal
+@group(0) @binding(55) var<storage, read_write> LVB: array<LvQuad>;   // d, r, z, q
 @group(0) @binding(56) var<storage, read_write> LVP: array<f32>;         // two distance planes before rhs, then p in turn
-@group(0) @binding(57) var<storage, read_write> LVF: array<vec4<f32>>;   // west face flux (+x), north face flux (+y), water scale, transport mark
+@group(0) @binding(57) var<storage, read_write> LVF: array<LvQuad>;   // west face flux (+x), north face flux (+y), water scale, transport mark
 @group(0) @binding(58) var<storage, read_write> LVR: array<f32>;         // per LT tile 8: pq, then rr and rz for even and odd iterations
 @group(0) @binding(59) var<storage, read_write> LVI: array<u32, 198>;    // tile/box args (lv_boxes), then 64 transport args (lv_subs)
 override LVPAR: u32 = 0u;
@@ -237,9 +238,13 @@ fn lv_boxes(@builtin(local_invocation_index) li: u32) {
       }
       // each box's fill (slideFillFor), and its level tiles, grouped by box in tile order
       for (var b = 0u; b < nb; b++) {
-        let B = lvBX(b); let cnt = LVX[B + 5u]; let mean = select(0.0, bitcast<f32>(LVX[B + 4u]) / f32(cnt), cnt > 0u);
+        let B = lvBX(b); let cnt = LVX[B + 5u];
+        var mean = 0.0;
+        if (cnt > 0u) { mean = bitcast<f32>(LVX[B + 4u]) / f32(cnt); }
         let fr = u.fillRef;
-        LVX[B + 6u] = bitcast<u32>(select(u.slideFill, u.slideFill * (fr / mean) * (fr / mean), fr > 0.0 && u.slide > 0.0 && mean > fr));
+        var boxFill = u.slideFill;
+        if (fr > 0.0 && u.slide > 0.0 && mean > fr) { let ratio = fr / mean; boxFill = u.slideFill * ratio * ratio; }
+        LVX[B + 6u] = bitcast<u32>(boxFill);
         LVX[B + 8u] = 0u; LVX[B + 14u] = 0u;
       }
       for (var w = 0u; w < nw; w++) { let r = lvTR(LVX[lvTR(w) + 9u]); let b = LVX[lvRM() + LVX[r + 7u]]; LVX[r + 7u] = b; LVX[lvBX(b) + 8u] += countOneBits(LVX[r + 8u]); }
@@ -297,8 +302,8 @@ fn lv_init(@builtin(workgroup_id) wid: vec3<u32>, @builtin(num_workgroups) nw: v
     atomicMax(&LVS[16u + 2u * b], bitcast<u32>(most));
     // the line's cells: a side not on a wet cell of the box
     let edge = !(c.x > 0u && lvLevel(i - 1u)) || !(c.y > 0u && lvLevel(i - u.w)) || !(c.x + 1u < u.w && lvLevel(i + 1u)) || !(c.y + 1u < u.h && lvLevel(i + u.w));
-    LVA[i] = vec4<f32>(0.0, cw, cn, 0.0);   // x: the meniscus's lowering of H (lv_dist)
-    LVF[i] = vec4<f32>(0.0, 0.0, 1.0, 0.0); LVB[i] = vec4<f32>(0.0);
+    LVA[i] = LvQuad(0.0, cw, cn, 0.0);   // x: the meniscus's lowering of H (lv_dist)
+    LVF[i] = LvQuad(0.0, 0.0, 1.0, 0.0); LVB[i] = LvQuad(0.0, 0.0, 0.0, 0.0);
     LVP[i] = select(1e9, 0.0, edge);
   }
 }
@@ -381,15 +386,10 @@ fn lv_rhs(@builtin(workgroup_id) wid: vec3<u32>, @builtin(num_workgroups) nw: ve
     if (c.z != 0u) {
       i = c.y * u.w + c.x;
       if (lvLevel(i) && lvActive(lvBoxOf(i))) {
-        // r = -L H - (I + L) d, from each face's difference of H + d (d is 0: lv_init)
-        let f = lvFaces(i, c.x, c.y); let dh = lvDiffs(i, f); let d = LVB[i].x;
-        var dd = vec4<f32>(0.0);
-        if (f[0].y != 0.0) { dd.x = d - LVB[i - 1u].x; }
-        if (f[1].y != 0.0) { dd.y = d - LVB[i - u.w].x; }
-        if (f[2].y != 0.0) { dd.z = d - LVB[i + 1u].x; }
-        if (f[3].y != 0.0) { dd.w = d - LVB[i + u.w].x; }
+        // r = -L H (lv_init zeroes displacement d before every solve; do not race neighbor LVB reads)
+        let f = lvFaces(i, c.x, c.y); let dh = lvDiffs(i, f);
         diag = 1.0 + f[0].y + f[1].y + f[2].y + f[3].y;
-        r = -(f[0].y * (dh.x + dd.x) + f[1].y * (dh.y + dd.y) + f[2].y * (dh.z + dd.z) + f[3].y * (dh.w + dd.w)) - d;
+        r = -(f[0].y * dh.x + f[1].y * dh.y + f[2].y * dh.z + f[3].y * dh.w);
         cp = lvInTile(f, lid); has = true;
         cdCell = 1.0;
         if (lid.x == 0u) { cwE = f[0].y; cdCell += cwE; }
@@ -399,7 +399,7 @@ fn lv_rhs(@builtin(workgroup_id) wid: vec3<u32>, @builtin(num_workgroups) nw: ve
       }
     }
     let z = lvPrecond(li, lid, r, diag, cp, has);
-    if (has) { LVA[i].w = diag; LVB[i] = vec4<f32>(LVB[i].x, r, z, 0.0); LVP[i] = 0.0; LVP[u.n + i] = 0.0; bb = r * r; rz = r * z; }
+    if (has) { LVA[i].w = diag; LVB[i].y = r; LVB[i].z = z; LVB[i].w = 0.0; LVP[i] = 0.0; LVP[u.n + i] = 0.0; bb = r * r; rz = r * z; }
     lvSum[li] = bb; lvSum2[li] = rz; lvSum3[li] = select(0.0, r, has);
     workgroupBarrier();
     lvReduce3(li);
@@ -493,7 +493,7 @@ fn lv_cg0(@builtin(workgroup_id) wid: vec3<u32>, @builtin(num_workgroups) nw: ve
     if (li == 0u) { lvRun = select(1u, 0u, bb <= tol); }
     if (workgroupUniformLoad(&lvRun) == 0u) {
       if (li == 0u) {
-        LVX[B + 9u] = 0u; LVX[B + 10u] = 0u; LVX[B + 11u] = bitcast<u32>(rzLoc); LVX[B + 12u] = bitcast<u32>(tol); LVX[B + 13u] = 0u;
+        LVX[B + 9u] = 0u; LVX[B + 10u] = 0u; LVX[B + 11u] = bitcast<u32>(rzLoc); LVX[B + 15u] = 0u; LVX[B + 12u] = bitcast<u32>(tol); LVX[B + 13u] = 0u;
         LVX[B + 14u] = 3u; atomicAdd(&LVS[7], 1u);
       }
       workgroupBarrier();
@@ -502,7 +502,7 @@ fn lv_cg0(@builtin(workgroup_id) wid: vec3<u32>, @builtin(num_workgroups) nw: ve
     let rzCoarse = lvCoarseSolve(b, li);
     if (li == 0u) {
       let rz0 = rzLoc + rzCoarse;
-      LVX[B + 9u] = 0u; LVX[B + 10u] = 0u; LVX[B + 11u] = bitcast<u32>(rz0); LVX[B + 15u] = bitcast<u32>(rz0); LVX[B + 12u] = bitcast<u32>(tol); LVX[B + 13u] = 0u;
+      LVX[B + 9u] = 0u; LVX[B + 10u] = 0u; LVX[B + 11u] = bitcast<u32>(rz0); LVX[B + 15u] = 0u; LVX[B + 12u] = bitcast<u32>(tol); LVX[B + 13u] = 0u;
       LVX[B + 14u] = 1u; atomicAdd(&LVS[7], 1u); atomicAdd(&LVS[12], 1u);
     }
     workgroupBarrier();
@@ -520,7 +520,7 @@ fn lv_flux(@builtin(workgroup_id) wid: vec3<u32>, @builtin(num_workgroups) nw: v
     var fw = 0.0; var fn_ = 0.0;
     if (a.y != 0.0) { fw = a.y * (lvDh(i - 1u, i) + (LVA[i - 1u].x - a.x) + u.lvTx + (LVB[i - 1u].x - di)); }
     if (a.z != 0.0) { fn_ = a.z * (lvDh(i - u.w, i) + (LVA[i - u.w].x - a.x) + u.lvTy + (LVB[i - u.w].x - di)); }
-    LVF[i] = vec4<f32>(fw, fn_, 1.0, -1.0);   // w -1: this cell's water moves in this step's rounds (lvRound)
+    LVF[i] = LvQuad(fw, fn_, 1.0, -1.0);   // w -1: this cell's water moves in this step's rounds (lvRound)
   }
 }
 // what a cell gives over the step: x, the faces to the west, north, east and south (signed out of the cell)
@@ -576,6 +576,10 @@ ${filmLevelTransportWgsl({ channel, count })}
 // (OUT4 x) and a puddle's concentration (OUT4 y); lv_br_c applies the water and the paint. Every read of a neighbour is of state written in an earlier
 // kernel, so the cells' order does not matter, as on the CPU. A neighbour is read only where M is set: a cell without
 // water lies in no wet tile, and its LVB and LVF are stale.
+fn lvBAt(i: u32, e: u32) -> f32 {
+  let b = LVB[i];
+  if (e == 0u) { return b.x; } if (e == 1u) { return b.y; } if (e == 2u) { return b.z; } return b.w;
+}
 fn brIn(x: u32, y: u32, e: u32) -> bool {
   if (e == 0u) { return x + 1u < u.w; } if (e == 1u) { return x > 0u; } if (e == 2u) { return y + 1u < u.h; } return y > 0u;
 }
@@ -612,7 +616,7 @@ fn lv_br_a(@builtin(workgroup_id) wid: vec3<u32>, @builtin(num_workgroups) nw: v
         go = s * moved;
       }
     }
-    LVB[i] = q; LVF[i] = vec4<f32>(s, go, damp, 0.0);
+    LVB[i] = LvQuad(q.x, q.y, q.z, q.w); LVF[i] = LvQuad(s, go, damp, 0.0);
   }
 }
 @compute @workgroup_size(16, 16)
@@ -622,11 +626,15 @@ fn lv_br_b(@builtin(workgroup_id) wid: vec3<u32>, @builtin(num_workgroups) nw: v
   for (var j = wid.x; j < count; j += nw.x) {
     let c = lvCellOf(TL[j], lid); if (c.z == 0u) { continue; }
     let i = c.y * u.w + c.x; if (M[i] != 1u) { continue; }
-    let q = LVB[i]; let Q = q.x + q.y + q.z + q.w; let s = LVF[i].x;
+    let q = LVB[i]; let Q = q.x + q.y + q.z + q.w; let s = LVF[i].x; let wi = W[i];
     for (var ka = 0u; ka < u.nAct; ka++) {
       let qq = klAt(ka) * u.n + i;
       // x: the paint it pushes on per unit of intake; y: a puddle's concentration, carried with the water it gives
-      o4set(qq, vec4<f32>(select(0.0, s * (G[qq] + D[qq]) / Q, Q > 0.0), select(0.0, (G[qq] + u.brPush * D[qq]) / W[i], W[i] > u.lvFloor), 0.0, 0.0));
+      var pushPer = 0.0;
+      if (Q > 0.0) { pushPer = s * (G[qq] + D[qq]) / Q; }
+      var puddleConc = 0.0;
+      if (wi > u.lvFloor) { puddleConc = (G[qq] + u.brPush * D[qq]) / wi; }
+      o4set(qq, vec4<f32>(pushPer, puddleConc, 0.0, 0.0));
     }
   }
 }
@@ -637,12 +645,12 @@ fn lv_br_c(@builtin(workgroup_id) wid: vec3<u32>, @builtin(num_workgroups) nw: v
   for (var j = wid.x; j < count; j += nw.x) {
     let c = lvCellOf(TL[j], lid); if (c.z == 0u) { continue; }
     let i = c.y * u.w + c.x; if (M[i] != 1u) { continue; }
-    let q = LVB[i]; let f = LVF[i]; let Q = q.x + q.y + q.z + q.w;
+    let qb = LVB[i]; let q = vec4<f32>(qb.x, qb.y, qb.z, qb.w); let f = LVF[i]; let Q = q.x + q.y + q.z + q.w;
     // water: a damp cell takes its intake; a puddle gives what its damp neighbours took from it
     var dw = 0.0;
     if (Q > 0.0) { dw = Q; }
     else if (W[i] > u.lvFloor) {
-      for (var e = 0u; e < 4u; e++) { if (!brIn(c.x, c.y, e)) { continue; } let k = brNb(i, e); if (M[k] == 1u) { dw -= LVB[k][brOpp(e)]; } }
+      for (var e = 0u; e < 4u; e++) { if (!brIn(c.x, c.y, e)) { continue; } let k = brNb(i, e); if (M[k] == 1u) { dw -= lvBAt(k, brOpp(e)); } }
     }
     // paint: what leaves, and what the invaded neighbours push on into a damp cell
     for (var ka = 0u; ka < u.nAct; ka++) {
@@ -653,7 +661,7 @@ fn lv_br_c(@builtin(workgroup_id) wid: vec3<u32>, @builtin(num_workgroups) nw: v
           let k = brNb(i, e); if (M[k] != 1u) { continue; }
           let ok = o4get(base + k);
           if (q[e] > 0.0) { inc += q[e] * ok.y; }   // the puddle's paint, carried in with its water
-          let v = LVB[k][e]; if (v > 0.0) { inc += f.z * v * ok.x; }
+          let v = lvBAt(k, e); if (v > 0.0) { inc += f.z * v * ok.x; }
         }
       }
       if (dw < 0.0) { let fr = dw / W[i]; G[base + i] = max(0.0, G[base + i] * (1.0 + fr)); D[base + i] = max(0.0, D[base + i] * (1.0 + u.brPush * fr)); }   // a puddle: its water left with its paint

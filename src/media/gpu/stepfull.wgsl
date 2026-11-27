@@ -298,7 +298,9 @@ fn wsc_tile(wid: vec3<u32>, lid: vec3<u32>) {
   if (c.x > 0u && M[i - 1u] == 1u) { o += max(-FX[i - 1u], 0.0); }
   if (c.y > 0u && M[i - u.w] == 1u) { o += max(-FY[i - u.w], 0.0); }
   let lim = W[i] * 0.95;
-  WSC[i] = select(1.0, lim / o, o > lim);
+  var sc = 1.0;
+  if (o > lim && o > 0.0) { sc = lim / o; }
+  WSC[i] = sc;
 }
 fn pflux(f: f32, wi: f32, wj: f32, gi: f32, gj: f32, si: f32, sj: f32) -> f32 {
   let sgn = select(select(0.0, -1.0, f < 0.0), 1.0, f > 0.0);
@@ -307,7 +309,8 @@ fn pflux(f: f32, wi: f32, wj: f32, gi: f32, gj: f32, si: f32, sj: f32) -> f32 {
   let mi = wi / u.cd; let mj = wj / u.cd;
   let carryI = select(mi * mi, 1.0, mi >= 1.0); let carryJ = select(mj * mj, 1.0, mj >= 1.0);
   let carryM = min(carryI, carryJ);
-  let ci = select(0.0, gi / wi, wi > 1e-6); let cj = select(0.0, gj / wj, wj > 1e-6);
+  var ci = 0.0; if (wi > 1e-6) { ci = gi / wi; }
+  var cj = 0.0; if (wj > 1e-6) { cj = gj / wj; }
   // paint mixes out into a standing film (sheet.mjs filmDiffuse)
   var fd = 0.0; if (u.filmDiff > 0.0) { fd = min(0.2, u.filmDiff * min(1.0, mw / u.filmDepth)); }
   return sgn * amt * select(cj, ci, f > 0.0) + (u.diffuse * carryM + fd) * (ci - cj) * mw;
@@ -331,7 +334,9 @@ fn ppout_tile(wid: vec3<u32>, lid: vec3<u32>) {
   if (c.x > 0u && M[i - 1u] == 1u) { o += max(-QX[base + i - 1u], 0.0); }
   if (c.y > 0u && M[i - u.w] == 1u) { o += max(-QY[base + i - u.w], 0.0); }
   let lim = G[base + i] * 0.95;
-  SC[base + i] = select(1.0, lim / o, o > lim);
+  var sc = 1.0;
+  if (o > lim && o > 0.0) { sc = lim / o; }
+  SC[base + i] = sc;
 }
 fn apply_water(c: Cx, first: bool) {
   let i = c.i;
@@ -389,14 +394,16 @@ fn suspensionSpeed(i: u32) -> f32 {
   if (u.coSettle <= 0.0) { return 0.0; }
   var v = 0.0; var gm = 0.0;
   for (var ka = 0u; ka < u.nAct; ka++) { let k = klAt(ka); let g = G[k * u.n + i]; v += g * pigB(k).x; gm += g; }
-  return select(0.0, v / gm, gm > 0.0);
+  if (gm > 0.0) { return v / gm; }
+  return 0.0;
 }
 fn p3a_tile(wid: vec3<u32>, lid: vec3<u32>) {
   let c = cx(wid, lid); if (!c.ok || M[c.i] != 1u || (RESIST[c.i] & 1u) != 0u) { return; }
   let i = c.i; let Wi = W[i]; let hh = PAPER3[i].z; let hol = hollowAt(i);
   let ld = Wi / u.liftDepth; let wetting = select(ld * ld, 1.0, ld >= 1.0);
   let rewet = u.hasTop != 0u && Wi > u.film;
-  let turnover = select(0.0, min(1.0, WENT[i] / Wi * (u.mmPerCell / 0.25)), Wi > 1e-6);
+  var turnover = 0.0;
+  if (Wi > 1e-6) { turnover = min(1.0, WENT[i] / Wi * (u.mmPerCell / 0.25)); }
   var settled = 0.0;
   if (u.granFill > 0.0) { for (var ka = 0u; ka < u.nAct; ka++) { settled += D[klAt(ka) * u.n + i]; } }
   let vMix = suspensionSpeed(i);
@@ -695,7 +702,9 @@ fn faceState(i: u32, x: u32, y: u32) -> vec3<f32> {
   if (x > 0u && M[i - 1u] == 1u) { o += max(-faceX(i - 1u), 0.0); }
   if (y > 0u && M[i - u.w] == 1u) { o += max(-faceY(i - u.w), 0.0); }
   let lim = W[i] * 0.95;
-  return vec3<f32>(fx, fy, select(1.0, lim / o, o > lim));
+  var sc = 1.0;
+  if (o > lim && o > 0.0) { sc = lim / o; }
+  return vec3<f32>(fx, fy, sc);
 }
 fn faces_wsc_tile(wid: vec3<u32>, lid: vec3<u32>) {
   let c = cx(wid, lid); if (!c.ok || M[c.i] != 1u) { return; }
@@ -719,7 +728,9 @@ fn pigmentFaces(c: Cx, f: vec2<f32>, si: f32, r: vec3<f32>, d: vec3<f32>, l: vec
     if (okL) { o += max(-pflux(fL, wL, wi, G[base + i - 1u], gi, sL, si), 0.0); }
     if (okU) { o += max(-pflux(fU, wU, wi, G[base + i - u.w], gi, sU, si), 0.0); }
     let lim = gi * 0.95;
-    SC[base + i] = select(1.0, lim / o, o > lim);
+    var sc = 1.0;
+    if (o > lim && o > 0.0) { sc = lim / o; }
+    SC[base + i] = sc;
   }
 }
 fn pflux_sc_tile(wid: vec3<u32>, lid: vec3<u32>) {
@@ -790,7 +801,8 @@ fn p3a_dep_tile(wid: vec3<u32>, lid: vec3<u32>) {
     let Wi = W[i]; let hh = PAPER3[i].z; let hol = hollowAt(i);
     let ld = Wi / u.liftDepth; let wetting = select(ld * ld, 1.0, ld >= 1.0);
     let rewet = u.hasTop != 0u && Wi > u.film;
-    let turnover = select(0.0, min(1.0, WENT[i] / Wi * (u.mmPerCell / 0.25)), Wi > 1e-6);
+    var turnover = 0.0;
+    if (Wi > 1e-6) { turnover = min(1.0, WENT[i] / Wi * (u.mmPerCell / 0.25)); }
     var settled = 0.0;
     if (u.granFill > 0.0) { for (var ka = 0u; ka < u.nAct; ka++) { settled += D[klAt(ka) * u.n + i]; } }
     let vMix = suspensionSpeed(i);

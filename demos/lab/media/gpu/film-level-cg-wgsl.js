@@ -45,7 +45,7 @@ fn lvCgA(t: u32, j: u32, lid: vec3<u32>, li: u32, par: u32, beta: f32) {
 }
 fn lvCgC(t: u32, j: u32, lid: vec3<u32>, li: u32, par: u32, alpha: f32) {
   let pn = (1u - par) * u.n;
-  var rr = 0.0; var rz = 0.0; var rTile = 0.0; var has = false; var v = vec4<f32>(0.0); var diag = 1.0; var cw = 0.0; var cn = 0.0; var i = 0u;
+  var rr = 0.0; var rz = 0.0; var rTile = 0.0; var has = false; var v = LvQuad(0.0, 0.0, 0.0, 0.0); var diag = 1.0; var cw = 0.0; var cn = 0.0; var i = 0u;
   let c = lvCellOf(t, lid);
   if (c.z != 0u) {
     i = c.y * u.w + c.x;
@@ -56,14 +56,16 @@ fn lvCgC(t: u32, j: u32, lid: vec3<u32>, li: u32, par: u32, alpha: f32) {
   }
   lvCw[li] = cw; lvCn[li] = cn;
   workgroupBarrier();
+  var ce = 0.0; if (lid.x < 15u) { ce = lvCw[li + 1u]; }
+  var cs = 0.0; if (lid.y < 15u) { cs = lvCn[li + 16u]; }
   let cp = vec4<f32>(
     select(0.0, cw, lid.x > 0u),
     select(0.0, cn, lid.y > 0u),
-    select(0.0, lvCw[li + 1u], lid.x < 15u),
-    select(0.0, lvCn[li + 16u], lid.y < 15u)
+    ce,
+    cs
   );
   let z = lvPrecond(li, lid, v.y, diag, cp, has);
-  if (has) { v.z = z; LVB[i] = v; rr = v.y * v.y; rz = v.y * z; rTile = v.y; }
+  if (has) { LVB[i].x = v.x; LVB[i].y = v.y; LVB[i].z = z; rr = v.y * v.y; rz = v.y * z; rTile = v.y; }
   lvSum[li] = rr; lvSum2[li] = rz; lvSum3[li] = rTile;
   workgroupBarrier();
   lvReduce3(li);
@@ -106,7 +108,10 @@ fn lv_cg_c(@builtin(workgroup_id) wid: vec3<u32>, @builtin(num_workgroups) nw: v
       if (li == 0u) {
         let pq = lvSum[0];
         let rz = bitcast<f32>(LVX[B + 11u]);
-        lvCoef = rz / pq; lvGo = select(0u, 1u, pq > 0.0);
+        var a = 0.0;
+        let ok = pq > 0.0;
+        if (ok) { a = rz / pq; }
+        lvCoef = a; lvGo = select(0u, 1u, ok);
         lvCOff = LVX[B + 7u];
       }
       boxGo = workgroupUniformLoad(&lvGo) != 0u;
@@ -116,7 +121,7 @@ fn lv_cg_c(@builtin(workgroup_id) wid: vec3<u32>, @builtin(num_workgroups) nw: v
     }
     if (j == boxOff) {
       if (li == 0u) {
-        if (!boxGo) { LVX[B + 14u] = 4u; atomicAdd(&LVS[4], 1u); atomicSub(&LVS[12], 1u); }
+        if (!boxGo) { LVX[B + 15u] = 1u; }
         else { LVX[B + 9u] = bitcast<u32>(boxAlpha); }
       }
       workgroupBarrier();
@@ -132,10 +137,15 @@ fn lv_cg_d(@builtin(workgroup_id) wid: vec3<u32>, @builtin(num_workgroups) nw: v
   if (workgroupUniformLoad(&lvRun) == 0u) { return; }
   let nb = lvBoxCount(li);
   for (var b = wid.x; b < nb; b += nw.x) {
-    if (li == 0u) { lvBox = select(0u, 1u, lvRunning(b)); }
-    if (workgroupUniformLoad(&lvBox) == 0u) { continue; }
-    lvBoxSums(b, li, 1u + 2u * LVPAR, 2u + 2u * LVPAR);
     let B = lvBX(b);
+    if (li == 0u) { lvBox = select(0u, 1u, lvRunning(b)); lvRun = LVX[B + 15u]; }
+    if (workgroupUniformLoad(&lvBox) == 0u) { continue; }
+    if (workgroupUniformLoad(&lvRun) != 0u) {
+      if (li == 0u) { LVX[B + 14u] = 4u; atomicAdd(&LVS[4], 1u); atomicSub(&LVS[12], 1u); }
+      workgroupBarrier();
+      continue;
+    }
+    lvBoxSums(b, li, 1u + 2u * LVPAR, 2u + 2u * LVPAR);
     let rzLoc = lvSum2[0];
     if (li == 0u) { lvGo = select(1u, 0u, lvSum[0] <= bitcast<f32>(LVX[B + 12u])); }
     if (workgroupUniformLoad(&lvGo) == 0u) {
@@ -151,9 +161,14 @@ fn lv_cg_d(@builtin(workgroup_id) wid: vec3<u32>, @builtin(num_workgroups) nw: v
     let rzCoarse = lvCoarseSolve(b, li);
     if (li == 0u) {
       let next = rzLoc + rzCoarse;
-      LVX[B + 10u] = bitcast<u32>(next / bitcast<f32>(LVX[B + 11u])); LVX[B + 11u] = bitcast<u32>(next);
-      let it = LVX[B + 13u] + 1u; LVX[B + 13u] = it;
-      atomicMax(&LVS[3], it);
+      let rzOld = bitcast<f32>(LVX[B + 11u]);
+      if (rzOld > 0.0) {
+        LVX[B + 10u] = bitcast<u32>(next / rzOld); LVX[B + 11u] = bitcast<u32>(next);
+        let it = LVX[B + 13u] + 1u; LVX[B + 13u] = it;
+        atomicMax(&LVS[3], it);
+      } else {
+        LVX[B + 14u] = 4u; atomicAdd(&LVS[4], 1u); atomicSub(&LVS[12], 1u);
+      }
     }
     workgroupBarrier();
   }
@@ -184,9 +199,9 @@ fn lv_cg_continue(@builtin(workgroup_id) wid: vec3<u32>, @builtin(num_workgroups
       storageBarrier();
       lvBoxSums(b, li, 0u, 0u);
       if (li == 0u) {
-        let pq = lvSum[0]; lvGo = select(0u, 1u, pq > 0.0);
-        lvCoef = bitcast<f32>(LVX[B + 11u]) / pq;
-        if (!(pq > 0.0)) { LVX[B + 14u] = 4u; atomicAdd(&LVS[4], 1u); }
+        let pq = lvSum[0];
+        if (pq > 0.0) { lvGo = 1u; lvCoef = bitcast<f32>(LVX[B + 11u]) / pq; }
+        else { lvGo = 0u; lvCoef = 0.0; LVX[B + 14u] = 4u; atomicAdd(&LVS[4], 1u); }
       }
       if (workgroupUniformLoad(&lvGo) == 0u) { break; }
       let alpha = workgroupUniformLoad(&lvCoef);
@@ -206,9 +221,14 @@ fn lv_cg_continue(@builtin(workgroup_id) wid: vec3<u32>, @builtin(num_workgroups
       }
       let rzCoarse = lvCoarseSolve(b, li);
       if (li == 0u) {
-        let next = rzLoc + rzCoarse; let it = LVX[B + 13u] + 1u;
-        LVX[B + 10u] = bitcast<u32>(next / bitcast<f32>(LVX[B + 11u])); LVX[B + 11u] = bitcast<u32>(next); LVX[B + 13u] = it;
-        atomicMax(&LVS[3], it);
+        let next = rzLoc + rzCoarse; let rzOld = bitcast<f32>(LVX[B + 11u]);
+        if (rzOld > 0.0) {
+          let it = LVX[B + 13u] + 1u;
+          LVX[B + 10u] = bitcast<u32>(next / rzOld); LVX[B + 11u] = bitcast<u32>(next); LVX[B + 13u] = it;
+          atomicMax(&LVS[3], it);
+        } else {
+          LVX[B + 14u] = 4u; atomicAdd(&LVS[4], 1u);
+        }
       }
       storageBarrier(); workgroupBarrier();
       par = 1u - par;

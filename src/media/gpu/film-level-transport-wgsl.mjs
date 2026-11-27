@@ -7,12 +7,17 @@ fn lvScale(t: u32, lid: vec3<u32>, round: u32) {
     if (LVX[B + 14u] == 0u || round >= subs) { return; }
     let wk = W[i]; let out = lvPos(lvOut(i, c.x, c.y)) / f32(subs);
     let budget = 0.95 * max(0.0, wk - u.lvFloor);
-    let scale = select(1.0, budget / out, out > budget);
+    var scale = 1.0;
+    if (out > budget && out > 0.0) { scale = budget / out; }
     LVF[i].z = scale;
     for (var ka = 0u; ka < ${count}; ka++) {
       let q = ${channel}(ka) * u.n + i; let g = G[q];
-      let conc = select(0.0, g / wk, wk > 1e-12); let pout = out * scale * conc;
-      o4set(q, vec4<f32>(conc, select(1.0, (0.95 * g) / pout, pout > 0.95 * g), 0.0, 0.0));
+      var conc = 0.0;
+      if (wk > 1e-12) { conc = g / wk; }
+      let pout = out * scale * conc;
+      var pscale = 1.0;
+      if (pout > 0.95 * g && pout > 0.0) { pscale = (0.95 * g) / pout; }
+      o4set(q, vec4<f32>(conc, pscale, 0.0, 0.0));
     }
 }
 @compute @workgroup_size(16, 16)

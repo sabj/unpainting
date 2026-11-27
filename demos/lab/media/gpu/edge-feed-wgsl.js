@@ -59,7 +59,7 @@ fn ef_reset(@builtin(local_invocation_index) li: u32) {
   if (efHalted()) { return; }
   if (li == 0u) { atomicStore(&EFB[15], 0u); }
   let words = atomicLoad(&EFB[0]) * (EF_RMAX + 1u);
-  for (var q = li; q < words; q += 256u) { atomicStore(&EFB[16u + q], select(0x7f800000u, 0u, q % (EF_RMAX + 1u) == 0u)); }
+  for (var q = li; q < words; q += 256u) { atomicStore(&EFB[16u + q], select(0x7f7fffffu, 0u, q % (EF_RMAX + 1u) == 0u)); }
 }
 @compute @workgroup_size(256)
 fn ef_begin(@builtin(global_invocation_id) gid: vec3<u32>) {
@@ -82,9 +82,10 @@ fn efPrepCell(q: u32, r: u32) {
 }
 fn efPrep(i: u32, sub: f32) {
   let w0 = W[i]; let dem = EFG[i].w;
-  var s = EFS[i];
-  s.x = w0; s.y = select(1.0, min(1.0, 0.5 * w0 / (sub * dem)), dem > 0.0);
-  EFS[i] = s;
+  let sd = sub * dem;
+  var rho = 1.0;
+  if (sd > 0.0) { rho = min(1.0, 0.5 * w0 / sd); }
+  EFS[i].x = w0; EFS[i].y = rho;
   // Only outgoing donors can supply pigment. Tiny-water donors retain zero concentration,
   // guarded below, so their stale EFC entries are never read.
   if (w0 > 1e-12 && dem > 0.0) {
@@ -192,7 +193,7 @@ fn ef_small(@builtin(local_invocation_index) li: u32) {
   let count = workgroupUniformLoad(&efCnt);
   if (count == 0u) { return; }
   let words = atomicLoad(&EFB[0]) * (EF_RMAX + 1u);
-  for (var q = li; q < words; q += 256u) { atomicStore(&EFB[16u + q], select(0x7f800000u, 0u, q % (EF_RMAX + 1u) == 0u)); }
+  for (var q = li; q < words; q += 256u) { atomicStore(&EFB[16u + q], select(0x7f7fffffu, 0u, q % (EF_RMAX + 1u) == 0u)); }
   storageBarrier(); workgroupBarrier();
   for (var q = li; q < count; q += 256u) {
     let i = EFL[1u + 2u * q]; let b = EFL[2u + 2u * q];
@@ -288,7 +289,7 @@ var<workgroup> efMin: array<atomic<u32>, ${EF_BMAX}>;
 var<workgroup> efWet: array<atomic<u32>, ${EF_BMAX}>;
 var<workgroup> efAny: atomic<u32>;
 fn efLocalReset(li: u32) {
-  atomicStore(&efMin[li], 0x7f800000u); atomicStore(&efWet[li], 0u);
+  atomicStore(&efMin[li], 0x7f7fffffu); atomicStore(&efWet[li], 0u);
   if (li == 0u) { atomicStore(&efAny, 0u); }
   workgroupBarrier();
 }
@@ -303,7 +304,7 @@ fn efPublish(li: u32, r: u32) {
   workgroupBarrier();
   if (li < atomicLoad(&EFB[0])) {
     let candidate = atomicLoad(&efMin[li]);
-    if (candidate != 0x7f800000u) { atomicMin(&EFB[efBox(li) + 1u + r], candidate); }
+    if (candidate != 0x7f7fffffu) { atomicMin(&EFB[efBox(li) + 1u + r], candidate); }
   }
   if (li == 0u && atomicLoad(&efAny) != 0u && r > 0u) { atomicMax(&EFB[15], r); }
 }

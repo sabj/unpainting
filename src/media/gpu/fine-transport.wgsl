@@ -6,8 +6,9 @@ struct Params {
   run: vec4u,  // dispatch row width
   physics: vec4f, // carryDepth, diffusion coefficient, film diffusion, filmDepth
 }
+struct FineGeom { x: f32, y: f32, z: f32, w: f32 }
 @group(0) @binding(0) var<uniform> p: Params;
-@group(0) @binding(1) var<storage, read_write> geometry: array<vec4f>; // wb, wa, FX, FY (or conductance)
+@group(0) @binding(1) var<storage, read_write> geometry: array<FineGeom>; // wb, wa, FX, FY (or conductance)
 @group(0) @binding(2) var<storage, read> volume: array<f32>;
 @group(0) @binding(3) var<storage, read> enabled: array<u32>;
 @group(0) @binding(4) var<storage, read_write> mass: array<f32>;

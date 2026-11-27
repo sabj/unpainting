@@ -439,3 +439,58 @@ test('pressed round section stroke leaks zero wet cells behind its landing endLi
     },
   });
 });
+
+test('thirsty section brush over wet wash conserves pigment mass on both fused and parallel GPU paths', t => {
+  const prevRes = process.env.GPU_RESIDENT;
+  process.env.GPU_RESIDENT = '1';
+  const w = 160, h = 140;
+  const paper = makePaper(w, h, { seed: 23, mmPerCell: 0.25, tooth: 0.75, coldPress: { mmPerCell: 0.25 } });
+  const sh = createSheet(paper, PIGS);
+  for (let i = 0; i < sh.n; i++) {
+    sh.M[i] = 1; sh.ever[i] = 1; sh.W[i] = 0.08; sh.s[i] = paper.capacity[i];
+  }
+  const info = attachGpu(sh, DEFAULTS, { mode: process.env.GPU_REQUIRED === '1' ? 'on' : 'auto', log() {} });
+  if (info.backend !== 'gpu') {
+    if (prevRes === undefined) delete process.env.GPU_RESIDENT; else process.env.GPU_RESIDENT = prevRes;
+    t.skip(info.reason);
+    return;
+  }
+  try {
+    // Exercise both fused (radius 8, <= 2048 bbox cells) and parallel (radius 30, > 2048 bbox cells).
+    for (const [label, radius, bristles] of [['fused', 8, 16], ['parallel', 30, 32]]) {
+      const b = createBrush({ model: 'section', radius, bristles, capacity: 40, belly: 2, seed: 11 });
+      const keepFrac = 0.5 * b.free;
+      dip(b, { water: keepFrac, conc: [0.6, 0.3, 0.15] });
+      b.resW = 0; b.resP.fill(0);
+      for (const hr of b.hairs) {
+        hr.water = b.capacity * hr.len * keepFrac;
+        hr.pig[0] = hr.water * 0.6;
+        hr.pig[1] = hr.water * 0.3;
+        hr.pig[2] = hr.water * 0.15;
+      }
+      const scale = kappaOf(b, paper.mmPerCell) / (paper.mmPerCell * paper.mmPerCell);
+      sh._gpu.syncAll(sh);
+      const beforeSheet = sheetMass(sh);
+      const beforeBrush = brushMass(b, sh.K, scale);
+      const beforeTotal = beforeSheet.pig.map((v, k) => v + beforeBrush.pig[k]);
+      for (let rep = 0; rep < 25; rep++) {
+        const y = 45 + (rep % 5) * 12;
+        stroke(b, sh, [{ x: 35, y, p: 0.9 }, { x: 125, y, p: 0.9 }], { spacing: 0.5, lift: false });
+      }
+      sh._gpu.settleBrush(b);
+      sh._gpu.syncAll(sh);
+      assertDeviceHealthy(sh);
+      const afterSheet = sheetMass(sh);
+      const afterBrush = brushMass(b, sh.K, scale);
+      for (let k = 0; k < sh.K; k++) {
+        const after = afterSheet.pig[k] + afterBrush.pig[k];
+        assert.ok(Number.isFinite(after), `${label} ch ${k} became non-finite: ${after}`);
+        const relErr = Math.abs(after - beforeTotal[k]) / Math.max(1e-9, beforeTotal[k]);
+        assert.ok(relErr < 1e-3, `${label} ch ${k} pigment mass drift: before=${beforeTotal[k]} after=${after} relErr=${relErr}`);
+      }
+    }
+  } finally {
+    sh._gpu?.close();
+    if (prevRes === undefined) delete process.env.GPU_RESIDENT; else process.env.GPU_RESIDENT = prevRes;
+  }
+});

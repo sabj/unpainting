@@ -1005,15 +1005,19 @@ fn section_scale(@builtin(local_invocation_index) li: u32) {
     let cL = capa * BSTR[h + 1u];
     let freeAt = keep * cL;
     let availFree = max(0.0, lw - freeAt) / g;
-    let sGive = select(1.0, (availFree / sumGive) * 0.999999, sumGive > availFree && sumGive > 0.0);
+    var sGive = 1.0;
+    if (sumGive > availFree && sumGive > 0.0) { sGive = (availFree / sumGive) * 0.999999; }
     let availRoom = max(0.0, cL - lw) / g;
-    let sTake = select(1.0, (availRoom / sumTake) * 0.999999, sumTake > availRoom && sumTake > 0.0);
+    var sTake = 1.0;
+    if (sumTake > availRoom && sumTake > 0.0) { sTake = (availRoom / sumTake) * 0.999999; }
     let giveOut = sumGive * sGive;
     let availPore = max(0.0, lw - giveOut * g) / g;
-    let sPore = select(1.0, (availPore / sumPore) * 0.999999, sumPore > availPore && sumPore > 0.0);
+    var sPore = 1.0;
+    if (sumPore > availPore && sumPore > 0.0) { sPore = (availPore / sumPore) * 0.999999; }
     let poreOut = sumPore * sPore;
     let availMix = max(0.0, lw - (giveOut + poreOut) * g) / g;
-    let sMix = select(1.0, (availMix / sumMix) * 0.999999, sumMix > availMix && sumMix > 0.0);
+    var sMix = 1.0;
+    if (sumMix > availMix && sumMix > 0.0) { sMix = (availMix / sumMix) * 0.999999; }
     SW.laneScale[j] = vec4<f32>(sMix, sGive, sTake, sPore);
     let takeIn = sumTake * sTake;
     let lwMid = clamp(lw + 0.5 * (takeIn - giveOut - poreOut) * g, 0.0, cL);
@@ -1116,7 +1120,7 @@ fn section_apply(
       if (Wi > 1e-9 && myLw > 1e-12 && hbVal > 0.0) {
         let xMid = TUFT_MIX * aa * contact * min(Wi, min(hbVal, myLw / g));
         let xStart = select(0.0, TUFT_MIX * aa * contact * min(Wi, min(hbStart, myLw / g)), hbStart > 0.0);
-        myX = select(xMid, min(xMid, xStart) * mySMix, mySMix < 1.0);
+        myX = min(xMid, xStart) * mySMix;
       }
       var J = 0.0;
       if (hbVal * contact > Wi) {
@@ -1151,10 +1155,8 @@ fn section_apply(
 
       if (J > 0.0) {
         var wantGive = min(J, max(0.0, myLw - freeAt) / g);
-        if (sGive < 1.0) {
-          let capG = select(0.0, min(Jstart, max(0.0, myLw - freeAt) / g), Jstart > 0.0);
-          wantGive = min(wantGive, capG);
-        }
+        let capG = select(0.0, min(Jstart, max(0.0, myLw - freeAt) / g), Jstart > 0.0);
+        wantGive = min(wantGive, capG);
         myGive = wantGive * sGive;
         if (myGive > 0.0) {
           if (M[cellI] == 1u || myMasked) {
@@ -1183,10 +1185,8 @@ fn section_apply(
         }
       } else if (J < 0.0 && Wi > 1e-9) {
         var wantTake = min(-J, min(Wi, max(0.0, cL - myLw) / g));
-        if (sTake < 1.0) {
-          let capT = select(0.0, min(-Jstart, min(Wi, max(0.0, cL - myLw) / g)), Jstart < 0.0);
-          wantTake = min(wantTake, capT);
-        }
+        let capT = select(0.0, min(-Jstart, min(Wi, max(0.0, cL - myLw) / g)), Jstart < 0.0);
+        wantTake = min(wantTake, capT);
         myTake = wantTake * sTake;
         if (myTake > 0.0) {
           wNow = Wi - myTake;
@@ -1201,15 +1201,13 @@ fn section_apply(
         let pullNow = TUFT_PORE * dryNow * select(1.0, max(0.0, 1.0 + hbVal / TUFT_SUCK), hbVal < 0.0);
         let expNow = select(1.0, exp(-wNow / TUFT_PORE_FILM), wNow > 0.0);
         var jpRaw = min(aa * contact * (push + pullNow) * expNow, min(myLw / g, contact * myPcap - sNow));
-        if (sPore < 1.0) {
-          let freeS = max(0.0, hbStart);
-          let pushS = freeS * (1.0 - SOAK_SIZING * freeS / (freeS + TUFT_PORE_FILM));
-          let dryEst = select(0.0, max(0.0, 1.0 - sEst / myPcap), myPcap > 0.0);
-          let pullEst = TUFT_PORE * dryEst * select(1.0, max(0.0, 1.0 + hbStart / TUFT_SUCK), hbStart < 0.0);
-          let expEst = select(1.0, exp(-wEst / TUFT_PORE_FILM), wEst > 0.0);
-          let jpEst = select(0.0, min(aa * contact * (pushS + pullEst) * expEst, min(myLw / g, contact * myPcap - sEst)), dryEst > 0.0 && contact * myPcap > sEst);
-          jpRaw = min(jpRaw, jpEst);
-        }
+        let freeS = max(0.0, hbStart);
+        let pushS = freeS * (1.0 - SOAK_SIZING * freeS / (freeS + TUFT_PORE_FILM));
+        let dryEst = select(0.0, max(0.0, 1.0 - sEst / max(myPcap, 1e-12)), myPcap > 0.0);
+        let pullEst = TUFT_PORE * dryEst * select(1.0, max(0.0, 1.0 + hbStart / TUFT_SUCK), hbStart < 0.0);
+        let expEst = select(1.0, exp(-wEst / TUFT_PORE_FILM), wEst > 0.0);
+        let jpEst = select(0.0, min(aa * contact * (pushS + pullEst) * expEst, min(myLw / g, contact * myPcap - sEst)), dryEst > 0.0 && contact * myPcap > sEst);
+        jpRaw = min(jpRaw, jpEst);
         let jp = jpRaw * sPore;
         if (jp > 1e-12) {
           myJp = jp;
@@ -1478,7 +1476,8 @@ fn section_commit_prep(@builtin(local_invocation_index) li: u32) {
         let lwOld = BSTR[h];
         let lwNew = max(0.0, lwOld - sumOut * g + sumTake * g);
         BSTR[h] = lwNew;
-        let outFrac = select(0.0, min(1.0, (sumOut * g) / lwOld), lwOld > 1e-12 && sumOut > 0.0);
+        var outFrac = 0.0;
+        if (lwOld > 1e-12 && sumOut > 0.0) { outFrac = min(1.0, (sumOut * g) / lwOld); }
         for (var ka = 0u; ka < nP; ka++) {
           let k = brushPigmentAt(ka);
           let lpkOld = BSTR[h + 4u + k];
@@ -1671,6 +1670,7 @@ fn section_run_small(@builtin(local_invocation_index) li: u32) {
       let water = f_reduce(li, vec4<f32>(myGive + myJp, myTake, 0.0, 0.0), lanesU);
       sumOut += water.x; sumTake += water.y;
     }
+    storageBarrier();
     if (li < lanesU && nCells > 0u) {
       let j = li;
       ${commit}
