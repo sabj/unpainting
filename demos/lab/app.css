@@ -258,3 +258,10 @@ body:not(.has-example):not(.replaying) #sheet-title{display:none}
 #welcome{color:#39362f}
 #welcome p,#welcome button:first-child{color:#7b7166}
 #welcome button{color:#39362f}
+
+/* One visible navigation bar shares the studio header with view controls. */
+.paint-head .paint-nav{display:flex;width:auto;min-height:44px;padding:0;margin:0;gap:18px;flex-wrap:nowrap;overflow:visible;font-size:15px}
+.paint-head .paint-nav strong{font-size:22px;font-weight:400;white-space:nowrap}
+.paint-head .paint-nav .paint-beta{margin:0;padding:0;border:0;font-size:12px}
+@media(max-width:899px){.paint-head .paint-nav{width:100%;gap:16px}.paint-head .stage-heading{width:100%;margin:0}.paint-head .paint-nav a{min-height:44px}}
+@media(max-width:480px){.paint-head .paint-nav{gap:12px;font-size:14px}.paint-head .paint-nav strong{font-size:20px}.paint-head .paint-beta{display:none}.paint-head .paint-nav a[href="lab/strokes/"]{display:none}}

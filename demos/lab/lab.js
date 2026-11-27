@@ -364,6 +364,7 @@ async function playExampleFilm(example, carry=false, seek=0) {
   }
   caption.textContent=example.film.operations?'Recording · completed physical operations':'Recording · saved frames. Overlay: stroke path.';
   const film={...example.film, operations:example.film.operations?new URL(example.film.operations,base).href:null, frames:example.film.frames.map(f=>new URL(f,base).href),paths:example.film.paths?new URL(example.film.paths,base).href:null};
+  lab.replayProgress=0;
   lab.target={id:example.id,film:true,frames:film.frames.length,started:performance.now()};
   worker.postMessage({type:'pause',on:true});
   playFilm(film,filmCanvas,W,H,{progress:(d,t)=>{playbackUI.ready();lab.seeking=false;playbackUI.update(d/t);document.getElementById('skip').disabled=false;playProgress.value=d/t;lab.replayProgress=d/t;operations.log.write(film.operations?{phase:'Recording',done:d,total:t,unit:'operation'}:recordedStatus(film,d/t));}, skipped:()=>filmSkip,alive,

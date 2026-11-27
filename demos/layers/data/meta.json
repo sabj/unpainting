@@ -1,355 +1,220 @@
 {
- "w": 1086,
- "h": 744,
- "families": [
-  "sun-main-gable",
-  "cool-main-return",
-  "main-chimney",
-  "slate-roofs",
-  "sky",
-  "opening-sidewalk",
-  "rest"
- ],
- "counts": [
-  {
-   "brush": {},
-   "pen": {}
-  },
-  {
-   "brush": {},
-   "pen": {}
-  },
-  {
-   "brush": {},
-   "pen": {
-    "2": 3,
-    "7": 5
-   }
-  },
-  {
-   "brush": {},
-   "pen": {
-    "1": 5,
-    "7": 3
-   }
-  },
-  {
-   "brush": {},
-   "pen": {
-    "1": 2,
-    "7": 6
-   }
-  },
-  {
-   "brush": {},
-   "pen": {
-    "7": 3
-   }
-  },
-  {
-   "brush": {
-    "7": 16
-   },
-   "pen": {}
-  },
-  {
-   "brush": {
-    "1": 4,
-    "2": 10,
-    "4": 14,
-    "7": 250
-   },
-   "pen": {}
-  },
-  {
-   "brush": {
-    "1": 2,
-    "2": 6,
-    "4": 13,
-    "7": 203
-   },
-   "pen": {}
-  },
-  {
-   "brush": {
-    "1": 4,
-    "2": 10,
-    "4": 14,
-    "7": 266
-   },
-   "pen": {}
-  },
-  {
-   "brush": {
-    "1": 4,
-    "2": 10,
-    "4": 14,
-    "7": 260
-   },
-   "pen": {}
-  },
-  {
-   "brush": {
-    "4": 2,
-    "7": 68
-   },
-   "pen": {}
-  },
-  {
-   "brush": {
-    "1": 2,
-    "2": 1,
-    "4": 4,
-    "7": 146
-   },
-   "pen": {}
-  },
-  {
-   "brush": {
-    "1": 1,
-    "2": 1,
-    "4": 1,
-    "7": 36
-   },
-   "pen": {}
-  },
-  {
-   "brush": {
-    "2": 1,
-    "4": 5,
-    "7": 107
-   },
-   "pen": {}
-  },
-  {
-   "brush": {
-    "1": 1,
-    "4": 1,
-    "7": 74
-   },
-   "pen": {}
-  },
-  {
-   "brush": {
-    "1": 2,
-    "2": 1,
-    "4": 2,
-    "7": 89
-   },
-   "pen": {}
-  },
-  {
-   "brush": {
-    "1": 4,
-    "2": 2,
-    "4": 1,
-    "7": 74
-   },
-   "pen": {}
-  },
-  {
-   "brush": {
-    "1": 4,
-    "4": 4,
-    "7": 70
-   },
-   "pen": {}
-  },
-  {
-   "brush": {
-    "1": 4,
-    "2": 1,
-    "4": 2,
-    "7": 56
-   },
-   "pen": {}
-  },
-  {
-   "brush": {
-    "2": 2,
-    "4": 4,
-    "7": 28
-   },
-   "pen": {}
-  },
-  {
-   "brush": {
-    "1": 1,
-    "2": 6,
-    "4": 3,
-    "5": 1,
-    "7": 74
-   },
-   "pen": {}
-  },
-  {
-   "brush": {
-    "1": 5,
-    "2": 10,
-    "4": 3,
-    "5": 1,
-    "7": 70
-   },
-   "pen": {}
-  },
-  {
-   "brush": {
-    "1": 21,
-    "2": 15,
-    "4": 3,
-    "5": 1,
-    "6": 2,
-    "7": 127
-   },
-   "pen": {}
-  },
-  {
-   "brush": {
-    "1": 58,
-    "2": 37,
-    "4": 5,
-    "5": 4,
-    "6": 1,
-    "7": 329
-   },
-   "pen": {}
-  },
-  {
-   "brush": {
-    "1": 66,
-    "2": 31,
-    "3": 1,
-    "4": 5,
-    "5": 3,
-    "7": 317
-   },
-   "pen": {}
-  },
-  {
-   "brush": {
-    "1": 46,
-    "2": 27,
-    "4": 7,
-    "5": 3,
-    "7": 254
-   },
-   "pen": {}
-  },
-  {
-   "brush": {
-    "1": 66,
-    "2": 34,
-    "3": 1,
-    "4": 5,
-    "5": 3,
-    "7": 322
-   },
-   "pen": {}
-  },
-  {
-   "brush": {
-    "1": 82,
-    "2": 26,
-    "4": 2,
-    "6": 12,
-    "7": 573
-   },
-   "pen": {}
-  },
-  {
-   "brush": {
-    "1": 72,
-    "2": 26,
-    "4": 4,
-    "5": 4,
-    "6": 11,
-    "7": 939
-   },
-   "pen": {}
-  },
-  {
-   "brush": {
-    "1": 74,
-    "2": 29,
-    "4": 2,
-    "5": 2,
-    "6": 13,
-    "7": 692
-   },
-   "pen": {}
-  },
-  {
-   "brush": {
-    "1": 68,
-    "2": 22,
-    "4": 4,
-    "5": 4,
-    "6": 17,
-    "7": 849
-   },
-   "pen": {}
-  },
-  {
-   "brush": {
-    "1": 32,
-    "2": 11,
-    "4": 2,
-    "5": 2,
-    "6": 7,
-    "7": 509
-   },
-   "pen": {
-    "1": 24,
-    "2": 12,
-    "3": 1,
-    "4": 5,
-    "7": 182
-   }
-  },
-  {
-   "brush": {},
-   "pen": {
-    "1": 39,
-    "2": 19,
-    "4": 3,
-    "5": 2,
-    "6": 2,
-    "7": 159
-   }
-  },
-  {
-   "brush": {},
-   "pen": {
-    "1": 36,
-    "2": 18,
-    "6": 2,
-    "7": 168
-   }
-  },
-  {
-   "brush": {},
-   "pen": {
-    "1": 7,
-    "2": 2,
-    "4": 5,
-    "7": 205
-   }
-  },
-  {
-   "brush": {},
-   "pen": {}
-  },
-  {
-   "brush": {},
-   "pen": {}
+  "title": "Bacchus and Ariadne · Tiepolo",
+  "w": 556,
+  "h": 707,
+  "stageGrouping": "Three contiguous groups of recorded brush passages between drawing and finishing; original saved frames only.",
+  "frames": [
+    "data/f0000.webp",
+    "data/f0001.webp",
+    "data/f0002.webp",
+    "data/f0003.webp",
+    "data/f0004.webp",
+    "data/f0005.webp",
+    "data/f0006.webp",
+    "data/f0007.webp",
+    "data/f0008.webp",
+    "data/f0009.webp",
+    "data/f0010.webp",
+    "data/f0011.webp",
+    "data/f0012.webp",
+    "data/f0013.webp",
+    "data/f0014.webp",
+    "data/f0015.webp"
+  ],
+  "labels": "data/subjects.png",
+  "subjects": [
+    "reclining figure",
+    "drapery",
+    "reclining figure hair",
+    "reclining figure face",
+    "staff with leaves",
+    "child upper right",
+    "child hair",
+    "child face",
+    "putto with wreath",
+    "dish",
+    "satyr",
+    "satyr hair",
+    "satyr face",
+    "satyr hand",
+    "urn"
+  ],
+  "stages": [
+    {
+      "key": "frisket-1",
+      "group": "frisket",
+      "label": "Reserve lights",
+      "frames": [
+        1,
+        1
+      ]
+    },
+    {
+      "key": "drawing-2",
+      "group": "drawing",
+      "label": "Ink drawing",
+      "frames": [
+        2,
+        3
+      ],
+      "ink": true
+    },
+    {
+      "key": "paint-0-4",
+      "group": "paint-0",
+      "label": "First washes",
+      "frames": [
+        4,
+        7
+      ]
+    },
+    {
+      "key": "paint-1-8",
+      "group": "paint-1",
+      "label": "Building color",
+      "frames": [
+        8,
+        10
+      ]
+    },
+    {
+      "key": "paint-2-11",
+      "group": "paint-2",
+      "label": "Final washes",
+      "frames": [
+        11,
+        14
+      ]
+    },
+    {
+      "key": "finished-15",
+      "group": "finished",
+      "label": "Finished sheet",
+      "frames": [
+        15,
+        15
+      ]
+    }
+  ],
+  "source": {
+    "code": "179f2cb7f7b42d6a7436187e498e599e24656165",
+    "dirty": true,
+    "brush": "section",
+    "backend": {
+      "backend": "gpu",
+      "fallback": false,
+      "adapter": "webgpu (Dawn)",
+      "device": null
+    },
+    "dimensions": {
+      "sourceWidth": 1600,
+      "sourceHeight": 2035,
+      "paintWidth": 556,
+      "paintHeight": 707,
+      "enlargement": 0.35,
+      "sheetWidth": 556,
+      "sourceScale": 0.3475,
+      "sourceScaleAllowed": 1
+    },
+    "targetSHA256": "9af6854e13dc6e99010f8cb35d38fd5f3e1b6c59ebd3a890a804bd378efd5355",
+    "maskSHA256": "1d4ede4732986bd1fd57b867b7921903898aea5d190a7c3def1544ade7948ec2",
+    "frames": [
+      {
+        "savedFrame": 0,
+        "stage": "paper",
+        "value": 0,
+        "sha256": "017f65de3b12f725b26caf799d59dc2b88d8177bd91931478688f932522a3bed"
+      },
+      {
+        "savedFrame": 1,
+        "stage": "frisket",
+        "value": null,
+        "sha256": "017f65de3b12f725b26caf799d59dc2b88d8177bd91931478688f932522a3bed"
+      },
+      {
+        "savedFrame": 2,
+        "stage": "drawing",
+        "value": null,
+        "sha256": "bf417413da0132f8b20989bb19b05adc3520c3178656961811e0259863ed7724"
+      },
+      {
+        "savedFrame": 6,
+        "stage": "drawing",
+        "value": null,
+        "sha256": "57eb31211939f2b55e82a11ca2284c9cf03e44717c941d32ead42f6df7056848"
+      },
+      {
+        "savedFrame": 7,
+        "stage": "paint",
+        "value": 1,
+        "sha256": "127c5363209fa4c8889d01b7551d11df504046d99643a521be50bca6d64128c1"
+      },
+      {
+        "savedFrame": 16,
+        "stage": "paint",
+        "value": 1,
+        "sha256": "3663b575d7dfe9272aef52875a2adfca53645f133a918da6b6c140bdf7dc2875"
+      },
+      {
+        "savedFrame": 41,
+        "stage": "paint",
+        "value": 1,
+        "sha256": "a21a111dce974f08673bc4041078ae46a59389b5bc930e502897e473794a75a9"
+      },
+      {
+        "savedFrame": 68,
+        "stage": "paint",
+        "value": 1,
+        "sha256": "8bad185686ed18fe4df4137ac4bd598ac188c251968c0aec304788ad04993eb0"
+      },
+      {
+        "savedFrame": 69,
+        "stage": "paint",
+        "value": 1,
+        "sha256": "bbaef977270fe3db911a60eb5ea725945f812d4ea4f787ca5203995adf277fa3"
+      },
+      {
+        "savedFrame": 83,
+        "stage": "paint",
+        "value": 3,
+        "sha256": "d7c7b51428553e03268d04bf9a0377dc68ff52b42707f90006819e0f695e1352"
+      },
+      {
+        "savedFrame": 118,
+        "stage": "paint",
+        "value": 3,
+        "sha256": "e75fa1e1281e19a472bf6c5f80164af1a4a9afc2948adab3bc4d07fbd26f26cd"
+      },
+      {
+        "savedFrame": 119,
+        "stage": "paint",
+        "value": 3,
+        "sha256": "6196fb79b9808c1ede0e1944b58a22b8beae3d00922e0edcd954fd2729d1c5a5"
+      },
+      {
+        "savedFrame": 125,
+        "stage": "paint",
+        "value": 1,
+        "sha256": "6b5ea52ef106d69b69acff6d713da9c2b6498d7dcf0baffcf6dcfb9b92f9af18"
+      },
+      {
+        "savedFrame": 150,
+        "stage": "paint",
+        "value": 3,
+        "sha256": "655d827c511f58686210135e2a05b70a21ddbfd3a7a68ec3cb86501d286323f7"
+      },
+      {
+        "savedFrame": 166,
+        "stage": "paint",
+        "value": 5,
+        "sha256": "f0ebe7a630d26d6c39f2f3c8464eee580d8d47342c23fb9d5833bba3ec4fbe82"
+      },
+      {
+        "savedFrame": 167,
+        "stage": "finished",
+        "value": null,
+        "sha256": "c1b5fdaa8338da5cea3d4abe840b89f1b620a9604641dd1cd300803014103c8b"
+      }
+    ]
   }
- ],
- "subjects": [
-  "Sky",
-  "Sunlit stone",
-  "Shaded stone",
-  "Windows, doors and deep shadow",
-  "Trees and dark foliage",
-  "Street and sidewalk"
- ]
 }

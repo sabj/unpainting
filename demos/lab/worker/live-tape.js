@@ -96,7 +96,7 @@ export async function runTape(tape,api,resume=null){
     else if(m.k==='R')liftResist(s);
     else if(m.k==='b')blot(s,mask,{strength:m.s,pigmentShare:m.p});
     else setClip(s,mask);
-   }),mask??(m.k==='R'?api.sheet().resist:api.sheet().clip));
+   },{kind}),mask??(m.k==='R'?api.sheet().resist:api.sheet().clip));
   }else if(m.k!=='m')throw new Error(`Unsupported recorded operation: ${m.k}`);
  }
  if(done===total&&api.finished)await api.finished(done,()=>({index:tape.marks.length,done,contactBrush:[...brushes].find(([,tool])=>tool===api.sheet()._contactBrush)?.[0],brushes:[...brushes].map(([id,t])=>[id,saveTool(t)]),pens:[...pens].map(([id,t])=>[id,saveTool(t)])}));

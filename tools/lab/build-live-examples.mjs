@@ -33,7 +33,9 @@ for (const [k, f] of shots.entries()) {
 }
 const meta = await sharp(path.join(run, 'painting.png')).metadata();
 const manifestFile = path.join(root, 'examples/recorded.json'), manifest = JSON.parse(fs.readFileSync(manifestFile, 'utf8'));
+const cardFile=path.join(run,'run-card.json'),card=fs.existsSync(cardFile)?JSON.parse(fs.readFileSync(cardFile)):null;
 const entry = {
+  ...(card?{source:{code:card.codeSHA,dirty:!card.cleanTree,backend:card.gpuBackend,dimensions:card.dimensions,brushModels:[...new Set(tape.brushOpts.map(o=>o.model??'row'))],targetSHA256:card.targetSHA256}}:{}),
   id, title: arg('title'), kind: arg('kind') ?? 'Watercolor', target: rel('target.jpg'), thumb: rel('thumb.webp'), credit: arg('credit'),
   live: {study: rel('live.json.gz')},
   studies: {study: {label: 'Drawing and block-in study', strokes: count, width: tape.w, height: tape.h, methods: tape.methods ?? null}},

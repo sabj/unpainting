@@ -10,7 +10,8 @@ import {tapeSheet,tapePixels,tapeFlow} from '../../demos/lab/worker/tape-sheet.j
 // fixed-layer settling used by these tapes, so it is not an equivalent backend.
 const root=new URL('../../demos/lab/',import.meta.url),manifestURL=new URL('examples/recorded.json',root);
 const manifest=JSON.parse(await fs.readFile(manifestURL));
-for(const ex of manifest.examples){if(!ex.live)continue;ex.checkpoints={};for(const limit of Object.keys(ex.live)){
+const ids=process.argv.slice(2);
+for(const ex of manifest.examples){if(!ex.live||ids.length&&!ids.includes(ex.id))continue;ex.checkpoints={};for(const limit of Object.keys(ex.live)){
  const tape=JSON.parse(gunzipSync(await fs.readFile(new URL(ex.live[limit],root))));
  if(tape.version<2||!tape.complete)throw Error('Checkpoints require a complete recorded run');
  const sheet=tapeSheet(tape),{w,h}=sheet;
@@ -29,4 +30,6 @@ for(const ex of manifest.examples){if(!ex.live)continue;ex.checkpoints={};for(co
  ex.checkpoints[limit]=list;
 
 }}
-await fs.writeFile(manifestURL,JSON.stringify(manifest,null,2)+'\n');
+const latest=JSON.parse(await fs.readFile(manifestURL));
+for(const ex of manifest.examples)if(!ids.length||ids.includes(ex.id)){const entry=latest.examples.find(e=>e.id===ex.id);if(entry)entry.checkpoints=ex.checkpoints;}
+await fs.writeFile(manifestURL,JSON.stringify(latest,null,2)+'\n');

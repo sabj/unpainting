@@ -205,11 +205,11 @@ body.canvas-focus{overflow:hidden}.canvas-focus :is(.paint-nav,.paint-head,.pane
     <button data-action="exit-focus" title="Exit fullscreen (Esc / H)" aria-label="Exit fullscreen">⛶ <span>Exit</span></button>
   </div>
 </div>
-<nav class="paint-nav" aria-label="unpainting"><a href="lab/" aria-current="page">Paint Lab</a><a href="lab/strokes/">Stroke bench</a><a href="./">All demos</a><a href="https://github.com/sabj/unpainting">Source on GitHub</a><span class="paint-beta">0.5.0-dev</span></nav>
+
 <main>
 <header class="paint-head">
-<p class="paint-kicker">unpainting</p>
-<div class="paint-title"><h1>Paint Lab</h1><span class="studio-version">0.5.0-dev</span><button class="help-toggle" popovertarget="paint-help">How it works</button><a class="help-toggle" href="lab/strokes/">Stroke bench</a></div>
+<nav class="paint-nav" aria-label="unpainting"><strong>Paint Lab</strong><a href="lab/strokes/">Stroke bench</a><a href="./">Demos</a><a href="https://github.com/sabj/unpainting">GitHub</a><button class="help-toggle" popovertarget="paint-help">Help</button><span class="paint-beta">0.5.0</span></nav>
+<h1 class="sr-only">Paint Lab</h1>
 <div class="stage-heading"><span id="sheet-title">Sheet</span><span id="engine-pill" title="Live engine, physical cell size and median input-to-frame time">Starting engine…</span><button id="studio-toggle" aria-expanded="false" aria-controls="run-settings mode-note operation-controls operation-timeline" title="Playback settings, masks and stroke history">Studio</button><button id="focus-view" aria-pressed="false" title="Fullscreen (H)">⛶ <span>Fullscreen</span></button></div>
 <div id="paint-help" popover role="dialog" aria-labelledby="paint-help-title">
 <header><strong id="paint-help-title">How it works</strong><button popovertarget="paint-help" popovertargetaction="hide" aria-label="Close help">Close ×</button></header>
@@ -219,7 +219,7 @@ body.canvas-focus{overflow:hidden}.canvas-focus :is(.paint-nav,.paint-head,.pane
 <p>Mouse and finger pressure is fixed by default. Turn off “Fixed mouse / finger pressure” for a gentle response to drawing speed. Hold Alt or the stylus barrel button for clean water.</p>
 <p>R round · F flat · W water · I ink · P pencil · D dryer · Shift+D dry layer. [ / ] resize. Space pauses drying. 1–9 choose pigments · Shift+1–4 choose brush presets · X re-dips · H toggles fullscreen · 0 fits the paper. Escape exits fullscreen. Cmd/Ctrl+Z undoes; add Shift to redo.</p>
 </div>
-<p class="paint-lede">Watercolor, ink and pencil on simulated paper. Pick a picture to watch it painted, or drag on the paper to begin.</p>
+
 </header>
 
 
@@ -230,7 +230,7 @@ body.canvas-focus{overflow:hidden}.canvas-focus :is(.paint-nav,.paint-head,.pane
   <p id="mode-note">Recording · original saved frames, stepped without fades. Overlay: stroke path.</p>
 
     <div id="return-sheet" class="toolbar paint-controls" hidden><button id="keep-painting">Keep painting</button><button id="dismiss-return">Start fresh</button></div>
-    <div class="sheet" id="sheet"><canvas id="canvas" width="480" height="360" tabindex="0" role="img" aria-label="Paper. Drag to paint."></canvas><canvas id="film" class="film" hidden aria-hidden="true"></canvas><img id="seek-preview" hidden alt="Selected painting state"><div id="welcome"><h2>The paper is yours.</h2><p>Drag anywhere to paint.</p><div><button data-start="blank">Start fresh</button><button data-start="example">See an example</button><button data-start="technique">See a technique</button></div></div><span id="paint-hint" aria-hidden="true">Drag to paint</span><canvas id="cursor" class="cursor" aria-hidden="true"></canvas></div>
+    <div class="sheet" id="sheet"><canvas id="canvas" width="480" height="360" tabindex="0" role="img" aria-label="Paper. Drag to paint."></canvas><canvas id="film" class="film" hidden aria-hidden="true"></canvas><img id="seek-preview" hidden alt="Selected painting state"><div id="welcome"><h2>Drag to paint</h2><div><button data-start="blank">Start fresh</button><button data-start="example">See an example</button><button data-start="technique">See a technique</button></div></div><span id="paint-hint" aria-hidden="true">Drag to paint</span><canvas id="cursor" class="cursor" aria-hidden="true"></canvas></div>
     <div id="current-materials" hidden aria-label="Current materials"></div>
     <section id="sequence" hidden aria-labelledby="sequence-title"><h2 id="sequence-title">Live study · jump in anywhere</h2><div class="sequence-row"><figure><img id="sequence-target" alt=""><figcaption>Target</figcaption></figure><nav id="sequence-thumbs" aria-label="Painting timeline"></nav></div></section>
     <div class="sheetbar">
@@ -339,9 +339,9 @@ body.canvas-focus{overflow:hidden}.canvas-focus :is(.paint-nav,.paint-head,.pane
         <div>
           <p class="label" id="model-label">Brush model</p>
           <div class="seg" role="group" aria-labelledby="model-label">
-            <button data-model="row" aria-pressed="true">Row</button>
+            <button data-model="row" aria-pressed="false">Row</button>
             <button data-model="tuft" aria-pressed="false">Tuft</button>
-            <button data-model="section" aria-pressed="false">Section</button>
+            <button data-model="section" aria-pressed="true">Section</button>
           </div>
         </div>
         <div>

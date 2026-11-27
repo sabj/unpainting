@@ -19,7 +19,7 @@ test('Chrome stroke rerun/export and 800×400 layers controls', {timeout:240000}
    // Add a coarse physical cell size only in this smoke server, keeping every
    // real stroke and drying path while avoiding a full rendering benchmark.
    if(file.endsWith('/media/stroke-bench.js'))data=Buffer.from(data.toString().replace('[0.25, 0.1, 0.05]', '[1, 0.25, 0.1, 0.05]'));
-   const mime={'.html':'text/html','.js':'text/javascript','.json':'application/json','.jpg':'image/jpeg','.png':'image/png','.css':'text/css'};
+   const mime={'.html':'text/html','.js':'text/javascript','.mjs':'text/javascript','.json':'application/json','.jpg':'image/jpeg','.png':'image/png','.css':'text/css'};
    res.writeHead(200,{'Content-Type':mime[path.extname(file)]??'application/octet-stream'}).end(data);
   }catch{res.writeHead(404).end();}
  });
@@ -28,7 +28,7 @@ test('Chrome stroke rerun/export and 800×400 layers controls', {timeout:240000}
  try{
   browser=await chromium.launch({channel:'chrome',headless:true,args:['--enable-unsafe-webgpu','--use-angle=metal']});
   const page=await browser.newPage({viewport:{width:800,height:400}}),errors=[];
-  page.on('pageerror',e=>errors.push(e.message));page.on('console',m=>{if(m.type()==='error')errors.push(m.text());});
+  page.on('pageerror',e=>errors.push(e.stack??e.message));page.on('console',m=>{if(m.type()==='error')errors.push(m.text());});
   await page.addInitScript(()=>{
    const NativeWorker=window.Worker;
    window.Worker=class extends NativeWorker{constructor(...args){super(...args);window.testWorker=this;}postMessage(data,...args){window.testGen=data.gen;return super.postMessage(data,...args);}};

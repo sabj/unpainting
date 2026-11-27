@@ -104,7 +104,8 @@ export class GpuPhysics {
   async fix(sheet, baseR = null, { foldOnGpu = false, foldFine = false } = {}) {
     await this.sectionPending;
     let foldedOnGpu = false;
-    const onFoldTop = foldOnGpu ? async () => {
+    // Fixed-bed transport needs the retained layers after CPU mutations too.
+    const onFoldTop = foldOnGpu && !(this.sheet.o.fixedBed > 0) ? async () => {
       if (foldFine && this.finish && baseR) {
         // Pull only active channels of superseded TOP to fold at 2x smooth resolution into fineBase
         const n = this.n, K = this.K, active = this.sheet.act;

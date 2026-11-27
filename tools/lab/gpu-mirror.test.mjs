@@ -6,7 +6,7 @@ import { generate } from './sync-site-media.mjs';
 
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
 const read = p => fs.readFileSync(path.join(ROOT, p), 'utf8');
-const uniforms = code => [...code.match(/const UF = \[([\s\S]*?)\.map\(k => \[k, 'f'\]\)\];/)[0].matchAll(/'([A-Za-z0-9]+)'/g)].map(m => m[1]);
+const uniforms = code => [...code.match(/const UF = \[([\s\S]*?)\];/)[0].matchAll(/'([A-Za-z0-9]+)'/g)].map(m => m[1]);
 // the drying and absorption lines of phase 1 (their pigment loops walk the pigments differently)
 const phase1Block = wgsl => {
   const start = wgsl.indexOf('let wv = max(0.0, W[i] - u.dt');

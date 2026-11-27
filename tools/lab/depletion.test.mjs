@@ -4,6 +4,7 @@ import {createSheet,step} from '../../src/media/sheet.mjs';
 import {createBrush,dip,stroke} from '../../src/media/brush.mjs';
 import {createPen,dipPen,penStroke} from '../../src/media/pen.mjs';
 import {handBrushOptions,needsRedip} from '../../demos/lab/brush-load.js';
+import {kappaOf} from '../../src/media/tuft-section.mjs';
 import {paperOptions} from '../../demos/lab/media/papers.js';
 import {measureLoad} from './measure-load.mjs';
 const pigment={K:[.4,.6,.9],S:[.01,.01,.01],rho:.05,omega:1.4,gamma:.15};
@@ -34,9 +35,9 @@ function band(s,j){
  }
  return {wet:wet/n,film:film/n,painted:painted/n,pigment};
 }
-for(const tool of ['round','flat'])test(`one loaded ${tool} brush glazes a broad area evenly, stays wet, then depletes`,()=>{
+for(const tool of ['round','flat'])test(`one loaded Row ${tool} brush glazes a broad area evenly, stays wet, then depletes`,()=>{
  const s=createSheet(labPaper(),[pigment]);
- const b=createBrush(handBrushOptions({tool,sizeMm:25,water:2},{seed:149}));
+ const b=createBrush(handBrushOptions({tool,model:'row',sizeMm:25,water:2},{seed:149}));
  dip(b,{water:2,conc:[.08]});const initial=water(b),bands=[];
  assert.equal(needsRedip(b),true);
  for(let j=0;j<2;j++){stroke(b,s,sweep(j));bands.push(band(s,j));}
@@ -63,11 +64,13 @@ test('the low-water hand brush skips the tooth and runs dry within one sweep',()
  stroke(b,s,sweep(1));assert.ok(band(s,1).pigment<first.pigment*.1);
 });
 
+// These lane-uniformity limits calibrate the Row model, which remains selectable.
+// Section uses finite swept contact and is covered by the GPU parity/browser checks.
 // Check transverse paint uniformity as well as bare-paper coverage: a striped
 // wash can still put a trace of pigment in every cell.
 for(const dpi of [15,60,90])for(const tool of ['round','flat'])for(const water of [1.5,3])
- test(`${tool} at water ${water}, ${dpi} dpi keeps loaded lanes even along a long stroke`,()=>{
-  const r=measureLoad({dpi,tool,water});
+ test(`Row ${tool} at water ${water}, ${dpi} dpi keeps loaded lanes even along a long stroke`,()=>{
+  const r=measureLoad({dpi,tool,water,model:'row'});
   const loaded=r.bands.filter(b=>b.before<.8&&b.left>.15);
   assert.ok(loaded.length>3);
   for(const b of loaded){
@@ -103,4 +106,15 @@ test('auto re-dip leaves a blotted brush finite',()=>{
  dip(b,{water:.15,conc:[.5]});assert.equal(needsRedip(b),false);
  b.resW=0;for(const h of b.hairs)h.water=0;
  assert.equal(needsRedip(b),false);
+});
+
+for(const tool of ['round','flat'])test(`default Section ${tool} deposits paint and conserves its finite load`,()=>{
+ const s=createSheet({...makePaper(96,64,paperOptions('cold',60,7)),mmPerCell:25.4/60},[pigment]);
+ const b=createBrush(handBrushOptions({tool,sizeMm:10,water:2},{seed:149}));assert.equal(b.model,'section');
+ dip(b,{water:2,conc:[.4]});const scale=kappaOf(b,s.paper.mmPerCell)/(s.paper.mmPerCell**2),w=water(b)*scale,p=paint(b)*scale;
+ stroke(b,s,[{x:15,y:30,p:.8},{x:80,y:34,p:.8}]);
+ const deposited=sum(s.G[0])+sum(s.P[0])+sum(s.D[0]);assert.ok(deposited>0);
+ assert.ok(Math.abs(water(b)*scale+sum(s.W)+sum(s.s)-w)<.001,'water conserved');
+ assert.ok(Math.abs(paint(b)*scale+deposited-p)<.001,'pigment conserved');
+ for(const a of [s.W,s.s,...s.G,...s.P,...s.D])assert.ok(a.every(Number.isFinite));
 });

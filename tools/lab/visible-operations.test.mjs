@@ -66,13 +66,16 @@ test('hand masking persists across strokes; removal, blotting and lifting change
 
 test('complete shipped live paintings preserve masks and their actual removal',()=>{
  const manifest=JSON.parse(fs.readFileSync(new URL('../../demos/lab/examples/recorded.json',import.meta.url)));
+ let masked=0;
  for(const file of manifest.examples.flatMap(ex=>Object.values(ex.live??{}))){
   const tape=JSON.parse(gunzipSync(fs.readFileSync(new URL(`../../demos/lab/${file}`,import.meta.url))));
   assert.equal(tape.complete,true);
-  assert.ok(tape.marks.some(m=>m.k==='r'),'the masking fluid is recorded');
-  assert.ok(tape.marks.some(m=>m.k==='R'),'the complete run includes physical mask removal');
+  const masks=tape.marks.filter(m=>m.k==='r').length,removals=tape.marks.filter(m=>m.k==='R').length;
+  assert.equal(removals,masks,'every recorded mask has its actual removal');
+  masked+=masks;
   assert.ok(tape.marks.some(m=>m.k==='y'),'the complete run includes drying');
  }
+ assert.ok(masked>0,'the gallery exercises physical mask removal');
 });
 
 test('carrying on mid-stroke never deposits a lift bead at the unvisited endpoint',async()=>{

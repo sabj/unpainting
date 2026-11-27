@@ -374,8 +374,16 @@ fn dep_k(@builtin(workgroup_id) wid: vec3<u32>, @builtin(local_invocation_id) li
   let c = cx(wid, lid); if (!c.ok || M[c.i] != 1u) { return; }
   var d = 0.0; for (var k = 0u; k < u.K; k++) { if (!hasPigment(c, k)) { continue; } d += D[k * u.n + c.i]; }
   DEP[c.i] = d;   // the deposit's height, unscaled: the slide scales it by its box's fill (fillAt)
+  if (FIXED_BED) {
+    var support = DEP[2u * u.n + c.i];
+    if (u.hasTop != 0u) { for (var k = 0u; k < u.K; k++) { support += TOP[k * u.n + c.i]; } }
+    DEP[u.n + c.i] = support;
+  }
 }
-fn surf(j: u32, fl: f32, fill: f32) -> f32 { return (1.0 - fl) * PAPER3[j].w + fl * PAPER3[j].x + fill * DEP[j]; }
+fn surf(j: u32, fl: f32, fill: f32) -> f32 {
+  var support = 0.0; if (FIXED_BED) { support = DEP[u.n + j]; }
+  return (1.0 - fl) * PAPER3[j].w + fl * PAPER3[j].x + fill * (DEP[j] + support);
+}
 @compute @workgroup_size(16, 16)
 fn slide_out(@builtin(workgroup_id) wid: vec3<u32>, @builtin(local_invocation_id) lid: vec3<u32>) {
   let c = cx(wid, lid); if (!c.ok || M[c.i] != 1u) { return; }
@@ -619,7 +627,9 @@ fn fix_a(@builtin(global_invocation_id) g: vec3<u32>) {
 fn fix_b(@builtin(global_invocation_id) g: vec3<u32>) {
   if (g.x >= u.w || g.y >= u.h) { return; }
   let i = g.y * u.w + g.x;
-  for (var k = 0u; k < u.K; k++) { let q = k * u.n + i; TOP[q] = D[q]; D[q] = 0.0; }
+  for (var k = 0u; k < u.K; k++) { let q = k * u.n + i;
+    if (FIXED_BED && u.hasTop != 0u) { DEP[2u * u.n + i] += TOP[q]; }
+    TOP[q] = D[q]; D[q] = 0.0; }
   EVER[i] = 0u;
 }
 
@@ -658,7 +668,7 @@ fn cap_commit(@builtin(workgroup_id) wid: vec3<u32>, @builtin(local_invocation_i
 }
 // a latched surface batch (surface_boundary) leaves the rest of its queued steps alone, the edge feed's too
 fn efHalted() -> bool { return atomicLoad(&CTR[8]) != 0u && atomicLoad(&CTR[11]) != 0u; }
-// what the boxes and levelling (media/gpu/film-level-wgsl.js) ask of the sheet: the lab keeps OUT4 whole and no fixed bed
+// what the boxes and levelling (media/gpu/film-level-wgsl.js) ask of the sheet: the lab keeps OUT4 whole; fixed-bed support uses DEP's third plane
 fn o4get(q: u32) -> vec4<f32> { return OUT4[q]; }
 fn o4set(q: u32, v: vec4<f32>) { OUT4[q] = v; }
 const FIXED_BED: bool = false;

@@ -17,7 +17,8 @@ const engineFiles=['demos/lab/worker.js','demos/lab/worker/live-tape.js','demos/
 // Freeze each version before Chrome starts, including during development edits.
 const originals=new Map(await Promise.all(engineFiles.map(async file=>['/'+file,baseline
  ?execFileSync('git',['show',baselineRef+':'+file],{cwd:root}):await readFile(path.join(root,file))])));
-const recorded=JSON.parse(gunzipSync(await readFile(path.join(root,'demos/lab/examples/tiepolo-camel/live.json.gz'))));
+const examples=JSON.parse(await readFile(path.join(root,'demos/lab/examples/recorded.json'))).examples;
+const recorded=JSON.parse(gunzipSync(await readFile(path.join(root,'demos/lab',Object.values(examples[0].live)[0]))));
 // The complete shipped recording, with its native size, materials and events.
 const drawing={version:2,w:240,h:180,paper:{seed:9,mmPerCell:.3},pigments:[BY_KEY.paynes,BY_KEY.rose],brushes:[0],brushOpts:[{model:'section',radius:8,capacity:30,bristles:24,seed:7}],penOpts:[],pens:[],marks:[]};
 for(let i=0;i<100;i++)drawing.marks.push({k:'g',pigment:0,points:[{x:20+i%10*19,y:20+Math.floor(i/10)*13},{x:33+i%10*19,y:28+Math.floor(i/10)*13}],options:{amount:.4,width:1.4,seed:i}});

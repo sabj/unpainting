@@ -150,7 +150,7 @@ function bareBase() {
   return paperReflectance(paper, surface, dpi);
 }
 // keep only the top dried wash as masses (new water can lift it); fold older ones into the paper's colour
-function foldLayers() { if(sheet.resist){baseDirty=true;return;}while (sheet.layers.length > 1) { glaze(baseR, sheet.layers.shift()); baseIsBare = false; baseDirty = true; } }
+function foldLayers() { if(sheet.resist||sheet._liveTape||phys?.sheet.o.fixedBed>0){baseDirty=true;return;}while (sheet.layers.length > 1) { glaze(baseR, sheet.layers.shift()); baseIsBare = false; baseDirty = true; } }
 
 // While masking fluid is on, retain removable layers as masses. Compose their
 // colour into a temporary base rather than permanently baking it into the paper.
@@ -939,10 +939,18 @@ async function liveTape(data,current){
         dirty=true;dryFinishDirty=true;dryCoarseRgba=null;
       });return count;
     },
-    mutate:fn=>locked(async()=>{if(!current())return;if(phys)await phys.syncAll(sheet, baseR);fn();if(phys){phys.upload(sheet);phys.finish?.invalidate(false);}dirty=baseDirty=true;dryFinishDirty=true;dryCoarseRgba=null;}),
+    mutate:(fn,{kind}={})=>locked(async()=>{
+      if(!current())return;
+      // Clipping is brush admission, packed into each Section plan. It changes
+      // no physical field and must not download/re-upload the whole wet sheet.
+      if(kind==='clip'||kind==='unclip'){fn();return;}
+      if(phys)await phys.syncAll(sheet,baseR);fn();
+      if(phys){phys.upload(sheet);phys.finish?.invalidate(false);}
+      dirty=baseDirty=true;dryFinishDirty=true;dryCoarseRgba=null;
+    }),
     flow:(dry,m)=>locked(async()=>{if(!current())return;
       const opts={...DEFAULTS,...tape.opts,...(liveOptions??{})};
-      const gpuOk = phys && !phys.lost && !(opts.fixedBed > 0);
+      const gpuOk = phys && !phys.lost;
       if (gpuOk) {
         await phys.sectionPending;
         const quick=interactive();
@@ -956,8 +964,8 @@ async function liveTape(data,current){
         }
       } else {
         if(phys)await phys.syncAll(sheet, baseR);
-        // Archived fixed-bed passages need CPU transport. Use its established
-        // analytic pore tail in Fast mode too; Full keeps the recorded schedule.
+        // CPU fallback retains the recorded fixed-bed transport. Fast mode
+        // uses its analytic pore tail; Full keeps the recorded schedule.
         const quick=dry&&interactive();
         const cpuTape=liveOptions||quick?{...tape,opts:{...opts,...(quick?{evap:opts.evap*4,edgeEvap:opts.edgeEvap*4,paperDry:opts.paperDry*4}:{})}}:tape;
         tapeFlow(cpuTape,sheet,dry,quick?{...m,at:true,dt:Math.max(m?.dt??2,8)}:m);

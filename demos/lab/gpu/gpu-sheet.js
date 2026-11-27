@@ -42,12 +42,14 @@ const UF = [['w', 'u'], ['h', 'u'], ['n', 'u'], ['tw', 'u'], ['th', 'u'], ['ntil
   'enclose', 'slideCap', 'holeFill', 'padB', 'filmDiff', 'filmDepth', 'holeSpan', 'mar', 'slope', 'padC', 'mmPerCell', 'edgeFlowDepth',
   'toothLo', 'toothSpan', 'hollowUnit', 'groundPhys', 'poreHalo', 'poreReach', 'padTime2', 'lvFloor',
   // the painter's film sheet (media/gpu/film-level-host.js levelUniforms)
-  'holdDepth', 'coSettle', 'fillRef', 'lvK0', 'lvTx', 'lvTy', 'lvTan', 'lvDm', 'lvR', 'lvIt', 'lvSubs', 'lvBoxes', 'brC', 'brPush', 'brHead', 'brPad2'].map(k => [k, 'f'])];
+  'holdDepth', 'coSettle', 'fillRef', 'lvK0', 'lvTx', 'lvTy', 'lvTan', 'lvDm', 'lvR', 'lvIt', 'lvSubs', 'lvBoxes', 'brC', 'brPush', 'brHead', 'brPad2'].map(k => [k, 'f']),
+  ['fixedBed', 'u'], ['bedPad0', 'u'], ['bedPad1', 'u'], ['bedPad2', 'u']];
 const UOFF = Object.fromEntries(UF.map(([k], i) => [k, i * 4]));
 const UTYPE = Object.fromEntries(UF);
 const UBYTES = UF.length * 4 + 512 + 64 + 256;
 const PRELUDE = `struct U {\n${UF.map(([k, t]) => `  ${k}: ${t === 'u' ? 'u32' : 'f32'},`).join('\n')}\n  pa: array<vec4<f32>, 16>,\n  pb: array<vec4<f32>, 16>,\n  act: array<vec4<u32>, 4>,\n  pc: array<vec4<f32>, 16>,\n}\n@group(0) @binding(0) var<uniform> u: U;\nfn pigA(k: u32) -> vec4<f32> { return u.pa[k]; }\nfn pigB(k: u32) -> vec4<f32> { return u.pb[k]; }\nfn pigC(k: u32) -> vec4<f32> { return u.pc[k]; }\nfn physicalChannel(a: u32) -> u32 { return u.act[a / 4u][a % 4u]; }\n`;
-const SRC = PRELUDE + WGSL;
+// Shared film-level kernels use the same fixed-bed switch as the slide kernels.
+const SRC = PRELUDE + WGSL.replace('const FIXED_BED: bool = false;', '').replaceAll('FIXED_BED', '(u.fixedBed != 0u)');
 
 // which bindings each entry point touches, found from the source: its own body plus the helpers it calls
 function analyse(src) {
@@ -109,7 +111,8 @@ export class GpuSheet {
     this.tw = Math.ceil(w / TILE); this.th = Math.ceil(h / TILE); this.ntiles = this.tw * this.th;
     const mk = (bytes, usage = 0) => d.createBuffer({ size: Math.max(16, bytes), usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST | usage });
     const f = n * 4, B = this.b = {};
-    for (const k of ['M', 'EVER', 'RESIST', 'W', 'S', 'S2', 'FX', 'FY', 'WSC', 'WENT', 'DEP', 'NEWF']) B[k] = mk(f);
+    for (const k of ['M', 'EVER', 'RESIST', 'W', 'S', 'S2', 'FX', 'FY', 'WSC', 'WENT', 'NEWF']) B[k] = mk(f);
+    B.DEP = mk(f * 3); // loose deposit, frozen support, older fixed layers
     for (const k of ['PAPER', 'PAPER2', 'PAPER3']) B[k] = mk(f * 4);
     for (const k of ['G', 'P', 'D', 'TOP', 'QX', 'QY', 'SC', 'OUTM', 'PN', 'DD']) B[k] = mk(f * K);
     B.OUT4 = mk(f * 4 * K);
@@ -387,6 +390,7 @@ export class GpuSheet {
     if (wasRealtime && !o.realtime && this.ef) { this.ef.stale = true; this.statusSynced = false; }
     const set = (k, v) => { const i = UOFF[k] / 4; if (UTYPE[k] === 'u') U32[i] = v; else F32[i] = v; };
     set('w', this.w ?? 0); set('h', this.h ?? 0); set('n', this.n ?? 0); set('tw', this.tw ?? 0); set('th', this.th ?? 0); set('ntiles', this.ntiles ?? 0); set('K', this.K);
+    set('fixedBed', o.fixedBed > 0 ? 1 : 0);
     set('p2', o.optimized === false ? 0 : 1); set('cap', this.cap ?? 0); set('hasTop', this.hasTop ? 1 : 0); set('holdOn', Number.isFinite(o.hold ?? Infinity) ? 1 : 0);
     // physical time (flow-time.js): a step's time in chunks of at most 2, flow and pore passes from dt and the cell size
     const requestedDt = o.dt ?? 1;
@@ -452,6 +456,13 @@ export class GpuSheet {
     for (let k = 0; k < K; k++) { put(B.G, sheet.G[k], k * n * 4); put(B.P, sheet.P[k], k * n * 4); put(B.D, sheet.D[k], k * n * 4); }
     this.hasTop = sheet.layers.length > 0;
     if (this.hasTop) { const top = sheet.layers[sheet.layers.length - 1]; for (let k = 0; k < K; k++) put(B.TOP, top[k], k * n * 4); }
+    // Older layers cannot lift; only their summed height is needed by transport.
+    // Rebuild after full uploads (mask removal/undo may have changed them).
+    const bed = new Float64Array(n);
+    for (let l = 0; l < sheet.layers.length - 1; l++) for (let k = 0; k < K; k++) {
+      const plane = sheet.layers[l][k]; for (let i = 0; i < n; i++) bed[i] += plane[i];
+    }
+    put(B.DEP, Float32Array.from(bed), 2 * n * 4);
     this.channelMask = observeSheetChannels(this.channelMask ?? 0, sheet, K);
     this.tilt = sheet.tilt ?? null;   // the board's tilt (sheet.js setTilt), for the levelling
     this.setOptions({ mmPerCell: sheet.paper?.mmPerCell ?? 0.3 });

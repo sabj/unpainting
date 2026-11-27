@@ -2,69 +2,18 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Unpainting demos</title>
 <style>
-:root { --bg: #f6f3eb; --fg: #2b2823; --muted: #6d665b; --card: #fffdf8; --rule: #e2dccf; color-scheme: light dark; }
-@media (prefers-color-scheme: dark) { :root { --bg: #1b1a17; --fg: #ece6da; --muted: #a59d90; --card: #24221e; --rule: #38342d; } }
-* { box-sizing: border-box; }
-body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.45 system-ui, sans-serif; padding: 32px 16px 56px; }
-main { max-width: 1040px; margin: 0 auto; display: grid; gap: 28px; }
-header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
-h1 { font: 600 28px/1.1 Georgia, serif; margin: 0; }
-header a { color: var(--muted); font-size: 14px; }
-.demo { display: grid; gap: 10px; }
-h2 { font: 600 20px/1.2 Georgia, serif; margin: 0; }
-h2 a { color: inherit; }
-.media { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(220px, 40%), 1fr)); gap: 12px; }
-.media a { display: block; background: var(--card); border: 1px solid var(--rule); border-radius: 8px; overflow: hidden; color: var(--muted); text-decoration: none; font-size: 13px; }
-.media img { display: block; width: 100%; aspect-ratio: 6 / 5; object-fit: contain; background: #f6f3eb; }
-.media span { display: block; padding: 6px 10px; }
-@media (prefers-reduced-motion: reduce) { .media .moving { display: none; } }
-.plates { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
-.plates a { display: block; border-radius: 6px; overflow: hidden; border: 1px solid var(--rule); }
-.plates img { display: block; width: 100%; aspect-ratio: 6 / 5; object-fit: cover; }
+:root{color-scheme:light;--paper:#f6f3eb;--ink:#302c26;--muted:#71695e;--line:#ddd6c8}
+*{box-sizing:border-box}body{margin:0;background:var(--paper);color:var(--ink);font:16px/1.5 system-ui,sans-serif}main{max-width:1120px;margin:auto;padding:40px 24px 64px}header{display:flex;align-items:baseline;justify-content:space-between;gap:20px;margin-bottom:32px}h1{font:400 30px/1.2 Georgia,serif;margin:0}header a{color:var(--muted);font-size:14px}.demos{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:24px}.demo{color:inherit;text-decoration:none}.demo img{display:block;width:100%;aspect-ratio:4/3;object-fit:contain;background:#fffdf8;border:1px solid var(--line)}h2{margin:14px 0 4px;font:400 24px/1.2 Georgia,serif}.demo p{margin:0;color:var(--muted);font-size:14px}.demo:hover h2{text-decoration:underline;text-underline-offset:4px}.demo:focus-visible{outline:2px solid #8f533b;outline-offset:8px}@media(max-width:720px){main{padding:28px 20px}.demos{grid-template-columns:1fr;gap:32px}.demo img{max-height:320px}h1{font-size:26px}}
 </style>
 </head>
-<body>
-<main>
-  <header><h1>Unpainting demos</h1><a href="https://github.com/sabj/unpainting">Source</a></header>
-  <section class="demo" aria-labelledby="fungi">
-    <h2 id="fungi"><a href="fungi/">Spore Studies</a></h2>
-    <div class="media">
-      <a href="fungi/"><img src="fungi/plates/amanita.webp" alt="A fly agaric plate in ink and watercolour"><span>Plate</span></a>
-      <a href="fungi/" class="moving"><img src="thumbs/fungi-paint.webp" alt="The plate painting itself from blank paper: ink line by line, then washes under the brush" loading="lazy"><span>Painting</span></a>
-      <a href="fungi/" class="moving"><img src="thumbs/fungi-turn.webp" alt="The plate turning a full circle in 3D" loading="lazy"><span>Turning</span></a>
-      <a href="fungi/" class="moving"><img src="thumbs/fungi-morph.webp" alt="A fly agaric morphing into a field mushroom and back" loading="lazy"><span>Morphing</span></a>
-    </div>
-  </section>
-  <section class="demo" aria-labelledby="lab">
-    <h2 id="lab"><a href="lab/">Paint Lab</a></h2>
-    <div class="media">
-      <a href="lab/"><img src="thumbs/lab.webp" alt="A heart with an arrow through it, painted in Paint Lab"><span>Painting</span></a>
-      <a href="lab/" class="moving"><img src="thumbs/lab-paint.webp" alt="The heart painted wet in rose, then the arrow glazed over it" loading="lazy"><span>Painting it</span></a>
-    </div>
-  </section>
-  <section class="demo" aria-labelledby="layers">
-    <h2 id="layers"><a href="layers/">Layers</a></h2>
-    <div class="media">
-      <a href="layers/"><img src="thumbs/layers.webp" alt="The Trumbull painting and its layers as small tiles"><span>Painting</span></a>
-      <a href="layers/" class="moving"><img src="thumbs/layers-spread.webp" alt="The Trumbull painting tilting into its layers and spreading apart" loading="lazy"><span>Taken apart</span></a>
-    </div>
-  </section>
-  <section class="plates" aria-label="Spore Studies plates">
-    <a href="fungi/?type=morel-1"><img src="fungi/plates/morel.webp" alt="Morel" loading="lazy"></a>
-    <a href="fungi/?type=chanterelle-1"><img src="fungi/plates/chanterelle.webp" alt="Chanterelle" loading="lazy"></a>
-    <a href="fungi/?type=oyster-1"><img src="fungi/plates/oyster.webp" alt="Oyster mushroom" loading="lazy"></a>
-    <a href="fungi/?type=agaric-4"><img src="fungi/plates/honey-fungus.webp" alt="Honey fungus" loading="lazy"></a>
-    <a href="fungi/?type=bolete-1"><img src="fungi/plates/bolete.webp" alt="Bolete" loading="lazy"></a>
-    <a href="fungi/?type=inkcap-1"><img src="fungi/plates/inkcap.webp" alt="Shaggy inkcap" loading="lazy"></a>
-    <a href="fungi/?type=bracket-6"><img src="fungi/plates/chicken-of-the-woods.webp" alt="Chicken of the woods" loading="lazy"></a>
-    <a href="fungi/?type=coral-1"><img src="fungi/plates/coral.webp" alt="Coral fungus" loading="lazy"></a>
-    <a href="fungi/?type=tooth-1"><img src="fungi/plates/lions-mane.webp" alt="Lion's mane" loading="lazy"></a>
-    <a href="fungi/?type=amanita-1&amp;background=1&amp;scene=woodland"><img src="fungi/plates/amanita-woodland.webp" alt="Fly agaric in woodland" loading="lazy"></a>
-    <a href="fungi/?type=agaric-4&amp;background=1&amp;scene=fallen-log"><img src="fungi/plates/honey-fungus-log.webp" alt="Honey fungus on a fallen log" loading="lazy"></a>
-  </section>
-</main>
-</body>
-</html>
+<body><main>
+<header><h1>Unpainting <small>0.5</small></h1><a href="https://github.com/sabj/unpainting">GitHub</a></header>
+<div class="demos">
+<a class="demo" href="lab/"><img src="thumbs/lab.webp" width="640" height="480" alt="The Laundresses painted with the section brush"><h2>Paint Lab</h2><p>Paint on paper. Replay a painting.</p></a>
+<a class="demo" href="fungi/"><img src="thumbs/fungi.webp" width="640" height="480" alt="An ink and watercolor mushroom study"><h2>Spore Studies</h2><p>Turn, morph, and paint a specimen.</p></a>
+<a class="demo" href="layers/"><img src="thumbs/layers.webp" width="640" height="480" alt="Tiepolo’s painting separated into its saved stages"><h2>Layers</h2><p>Explore painting stages and named forms.</p></a>
+</div>
+</main></body></html>

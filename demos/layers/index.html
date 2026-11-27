@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Trumbull Layers</title>
+<title>Layers · Unpainting</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%2399543a' d='M12 2 2 7l10 5 10-5-10-5ZM2 11v3l10 5 10-5v-3l-10 5-10-5Zm0 7v2l10 4 10-4v-2l-10 4-10-4Z'/%3E%3C/svg%3E">
 <style>
 :root { --bg:#f6f2ea; --ink:#2b2a27; --muted:#746c60; --line:#d9d2c4; --accent:#99543a; }
@@ -83,7 +83,7 @@ body.spread #spread { display:grid; } body.spread #stack { display:none; }
 #tTicks .tick { position:absolute; height:18px; text-align:center; }
 #tTicks .tick-label { display:inline-block; white-space:nowrap; visibility:hidden; }
 #tTicks .tick-label.fits { visibility:visible; }
-#tTooltip { position:absolute; bottom:48px; max-width:100%; padding:4px 8px; border:1px solid var(--line); border-radius:4px; background:var(--bg); font-size:12px; pointer-events:none; z-index:30; }
+#tTooltip { position:absolute; bottom:48px; max-width:200px; transform:translateX(-50%); padding:4px 8px; border:1px solid var(--line); border-radius:4px; background:var(--bg); font-size:12px; pointer-events:none; z-index:30; }
 .kicker, .tl { font:600 10px -apple-system, Helvetica, Arial; letter-spacing:.08em; text-transform:uppercase; color:var(--accent); }
 .kicker { margin:2px 0 -4px 2px; }
 .tl { margin-right:2px; }
@@ -120,12 +120,14 @@ body.full #timeline { position:fixed; left:260px; right:260px; bottom:12px; z-in
   body.full .tabs { width:calc(100% - 20px); }
 }
 @media (prefers-reduced-motion:reduce) { #stackInner .plane { transition:none; } }
+nav{padding:12px 24px;font:14px system-ui}nav a{color:inherit}#stackInner{will-change:transform}.plane{will-change:transform}
 </style>
 </head>
 <body>
+<nav aria-label="Demos"><a href="../">All demos</a> · <a href="https://github.com/sabj/unpainting">GitHub</a></nav>
 <header>
-  <h1>Trumbull, taken apart</h1>
-  <p>Trumbull College, split two ways: by stage (when the paint went on) and by subject (which part of the plan it was for). Pick any mix, or press Play to watch it paint. Every pixel comes from the painter's own saved frames.</p>
+  <h1>Layers</h1>
+  <p>Bacchus and Ariadne · Tiepolo. Saved painting stages and named forms.</p>
 </header>
 <main>
   <aside>
@@ -143,7 +145,7 @@ body.full #timeline { position:fixed; left:260px; right:260px; bottom:12px; z-in
       <div class="slider"><span>Ink weight</span><input id="inkw" type="range" min="1" max="6" step="0.5" value="2.5"><span></span></div>
       <input type="radio" name="by" value="stage" checked hidden>      <label><input type="checkbox" id="showPaper" checked> finished sheet in front</label>
       <label><input type="checkbox" id="tags" checked> labels</label>
-      <p class="note" style="margin:6px 0 0">Left-drag to spin and tilt. Right-drag (or Option-drag) to twist and tilt. Middle-drag or Shift-drag to move. Scroll to zoom; Shift-scroll to spread the layers apart. Shift-drag to move. Double-click to reset.</p>
+      <p class="note" style="margin:6px 0 0">Left-drag to spin and tilt. Right-drag (or Option-drag) to twist and tilt. Middle-drag or Shift-drag to move. Scroll to zoom; Shift-scroll to spread the layers apart. Double-click to reset.</p>
       <div class="row"><button id="copyView">Copy view settings</button></div>
     </fieldset>
     <div id="layerList"><b>Layers</b> <span class="note">Hover to find a layer. Click to isolate; click again to show all.</span><div id="lis"></div><div class="row"><button id="exitFull">Exit full page</button></div></div>
@@ -162,38 +164,37 @@ body.full #timeline { position:fixed; left:260px; right:260px; bottom:12px; z-in
   </section>
 </main>
 <script>
-const STAGES = [
-  { key:'frisket', label:'Reserve lights', frames:[1,1] },
-  { key:'drawing', label:'Ink drawing', frames:[2,5], ink:true },
-  { key:'v1', label:'Value 1: lightest wash', frames:[6,10] },
-  { key:'v2', label:'Value 2', frames:[11,22] },
-  { key:'v3', label:'Value 3', frames:[23,23] },
-  { key:'v4', label:'Value 4', frames:[24,25] },
-  { key:'v5', label:'Value 5: darks', frames:[26,27] },
-  { key:'t1', label:'Look and correct 1', frames:[28,29] },
-  { key:'t2', label:'Look and correct 2', frames:[30,31] },
-  { key:'ink', label:'Closing ink', frames:[32,35], ink:true },
-];
+let STAGES=[], W=1,H=1,N=1,MAX_FRAME=0;
 const FAM_NAMES = {};
-const FAM_COL = ['#999','#8fb3d9','#d9a441','#a0522d','#3b3b46','#5f7a3a','#9a9a8a','#b58fb5'];
-const W = 1086, H = 744, N = W*H;
-let upto = 36, playing = null, frames = [], labels = [], meta, sel = { stages:new Set(STAGES.map(s=>s.key)), fams:new Set() };
-
-const loadImg = src => new Promise((ok, no) => { const i = new Image(); i.onload = () => ok(i); i.onerror = no; i.src = src; });
-const pixels = (img, gray) => { const c = new OffscreenCanvas(W, H), x = c.getContext('2d'); x.drawImage(img, 0, 0, W, H); const d = x.getImageData(0, 0, W, H).data; if (!gray) return d; const o = new Uint8Array(N); for (let i = 0; i < N; i++) o[i] = d[i*4]; return o; };
-
-async function init() {
-  window.tilt = document.getElementById('tilt'); window.turn = document.getElementById('turn'); window.gap = document.getElementById('gap'); window.inkw = document.getElementById('inkw');
-  meta = await (await fetch('data/meta.json')).json();
-  const f = await Promise.all(Array.from({length:37}, (_, i) => loadImg(`data/f${String(i).padStart(4,'0')}.jpg`)));
-  frames = f.map(i => pixels(i));
-  const subj = pixels(await loadImg('data/subjects.png'), true);
-  labels = Array(36).fill(subj);
-  meta.families = meta.subjects;
-  meta.families.forEach((_, i) => sel.fams.add(i + 1));
-  buildControls();
+const FAM_COL = ['#999999','#8fb3d9','#d9a441','#a0522d','#3b3b46','#5f7a3a','#9a9a8a','#b58fb5','#b39175','#6f8484','#b592a4','#aab68a','#947969','#b3ab7f','#947d9f','#69847a','#9e725b'];
+let upto=0,playing=null,meta,sel={stages:new Set(),fams:new Set()};
+let truthFrames=[];
+let bank=null,bankKey=null,requestedKey=null,rasterWorker;
+const bankIdentity=()=>JSON.stringify([[...sel.fams].sort(),[...sel.stages].sort(),+inkw.value,document.getElementById('outline').checked]);
+function prepareBank(){
+ const key=bankIdentity();if(key===bankKey)return true;if(key===requestedKey)return false;
+ requestedKey=key;document.body.dataset.rasterizing='true';
+ rasterWorker.postMessage({key,fams:[...sel.fams],stages:[...sel.stages],gain:+inkw.value,outline:document.getElementById('outline').checked,colors:FAM_COL});return false;
 }
-
+async function init(){
+ window.tilt=document.getElementById('tilt');window.turn=document.getElementById('turn');window.gap=document.getElementById('gap');window.inkw=document.getElementById('inkw');
+ meta=await(await fetch('data/meta.json')).json();({w:W,h:H}=meta);N=W*H;STAGES=meta.stages;MAX_FRAME=meta.frames.length-1;upto=MAX_FRAME;
+ meta.families=meta.subjects;sel.stages=new Set(STAGES.map(s=>s.key));meta.families.forEach((_,i)=>sel.fams.add(i+1));
+ for(const id of ['tSlider','scrub']){document.getElementById(id).max=MAX_FRAME;document.getElementById(id).value=MAX_FRAME;}
+ rasterWorker=new Worker('raster-worker.mjs',{type:'module'});
+ const loaded=new Promise((resolve,reject)=>{rasterWorker.onmessage=({data:d})=>{
+  if(d.kind==='error'){reject(Error(d.message));return;}
+  if(d.kind==='loaded'){prepareBank();return;}
+  if(d.kind==='bank'){
+   if(d.key!==bankIdentity()){for(const b of [...d.composites,...Object.values(d.layers)])b.close();return;}
+   if(bank)for(const b of [...bank.composites,...Object.values(bank.layers)])b.close();bank=d;bankKey=d.key;requestedKey=null;document.body.dataset.rasterizing='false';redraw();resolve();
+  }
+ };rasterWorker.onerror=e=>reject(Error(e.message));});
+ rasterWorker.postMessage({kind:'init',meta:{...meta,frames:meta.frames.map(f=>new URL(f,location.href).href),labels:new URL(meta.labels,location.href).href}});
+ truthFrames=await Promise.all(meta.frames.map(async f=>createImageBitmap(await(await fetch(f)).blob())));buildControls();await loaded;
+}
+function copyBitmap(canvas,source){if(!source||canvas._source===source)return;canvas._source=source;if(canvas.width!==W)canvas.width=W;if(canvas.height!==H)canvas.height=H;const c=canvas.getContext('2d');c.clearRect(0,0,W,H);c.drawImage(source,0,0);}
+function stageBitmap(s){return bank.layers[upto<s.frames[0]?'blank':`${s.key}:${Math.min(upto,s.frames[1])}`]??bank.layers.blank;}
 function buildControls() {
   const st = document.getElementById('stages');
   STAGES.forEach(s => { const l = document.createElement('label'); l.innerHTML = `<input type="checkbox" data-st="${s.key}" checked> ${s.label} <small>frames ${s.frames[0]}${s.frames[1]!==s.frames[0]?'–'+s.frames[1]:''}</small>`; st.appendChild(l); });
@@ -221,79 +222,28 @@ function buildControls() {
   document.getElementById('scrub').oninput = e => goTo(+e.target.value);
 }
 
-// Apply frame j's change (frame j over frame j-1) to buffer C where the pixel belongs to a selected subject.
-function applyFrame(C, j, famOk) {
-  if (j > upto) return;
-  const A = frames[j-1], B = frames[j], L = labels[j-1] ?? labels[0];
-  for (let p = 0, q = 0; p < N; p++, q += 4) {
-    if (!famOk(L[p])) continue;
-    for (let c = 0; c < 3; c++) { const a = A[q+c], b = B[q+c]; if (a === b) continue; const r = Math.min(1.6, (b + 1) / (a + 1)); C[q+c] = Math.max(0, Math.min(255, C[q+c] * r)); }
-  }
-}
-function famOkFn(set) { return v => set.has(v); }
-
-function render() {
-  const C = new Float32Array(frames[0]);
-  const ok = famOkFn(sel.fams);
-  for (const s of STAGES) if (sel.stages.has(s.key)) for (let j = s.frames[0]; j <= s.frames[1]; j++) applyFrame(C, j, ok);
-  const cv = document.getElementById('cv'); cv.width = W; cv.height = H;
-  const x = cv.getContext('2d'), im = x.createImageData(W, H);
-  for (let i = 0; i < N*4; i++) im.data[i] = i % 4 === 3 ? 255 : C[i];
-  if (document.getElementById('outline').checked) outline(im.data);
-  x.putImageData(im, 0, 0);
-}
-function outline(D) {
-  const L = labels.reduce((acc, l, k) => { if (k) for (let p = 0; p < N; p++) if (l[p]) acc[p] = l[p]; return acc; }, new Uint8Array(N));
-  for (let y = 1; y < H-1; y++) for (let x = 1; x < W-1; x++) { const p = y*W+x, v = L[p]; if (v && (L[p+1] !== v || L[p+W] !== v)) { const col = FAM_COL[v].match(/\w\w/g).map(h => parseInt(h, 16)); D[p*4] = col[0]; D[p*4+1] = col[1]; D[p*4+2] = col[2]; } }
-}
-
-// One stage alone, as paint on a transparent ground (alpha from how much it darkened the paper).
-function stageLayer(s, inkGain) {
-  const C = new Float32Array(N*4).fill(255), ok = famOkFn(sel.fams);
-  for (let j = s.frames[0]; j <= s.frames[1]; j++) applyFrame(C, j, ok);
-  const c = document.createElement('canvas'); c.width = W; c.height = H;
-  const x = c.getContext('2d'), im = x.createImageData(W, H);
-  for (let p = 0, q = 0; p < N; p++, q += 4) {
-    const m = Math.min(C[q], C[q+1], C[q+2]); let a = (255 - m) / 255;
-    if (s.ink) a = Math.min(1, a * inkGain);
-    if (a < 0.02) continue;
-    const k = 1 / Math.max(a, 1e-3);
-    for (let ch = 0; ch < 3; ch++) im.data[q+ch] = Math.max(0, Math.min(255, 255 - (255 - C[q+ch]) * k * (s.ink ? 1 : 1)));
-    im.data[q+3] = Math.round(Math.min(1, a * 1.15) * 255);
-  }
-  x.putImageData(im, 0, 0); return c;
-}
-let planes = [];
-function subjectLayer(v) {
-  const C = new Float32Array(N*4).fill(255), ok = x => x === v;
-  for (const st of STAGES) if (sel.stages.has(st.key)) for (let j = st.frames[0]; j <= st.frames[1]; j++) applyFrame(C, j, ok);
-  return toLayer(C, false, 1);
-}
-function toLayer(C, ink, inkGain) {
-  const c = document.createElement('canvas'); c.width = W; c.height = H;
-  const x = c.getContext('2d'), im = x.createImageData(W, H);
-  for (let p = 0, q = 0; p < N; p++, q += 4) {
-    const m = Math.min(C[q], C[q+1], C[q+2]); let a = (255 - m) / 255;
-    if (ink) a = Math.min(1, a * inkGain);
-    if (a < 0.02) continue;
-    const k = 1 / Math.max(a, 1e-3);
-    for (let ch = 0; ch < 3; ch++) im.data[q+ch] = Math.max(0, Math.min(255, 255 - (255 - C[q+ch]) * k));
-    im.data[q+3] = Math.round(Math.min(1, a * 1.15) * 255);
-  }
-  x.putImageData(im, 0, 0); return c;
-}
+function render(){if(!prepareBank())return;copyBitmap(document.getElementById('cv'),bank.composites[upto]);}
+function stageLayer(s){const c=document.createElement('canvas');copyBitmap(c,stageBitmap(s));return c;}
+let planes=[],stackSignature=null;
 function buildStack() {
+  if(!prepareBank())return;
+  const signature=JSON.stringify([mode,[...sel.stages],document.getElementById('showPaper').checked,document.getElementById('tags').checked]);
+  if(signature===stackSignature&&planes.length){
+    const selected=STAGES.filter(s=>sel.stages.has(s.key));
+    planes.forEach((p,i)=>copyBitmap(p.querySelector('canvas'),selected[i]?stageBitmap(selected[i]):bank.composites[upto]));return;
+  }
+  stackSignature=signature;
   if (mode === '2d') { const g = document.getElementById('spread'); g.innerHTML = ''; planes = [];
     const inkGain2 = +document.getElementById('inkw').value;
     STAGES.filter(s => sel.stages.has(s.key)).forEach(s => { const f = document.createElement('figure'); const c = stageLayer(s, inkGain2); f.appendChild(c); const cap = document.createElement('figcaption'); cap.textContent = s.label; cap.title = s.label; f.appendChild(cap); g.appendChild(f); });
-    const f = document.createElement('figure'), c = document.createElement('canvas'); c.width = W; c.height = H; const C = new Float32Array(frames[0]); const ok = famOkFn(sel.fams); for (const st of STAGES) if (sel.stages.has(st.key)) for (let j = st.frames[0]; j <= st.frames[1]; j++) applyFrame(C, j, ok); const im = c.getContext('2d').createImageData(W, H); for (let i = 0; i < N*4; i++) im.data[i] = i % 4 === 3 ? 255 : C[i]; c.getContext('2d').putImageData(im, 0, 0); f.appendChild(c); const cap = document.createElement('figcaption'); cap.textContent = 'All together'; f.appendChild(cap); g.appendChild(f);
+    const f=document.createElement('figure'),c=document.createElement('canvas');copyBitmap(c,bank.composites[upto]);f.appendChild(c);const cap=document.createElement('figcaption');cap.textContent='All together';f.appendChild(cap);g.appendChild(f);
     planes = [...g.children]; buildList(); fitSpread(); return; }
   const box = document.getElementById('stackInner'); box.innerHTML = ''; planes = [];
   const inkGain = +document.getElementById('inkw').value, tags = document.getElementById('tags').checked;
   const by = document.querySelector('input[name=by]:checked').value;
   const add = (canvas, label) => { const d = document.createElement('div'); d.className = 'plane'; d.dataset.label = label; d.appendChild(canvas); if (tags) { const t = document.createElement('div'); t.className = 'tag'; t.textContent = label; d.appendChild(t); } box.appendChild(d); planes.push(d); };
   if (by === 'stage') STAGES.filter(s => sel.stages.has(s.key)).forEach(s => add(stageLayer(s, inkGain), s.label));
-  else [1, 5, 2, 3, 4, 6].filter(v => sel.fams.has(v)).forEach(v => add(subjectLayer(v), meta.families[v-1]));
+
   if (document.getElementById('showPaper').checked) { const d = document.createElement('div'); d.className = 'plane paper'; const c = document.createElement('canvas'); c.width = W; c.height = H; render(); c.getContext('2d').drawImage(document.getElementById('cv'), 0, 0); d.appendChild(c); if (tags) { const t = document.createElement('div'); t.className = 'tag'; t.textContent = 'Finished'; d.appendChild(t); } box.appendChild(d); planes.push(d); }
   buildList();
   updateStack();
@@ -326,18 +276,19 @@ function buildList() {
     if (mode === '2d') { d.onmouseenter = li.onmouseenter; d.onmouseleave = li.onmouseleave; d.onclick = li.onclick; }
     lis.appendChild(li); });
 }
-function updateStack() {
+let stackFrame=0;
+function updateStack(){if(!stackFrame)stackFrame=requestAnimationFrame(()=>{stackFrame=0;paintStack();});}
+function paintStack() {
   const tilt = +document.getElementById('tilt').value, turn = +document.getElementById('turn').value, gap = +document.getElementById('gap').value;
   for (const id of ['tilt','turn','spin','gap','inkw','fan','zoom']) document.getElementById(id).nextElementSibling.textContent = document.getElementById(id).value;
   const fan = +document.getElementById('fan').value, zoom = +document.getElementById('zoom').value / 100, n = planes.length, mid = (n - 1) / 2;
   document.getElementById('stackInner').style.transform = `translate(${pan.x}px, ${pan.y}px) scale(${zoom}) rotateY(${+document.getElementById('spin').value}deg) rotateX(${tilt}deg) rotateZ(${turn}deg)`;
   planes.forEach((d, i) => d.style.transform = `translate3d(${(i - mid) * fan}px, ${(mid - i) * fan * 0.35}px, ${(i - mid) * gap}px)`);
 }
-function truth() {
-  const j = +document.getElementById('scrub').value, cv = document.getElementById('tv'); cv.width = W; cv.height = H;
-  cv.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(frames[j]), W, H), 0, 0);
-  const s = STAGES.find(s => j >= s.frames[0] && j <= s.frames[1]);
-  document.getElementById('tlabel').textContent = `Frame ${j} of 36 · ${j === 0 ? 'Bare paper' : j === 36 ? 'Finished' : s?.label ?? ''}`;
+function truth(){
+ if(!prepareBank())return;const j=+document.getElementById('scrub').value;
+ const cv=document.getElementById('tv');const img=truthFrames[j];if(img)copyBitmap(cv,img);
+ document.getElementById('tlabel').textContent=`Frame ${j} of ${MAX_FRAME} · ${stageAt(j)}`;
 }
 let pan = { x: 0, y: 0 };
 const wrap = a => ((a + 540) % 360) - 180;
@@ -356,13 +307,13 @@ function wireMouse() {
   document.getElementById('copyView').onclick = () => { const v = { tilt: +tilt.value, turn: +turn.value, spin: +document.getElementById('spin').value, gap: +gap.value, fan: +document.getElementById('fan').value, zoom: +document.getElementById('zoom').value, inkw: +inkw.value, pan, by: document.querySelector('input[name=by]:checked').value, stages: [...sel.stages], subjects: [...sel.fams] }; navigator.clipboard?.writeText(JSON.stringify(v)); document.getElementById('copyView').textContent = 'Copied'; setTimeout(() => document.getElementById('copyView').textContent = 'Copy view settings', 1200); };
 }
 function curView() { return document.querySelector('[data-view].on')?.dataset.view; }
-function stageAt(j) { return j === 0 ? 'Bare paper' : j >= 36 ? 'Finished' : (STAGES.find(s => j >= s.frames[0] && j <= s.frames[1])?.label ?? ''); }
+function stageAt(j) { return j === 0 ? 'Bare paper' : j >= MAX_FRAME ? 'Finished' : (STAGES.find(s => j >= s.frames[0] && j <= s.frames[1])?.label ?? ''); }
 function updateTimeline() {
   const stage = stageAt(upto);
   document.getElementById('tSlider').value = upto;
-  document.getElementById('tSlider').setAttribute('aria-valuetext', `${stage}, frame ${upto} of 36`);
+  document.getElementById('tSlider').setAttribute('aria-valuetext', `${stage}, frame ${upto} of ${MAX_FRAME}`);
   document.getElementById('stageName').textContent = stage;
-  document.getElementById('frameName').textContent = `frame ${upto} of 36`;
+  document.getElementById('frameName').textContent = `frame ${upto} of ${MAX_FRAME}`;
 }
 function redraw() {
   const v = curView();
@@ -377,13 +328,15 @@ function setPlaying(on) {
   btn.innerHTML = playIcon(on); btn.setAttribute('aria-label', on ? 'Pause' : 'Play'); btn.title = on ? 'Pause' : 'Play';
 }
 function stopPlaying() { clearTimeout(playing); playing = null; setPlaying(false); }
-function goTo(j) { stopPlaying(); upto = Math.max(0, Math.min(36, j)); redraw(); }
+let scrubFrame=0,scrubTarget=0;
+function queueGoTo(j){scrubTarget=j;if(!scrubFrame)scrubFrame=requestAnimationFrame(()=>{scrubFrame=0;goTo(scrubTarget);});}
+function goTo(j) { stopPlaying(); upto = Math.max(0, Math.min(MAX_FRAME, j)); redraw(); }
 const BAND_COLORS = ['#d5c9ac','#9b8b71','#c7c39f','#b5b18a','#989773','#85886d','#69745e','#bbaa86','#a48b69','#776e62'];
 function buildTicks() {
   const t = document.getElementById('tTicks'), bands = document.getElementById('tBands');
   t.innerHTML = ''; bands.innerHTML = '';
   STAGES.forEach((s, i) => {
-    const left = (s.frames[0] - .5) / 36 * 100, width = (s.frames[1] - s.frames[0] + 1) / 36 * 100;
+    const left = (s.frames[0] - .5) / MAX_FRAME * 100, width = (s.frames[1] - s.frames[0] + 1) / MAX_FRAME * 100;
     const band = document.createElement('span'); band.style.cssText = `left:${left}%;width:${width}%;--band:${BAND_COLORS[i]}`; bands.appendChild(band);
     const tick = document.createElement('span'); tick.className = 'tick'; tick.style.cssText = `left:${left}%;width:${width}%`; tick.title = s.label;
     const label = document.createElement('span'); label.className = 'tick-label'; label.textContent = s.label.replace(/:.*/, '').replace('Look and correct', 'Correct'); tick.appendChild(label); t.appendChild(tick);
@@ -391,22 +344,23 @@ function buildTicks() {
   fitTicks();
 }
 function fitTicks() {
-  document.querySelectorAll('.tick').forEach(t => {
-    const label = t.querySelector('.tick-label'); label.classList.toggle('fits', label.getBoundingClientRect().width + 8 <= t.getBoundingClientRect().width);
-  });
+  const measured=[...document.querySelectorAll('.tick')].map(t=>{const label=t.querySelector('.tick-label');return {label,fits:label.getBoundingClientRect().width+8<=t.getBoundingClientRect().width};});
+  for(const {label,fits} of measured)label.classList.toggle('fits',fits);
 }
+let timelineRect=null;
 function showStageTooltip(frame, x) {
   const tip = document.getElementById('tTooltip'), track = document.getElementById('tTrack');
   tip.textContent = stageAt(frame); tip.hidden = false;
-  tip.style.left = `${Math.max(0, Math.min(track.clientWidth - tip.offsetWidth, x - tip.offsetWidth / 2))}px`;
+  const width=(timelineRect??=track.getBoundingClientRect()).width;
+  tip.style.left=`${Math.max(Math.min(100,width/2),Math.min(width-Math.min(100,width/2),x))}px`;
 }
 function play() {
   if (playing !== null) { stopPlaying(); return; }
-  if (upto >= 36) upto = 0;
+  if (upto >= MAX_FRAME) upto = 0;
   setPlaying(true);
   const step = () => {
     redraw();
-    if (upto >= 36) { stopPlaying(); return; }
+    if (upto >= MAX_FRAME) { stopPlaying(); return; }
     playing = setTimeout(() => { upto++; step(); }, curView() === 'stack' ? 240 : 170);
   };
   step();
@@ -426,9 +380,9 @@ function buildSubjList() {
 }
 function setFam(v, on) { on ? sel.fams.add(v) : sel.fams.delete(v); const c = document.querySelector(`[data-fam="${v}"]`); if (c) c.checked = on; }
 init().then(() => { wireMouse(); buildSubjList(); buildTicks(); document.getElementById('playBtn').onclick = play;
-  document.getElementById('tFirst').onclick = () => goTo(0); document.getElementById('tLast').onclick = () => goTo(36);
+  document.getElementById('tFirst').onclick = () => goTo(0); document.getElementById('tLast').onclick = () => goTo(MAX_FRAME);
   document.getElementById('tBack').onclick = () => goTo(upto - 1); document.getElementById('tFwd').onclick = () => goTo(upto + 1);
-  document.getElementById('tSlider').oninput = e => goTo(+e.target.value);
+  document.getElementById('tSlider').oninput = e => queueGoTo(+e.target.value);
   addEventListener('keydown', e => { if (e.target.tagName === 'INPUT' && e.target.type !== 'range') return; if (e.key === ' ') { e.preventDefault(); play(); } if (e.key === 'ArrowRight') { e.preventDefault(); goTo(upto + 1); } if (e.key === 'ArrowLeft') { e.preventDefault(); goTo(upto - 1); } });
   const initialStack = document.getElementById('stack');
   if (innerWidth <= 820) { setVal('gap', 30); setVal('fan', 20); }
@@ -440,13 +394,14 @@ init().then(() => { wireMouse(); buildSubjList(); buildTicks(); document.getElem
   const go = on => { document.body.classList.toggle('full', on); (on ? document.querySelector('main > section') : document.querySelector('aside')).appendChild(document.getElementById('layerList')); if (on) { document.querySelector('input[name=by][value=stage]').checked = true; buildSubjList(); } if (curView() === 'stack') buildStack(); fitTicks(); };
   document.getElementById('fullBtn').onclick = () => go(!document.body.classList.contains('full'));
   document.getElementById('exitFull').onclick = () => go(false);
-  
+
   const track = document.getElementById('tTrack'), tip = document.getElementById('tTooltip');
-  track.onpointermove = e => { const x = e.clientX - track.getBoundingClientRect().left; showStageTooltip(Math.max(0, Math.min(36, Math.round((x - 9) / (track.clientWidth - 18) * 36))), x); };
-  track.onpointerleave = () => tip.hidden = true;
-  document.getElementById('tSlider').onfocus = () => showStageTooltip(upto, 9 + upto / 36 * (track.clientWidth - 18));
+  track.onpointermove = e => { const rect=timelineRect??=track.getBoundingClientRect(),x=e.clientX-rect.left; showStageTooltip(Math.max(0, Math.min(MAX_FRAME, Math.round((x - 9) / (rect.width - 18) * MAX_FRAME))), x); };
+  track.onpointerleave = () => {tip.hidden=true;timelineRect=null;};
+  addEventListener('scroll',()=>{timelineRect=null;},{passive:true,capture:true});
+  document.getElementById('tSlider').onfocus = () => showStageTooltip(upto, 9 + upto / MAX_FRAME * (track.clientWidth - 18));
   document.getElementById('tSlider').onblur = () => tip.hidden = true;
-  const observer = new ResizeObserver(() => { fitTicks(); if (mode === '2d') fitSpread(); });
+  const observer = new ResizeObserver(() => { timelineRect=null;fitTicks(); if (mode === '2d') fitSpread(); });
   observer.observe(track); observer.observe(document.getElementById('vStack'));
   document.body.dataset.ready = 'true';
   addEventListener('keydown', e => { if (e.key === 'Escape') go(false); if (e.key === 'f' && e.target.tagName !== 'INPUT') go(!document.body.classList.contains('full')); });

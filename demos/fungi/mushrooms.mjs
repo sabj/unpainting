@@ -6469,7 +6469,7 @@ function implicitMixField(a,b,t,targetCount,out,band){
  if(t===0||t===1)return 0;
  lo-=band;hi+=band;let offset=0;
  for(let pass=0;pass<16;pass++){
-  let area=0,derivative=0;for(const v of out){const q=.5+(offset-v)/(2*band);area+=clamp(q);if(q>0&&q<1)derivative+=1/(2*band);}
+  let area=0,derivative=0;for(let i=0;i<out.length;i++){const q=.5+(offset-out[i])/(2*band);area+=q<0?0:q>1?1:q;if(q>0&&q<1)derivative+=1/(2*band);}
   const error=targetCount-area;if(Math.abs(error)<Math.max(.00001,targetCount*1e-7))return offset;
   if(error>0)lo=offset;else hi=offset;
   const next=derivative?offset+error/derivative:(lo+hi)*.5;offset=next>lo&&next<hi?next:(lo+hi)*.5;
@@ -6491,8 +6491,12 @@ export function fieldContours(values,g,offset=0){
  };
  const table={1:[[0,3]],2:[[1,0]],3:[[1,3]],4:[[2,1]],6:[[2,0]],7:[[2,3]],8:[[3,2]],9:[[0,2]],11:[[1,2]],12:[[3,1]],13:[[0,1]],14:[[3,0]]};
  for(let y=-pad;y<h-1+pad;y++)for(let x=-pad;x<w-1+pad;x++){
-  const vs=[valuesAt(x,y),valuesAt(x+1,y),valuesAt(x+1,y+1),valuesAt(x,y+1)],code=vs.reduce((n,v,i)=>n|(v<0?1<<i:0),0);if(code===0||code===15)continue;
-  const center=vs.reduce((a,b)=>a+b,0)*.25,segments=code===5?(center<0?[[0,1],[2,3]]:[[0,3],[2,1]]):code===10?(center<0?[[3,0],[1,2]]:[[1,0],[3,2]]):table[code];
+  // Interior cells dominate the scan. Read four scalars first; allocating
+  // an array and running two reductions for every empty cell made morphs
+  // spend most of a frame scanning air and collecting those arrays.
+  const row=y*w+x,v0=pad?valuesAt(x,y):values[row]-offset,v1=pad?valuesAt(x+1,y):values[row+1]-offset,v2=pad?valuesAt(x+1,y+1):values[row+w+1]-offset,v3=pad?valuesAt(x,y+1):values[row+w]-offset;
+  const code=(v0<0?1:0)|(v1<0?2:0)|(v2<0?4:0)|(v3<0?8:0);if(code===0||code===15)continue;
+  const vs=[v0,v1,v2,v3],center=(v0+v1+v2+v3)*.25,segments=code===5?(center<0?[[0,1],[2,3]]:[[0,3],[2,1]]):code===10?(center<0?[[3,0],[1,2]]:[[1,0],[3,2]]):table[code];
   for(const [a,b] of segments)next.set(edge(x,y,a,vs),edge(x,y,b,vs));
  }
  const seen=new Set(),paths=[];for(const start of next.keys())if(!seen.has(start)){const points=[];let at=start;while(!seen.has(at)&&next.has(at)){seen.add(at);points.push(coords.get(at));at=next.get(at);}if(at===start&&points.length>=3){points.push(points[0]);paths.push(points);}}
@@ -7602,7 +7606,7 @@ export class Painter {
     this.canvas=canvas;this.ctx=canvas.getContext('2d');
     if(!this.ctx)throw new Error('Canvas 2D unavailable');
     this._paper=paper;this.sheetKey=paper?null:'cream:';this.materials=null;this.inkPattern='#30251c';
-    this.paintLayer=null;this.surfaceLayer=null;this.frames=0;this.lastRenderMs=0;
+    this.paintLayer=null;this.surfaceLayer=null;this.frames=0;this.lastRenderMs=0;this.lastPreviewGeometryMs=0;this.lastPreviewDrawMs=0;this.lastPreviewMs=0;
     this.lamellarMasks=new WeakMap();this.granuleCache=new Map();this.paths=new WeakMap();this.cutouts=new WeakMap();this.shapeBounds=new WeakMap();this.textureCache=new Map();this.visibleInk=new WeakMap();
   }
   // The paper raster is built on first use. A page adopts the identical
@@ -8089,7 +8093,7 @@ export const NATIVE_PACING=Object.freeze({inkMs:1100,depositMs:450,turnedInkMs:2
 // screen, so the repaint lays its ink almost at once and its washes unpaced,
 // and streams a frame per dried passage rather than per stroke.
 export function settlePacing({turned=false}={}){return turned?{inkMs:NATIVE_PACING.turnedInkMs,depositMs:0,passageFramesOnly:true}:{inkMs:NATIVE_PACING.inkMs,depositMs:NATIVE_PACING.depositMs};}
-export const NATIVE_PAINT_LIMITS=Object.freeze({width:512,maxCells:218624,maxChannels:14,maxCheckpoints:12,cacheBytes:24*1024*1024,maxSteps:5000,maxMs:30000});
+export const NATIVE_PAINT_LIMITS=Object.freeze({width:512,maxCells:218624,maxChannels:14,maxCheckpoints:12,cacheBytes:24*1024*1024,maxSteps:5000,maxMs:120000});
 export const NATIVE_TRANSPORT=Object.freeze({dt:.6,flowIters:1,evap:.01,paperDry:.006,edgeEvap:.009,gran:2});
 
 // Existing coral branch tubes retain their projected anatomy. Selected broad
@@ -8719,7 +8723,7 @@ export function nativeGestureMaterial(passage,mark,gesture,{keys,scale,seed,stro
 // spreading under the brush, with the Paint Lab's own brush, nib and pencil
 // cursor drawn from the real tool state. Load, Random, prepared plates and
 // morph landings keep the fast path. The finished plate is the same bytes.
-export const PLAYBACK=Object.freeze({frameMs:33,fullFrameMs:350,refreshMs:1000,ink:Object.freeze({perUnitMs:.4,minMs:4000,maxMs:6500}),wash:Object.freeze({mmPerS:450,minMs:12000,maxMs:20000}),liftMs:40,lagMs:750,plateMm:240,inkColour:'#2b241d'});
+export const PLAYBACK=Object.freeze({frameMs:1000/60,fullFrameMs:350,refreshMs:1000,ink:Object.freeze({perUnitMs:.4,minMs:4000,maxMs:6500}),wash:Object.freeze({mmPerS:450,minMs:12000,maxMs:20000}),liftMs:40,lagMs:750,plateMm:240,inkColour:'#2b241d'});
 // Ink by its drawn length; washes by the brush's travel in millimetres at a
 // steady hand speed, held between the bounds so a plate plays in 20 to 40 s.
 export function nativePlaybackPacing({inkLength=0,washMm=0}={}){
@@ -8811,7 +8815,7 @@ export function browserNativeDry(search=''){
   let gpu=null,device=null,attached=null,disabled=!nativeWebGpuEnabled(search)||!globalThis.navigator?.gpu;
   const run=async(sheet,transport,work)=>{
     if(disabled)return null;
-    const fields=[sheet.W,sheet.s,sheet.M,sheet.ever,...sheet.G,...sheet.P,...sheet.D,...sheet.layers.flat()];
+    const fields=[sheet.W,sheet.s,sheet.M,sheet.ever,...sheet.G,...sheet.P,...sheet.D,...(sheet.layers.at(-1)??[])];
     const saved=fields.map(a=>a.slice()),pending=sheet.edgePending?.slice();
     try{
       const {GpuSheet,openDevice}=await import('../lab/gpu/gpu-sheet.js');
@@ -9538,7 +9542,7 @@ async function renderNativePainting(payload,emit,waitForFrame=async()=>{}){
     const frameAt=performance.now(),budget=total*Math.min(1,playback&&nativePlaybackSkip.on?1:(frameAt-inkStarted)/inkMs);
     while(index<inkMarks.length){
       const end=Math.min(inkMarks.length,index+16),weight=weights.slice(index,end).reduce((a,b)=>a+b,0);if(budget<total&&done+weight>budget+1e-7)break;
-      const batches=new Map();for(let i=index;i<end;i++)painter.inkStroke(inkMarks[i],1,batches);drawBatches(ic,batches);done+=weight;index=end;if(performance.now()-frameAt>22)break;
+      const batches=new Map();for(let i=index;i<end;i++)painter.inkStroke(inkMarks[i],1,batches);drawBatches(ic,batches);done+=weight;index=end;if(performance.now()-frameAt>8)break;
     }
     pc.globalCompositeOperation='source-over';pc.globalAlpha=1;pc.clearRect(0,0,1200,1000);pc.drawImage(committed,0,0,1200,1000);
     if(index<inkMarks.length){
@@ -9549,7 +9553,7 @@ async function renderNativePainting(payload,emit,waitForFrame=async()=>{}){
     finishNativeInk(pc,painter);drawNativeLabels(pc,study,genome);renderTimings.inkMs+=performance.now()-frameAt;
     if(playback&&index>=inkMarks.length)cursorNow=null;
     await send('Ink',.22*Math.min(1,budget/Math.max(1,total)),false,playback?{cursor:nativePlaybackSkip.on?null:cursorNow}:{});
-    await new Promise(r=>setTimeout(r,Math.max(0,33-(performance.now()-frameAt))));
+    await new Promise(r=>setTimeout(r,Math.max(0,PLAYBACK.frameMs-(performance.now()-frameAt))));
   }
   c.clearRect(0,0,1200,1000);c.drawImage(committed,0,0,1200,1000);finishNativeInk(c,painter,'high');const ink=c.getImageData(0,0,W,H);painter.ctx=c;
   const pixelHash=data=>{let h=2166136261;for(let i=0;i<data.length;i++)h=Math.imul(h^data[i],16777619);return(h>>>0).toString(16).padStart(8,'0');};
@@ -9893,9 +9897,22 @@ async function renderMorph(settings,emit,isCurrent) {
   }
 }
 if(typeof document==='undefined'&&typeof self!=='undefined'&&typeof self.postMessage==='function') {
-  let nativeOutstanding=0,frameWaiter=null;
+  let nativeOutstanding=0,frameWaiter=null,previewPainter=null,previewPair=null;const previewPairs=new Map();
   const waitForFrame=()=>nativeOutstanding<2?Promise.resolve():new Promise(resolve=>{frameWaiter=resolve;});
   self.onmessage=async event=>{
+    if(event.data.kind==='preview'){
+      const d=event.data;
+      try{
+        if(!previewPainter)previewPainter=new Painter(newCanvas(d.width,d.height));
+        const p=previewPainter;if(p.canvas.width!==d.width||p.canvas.height!==d.height){p.canvas.width=d.width;p.canvas.height=d.height;}
+        if(d.pair){previewPairs.set(d.pairKey,d.pair);while(previewPairs.size>4)previewPairs.delete(previewPairs.keys().next().value);}previewPair=previewPairs.get(d.pairKey);
+        Object.assign(previewPair,{view:d.view,shapeModifiers:d.shapeModifiers});if(d.pageFrame)previewPair.composition.pageFrame=d.pageFrame;
+        p.useSheet(d.seed);p.sketch(d.genome,{morph:previewPair,blend:d.blend,scene:d.scene,coloured:d.coloured,interactive:true});
+        const bitmap=p.canvas.transferToImageBitmap();
+        self.postMessage({kind:'preview',serial:d.serial,epoch:d.epoch,warm:d.warm,position:d.position,orbit:!!previewPair.orbitRest,bitmap,coloured:p.previewColoured,geometryMs:p.lastPreviewGeometryMs,drawMs:p.lastPreviewDrawMs,ms:p.lastPreviewMs,measures:d.measure?measureSketch(p.framedPreviewPlan()):null},[bitmap]);
+      }catch(error){self.postMessage({kind:'preview',serial:d.serial,epoch:d.epoch,error:error.message});}
+      return;
+    }
     if(event.data.kind==='native-frame-ack'){nativeOutstanding=Math.max(0,nativeOutstanding-1);if(nativeOutstanding<2&&frameWaiter){const resolve=frameWaiter;frameWaiter=null;resolve();}return;}
     if(/^(frame-(init|compose|snap|patch)|band-(init|compose)|detail-band)$/.test(event.data.kind??'')){
       try{const reply=await nativeComposerMessage(event.data);if(reply){const {transfer=[],...message}=reply;self.postMessage(message,transfer);}}
@@ -9903,6 +9920,16 @@ if(typeof document==='undefined'&&typeof self!=='undefined'&&typeof self.postMes
       return;
     }
     try {
+      if(event.data.kind==='page-pair'){
+        const plan=event.data.plan,value=planPreparedPlate(plan),pair=value.morph,st=plan.state;
+        pair.measuresA=measureSketch(pair.source);pair.measuresB=measureSketch(pair.target);
+        pagePairFrame(pair,st.scene);
+        const habit=habitRestPreferred(pair.a,st.scene),rest=prepareOrbitRest({genome:pair.a,composition:pair.composition,habit,scene:st.scene});
+        rest.pageFrame=pair.composition.pageFrame;
+        if(habit){const body=createOrbitRestPair(pair.a,rest.composition,{view:{yaw:DEFAULT_ORBIT_VIEW.yaw,pitch:DEFAULT_ORBIT_VIEW.pitch},shapeModifiers:pair.shapeModifiers},{scene:st.scene});rest.habitFrame=pageFrameAt(pagePairFrame(body,st.scene),0);}
+        const {implicitData,previewData,...portable}=pair;if(pair.implicitMorph){delete portable.source;delete portable.target;}
+        self.postMessage({kind:'page-pair-ready',data:{pair:portable,rest},revision:event.data.revision});return;
+      }
       if(event.data.kind==='plan-plate'){self.postMessage({kind:'plate-planned',data:plannedPlateData(planPreparedPlate(event.data.plan)),revision:event.data.revision});return;}
       if(event.data.kind==='orbit-rest-prepare'){self.postMessage({kind:'orbit-rest-ready',data:prepareOrbitRest(event.data),revision:event.data.revision});return;}
       if(event.data.kind==='implicit-prepare'){const {a,b,composition,view,shapeModifiers,nativeTargets}=event.data;const data=createImplicitMorph(a,b,composition,{view,shapeModifiers,nativeTargets:!!nativeTargets}),out=serializableImplicitMorph(data);
@@ -10187,10 +10214,10 @@ async function mount() {
     canvas.dataset.preparingShapes='true';status.textContent='Getting shapes ready…';
     implicitPreparation.prepare(key,{a:pair.a,b:pair.b,composition:pair.composition,view:pair.view,shapeModifiers:pair.shapeModifiers,nativeTargets:!pair.implicitMorph},data=>{
       if(pair!==morphPair)return;
-      if(!pair.implicitMorph){pair.previewData=data;canvas.dataset.preparingShapes='false';canvas.dataset.shapePreparationMs=data.preparationMs.toFixed(2);const callback=implicitReadyIntent;implicitReadyIntent=null;preparing=false;callback?.();return;}
+      if(!pair.implicitMorph){pair.previewData=data;canvas.dataset.preparingShapes='false';canvas.dataset.shapePreparationMs=data.preparationMs.toFixed(2);const callback=implicitReadyIntent;implicitReadyIntent=null;preparing=false;if(painter)queuePreview({genome:morphGenome(pair,0),morph:pair,blend:0,scene:state.scene});callback?.();return;}
       pair.implicitData=data;pair.composition=data.composition;syncImplicitPlateIdentity(pair);const samples=data.samples;pair.source=samples?.source??sampleImplicitMorph(data,0);pair.target=samples?.target??sampleImplicitMorph(data,1);pair.measuresA=samples?.measuresA??measureSketch(pair.source);pair.measuresB=samples?.measuresB??measureSketch(pair.target);
       state.compositionAnchors=data.composition.implicitAnchors;canvas.dataset.preparingShapes='false';canvas.dataset.shapePreparationMs=data.preparationMs.toFixed(2);
-      const callback=implicitReadyIntent;implicitReadyIntent=null;preparing=false;persist();callback?.();
+      const callback=implicitReadyIntent;implicitReadyIntent=null;preparing=false;persist();if(painter)queuePreview({genome:morphGenome(pair,0),morph:pair,blend:0,scene:state.scene});callback?.();
     },error=>{canvas.dataset.preparingShapes='false';preparing=false;status.textContent=error.message;controls();});
   }
   let nativeResult=null,nativeBuilding=null,nativePhase='',nativeReplayIndex=-1,nativeDecodeBusy=false;
@@ -10406,6 +10433,7 @@ async function mount() {
   const habitFrames=new Map();
   function habitRestFrame(genome,pair,st){
     const key=JSON.stringify([genome.seed,genome.profileId,genome.donorId,pair.composition.id,pair.composition.members,st.scene,st.capDepth,st.stemBend]);
+    const prepared=turnPreparation.cached?.data;if(prepared?.habitFrame&&prepared.restKey===orbitRestPreparationKey(genome,pair.composition,true))return prepared.habitFrame;
     if(!habitFrames.has(key)){
       if(habitFrames.size>16)habitFrames.delete(habitFrames.keys().next().value);
       const rest=createOrbitRestPair(genome,orbitRestComposition(genome,pair.composition,{habit:true}),{view:{yaw:DEFAULT_ORBIT_VIEW.yaw,pitch:DEFAULT_ORBIT_VIEW.pitch},shapeModifiers:{capDepth:st.capDepth??1,stemBend:st.stemBend??0}});
@@ -10428,6 +10456,10 @@ async function mount() {
     turnPreparation.prepare(key,{genome,composition:pair.composition,habit:colony,frame,scene:state.scene},data=>{
       adoptOrbitRestOwnFrame(data);const held=pair.composition.pageFrame,next=data.pageFrame;
       if(pair===morphPair&&next&&next.key===pageFrameKey(pair,state.scene)&&!(held?.version===1&&held.key===next.key)){pair.composition={...pair.composition,pageFrame:next};if(pair.implicitData)pair.implicitData.composition=pair.composition;}
+      if(pair===morphPair&&!playing&&!turning){
+        const rest=createOrbitRestPair(genome,data.composition,connectedViewOptions(state),{frame:data.pageFrame?pageFrameAt(data.pageFrame,blend>=1?1:0):null,scene:state.scene});
+        queuePreview({genome,morph:rest,blend:0,scene:state.scene},true);
+      }
       done();
     },error=>{console.warn('Turn not prepared',error);done();});
   }
@@ -10603,7 +10635,7 @@ async function mount() {
   // camera, so idle preparation never blocks a touch; a turned or colony plate
   // is planned here as before.
   function planAhead(plan,ready){
-    const st=plan.state,worker=typeof Worker!=='undefined'&&isDefaultOrbitView(st)&&(!HABIT_COLONY_AT_REST||st.scene==='plain');
+    const st=plan.state,worker=typeof Worker!=='undefined';
     if(!worker){ready(plan.type==='destination'?finishedSnapshot(plan.seed):plannedPlate(st));return;}
     const message=plan.type==='destination'?{type:'destination',state:st,from:promotionSource(morphPair),fieldPlate:state.fieldPlate}:{type:'random',state:st};
     planPreparation.prepare(JSON.stringify(message),{plan:message},data=>ready(plannedPlateSnapshot(data)),error=>console.warn('Next plate not planned',error));
@@ -10694,29 +10726,10 @@ async function mount() {
   }
   // Build the turned body's world geometry once the plate is settled, so the
   // first frame of a drag only re-projects it.
-  let warmedRest=null;
-  function warmOrbitLines(value){
-    const build=(pair,scene)=>{try{buildMorphSketch(pair,0,{inkOnly:true,interactive:true,scene});}catch(error){console.warn('Orbit drawing not prepared',error);}};
-    setTimeout(()=>{
-      let rest=null;
-      try{const morph=value?.morph;rest=morph?.orbitRest?morph:morph&&!morph.connectedAnatomy&&!value.fieldPlate?orbitRestFor(value.blend,morphPair,a,b,state,{anyView:true}):null;}
-      catch(error){console.warn('Orbit drawing not prepared',error);}
-      if(!rest||rest===warmedRest)return;warmedRest=rest;
-      // One task per body for its world geometry, then three drag frames'
-      // re-projections at turned cameras (so the first real frame runs warm
-      // code), each well inside a frame on a phone.
-      let steps=[];try{steps=orbitWorldWarmers(rest);}catch(error){console.warn('Orbit drawing not prepared',error);}
-      for(const turn of [.05,.1,.15])steps.push(()=>build({...rest,view:{...rest.view,yaw:rest.view.yaw+turn}},value.scene));
-      // A finger already on the plate turns it soon: the drag builds lazily
-      // rather than queue a step behind its first frames.
-      const next=()=>{if(warmedRest!==rest)return;if(plateViewport?.isPointerDown()){warmedRest=null;return;}const step=steps.shift();if(!step)return;try{step();}catch(error){console.warn('Orbit drawing not prepared',error);}setTimeout(next,0);};
-      setTimeout(next,0);
-    },0);
-  }
   function captureReprojection(value,painted){
     // The turned bodies are prepared after the settle crossfade, when nothing
     // on the page moves; at completion this froze the last frames for ~0.6 s.
-    if(ORBIT_DRAG_DISPLAY!=='reproject'){const pair=morphPair;setTimeout(()=>whenTurnPrepared(()=>{if(pair!==morphPair)return;pinPageFrame(value);warmOrbitLines(value);}),REPROJECTION.fadeMs+80);return;}
+    if(ORBIT_DRAG_DISPLAY!=='reproject'){const pair=morphPair;setTimeout(()=>whenTurnPrepared(()=>{if(pair!==morphPair)return;pinPageFrame(value);}),REPROJECTION.fadeMs+80);return;}
     const source=reprojectSource(value,{anyView:true});if(!source||!painter)return;
     let key,view;
     try{key=reprojectionKey(source.pair,source.t,value.scene);view={...source.pair.view};}catch(error){console.warn('Reprojection capture skipped',error);return;}
@@ -10804,6 +10817,51 @@ async function mount() {
     const value=snapshot();if(keepFrame){value.keepFrame=true;value.landing=true;}if(plateViewport?.isOrbitHolding())value.turned=true;
     sketchQueue.input(value);if(settle)sketchQueue.release();
   }
+  let previewWorker=null,previewBusy=false,previewPending=null,previewEpoch=0,previewSerial=0;const previewModels=[];let previewModelSerial=0;
+  function cancelPreview(){previewEpoch++;previewPending=null;}
+  function queuePreview(value,warm=false){
+    previewPending={value,epoch:previewEpoch,warm};
+    if(previewBusy)return;
+    if(!previewWorker){
+      previewWorker=new Worker(import.meta.url,{type:'module'});
+      previewWorker.onmessage=({data:d})=>{
+        previewBusy=false;
+        if(d.error){console.error('Preview failed',d.error);canvas.dataset.previewError=d.error;}
+        if(d.bitmap){
+          canvas.dataset.previewReady='true';
+          if(!d.warm&&d.epoch===previewEpoch&&renderMode==='sketch'){
+            const started=performance.now(),c=painter.ctx;
+            c.setTransform(1,0,0,1,0,0);c.globalAlpha=1;c.globalCompositeOperation='source-over';c.filter='none';c.drawImage(d.bitmap,0,0,canvas.width,canvas.height);
+            Object.assign(painter,{previewColoured:d.coloured,previewMeasures:d.measures??painter.previewMeasures,lastPreviewGeometryMs:d.geometryMs,lastPreviewDrawMs:d.drawMs,lastPreviewMs:d.ms,previewFrames:(painter.previewFrames??0)+1});
+            Object.assign(canvas.dataset,{previewReady:'true',displayedPosition:String(d.position),displayedOrbit:String(d.orbit),previewFrame:String(painter.previewFrames),previewMs:d.ms.toFixed(2),previewPresentMs:(performance.now()-started).toFixed(2)});
+          }
+          d.bitmap.close();
+        }
+        if(previewPending)queuePreview(previewPending.value,previewPending.warm);
+        else if(!d.warm&&!playing&&!turning&&renderMode==='painting')warmPreparedOrbit();
+      };
+      previewWorker.onerror=e=>{previewBusy=false;canvas.dataset.previewError=e.message;};
+    }
+    const {value:v,epoch,warm:pendingWarm}=previewPending;previewPending=null;
+    const m=v.morph;
+    // Orbit snapshots change camera only. Keep the expensive body/field resident.
+    const identity=[m.a,m.b,m.implicitData,m.previewData,JSON.stringify([m.composition.id,m.composition.members,m.composition.implicitAnchors,m.orbitRest,m.fieldPlate?.pairKey])];
+    let model=previewModels.find(e=>identity.every((x,i)=>x===e.identity[i]));const same=!!model;
+    if(!model){model={identity,id:++previewModelSerial};previewModels.push(model);if(previewModels.length>4)previewModels.shift();}
+    previewBusy=true;
+    const field=!!(m.implicitData||m.previewData)&&!m.fieldPlate;
+    const pair=field?Object.fromEntries(['a','b','composition','sameRecipe','implicitMorph','previewField','view','shapeModifiers','fieldPlate','supportedMotion'].map(k=>[k,m[k]])):m;
+    previewWorker.postMessage({kind:'preview',serial:++previewSerial,epoch,warm:pendingWarm,position:state.blend,pairKey:model.id,width:Math.min(720,canvas.width),height:Math.round(Math.min(720,canvas.width)*canvas.height/canvas.width),pair:same?null:pair,pageFrame:m.composition.pageFrame,measure:!$('morph-debug').hidden,view:m.view,shapeModifiers:m.shapeModifiers,genome:v.genome,seed:plateSheetSeed(v),blend:v.blend,scene:v.scene,coloured:playbackColouring({playing,sketchPlaying})});
+  }
+  let orbitWarmKey=null;
+  function warmPreparedOrbit(){
+    const ready=turnPreparation.cached;if(!ready||ready.key===orbitWarmKey)return;
+    const blend=smooth(state.blend),genome=blend>=1?b:a,data=ready.data;
+    if(data.restKey!==orbitRestPreparationKey(genome,morphPair.composition,habitRestPreferred(genome,state.scene)))return;
+    orbitWarmKey=ready.key;
+    const rest=createOrbitRestPair(genome,data.composition,connectedViewOptions(state),{frame:data.pageFrame?pageFrameAt(data.pageFrame,blend>=1?1:0):null,scene:state.scene});
+    queuePreview({genome,morph:rest,blend:0,scene:state.scene},true);
+  }
   function drawPreview(value){
     if(!painter||!value)return;
     // Painting starts immediately; the native ink stream is the first thing shown.
@@ -10813,17 +10871,12 @@ async function mount() {
     let rest=null;
     if(orbitFrom){
       const target=orbitRestOpacity(state,orbitFrom);rest=clamp(target,restShown-ORBIT_REST_FADE.step,restShown+ORBIT_REST_FADE.step);
-      // A plate turned before its bodies were warmed builds them one per
-      // frame here, under the painting, instead of in one long first frame.
-      let pending=[];if(rest<1&&value.morph?.orbitRest)try{pending=orbitWorldWarmers(value.morph,{missing:true});}catch(error){console.warn('Orbit drawing not prepared',error);}
-      if(pending.length){try{pending[0]();}catch(error){console.warn('Orbit drawing not prepared',error);}rest=restShown;}
-      if(pending.length||rest!==target)requestRestFrame();
+      if(rest!==target)requestRestFrame();
     }
     const covered=rest!==null&&rest>=1;
     if(!covered)hideDetail();
-    if(painter.useSheet(plateSheetSeed(value)))nativeInkPaperRaster=null;
     const keep=value.keepFrame&&painter.previewColoured||covered;value.keepFrame=false;if(rest!==null)setRestOpacity(rest);
-    if(!keep){cancelFade();if(drawReprojectedPreview(value))painter.previewColoured=false;else{painter.sketch(value.genome,{morph:value.morph,blend:value.blend,scene:value.scene,coloured:playbackColouring({playing,sketchPlaying}),interactive:playing||!!plateViewport?.isOrbitHolding()});canvas.dataset.reprojected='false';}}renderMode='sketch';canvas.dataset.renderMode=renderMode;
+    if(!keep){cancelFade();queuePreview(value);canvas.dataset.reprojected='false';}renderMode='sketch';canvas.dataset.renderMode=renderMode;
     if(morphFrom&&playing){const c=painter.ctx,k=clamp(morphFrom.until-performance.now(),0,MORPH_FADE_MS)/MORPH_FADE_MS;if(k>0){c.setTransform(1,0,0,1,0,0);c.globalAlpha=smooth(k);c.drawImage(morphFrom.canvas,0,0);c.globalAlpha=1;}else morphFrom=null;}
     canvas.dataset.previewColoured=String(!!painter.previewColoured);
     if(!covered){canvas.dataset.previewGeometryMs=painter.lastPreviewGeometryMs.toFixed(2);canvas.dataset.previewDrawMs=painter.lastPreviewDrawMs.toFixed(2);canvas.dataset.previewMs=painter.lastPreviewMs.toFixed(2);canvas.dataset.previewFrame=String(painter.previewFrames);}
@@ -10846,7 +10899,7 @@ async function mount() {
     canvas.dataset.morphFrames=String(metrics.delivered);
     canvas.dataset.morphDurationMs=metrics.playbackMs.toFixed(2);
     canvas.dataset.morphFps=(metrics.delivered*1000/Math.max(1,metrics.playbackMs)).toFixed(2);
-    canvas.dataset.morphTargetFps=sketchPlaying||metrics.mode==='sketch'?'30':'24';
+    canvas.dataset.morphTargetFps=sketchPlaying||metrics.mode==='sketch'?'60':'24';
     publishPreviewMetrics();
   }
   function refinePreview(value,isCurrent,{rerun=false}={}){
@@ -10862,7 +10915,7 @@ async function mount() {
       if(job?.complete&&job.frames.length>2&&!value.landing)return replayPrepared(job,value,isCurrent);
       if(job){prefetch?.worker?.terminate();job.key=job.plateKey;prefetch=job;return adoptPrefetch(value,isCurrent);}
     }
-    const revision=++settledRevision,started=performance.now();let lastNativeUI=0;
+    cancelPreview();const revision=++settledRevision,started=performance.now();let lastNativeUI=0;
     // After a coloured preview the plate stays on screen until the finished
     // painting can be crossfaded in; it never restarts from blank paper.
     const quiet=!rerun&&!!painter.previewColoured;
@@ -11061,7 +11114,7 @@ async function mount() {
     q.set('scene',state.selectedScene);q.set('background',state.background?'1':'0');q.set('paint',state.paint);if(state.fieldPlate)q.set('plate','1');if(state.includeAlpha)q.set('alpha','1');if(!HABIT_COLONY_AT_REST)q.set('colony','0');if($('debug-toggle').getAttribute?.('aria-pressed')==='true')q.set('debug','1');
     history.replaceState(null, '', `${location.pathname}?${q}`);
   }
-  function regenerate({preview=true,promoteFrom=null}={}) {
+  function regenerate({preview=true,promoteFrom=null,prepared=null}={}) {
     canvas.dataset.nativeComplete='false';
     const recipeKey=JSON.stringify([state.typeId,state.donorId,state.seed]);
     if(lastRecipeKey!==null&&recipeKey!==lastRecipeKey&&!promoteFrom)Object.assign(state,DEFAULT_ORBIT_VIEW);
@@ -11072,6 +11125,8 @@ async function mount() {
     sketchQueue.cancel();cancelRefinement();
     if(cache.key!==morphIdentity(morphSettings(state)))cache.reset();
     const profile = getMushroomType(state.typeId); state.family = profile.family;
+    if(prepared){morphPair=prepared;a=prepared.a;b=prepared.b;}
+    else{
     a = generateSpecimen(state.seed, state.typeId, state.donorId); b = generateSpecimen(state.next, state.nextTypeId, state.nextDonorId);
     if(!state.compositionCount)state.compositionCount=seedSpecimenCount(a,buildSketch(a).specimenCount);
     const composition=applyCompositionAnchors(createSpecimenComposition({...a,seed:state.compositionSeed},{count:state.compositionCount}),state.compositionAnchors);
@@ -11079,6 +11134,7 @@ async function mount() {
       withFieldPlatePair(createMorphPair(a,b,{composition,...orbitViewOptions(state)}),state.fieldPlate);
     if(!morphPair.supportedMotion)state.blend=0;
     morphPair.measuresA=measureSketch(morphPair.source);morphPair.measuresB=measureSketch(morphPair.target);
+    }
     update3DControls();
     const active=[...new Set([...activeTraitsFor(a),...activeTraitsFor(b)])],labels=currentTraitLabels(),labelsB=currentTraitLabels(state.nextTypeId);
     describeRecipe();
@@ -11116,7 +11172,7 @@ async function mount() {
   function pause({settle=true,fromOrbit=false}={}) {
     stopLoopPause();cancelImplicitPreparation();
     if(!fromOrbit){plateViewport?.cancelGesture({settle:false});hideRestLayer();}
-    playbackEpoch++;const restoreDetail=playing||renderMode!=='painted';
+    cancelPreview();playbackEpoch++;const restoreDetail=playing||renderMode!=='painted';
     if(playing)publishMotionMetrics();
     sketchQueue.cancel();cancelRefinement();cancelPrefetch();cancelFade();morphFrom=null;
     if(preparing){cache.reset();preparing=false;$('morph-progress').hidden=true;}
@@ -11135,9 +11191,9 @@ async function mount() {
     if(playing&&sketchPlaying){
       if(!playStart){playStart=now+(morphFrom?MORPH_FADE_MS:0);playBlend=state.blend;if(morphFrom)morphFrom.until=playStart;}
       state.blend=Math.min(1,playBlend+Math.max(0,now-playStart)/(state.duration*1000));
-      if(!lastSketchAt||now-lastSketchAt>=1000/30||state.blend===1){
+      if(!lastSketchAt||now>lastSketchAt||state.blend===1){
         try{drawPreview(playbackSnapshot());}catch(error){playbackFailed(error);return;}
-        lastSketchAt=lastSketchAt?now-(now-lastSketchAt)%(1000/30):now;metrics.delivered++;
+        lastSketchAt=now;metrics.delivered++;
         if(metrics.delivered%15===0)publishMotionMetrics();
         if(state.blend===1)finishMorph();
       }
@@ -11177,7 +11233,7 @@ async function mount() {
     $('sum-measures').textContent=`${ANATOMY_MEASURES.length} measures`;
   }
   function updateTraits(g,now,force=false) {
-      // Reuse cells and sample at 10 Hz; the sketch stays on its 30 Hz clock.
+      // Reuse cells and sample at 10 Hz; the preview follows the display clock.
       // Read the actual rendered genome, including the same easing function.
       if (force || now-lastTraits>=100) {
         if(!$('morph-debug').hidden){
@@ -11197,7 +11253,7 @@ async function mount() {
 
             $('view-values').textContent=`Camera: yaw ${(state.yaw*180/Math.PI).toFixed(1)}° · pitch ${(state.pitch*180/Math.PI).toFixed(1)}°`;
           }
-          const measure=measureSketch(painter.framedPreviewPlan()??buildMorphSketch(morphPair,smooth(state.blend),{scene:state.scene}));
+          const measure=painter.previewMeasures??morphPair.measuresA;
           for(const {key,cells} of anatomyElements){const av=morphPair.measuresA[key],bv=morphPair.measuresB[key],now=measure[key],delta=now-av;[av,now,bv,delta].forEach((n,i)=>cells[i].textContent=n.toFixed(1));}
           $('debug-current-id').textContent=state.blend===0?a.profileId:state.blend===1?b.profileId:`${a.profileId} → ${b.profileId} @ ${smooth(state.blend).toFixed(3)}`;
           $('debug-position').textContent=`Morph ${(state.blend*100).toFixed(1)}% · shape ${(smooth(state.blend)*100).toFixed(1)}%`;
@@ -11206,16 +11262,22 @@ async function mount() {
         lastTraits = now;
       }
   }
-  function finishMorph() {
-    publishMotionMetrics();
-    const loop=continuous;playing=sketchPlaying=false;playStart=0;
-    metrics.playbackMs=performance.now()-metrics.playbackStarted;
+  const promotionPreparation=new MorphPreparation(()=>new Worker(import.meta.url,{type:'module'}),{kind:'page-pair',ready:'page-pair-ready'});
+  function finishMorph(){
+    publishMotionMetrics();const loop=continuous,from=morphPair,epoch=playbackEpoch;
+    playing=sketchPlaying=false;playStart=0;metrics.playbackMs=performance.now()-metrics.playbackStarted;
     const nextSeed=plannedNextSeed??randomSeed();plannedNextSeed=null;
-    Object.assign(state,advanceMorphState(state,nextSeed));
-    $('seed').value=state.seed;$('next-seed').value=state.next;regenerate({preview:false,promoteFrom:morphPair});persist();
-    if(!loop)continuous=false;
-    drawingStage=1;replaying=false;dirty=false;sketchQueue.cancel();requestSketch(true,{keepFrame:true});controls();
-    if(loop)holdLoopPause();
+    const next=advanceMorphState(state,nextSeed),plan={type:'destination',state:next,from:promotionSource(from),fieldPlate:state.fieldPlate};
+    preparing=true;controls();status.textContent='Preparing the next plate…';
+    promotionPreparation.prepare(JSON.stringify(next),{plan},data=>{
+      if(epoch!==playbackEpoch||from!==morphPair)return;
+      preparing=false;Object.assign(state,next);$('seed').value=state.seed;$('next-seed').value=state.next;
+      adoptOrbitRestOwnFrame(data.rest);turnPreparation.cached={key:data.rest.restKey,data:data.rest};
+      regenerate({preview:false,promoteFrom:from,prepared:data.pair});persist();
+      if(!loop)continuous=false;
+      drawingStage=1;replaying=false;dirty=false;sketchQueue.cancel();requestSketch(true,{keepFrame:true});controls();
+      if(loop)holdLoopPause();
+    },error=>{if(epoch===playbackEpoch)playbackFailed(error);});
   }
   // Loop: the landed plate paints in full, then stays on screen for the loop
   // pause, counted from completion, before the next morph begins. Prepared
@@ -11241,7 +11303,9 @@ async function mount() {
     sketchQueue.cancel();cancelRefinement();playbackEpoch++;preparing=false;
     playing=sketchPlaying=true;continuous=loop;replaying=false;drawingStage=1;dirty=false;
     // A single morph settles on a known plate: paint it while the shapes move.
-    plannedNextSeed??=randomSeed();try{prefetchNative(destinationSnapshot(plannedNextSeed));}catch(error){console.warn('Destination painting not prepared',error);prefetch=null;}
+    plannedNextSeed??=randomSeed();
+    const epoch=playbackEpoch,from=morphPair,next=advanceMorphState(state,plannedNextSeed);
+    planAhead({type:'destination',state:next,seed:plannedNextSeed},value=>{if(epoch===playbackEpoch&&from===morphPair)prefetchNative(value);});
     playStart=0;lastSketchAt=0;hiddenAt=0;renderMode='sketch';
     metrics={preparationMs:0,cached:false,mode:'sketch',delivered:0,skipped:0,intervals:[],playbackStarted:performance.now()};
     controls();queueFrame();status.textContent=loop?'Looping':'Morphing';
@@ -11447,7 +11511,7 @@ async function mount() {
       if(playing||replaying||dirty)queueFrame();else if(renderMode!=='painted')showFinished();
     }
   });
-  window.addEventListener('pagehide',()=>{pause({settle:false});cache.reset();settledWorker?.terminate();settledWorker=null;retireDetailWorker();});
+  window.addEventListener('pagehide',()=>{pause({settle:false});previewWorker?.terminate();cache.reset();settledWorker?.terminate();settledWorker=null;retireDetailWorker();});
   reducedMotion.addEventListener('change', () => { if (reducedMotion.matches) { pause(); showFinished(); } });
   $('paint-lab').addEventListener('click',()=>{
     // Store before opening: a new tab copies this tab's session storage when it opens.

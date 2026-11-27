@@ -428,3 +428,64 @@ test('Paint Lab efRefresh uses browser GPU distance and pressure on a 40 mm wash
     t.diagnostic(JSON.stringify(g.ef.pressureSolve));
   } finally { g?.destroy(); device.destroy(); }
 });
+
+test('Paint Lab fixed-bed glazes retain support through GPU fix and masked full uploads', async t => {
+  const gpu = await getGpu(); if (!gpu) return t.skip('no WebGPU adapter');
+  const pigments = [BY_KEY.ultramarine, BY_KEY.sienna], w = 48, h = 36;
+  const paper = makePaper(w, h, { mmPerCell: .3, seed: 9 });
+  const make = () => {
+    const s = createSheet(paper, pigments);
+    for (let l = 0; l < 2; l++) {
+      const layer = pigments.map(() => new Float32Array(s.n));
+      for (let y = 4; y < h - 4; y++) for (let x = 4; x < w - 4; x++) layer[l][y * w + x] = x % 9 < 4 ? .8 : .04;
+      s.layers.push(layer);
+    }
+    for (let y = 8; y < h - 8; y++) for (let x = 8; x < w - 8; x++) {
+      const i = y * w + x; deposit(s, i, .18, [.03, .02]); s.D[0][i] = .12; s.D[1][i] = .07;
+    }
+    return s;
+  };
+  const o = { ...DEFAULTS, fixedBed: 1, mmPerCell: .3, edgeEvap: 0, dt: .1, slide: .04, fillRef: .4 };
+  const cpu = make(), actual = make(), legacy = make(), phys = await GpuPhysics.create(pigments, o, gpu);
+  const errors = []; phys.device.addEventListener('uncapturederror', e => errors.push(e.error.message));
+  const base = paperReflectance(paper, 'cold', 85);
+  const parity = label => {
+    for (const key of ['W', 's', 'G', 'P', 'D']) {
+      const aa = ArrayBuffer.isView(cpu[key]) ? [cpu[key]] : cpu[key], bb = ArrayBuffer.isView(actual[key]) ? [actual[key]] : actual[key];
+      for (let k = 0; k < aa.length; k++) {
+        let error = 0; for (let i = 0; i < cpu.n; i++) error = Math.max(error, Math.abs(aa[k][i] - bb[k][i]));
+        assert.ok(error < 2e-4, `${label} ${key}[${k}] max error ${error}`);
+      }
+    }
+    assert.equal(actual.layers.length, cpu.layers.length);
+  };
+  try {
+    await phys.load(actual, base, new Float32Array(cpu.n)); phys.setOptions(o);
+    for (let phase = 0; phase < 3; phase++) {
+      await phys.step(2); step(cpu, o); step(cpu, o);
+      await phys.syncAll(actual); parity(`glaze ${phase}`);
+      if (phase === 0) {
+        step(legacy, { ...o, fixedBed: 0 }); step(legacy, { ...o, fixedBed: 0 });
+        assert.ok(cpu.D.some((a, k) => a.some((v, i) => Math.abs(v - legacy.D[k][i]) > 1e-6)), 'bound pigment changes the slide/filled hollow');
+      }
+      fix(cpu);
+      const result = await phys.fix(actual, base, { foldOnGpu: true });
+      assert.equal(result.foldedOnGpu, false, 'bound layers remain available to mask removal and undo');
+      await phys.syncAll(actual); parity(`fixed ${phase}`);
+      const lower = new Float32Array(await phys.sheet.readWords('DEP', cpu.n * 4, 2 * cpu.n * 4));
+      for (let i = 0; i < cpu.n; i++) {
+        let sum = 0; for (const layer of cpu.layers.slice(0, -1)) for (const plane of layer) sum += plane[i];
+        assert.ok(Math.abs(lower[i] - sum) < 2e-4, 'GPU retains each superseded TOP exactly once');
+      }
+      // Mask removal can alter an old layer; a full upload must replace cached support.
+      for (const s of [cpu, actual]) {
+        s.layers[0][0][12 * w + 12] = 0;
+        for (let y = 9; y < 20; y++) for (let x = 10; x < 26; x++) {
+          const i = y * w + x; deposit(s, i, .12, [.01, .02]); s.D[1][i] += .06;
+        }
+      }
+      phys.upload(actual);
+    }
+    assert.deepEqual(errors, []);
+  } finally { phys.destroy(); }
+});
