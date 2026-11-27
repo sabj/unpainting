@@ -71,8 +71,14 @@ Edits, applied in order to the present script:
 - \`{"op": "drawing", "medium": "pen", "ink": "waterproof", "lines": {...}}\`: the drawing beside the script.`;
 }
 
-/** The open session's way of answering (L4). `v` {steps, reverts, wallMinutes, showCost, seen (pictures it writes a line on)}. */
+/** The open session's way of answering (L4, or L4b open-book). `v` {steps, reverts, wallMinutes, showCost, seen, openBook, autoBudget}. */
 function sessionAnswer(v) {
+  const openBookRule = v.openBook
+    ? `- **OPEN-BOOK OPTIMIZATION MODE (Level L4b):** The eyes-only rule is OFF. Your scripts and code (Python, NumPy, PIL, SciPy, Node, etc.) have **full unrestricted read access** to \`inputs/source.png\`, every study, \`auto-result/auto-painting.png\`, and every rendered look. Pictures are never put away, and **no human-ness progression judge applies**.
+- **Goal & Complexity Budget:** Produce the highest-craft, most faithful watercolour match to \`inputs/source.png\` through the real watercolour simulator, beating \`auto-result/auto-painting.png\`. To keep this an inverse-graphics / rate-distortion problem rather than trivial pixel-printing, stay within Auto 0.5's complexity budget${v.autoBudget ? `: **at most ${v.autoBudget.maxStrokes} strokes** (Auto 0.5 used ${v.autoBudget.autoStrokes} strokes across ${v.autoBudget.autoWashes} washes; rendering unit ${v.autoBudget.autoUnit}) and **at most ${v.autoBudget.maxGzipBytes} gzipped bytes** for \`script.json\`` : ''}. You may use simulated annealing, residual error-guided wash placement, colour clustering, surrogate models, or any optimization you invent.`
+    : `- Pictures are put away when you plan or look; \`./unpaint show inputs/source.png\` brings the subject back for
+  ${v.showCost} of a look unit, a study for nothing. A program that reads a picture is refused, and that disqualifies the
+  try. Data files may be read by code.${v.seen?.length ? `\n- ${seenAsk(v.seen)}` : ''}`;
   return `### How you answer: an open session
 
 You have this folder and a shell. \`README.md\` lists the commands, the files and their formats.
@@ -85,9 +91,7 @@ You have this folder and a shell. \`README.md\` lists the commands, the files an
   sheet beside the subject and the middle study, the sheet at 10, 25, 50, 75 and 100% of the strokes, and each named
   form measured against the study and against your script.
 - Steps: ${v.steps} tool calls. Returns to a choice you had already left: ${v.reverts}; after that a return is refused.
-- Pictures are put away when you plan or look; \`./unpaint show inputs/source.png\` brings the subject back for
-  ${v.showCost} of a look unit, a study for nothing. A program that reads a picture is refused, and that disqualifies the
-  try. Data files may be read by code.${v.seen?.length ? `\n- ${seenAsk(v.seen)}` : ''}`;
+${openBookRule}`;
 }
 
 /**

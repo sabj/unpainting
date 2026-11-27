@@ -5,6 +5,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import zlib from 'node:zlib';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { parseArgs, USAGE } from './args.mjs';
@@ -529,16 +530,39 @@ async function sessionRun(r) {
       if (terms.previous) record.author.previousTry = { tryNumber: req.tryNumber, retries: req.retries, from: path.resolve(req.previous) };
       routes = await closedRoutes(author);
       // the code's plan and its settings are handed at no level (levels.mjs): the folder holds no auto/
+      // Open-book mode (L4b): compute Auto 0.5's complexity budget (strokes, washes, gzipped plan bytes) for rate-distortion cap
+      let autoBudget = null;
+      if (terms.openBook) {
+        let autoStrokes = null, autoWashes = null, autoGzipBytes = null;
+        try {
+          const vc = JSON.parse(fs.readFileSync(path.join(preparedFolder, 'painting/plate/value-executed-counts.json'), 'utf8'));
+          autoStrokes = (vc.bands ?? []).reduce((a, b) => a + (Number(b.strokes) || 0), 0);
+        } catch {}
+        try {
+          const rawPlan = fs.readFileSync(path.join(preparedFolder, 'plan/plan-to-edit.json'));
+          autoWashes = (JSON.parse(rawPlan.toString('utf8')).washes ?? []).length;
+          autoGzipBytes = zlib.gzipSync(rawPlan).length;
+        } catch {}
+        autoBudget = {
+          autoStrokes: autoStrokes ?? 1500,
+          autoWashes: autoWashes ?? 60,
+          autoUnit: prepared.record.unit ?? null,
+          maxStrokes: autoStrokes ?? 1500,
+          maxGzipBytes: Math.max(8192, Math.round((autoGzipBytes ?? 16384) * 1.5)),
+        };
+        record.author.openBookBudget = autoBudget;
+      }
       // the brief every level gets (brief.mjs), its level block naming this folder's files
       const formsGiven = Boolean(record.masks.mask), task = await sessionBrief({ level: level.name, packet, handed, medium: record.drawing.medium.split(',')[0], studies: record.studies ?? [], sheet: spec.sheet, preparedDrawing: terms.preparedDrawing,
         brushes: JSON.parse(fs.readFileSync(path.join(ROOT, 'src/paint/brushes.json'), 'utf8')).brushes, paints: BOX, paintsMost: SCRIPT_PAINTS_MOST, looksMost, lookWhole: LOOK_PRICE.half, wallMinutes: wallMost,
         data: [...(formsGiven ? [{ name: 'inputs/forms.json', what: 'the named forms as data: number, name, kind and box in mm' }, { name: 'inputs/forms-ids.png', what: 'the named forms as data: a grey image whose pixel value is the form\'s number (0: none)' }] : []),
           ...(base.listing ? [{ name: 'drawing/lines.json', what: 'every line of the drawing as a row (README.md: choosing the drawing\'s lines)' }, { name: 'drawing/all-lines.png', what: 'every line the painter lays' }] : [])],
-        v: { steps: stepsMost, reverts: revertsMost, showCost: SHOW_ORIGINAL_COST } });
+        v: { steps: stepsMost, reverts: revertsMost, showCost: SHOW_ORIGINAL_COST, openBook: Boolean(terms.openBook), autoBudget } });
       record.author.brief = { ...briefRecord(task), sent: 'author/session-prompt.txt' };
-      const { prompt, pictures: handedPictures, eyesOnly } = writeSession({ dir: cwd, task: task.text, preparedDrawing: terms.preparedDrawing, tools: routes.toolbox ? toolsText(routes.toolbox.said) : undefined, packet, sheet: spec.sheet, realSize: spec.realSize, medium: record.drawing.medium, codePlan: terms.plan, ...(terms.plan ? { auto: { picture: await planPicture({ planPreview: auto.planPreview, run: record }), washesText: washesText(auto), plan: { summary: auto.summary, washes: auto.rows }, toEdit: listing }, settings: settingsList(spec) } : {}),
+      const { prompt, pictures: handedPictures, eyesOnly: rawEyesOnly } = writeSession({ dir: cwd, task: task.text, preparedDrawing: terms.preparedDrawing, tools: routes.toolbox ? toolsText(routes.toolbox.said) : undefined, packet, sheet: spec.sheet, realSize: spec.realSize, medium: record.drawing.medium, codePlan: terms.plan, ...(terms.plan ? { auto: { picture: await planPicture({ planPreview: auto.planPreview, run: record }), washesText: washesText(auto), plan: { summary: auto.summary, washes: auto.rows }, toEdit: listing }, settings: settingsList(spec) } : {}),
         forms: record.masks.mask ? await formBoxes(record.masks.mask, record.masks.forms, W) : null, formsIds: record.masks.mask ?? null, looks: looksMost, wallMinutes: wallMost, graceMinutes: graceMost, steps: stepsMost, reverts: revertsMost, briefFile: path.join(HERE, 'SESSION-BRIEF.md'), readmeFile: path.join(HERE, 'SESSION-README.md'), handed,
         drawing: base.listing ? { listing: base.listing, picture: await drawingPicture(allLinesDoc(base.vectors, base.lines, base.mask ? { ...base.mask, list: base.forms } : null), W) } : null });
+      const eyesOnly = terms.openBook ? [] : rawEyesOnly;
       // nothing withheld is in the folder: the code's plan, its washes, anything of Auto's painting (level4.mjs)
       checkWithheld(cwd);
       // the pictures that are for looking at only (eyes-only.mjs), kept outside the folder to be shown again when asked
@@ -565,17 +589,19 @@ async function sessionRun(r) {
       // and earlier run under it), the subject list with its inputs, and whatever UNPAINT_SESSION_DENY adds (a:b:c)
       const deny = [...sessionDeny(spec), ...runs.filter(o => o !== r && o.sessionDir).map(o => o.sessionDir)];
       const call = sessionCall(author, { prompt, cwd, sessionHome, deny, images: packet.files.filter(f => /source|study-2/.test(f)).map(f => path.join(cwd, f)), gate: routes.gate, toolbox: routes.toolbox, eyesOnly });
-      // no silent fallback: a command whose sandbox cannot hold the pictures to looking is not started
-      if (!call.eyesHeld || !call.probe) throw new Error(`the session's sandbox cannot hold its pictures to looking for the ${author.cli} command (${EYES_ONLY_WORDS}); the session is not started`);
+      // no silent fallback: a command whose sandbox cannot hold the pictures to looking is not started (unless L4b open-book)
+      if (!terms.openBook && (!call.eyesHeld || !call.probe)) throw new Error(`the session's sandbox cannot hold its pictures to looking for the ${author.cli} command (${EYES_ONLY_WORDS}); the session is not started`);
       started.call = call;
       // the profile is tried before the model is started: a file of the repository must not be readable under it
       if (call.probe) {
         const can = file => { const p = call.probe(file); try { execFileSync(p.cmd, p.args, { stdio: 'ignore' }); return true; } catch { return false; } };
         if (can(path.join(ROOT, 'package.json'))) throw new Error('the session\'s sandbox does not hold: a file of the repository can be read under it; the session is not started');
         if (!can(path.join(cwd, 'README.md'))) throw new Error('the session\'s sandbox cannot be started on this machine (its own folder is not readable under it); the session is not started');
-        // ... and a picture must not be readable by a program, while the data beside it is
-        const read = eyesOnly.filter(f => can(path.join(cwd, f)));
-        if (read.length) throw new Error(`the session's sandbox does not hold its pictures: a program can read ${read.join(', ')} under it; the session is not started`);
+        // ... and a picture must not be readable by a program, while the data beside it is (skipped when L4b open-book)
+        if (!terms.openBook) {
+          const read = eyesOnly.filter(f => can(path.join(cwd, f)));
+          if (read.length) throw new Error(`the session's sandbox does not hold its pictures: a program can read ${read.join(', ')} under it; the session is not started`);
+        }
         if (!can(path.join(cwd, 'drawing/lines.json')) && fs.existsSync(path.join(cwd, 'drawing/lines.json'))) throw new Error('the session\'s sandbox refuses the drawing\'s data, which is the session\'s to read; the session is not started');
       }
       say(r, `${author.name} starts its working session (${author.cli}; level ${level.name}, try ${req.tryNumber}; the benchmark's budget for this try: ${looksMost} rendering units, ${stepsMost} steps, ${revertsMost} returns to an earlier choice; safety stop at ${wallMost} min${handed.length ? `; handed: ${handed.map(h => h.folder).join(', ')}` : ''}): ${call.closed}`);
@@ -599,7 +625,9 @@ async function sessionRun(r) {
       const outside = reachedOutside(seen.commands, deny, [cwd, real]), pictures = ownPictures(cwd);
       // the one disqualification (bench/docs/rules.md): a picture read with code. Refused reads and scripts that name a picture, from the transcript and the folder
       const endFiles = listFiles(cwd), readOwn = f => { try { return safeRead(cwd, f); } catch { return null; } };
-      const guarded = guardRecord(pictureReadsByCode({ steps: seen.steps, scripts: endFiles.filter(f => !startFiles.includes(f) && isProgram(f)).map(f => ({ name: f, text: readOwn(f) })), pictures: eyesOnly }), { held: call.eyesHeld });
+      const guarded = terms.openBook
+        ? { guard: { openBook: true }, cheat: { openBook: true, disqualified: false, flagged: false, attemptedReadByCode: false } }
+        : guardRecord(pictureReadsByCode({ steps: seen.steps, scripts: endFiles.filter(f => !startFiles.includes(f) && isProgram(f)).map(f => ({ name: f, text: readOwn(f) })), pictures: eyesOnly }), { held: call.eyesHeld });
       // a session ended by the budget is not a failure: it is marked, and what it had is painted
       const budgetReached = kept.budgetReached ?? (done.ended === 'budget reached' ? { what: `the safety stop (${wallMost} minutes on the clock)`, safetyStop: true } : null);
       session = {

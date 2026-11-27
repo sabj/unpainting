@@ -98,9 +98,9 @@ export function parseArgs(argv) {
   const [names, word] = words;
   if (!['plan', 'paint', 'prepare', 'look', 'preflight'].includes(word)) throw new Error(`the second word is plan, paint, prepare, look or preflight, not "${word}"`);
   const level = given['--level'] ?? 'L2';
-  if (!['L1', 'L2', 'L3', 'L4', 'L4-retry'].includes(level)) throw new Error('--level is L1, L2 or L3 (fixed rounds), L4 (an open session), or L4-retry (the old level 4, to replay runs of 23-24 Nov only)');
-  // preparing at L3 or L4 paints Auto's full-size painting too: those levels hand it over
-  const prepare = word === 'prepare', look = word === 'look', preflight = word === 'preflight', mode = prepare ? (['L3', 'L4'].includes(level) ? 'paint' : 'plan') : look || preflight ? 'plan' : word;
+  if (!['L1', 'L2', 'L3', 'L4', 'L4b', 'L4-retry'].includes(level)) throw new Error('--level is L1, L2 or L3 (fixed rounds), L4 (an open session), L4b (open-book optimization), or L4-retry (the old level 4, to replay runs of 23-24 Nov only)');
+  // preparing at L3, L4 or L4b paints Auto's full-size painting too: those levels hand it over
+  const prepare = word === 'prepare', look = word === 'look', preflight = word === 'preflight', mode = prepare ? (['L3', 'L4', 'L4b'].includes(level) ? 'paint' : 'plan') : look || preflight ? 'plan' : word;
   const subjects = list(names).map(s => { const [id, variant = null, more] = s.split(':'); if (!id || more !== undefined) throw new Error(`subject "${s}": write name or name:variant`); return { id, variant }; });
   const authors = list(given['--author'] ?? 'auto');
   if (prepare && (authors.length !== 1 || authors[0] !== 'auto')) throw new Error('prepare makes the automatic plan (and painting): it takes no --author');
