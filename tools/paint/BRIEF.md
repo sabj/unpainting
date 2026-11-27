@@ -158,9 +158,15 @@ Brushes and wet-in-wet washes:
 - Wet-in-wet gradients and colour shifts: instead of one flat monotone wash, immediately chain a second wash or shaped
   strokes into it while damp (`into: "<prev id>"`, `wait: "damp"`, `paper: "damp"`, `edges: "lost"`). This is the
   cleanest way to build soft clouds, atmospheric depth, sunlit-to-shadow transitions, and glowing fur or foliage masses.
-- Inside faces, animals, figures, or narrow features where precision or reserved lights need control: use rounds of
-  `17 mm` or less (17, 13 or 10 mm for a base wash; 10 or 7 mm for damp drops and glazes; 3 mm or the rigger for crisp
-  accents).
+- Match brush width to the passage, not the subject label: a broad cheek, chest, or animal base wash can use a `17–25 mm`
+  round or flat; use smaller rounds (`13, 10, 7 mm`) for modelling and damp drops, and `3 mm` or the rigger for crisp
+  accents.
+- Preserving bright whites (blank-paper highlights, clouds, white fur, sunlit walls): declare key white areas in the
+  top-level `lights` array (`"lights": [{"what": "white bib", "region": [[x,y], ...]}]`) or shape your base wash
+  polygon cleanly around them — never flood a broad wash blindly over the picture's bright whites.
+- Light freehand sketch on blank paper (optional): when no prepared drawing is on the sheet, you may lay a few light
+  placement lines of your own before the washes using `lines.own`, e.g.
+  `{"format": "lines-edit 1", "own": [{"points": [[105, 160], [122, 156], [134, 162]], "medium": "pencil", "widthMm": 0.35, "dark": 0.35, "when": "before"}]}`.
 
 One way to paint a soft form (a face, fur, an animal, hair, a figure, clothing; the sky or background as one form):
 

@@ -94,10 +94,11 @@ if (!['forms', 'file'].includes(DRAWING_ORDER)) throw new Error(`--drawingorder:
 ctx.filmPass = 0;
 // under --smalllights the fluid goes on the small lights too, whether or not the big lights were worth masking
 // (--lightresist 0, a probe: the plan and the brush leave the lights out, and nothing seals them)
-const FLUID = SMALL && opt('lightresist', '1') !== '0' ? SMALL : null;
+// For authored scripts, never apply source-derived masking fluid; only authored `lights`/`reserve` govern paper reserves.
+const FLUID = !ctx.AUTHORED_SCRIPT && SMALL && opt('lightresist', '1') !== '0' ? SMALL : null;
 // --resistmin s: masking fluid only on lights of at least s of the sheet's cells; a masked speck dries as a rimmed hole. Default 0.
 const bigLights = (mask, min) => (min > 0 ? removeSmall(mask, w, h, Math.round(min * n)) : mask);
-const RESIST0 = FLUID ? Uint8Array.from(FLUID, (v, i) => (v || (ctx.masked > n * 0.01 && highlights[i]) ? 1 : 0)) : ctx.masked > n * 0.01 ? bigLights(highlights, num('resistmin', 0)) : null;
+const RESIST0 = ctx.AUTHORED_SCRIPT ? null : (FLUID ? Uint8Array.from(FLUID, (v, i) => (v || (ctx.masked > n * 0.01 && highlights[i]) ? 1 : 0)) : ctx.masked > n * 0.01 ? bigLights(highlights, num('resistmin', 0)) : null);
 const RESIST_BASE = RESIST0;
 const RESIST_SOFT_BASE = null;
 let RESIST_SOFT = RESIST_SOFT_BASE; ctx.RESIST = RESIST_BASE;

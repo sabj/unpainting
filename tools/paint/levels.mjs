@@ -1,16 +1,14 @@
-// The levels of a model session, as named settings of one session (never a fork of the code). The ladder is the
-// owner's of 24 Nov (work/lead-04/work/BENCHMARK-DEFINITION.md, "levels, revised" and the anti-cheat correction):
-// every level is ONE fresh, independent session; no level is handed another level's output, so every level and
-// picture can run at once. At every level: the same look budget, the anti-cheat guard (code may not read the
-// original's pixels), no judge feedback, and the model hands in its own script. Each level adds one thing:
-//   L1  the picture, the script format and the painting tips; nothing prepared. Fixed rounds.
-//   L2  + the prepared studies: the drawing, the named forms, the studies' traced shapes (offered as regions, maybe
-//       wrong). Nothing of Auto. Fixed rounds.
-//   L3  + Auto's plan (its washes in numbers, to read) and Auto's finished painting (to improve on). Fixed rounds.
-//   L4  L3's inputs in an open session with tools (sandbox, painter commands, its own files). --work session.
+// The levels of a model session, as named settings of one session (never a fork of the code).
+// Option A ladder (0.5.1): every level is ONE fresh, independent session; no level is handed another level's output,
+// so every level and picture can run at once. At every level: the same look budget, the anti-cheat guard (code may not
+// read the original's pixels), no judge feedback, and the model hands in its own script.
+//   L1  the picture, the script format and the painting tips; nothing prepared; blank paper. Fixed rounds.
+//   L2  + three unnumbered colour studies for visual value/colour reference; no prepared drawing, named forms, or traced
+//       shapes; blank paper. Fixed rounds.
+//   L3  + opt-in prepared drawing (OFF/blank paper unless selected), named forms, traced shapes, and Auto's plan & painting. Fixed rounds.
+//   L4  L3's inputs (with opt-in prepared drawing) in an open sandboxed session with tools (--work session).
 // Kept only to replay the runs of 23-24 Nov made under the earlier ladder, never part of the benchmark:
-//   L4-retry  the old level 4: the traced shapes and the model's own earlier painting and script (--previous;
-//             "L4 after L2" or "after L3"); nothing of Auto.
+//   L4-retry  the old level 4: the traced shapes and the model's own earlier painting and script (--previous); nothing of Auto.
 // Planner settings alone, or the code's plan as a choice, are refused at every level (OWN_SCRIPT_ONLY): Auto's plan
 // at L3 and L4 is something to read, never a choice to hand in. Looks are priced by size and share (look-cost.mjs).
 // Pure: nothing is read or written here.
@@ -58,4 +56,37 @@ export function handedAt(level, { tryNumber = 1, retries = DEFAULT_RETRIES, prev
   return { previous: Boolean(previous), plan: level.codePlan, autoPlan: level.autoPlan, auto: level.autoPainting, shapes: level.shapesData,
     studiesOnly: Boolean(level.studiesOnly), preparedDrawing: level.preparedDrawing ?? true, namedForms: level.namedForms ?? !level.noInputs,
     ...(level.noInputs ? { noInputs: true } : {}) };
+}
+
+/**
+ * Shared Option A prepared-drawing policy for both fixed rounds (L1-L3) and open sessions (L4).
+ * Given a parsed `choice` (from readChoice, with `choice.tools?.linesEdit` already loaded when `lines` is set) and the
+ * level's `preparedDrawing` (`false`, `'opt-in'`, or `true`), returns the normalized choice actually laid:
+ *   - false (L1, L2): always forces `medium: 'none'` (blank paper; author's `own` lines still drawn).
+ *   - 'opt-in' (L3, L4):
+ *       * explicit `medium` ('pencil' | 'pen' | 'none') is respected verbatim;
+ *       * omitted `medium` + `linesEdit.rules` with any non-drop rule (`r.do && r.do !== 'drop'`) sets `startDropped: true`
+ *         so ONLY the explicitly selected prepared lines are drawn (not the whole default drawing);
+ *       * omitted `medium` + (no rules or drop-only rules) forces `medium: 'none'` (blank paper; `own` lines still drawn).
+ *   - true (L4-retry / legacy): returns `choice` unchanged.
+ */
+export function applyPreparedDrawingPolicy(choice, preparedDrawing = true) {
+  if (preparedDrawing === true || !choice) return choice;
+  const tools = choice.tools ? { ...choice.tools } : {};
+  if (preparedDrawing === false) {
+    tools.medium = 'none';
+    return { ...choice, tools };
+  }
+  if (preparedDrawing === 'opt-in') {
+    if (tools.medium) return choice;
+    const rules = tools.linesEdit?.rules;
+    const selectsPrepared = Array.isArray(rules) && rules.some(r => r && r.do && r.do !== 'drop');
+    if (selectsPrepared) {
+      tools.startDropped = true;
+      return { ...choice, tools };
+    }
+    tools.medium = 'none';
+    return { ...choice, tools };
+  }
+  return choice;
 }

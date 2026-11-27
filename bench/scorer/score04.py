@@ -220,9 +220,18 @@ def main(argv=None, judge=s04_judge, env=None, say=print):
     ap.add_argument("--fresh", action="store_true", help="read every picture again: no kept reading is reused (the new readings replace the kept ones)")
     ap.add_argument("--repeat", type=int, default=1, metavar="N", help="score the same paintings a further time, kept apart from repeat 1 (results-repeat-N.json, SCORES-repeat-N.md): for measuring the judges' noise")
     ap.add_argument("--concurrency", type=int, default=CONCURRENCY, metavar="N", help=f"hosted route: readings in flight at once for each judge, every judge at once (default {CONCURRENCY}). The local route holds one model at a time and reads one reading after another")
-    ap.add_argument("--quality-mode", default="blind", choices=R.QUALITY_MODES, help="quality judging mode: blind (0.4 single image vs original share) or anchored (0.5.1 reference=9.0 harsh craft scale, Q = 10 x overall)")
-    ap.add_argument("--combined-mode", default="weighted", choices=T.COMBINED_MODES, help="combined formula: weighted (0.4 2:1 H:Q) or gated (0.5.1 Q * min(1, H / 65))")
+    ap.add_argument("--profile", default=None, choices=("0.5.1", "0.4"), help="named scoring profile: 0.5.1 sets panel open3v2 (reasoning medium), anchored quality, gated combined; 0.4 sets open3, blind, weighted")
+    ap.add_argument("--quality-mode", default=None, choices=R.QUALITY_MODES, help="quality judging mode: blind (0.4 single image vs original share) or anchored (0.5.1 reference=9.0 harsh craft scale, Q = 10 x overall)")
+    ap.add_argument("--combined-mode", default=None, choices=T.COMBINED_MODES, help="combined formula: weighted (0.4 2:1 H:Q) or gated (0.5.1 Q * min(1, H / 65))")
     a = ap.parse_args(argv)
+    if a.profile == "0.5.1":
+        a.quality_mode = a.quality_mode or "anchored"
+        a.combined_mode = a.combined_mode or "gated"
+        env = {**(os.environ if env is None else env)}
+        env.setdefault("JUDGE_PANEL", "open3v2")
+    else:
+        a.quality_mode = a.quality_mode or "blind"
+        a.combined_mode = a.combined_mode or "weighted"
     if a.repeat < 1:
         ap.error("--repeat is 1 or more")
     if a.concurrency < 1:
@@ -234,12 +243,21 @@ def main(argv=None, judge=s04_judge, env=None, say=print):
         # a run that failed is kept and counted (never judged, never dropped); the paintings are judged
         paintings, failed = [e for e in everything if not e.get("failed")], [e for e in everything if e.get("failed")]
         bad = []
-        for e in paintings:
+        def _prep_frames(e):
             try:
-                shown = R.frames_for(e["painting"], a.snapshots)
-                e.update(scheme=a.snapshots, snapshots=shown["snapshots"], opening=shown["opening"], drawing=shown["drawing"], firstWash=shown["firstWash"], frames=shown["frames"])
+                return e, R.frames_for(e["painting"], a.snapshots), None
             except R.Refusal as x:
-                bad.append(f"{e['id']}: {x}")
+                return e, None, f"{e['id']}: {x}"
+        if len(paintings) > 1:
+            with ThreadPoolExecutor(max_workers=min(8, len(paintings))) as pool:
+                prepped = list(pool.map(_prep_frames, paintings))
+        else:
+            prepped = [_prep_frames(e) for e in paintings]
+        for e, shown, err in prepped:
+            if err:
+                bad.append(err)
+            else:
+                e.update(scheme=a.snapshots, snapshots=shown["snapshots"], opening=shown["opening"], drawing=shown["drawing"], firstWash=shown["firstWash"], frames=shown["frames"])
         if bad:
             raise R.Refusal("\n".join(bad))
         jrec = judge.record(cfg)
@@ -328,7 +346,7 @@ def results(a, cfg, jrec, rubric, rubric_sha, paintings, failed, originals, got)
     series = SERIES + " " + SCHEME_NOTE[a.snapshots]
     if qmode == "anchored" or cmode == "gated":
         series = f"0.5.1 series (qualityMode={qmode}, combinedMode={cmode}): NOT comparable with 0.4 or 0.5 blind scores. " + SCHEME_NOTE[a.snapshots]
-    res = {"schema": "unpaint-bench/score04@1", "written": time.strftime("%Y-%m-%d %H:%M"), "series": series, "judge": jrec,
+    res = {"schema": "unpaint-bench/score04@1", "profile": getattr(a, "profile", None) or ("0.5.1" if qmode == "anchored" and cmode == "gated" else "0.4"), "written": time.strftime("%Y-%m-%d %H:%M"), "series": series, "judge": jrec,
            "qualityMode": qmode, "combinedMode": cmode, "gateFloor": T.GATE_FLOOR if cmode == "gated" else None,
            "rubric": {"path": os.path.relpath(RUBRIC, REPO), "sha256": rubric_sha}, "prompts": R.prompt_hashes(rubric, a.snapshots, quality_mode=qmode),
            "weights": dict(T.WEIGHTS), "readings": R.READINGS, "repeat": a.repeat, "fresh": bool(a.fresh), "snapshots": R.SCHEMES[a.snapshots]["count"], "snapshotScheme": {**R.SCHEMES[a.snapshots], "note": SCHEME_NOTE[a.snapshots]}, "pictureLongSidePx": {"stills": SNAP_PX, "alone": ONE_PX, "likeness": ONE_PX}, "faults": faults, "failedRuns": [{"id": e["id"], "subject": e["subject"], "author": e["author"], "level": e["level"], "why": e["failed"]} for e in failed], "originals": originals, "paintings": rows}

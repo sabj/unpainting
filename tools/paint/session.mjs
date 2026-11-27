@@ -30,7 +30,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawn, execFileSync } from 'node:child_process';
 import { readChoice, choiceKind, choiceKey } from './choice.mjs';
-import { OWN_SCRIPT_ONLY } from './levels.mjs';
+import { OWN_SCRIPT_ONLY, applyPreparedDrawingPolicy } from './levels.mjs';
 import { needsOf } from './author.mjs';
 import { editLine } from '../../src/paint/methods/plan-edit.mjs';
 import { tinyTouchWarning } from './plan-data.mjs';
@@ -145,15 +145,17 @@ const AUTO_FILES = ['auto/settings.json', 'auto/plan.json', 'auto/plan-to-edit.j
  * stands, it names what is handed itself, and no own-script-brief.md is written. Returns {prompt, files}. Nothing of
  * this machine's paths goes into any file.
  */
-export function writeSession({ dir, packet, sheet, realSize = null, medium, codePlan, auto = null, settings = null, forms = null, formsIds = null, looks, wallMinutes, steps = DEFAULT_STEPS, graceMinutes = DEFAULT_GRACE_MINUTES, reverts = DEFAULT_REVERTS, briefFile, readmeFile, handed = [], drawing = null, tools = TOOLS_OPEN, task = null }) {
+export function writeSession({ dir, packet, sheet, realSize = null, medium, codePlan, auto = null, settings = null, forms = null, formsIds = null, looks, wallMinutes, steps = DEFAULT_STEPS, graceMinutes = DEFAULT_GRACE_MINUTES, reverts = DEFAULT_REVERTS, briefFile, readmeFile, handed = [], drawing = null, tools = TOOLS_OPEN, task = null, preparedDrawing = true }) {
   if (typeof codePlan !== 'boolean') throw new Error('session: say whether this level hands over the code\'s plan (codePlan true for the preflight only)');
   if (codePlan && !(auto && settings)) throw new Error('session: the preflight\'s folder holds the code\'s plan and its settings, and none were given');
   if (!codePlan && (auto || settings)) throw new Error(`session: ${OWN_SCRIPT_ONLY}; it is not started`);
   const mk = d => fs.mkdirSync(path.join(dir, d), { recursive: true });
   for (const d of [...(codePlan ? ['auto'] : []), 'plans', 'looks', '.requests']) mk(d);
   const put = (f, text) => fs.writeFileSync(path.join(dir, f), text);
-  const ink = /^ink/.test(medium), v = { TOOLS_NOTE: tools, STEPS_MOST: steps, 'REAL_SIZE_LINE\n': realSizeLine(realSize, sheet) ? `${realSizeLine(realSize, sheet)}\n` : '', SHEET_W: sheet.widthMm, SHEET_H: sheet.heightMm, WALL_MINUTES: wallMinutes, GRACE_MINUTES: graceMinutes, LOOKS_MOST: looks, REVERTS_MOST: reverts, SHOW_COST: SHOW_ORIGINAL_COST,
-    DRAWING_NOTE: ink ? 'As prepared, the drawing is waterproof ink laid before the washes; it carries the form and the washes go over it. It is offered, not required: laying no drawing (`"medium": "none"` in `choice.json`) is a normal choice, and then the brush makes the shapes on clean paper.' : 'As prepared, the drawing is light pencil laid before the washes; it only places the forms, and the paint carries form, value and edge. It is offered, not required: laying no drawing (`"medium": "none"` in `choice.json`) is a normal choice, and then the brush makes the shapes on clean paper.',
+  const ink = /^ink/.test(medium), optIn = preparedDrawing === 'opt-in', v = { TOOLS_NOTE: tools, STEPS_MOST: steps, 'REAL_SIZE_LINE\n': realSizeLine(realSize, sheet) ? `${realSizeLine(realSize, sheet)}\n` : '', SHEET_W: sheet.widthMm, SHEET_H: sheet.heightMm, WALL_MINUTES: wallMinutes, GRACE_MINUTES: graceMinutes, LOOKS_MOST: looks, REVERTS_MOST: reverts, SHOW_COST: SHOW_ORIGINAL_COST,
+    DRAWING_NOTE: optIn
+      ? `The prepared ${ink ? 'ink' : 'light pencil'} drawing is optional and OFF by default (the sheet starts blank). Set \`"medium": "${ink ? 'pen' : 'pencil'}"\` in \`choice.json\` (or select specific prepared lines in \`"lines"\`) only if you choose to lay it; otherwise the brush makes the shapes on clean paper.`
+      : ink ? 'As prepared, the drawing is waterproof ink laid before the washes; it carries the form and the washes go over it. It is offered, not required: laying no drawing (`"medium": "none"` in `choice.json`) is a normal choice, and then the brush makes the shapes on clean paper.' : 'As prepared, the drawing is light pencil laid before the washes; it only places the forms, and the paint carries form, value and edge. It is offered, not required: laying no drawing (`"medium": "none"` in `choice.json`) is a normal choice, and then the brush makes the shapes on clean paper.',
     INPUT_LIST: packet.files.map(f => `- \`${f}\`: ${f.includes('source') ? 'the SUBJECT, the picture to paint (to look at only)' : f.includes('drawing') ? 'the opening DRAWING, already on the sheet before any wash' : f.includes('forms') ? 'the NAMED FORMS, each one flat colour' : `block-in STUDY ${/study-(\d)/.exec(f)?.[1]}: the subject simplified to flat shapes (1 the broad shapes, 2 the middle study, 3 details and accents; to look at only)${codePlan ? '; the code planner reads its washes from these' : ''}`}`).join('\n') };
   // `task`: the brief already written for the level (brief.mjs), which names what is handed itself; else the brief file filled here
   let prompt = task ?? fill(forLevel(fs.readFileSync(briefFile, 'utf8'), codePlan), v);
@@ -241,7 +243,7 @@ function tokenSplit(cli, split) {
  * and recorded); a plan or a look that gets as far as the planner puts them away; `./unpaint show FILE` brings one
  * back, written into the ledger first, the original at its price from the same budget as the looks (look-cost.mjs).
  */
-export function sessionServer({ dir, codePlan = true, sheet = null, forms = [], looks: most = DEFAULT_LOOKS, wallMinutes = DEFAULT_WALL_MINUTES, graceMinutes = DEFAULT_GRACE_MINUTES, steps: stepsMost = DEFAULT_STEPS, stepsTaken = () => 0, lookSize = 'half', reverts: revertsMost = DEFAULT_REVERTS, startKey = null, pictures = [], eyes = null, compile, look: paintLook, keep = null, checkScript, checkPlan = null, checkTools = null, ledger, now = Date.now, everyMs = 400 }) {
+export function sessionServer({ dir, codePlan = true, preparedDrawing = true, sheet = null, forms = [], looks: most = DEFAULT_LOOKS, wallMinutes = DEFAULT_WALL_MINUTES, ownMinutes = null, graceMinutes = DEFAULT_GRACE_MINUTES, steps: stepsMost = DEFAULT_STEPS, stepsTaken = () => 0, lookSize = 'half', reverts: revertsMost = DEFAULT_REVERTS, startKey = null, pictures = [], eyes = null, compile, look: paintLook, keep = null, checkScript, checkPlan = null, checkTools = null, ledger, now = Date.now, everyMs = 400 }) {
   if (!(most > 0) || !(wallMinutes > 0) || !(stepsMost > 0)) throw new Error('session: the budget is a number of look units and of steps, and the safety stop a number of minutes, each above 0');
   const plans = [], cache = new Map(), painted = new Map(), requests = [], good = new Set(), seen = new Map(), reverts = revertCounter(revertsMost, startKey);
   let t0 = now(), waitMs = 0, busy = false, timer = null, lastGood = null, n = 0, pending = null, lastEnd = t0, reached = null, warningsGiven = 0, described = null;
@@ -251,8 +253,10 @@ export function sessionServer({ dir, codePlan = true, sheet = null, forms = [], 
   const spent = () => +(ledgerLooks(ledger).reduce((a, l) => a + (l.cost ?? 1), 0) + ledgerShowings(ledger).reduce((a, l) => a + (l.cost ?? 0), 0)).toFixed(2), unitsLeft = () => +Math.max(0, most - spent()).toFixed(2);
   // the model's own time: the clock less every stretch a request of its was waiting on this side (a stretch counted once)
   const ownSeconds = () => Math.round((now() - t0 - waitMs - (pending == null ? 0 : now() - pending)) / 1000);
-  const wallSeconds = () => Math.round((now() - t0) / 1000), wallUp = () => wallSeconds() >= wallMinutes * 60;
-  const steps = () => stepsTaken() ?? 0, stepsUp = () => steps() >= stepsMost, SAFETY = `the safety stop (${wallMinutes} minutes on the clock)`;
+  const wallSeconds = () => Math.round((now() - t0) / 1000);
+  // When ownMinutes is set (e.g. L4: 60 min author time + 180 min hard wall cap), budget author thinking time apart from GPU queue waits.
+  const wallUp = () => (ownMinutes != null && ownSeconds() >= ownMinutes * 60) || wallSeconds() >= wallMinutes * 60;
+  const steps = () => stepsTaken() ?? 0, stepsUp = () => steps() >= stepsMost, SAFETY = `the safety stop (${ownMinutes ?? wallMinutes} minutes on the clock)`;
   const check = () => { if (wallUp()) reach(SAFETY); if (stepsUp()) reach(`${stepsMost} steps`); };
   // the budget is reached once, by whichever comes first; it is recorded with when, and said in every answer after
   const reach = what => { if (!reached) { reached = { what, safetyStop: what === SAFETY, atWallMinutes: +(wallSeconds() / 60).toFixed(1), looks: used(), lookUnits: spent(), steps: steps() }; note({ budgetReached: reached }); } };
@@ -270,18 +274,18 @@ export function sessionServer({ dir, codePlan = true, sheet = null, forms = [], 
 
   /** The folder's present choice, checked: {choice, script, scriptText, key}. Throws with the reason. */
   function present() {
-    const choice = readChoice(safeJson(dir, 'choice.json').value, { codePlan }); let script = null, edit = null, text = '';
+    let choice = readChoice(safeJson(dir, 'choice.json').value, { codePlan }); let script = null, edit = null, text = '';
     if (choice.kind === 'script') { const got = safeJson(dir, choice.script); text = got.text; script = checkScript(got.value); }
     // an edited plan is checked against the code planner's plan it must be an edit of: {edit, record (what it changes, counted)}
     if (choice.kind === 'plan') { if (!checkPlan) throw new Error('an edited plan cannot be read in this session'); const got = safeJson(dir, choice.plan); text = got.text; edit = checkPlan(got.value); }
-    // the choice's tools (its lines, its forms, settings per form): their files are read here and checked against the
-    // drawing and the forms of the run: {record (what was chosen, counted), said}
-    let tools = null;
+    // load lines/forms edit files before applying the level's prepared-drawing policy (Option A opt-in)
     if (choice.tools) {
       if (!checkTools) throw new Error('"lines", "forms" and "perForm" cannot be read in this session');
       const t = choice.tools; if (t.lines) t.linesEdit = safeJson(dir, t.lines).value; if (t.forms) t.formsEdit = safeJson(dir, t.forms).value;
-      tools = checkTools(t);
     }
+    choice = applyPreparedDrawingPolicy(choice, preparedDrawing);
+    let tools = null;
+    if (choice.tools && checkTools) tools = checkTools(choice.tools);
     // what the choice was warned of: its own form (choice.mjs), and its tools (session-tools.mjs)
     const warnings = [...(choice.warnings ?? []), ...(tools?.warnings ?? [])];
     const drawn = choice.tools && (choice.tools.lines || choice.tools.medium) ? choice.sets.map(([k]) => k).filter(k => ['drawingorder', 'drawinglast', 'drawinglastmin', 'outlinemedium'].includes(k)) : [];
@@ -321,11 +325,26 @@ export function sessionServer({ dir, codePlan = true, sheet = null, forms = [], 
     if (cmd === 'look' && reached && !/rendering units/.test(reached.what)) return `NOT PAINTED, no look was counted: the benchmark's resource budget for this try is reached (${reached.what}). This is the benchmark's limit on its machines, not a judgment of your work.\n${left()}`;
     const unseen = seenFault(); if (unseen) return unseen;
     let p; try { p = present(); } catch (e) { return `REFUSED, nothing was planned${cmd === 'look' ? ' and no look was counted' : ''}: ${e.message}`; }
+    // `./unpaint cost` is strictly side-effect-free: no reverts counted, no plans registered, no good/lastGood mutation, no pictures put away
+    if (cmd === 'cost') {
+      let got = cache.get(p.key);
+      if (!got) { try { got = await compile(p.choice, p.script, n + 1, p.edit?.edit ?? null); } catch (e) { got = { ok: false, error: e.message }; } if (got.ok) cache.set(p.key, got); }
+      if (!got.ok) return `REFUSED by the planner: ${got.error}`;
+      let region = null;
+      try {
+        region = regionBox(ask.region, { sheet: sheet ?? { widthMm: Infinity, heightMm: Infinity }, forms });
+        if (region && p.choice.kind !== 'script') throw new Error('a look of a region is painted for your own script only (its passages are written in millimetres, so those in the box can be painted by themselves); the code planner\'s plan and an edited plan are painted whole, or stopped at a stage with --until');
+      } catch (e) { return `REFUSED, nothing was painted and nothing was spent: ${e.message}`; }
+      if (region) { const inR = scriptInRegion(p.script, region.box); if (!inR.kept) return `REFUSED, nothing was painted and nothing was spent: no passage of your script touches the region ${region.box.join(', ')} mm`; region.passages = inR.kept; region.of = inR.of; region.passageShare = inR.kept / inR.of; }
+      const cost = lookCost(got.rows ?? [], { until: ask.until, regionShare: region?.passageShare ?? null, size: lookSize });
+      const askKey = `${p.key}:${ask.until ?? ''}:${region ? region.box.join(',') : ''}`, costSaid = `${cost.cost} unit${cost.cost === 1 ? '' : 's'} (${ask.until != null ? `stopped after stage ${ask.until}: ${cost.washes} of the plan's ${cost.of} washes` : `the whole plan, ${cost.of} washes`}${region ? `; the region ${region.name ? `"${region.name}", ` : ''}${region.box.join(', ')} mm, which ${region.passages} of your ${region.of} passages touch` : ', the whole sheet'})`;
+      return `This look would cost ${costSaid}. You have ${unitsLeft()} of ${most} units left. Nothing was painted and nothing was spent.${painted.has(askKey) ? ' (You have already looked at exactly this: looking again renders nothing and costs nothing.)' : ''}\n${left()}`;
+    }
     // a return to a choice the session had left is counted; past the allowed number it is refused (reverts.mjs)
     const back = reverts.see(p.key, ownSeconds());
     if (back.refused) return `REFUSED, nothing was planned${cmd === 'look' ? ' and no look was counted' : ''}: this choice is one you planned before and then left, and you have gone back to an earlier choice ${back.count} times, the most this benchmark allows (${revertsMost}). Going back again and again to keep only what a look liked is the one thing a session may not do. Go on from your present work: change it, do not undo it.\n${left()}`;
     // the pictures are put away while the session plans and paints: ./unpaint show brings one back
-    if (cmd !== 'cost') putAway();
+    putAway();
     const id = ++n, what = choiceKind(p.choice), atSeconds = ownSeconds(), t1 = now();
     let got = cache.get(p.key);
     if (!got) { try { got = await compile(p.choice, p.script, id, p.edit?.edit ?? null); } catch (e) { got = { ok: false, error: e.message }; } cache.set(p.key, got); }
@@ -421,7 +440,7 @@ export function sessionServer({ dir, codePlan = true, sheet = null, forms = [], 
       // the pictures lie in the folder as the session starts: the first showing of each, free and recorded once
       if (eyes && !ledgerShowings(ledger).some(e => e.atStart)) for (const f of eyes.files.filter(lies)) note({ shown: f, cost: 0, atStart: true, at: new Date(t0).toISOString(), atSeconds: 0 }); },
     /** The safety stop and its minutes to hand in, or the steps and their grace, are used: the command is ended. */
-    over: () => { check(); return wallSeconds() >= (wallMinutes + graceMinutes) * 60 || steps() >= stepsMost + STEP_GRACE; },
+    over: () => { check(); return (ownMinutes != null && ownSeconds() >= (ownMinutes + graceMinutes) * 60) || wallSeconds() >= (wallMinutes + graceMinutes) * 60 || steps() >= stepsMost + STEP_GRACE; },
     /** Whether handing over this choice would be a return to an earlier choice past the allowed number. */
     barred: key => reverts.barred(key),
     async stop() { if (timer) clearInterval(timer); while (busy) await new Promise(r => setTimeout(r, 50));
@@ -502,8 +521,14 @@ export function seatbelt({ deny, write, cwd, local = false, gated = false, reada
  * prompts off inside it; its transcript is the log it keeps (`log`, transcriptFile). With a `gate` (session-net.mjs)
  * each of the four is let out only through it and sees of the home folder only what it needs to sign in and run.
  */
-export function sessionCall(author, { prompt, cwd, deny = [], images = [], home = os.homedir(), tmp = os.tmpdir(), gate = null, toolbox = null, eyesOnly = null }) {
+export function sessionCall(author, { prompt, cwd, deny = [], images = [], home = os.homedir(), tmp = os.tmpdir(), sessionHome = null, gate = null, toolbox = null, eyesOnly = null }) {
   const real = d => { try { return fs.realpathSync(d); } catch { return d; } }, all = [...new Set(deny.flatMap(d => [d, real(d)]))];
+  // Per-session isolated tmp dir (outside cwd so dotfiles never pollute the session record or anti-cheat scan)
+  const isoHome = sessionHome ? real(sessionHome) : null;
+  const isoTmp = isoHome ? path.join(isoHome, 'tmp') : null;
+  if (isoTmp) fs.mkdirSync(isoTmp, { recursive: true });
+  const writeTmp = isoTmp ? [isoTmp] : [real(tmp), '/private/tmp', '/private/var/folders'];
+  const tmpEnv = isoTmp ? { TMPDIR: isoTmp } : {};
   // eyesOnly: the folder's pictures that are for looking at (eyes-only.mjs): under a profile of this harness only the
   // model command's own program reads them. A command that is not installed has no viewer to name: it is not started.
   const eyes = eyesOnly ? { pictures: eyesOnly, viewers: viewersOf(author.cli) } : null;
@@ -514,10 +539,10 @@ export function sessionCall(author, { prompt, cwd, deny = [], images = [], home 
     // exposure, SIGN_IN_EXPOSURE); measured, it signs in and answers without ~/.claude or ~/.claude.json
     const bin = (() => { try { return real(execFileSync('/usr/bin/which', ['claude'], { encoding: 'utf8' }).trim()); } catch { return null; } })();
     const signIn = [path.join(home, 'Library', 'Keychains')];
-    const profile = seatbelt({ deny: all, write: [...new Set([real(tmp), '/private/tmp', '/private/var/folders'])], cwd: real(cwd), local: true, gated: true, eyes,
+    const profile = seatbelt({ deny: all, write: [...new Set([...writeTmp, '/private/var/folders'])], cwd: real(cwd), local: true, gated: true, eyes,
       readable: [...new Set([...(toolbox?.readable ?? []), ...(bin ? [path.dirname(bin)] : []), ...signIn])], hidden: [...new Set([home, real(home), '/Users', '/Volumes'])], metadata: [path.join(home, '.local', 'bin'), path.join(home, '.local', 'bin', 'claude'), home] });
     const settings = { sandbox: { enabled: false }, permissions: { deny: all.map(d => `Read(/${d}/**)`) } };
-    return { cmd: 'sandbox-exec', env: { CLAUDE_CODE_DISABLE_AUTO_MEMORY: '1', BASH_DEFAULT_TIMEOUT_MS: '120000', BASH_MAX_TIMEOUT_MS: '600000', DISABLE_TELEMETRY: '1', DISABLE_ERROR_REPORTING: '1', CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: '1', ...proxyEnv(gate.url), ...(toolbox?.env ?? {}) }, unset: [], profile, gated: true, signIn,
+    return { cmd: 'sandbox-exec', env: { ...tmpEnv, CLAUDE_CODE_DISABLE_AUTO_MEMORY: '1', BASH_DEFAULT_TIMEOUT_MS: '120000', BASH_MAX_TIMEOUT_MS: '600000', DISABLE_TELEMETRY: '1', DISABLE_ERROR_REPORTING: '1', CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: '1', ...proxyEnv(gate.url), ...(toolbox?.env ?? {}) }, unset: [], profile, gated: true, signIn,
       // its own permission prompts off inside the profile, as agy's and codex's are: headless, a prompt is a refusal (the
       // 22 Nov preflight: a compound shell command "requires approval" and a Write to seen.md was refused as sensitive)
       args: ['-p', profile, 'claude', '-p', prompt, '--model', author.id, ...(author.effort ? ['--effort', author.effort] : []), '--allowedTools', 'Read Write Edit Glob Grep Bash', '--dangerously-skip-permissions', '--settings', JSON.stringify(settings), '--setting-sources', 'project', '--no-session-persistence', '--output-format', 'stream-json', '--verbose'],
@@ -526,44 +551,49 @@ export function sessionCall(author, { prompt, cwd, deny = [], images = [], home 
   }
   if (author.cli === 'claude') {
     const settings = { sandbox: { enabled: true, autoAllowBashIfSandboxed: true, allowUnsandboxedCommands: false }, permissions: { deny: all.map(d => `Read(/${d}/**)`) } };
-    return { cmd: 'claude', env: { CLAUDE_CODE_DISABLE_AUTO_MEMORY: '1', BASH_DEFAULT_TIMEOUT_MS: '120000', BASH_MAX_TIMEOUT_MS: '600000' }, unset: [],
+    return { cmd: 'claude', env: { ...tmpEnv, CLAUDE_CODE_DISABLE_AUTO_MEMORY: '1', BASH_DEFAULT_TIMEOUT_MS: '120000', BASH_MAX_TIMEOUT_MS: '600000' }, unset: [],
       args: ['-p', prompt, '--model', author.id, ...(author.effort ? ['--effort', author.effort] : []), '--allowedTools', 'Read Write Edit Glob Grep Bash', '--settings', JSON.stringify(settings), '--setting-sources', 'project', '--no-session-persistence', '--output-format', 'stream-json', '--verbose'],
       probe: null, eyesHeld: false, closed: 'its shell runs in the command\'s own sandbox (writes only in its folder, network held to the command\'s allowed hosts) and neither its shell nor its file tools can read the repository, the subject list, the caches or other sessions' };
   }
   if (author.cli === 'codex') {
-    // with a gate (session-net.mjs): out only through it, the toolbox first on PATH, and of the home folder only its
-    // own folder (~/.codex: its sign-in file auth.json, the accepted exposure, and what it keeps as it runs); the
-    // user's config.toml is not loaded (no MCP servers or plugins of the operator's), and its usage reports are off
+    // When sessionHome is given, isolate CODEX_HOME to a fresh dir holding ONLY auth.json so earlier Codex transcripts cannot be read.
     const codex = (() => { try { return real(execFileSync('/usr/bin/which', ['codex'], { encoding: 'utf8' }).trim()); } catch { return null; } })();
-    const own = path.join(home, '.codex'), signIn = gate ? [own] : [];
-    const profile = seatbelt({ deny: all, write: [...new Set([own, real(tmp), '/private/tmp', '/private/var/folders'])], cwd: real(cwd), gated: Boolean(gate), eyes,
+    let own = path.join(home, '.codex');
+    const codexEnv = {};
+    if (isoHome) {
+      own = path.join(isoHome, 'codex');
+      fs.mkdirSync(own, { recursive: true });
+      const srcAuth = path.join(home, '.codex', 'auth.json');
+      if (fs.existsSync(srcAuth)) fs.copyFileSync(srcAuth, path.join(own, 'auth.json'));
+      codexEnv.CODEX_HOME = own;
+    }
+    const signIn = gate ? [own] : [];
+    const profile = seatbelt({ deny: all, write: [...new Set([own, ...writeTmp, '/private/var/folders'])], cwd: real(cwd), gated: Boolean(gate), eyes,
       readable: gate ? [...new Set([...(toolbox?.readable ?? []), ...(codex ? [codex] : [])])] : [], hidden: gate ? [...new Set([home, real(home), '/Users', '/Volumes'])] : [], metadata: gate ? [...(codex ? [path.dirname(codex)] : []), home] : [] });
-    return { cmd: 'sandbox-exec', env: { ...(gate ? proxyEnv(gate.url) : {}), ...(toolbox?.env ?? {}) }, unset: [], profile, gated: Boolean(gate), signIn,
+    return { cmd: 'sandbox-exec', env: { ...tmpEnv, ...codexEnv, ...(gate ? proxyEnv(gate.url) : {}), ...(toolbox?.env ?? {}) }, unset: [], profile, gated: Boolean(gate), signIn,
       args: ['-p', profile, 'codex', 'exec', '--json', '-m', author.id, ...(author.effort ? ['-c', `model_reasoning_effort="${author.effort}"`] : []), ...(gate ? ['--ignore-user-config', '-c', 'analytics.enabled=false'] : []), '--dangerously-bypass-approvals-and-sandbox', '--skip-git-repo-check', '--ephemeral', '-C', cwd, ...images.flatMap(f => ['-i', f]), '--', prompt],
       probe: file => ({ cmd: 'sandbox-exec', args: ['-p', profile, '/bin/cat', file] }),
       closed: `the whole command runs under a seatbelt profile of this harness: it cannot read the repository, the subject list, the caches or other sessions, writes only in its folder, its own settings folder and temporary folders, and ${gate ? `nothing else of the home folder can be listed or read (its settings folder holds its sign-in: ${SIGN_IN_EXPOSURE}); it reaches only this machine's loopback, where a gate passes its own service's hosts and refuses every other (no downloads, no installs)` : 'reaches the network on port 443 only'} (the command's own sandbox is off: two do not nest)${HELD}`, eyesHeld: Boolean(eyes) };
   }
   if (author.cli === 'muse') {
-    // the whole command under this harness's profile, its own sandbox and approval prompts off inside it (two profiles
-    // do not nest; headless, a prompt is a refusal). Of the home folder it reads its program (a launcher and the program
-    // beside it, named muse*, with the launcher's notes .muse-*), its settings folder (~/.config/muse: its sign-in file)
-    // and the login keychain (where the sign-in file says its secret is kept), and writes its settings folder and its
-    // data folder (~/.local/share/muse: its session log, which is this session's transcript; earlier Muse sessions'
-    // logs lie there too and can be read by the session's shell). The launcher's update is off: nothing is downloaded.
-    // Flags as bench/scripts/runners.mjs sends them at level 1 (contributor mode off: no training on the session; no
-    // personal rules, web tools or reminders), with --disable-sandbox added. No switch for its usage reports is in its
-    // help: a report to any host but its own service is refused at the gate.
-    // Loopback and a pseudo-terminal are allowed as for agy (it keeps a session server and runs a managed shell): the
-    // best reading of its help and data folder, not yet measured in a session.
+    // Isolate HOME + XDG_DATA_HOME to sessionHome (outside cwd): skips personal ~/.agents/skills EPERM, keeps dotfiles out of cwd,
+    // and prevents reading earlier Muse session transcripts while keeping ~/.config/muse + Keychains for sign-in.
     const own = museFiles(home), id = crypto.randomUUID(), signIn = gate ? own.signIn : [];
-    const profile = seatbelt({ deny: all, write: [...new Set([...own.write, real(tmp), '/private/tmp', '/private/var/folders'])], cwd: real(cwd), local: true, gated: Boolean(gate), eyes,
+    const museDataRoot = isoHome ? path.join(isoHome, 'data') : path.join(home, '.local', 'share');
+    const museSessions = path.join(museDataRoot, 'muse', 'sessions');
+    if (isoHome) fs.mkdirSync(museSessions, { recursive: true });
+    const museWrite = isoHome ? [isoHome, path.join(home, '.config', 'muse')] : own.write;
+    const museEnv = isoHome
+      ? { ...own.env, HOME: isoHome, XDG_CONFIG_HOME: path.join(home, '.config'), XDG_DATA_HOME: museDataRoot }
+      : { ...own.env };
+    const profile = seatbelt({ deny: all, write: [...new Set([...museWrite, ...writeTmp, '/private/var/folders'])], cwd: real(cwd), local: true, gated: Boolean(gate), eyes,
       readable: gate ? [...new Set([...(toolbox?.readable ?? []), ...own.readable])] : [], hidden: gate ? [...new Set([home, real(home), '/Users', '/Volumes'])] : [], metadata: gate ? own.metadata : [] });
-    return { cmd: 'sandbox-exec', env: { ...own.env, ...(gate ? proxyEnv(gate.url) : {}), ...(toolbox?.env ?? {}) }, unset: [], profile, gated: Boolean(gate), signIn,
-      // its transcript is not its output: it is the log it keeps under its data folder, in a folder named for the session
-      log: { root: own.sessions, id },
+    return { cmd: 'sandbox-exec', env: { ...tmpEnv, ...museEnv, ...(gate ? proxyEnv(gate.url) : {}), ...(toolbox?.env ?? {}) }, unset: [], profile, gated: Boolean(gate), signIn,
+      // its transcript is not its output: it is the log it keeps under its isolated data folder, in a folder named for the session
+      log: { root: museSessions, id },
       args: ['-p', profile, 'muse', 'exec', '--json', '--model', author.id, ...(author.effort ? ['--effort', author.effort] : []), '--contributor-mode', 'off', '--no-foreign-personal-context', '--disable-web-tools', '--disable-reminders', '--disable-request-user-input', '--disable-approval', '--disable-sandbox', '--workspace', cwd, '--session-id', id, prompt],
       probe: file => ({ cmd: 'sandbox-exec', args: ['-p', profile, '/bin/cat', file] }),
-      closed: `the whole command runs under a seatbelt profile of this harness (its own sandbox and permission prompts off inside it): neither its shell nor its file tools can read the repository, the subject list, the caches or other sessions, it writes only in its folder, its own settings and data folders and temporary folders, and ${gate ? `of the home folder reads only those, its program and the login keychain (${SIGN_IN_EXPOSURE}); it reaches only this machine's loopback, where a gate passes its own service's hosts and refuses every other (no downloads, no installs)` : 'reaches the network on port 443 and this machine\'s loopback only'}${HELD}`, eyesHeld: Boolean(eyes) };
+      closed: `the whole command runs under a seatbelt profile of this harness (its own sandbox and permission prompts off inside it): neither its shell nor its file tools can read the repository, the subject list, the caches or other sessions, it writes only in its folder, its own isolated session folder and temporary folders, and ${gate ? `of the home folder reads only its config, its program and the login keychain (${SIGN_IN_EXPOSURE}); it reaches only this machine's loopback, where a gate passes its own service's hosts and refuses every other (no downloads, no installs)` : 'reaches the network on port 443 and this machine\'s loopback only'}${HELD}`, eyesHeld: Boolean(eyes) };
   }
   if (author.cli === 'agy') {
     // with a gate (session-net.mjs) its network is the gate's: the model's service only; with a toolbox, its Python is on PATH and installs are answered by shims
@@ -573,8 +603,8 @@ export function sessionCall(author, { prompt, cwd, deny = [], images = [], home 
     // its sign-in (accepted exposure, SIGN_IN_EXPOSURE): its handle in Application Support and the login keychain; its own folder seen, not listed
     const signIn = gate ? [path.join(home, 'Library', 'Application Support', 'antigravity'), path.join(home, 'Library', 'Keychains')] : [];
     const readable = [...(toolbox?.readable ?? []), ...(gate && agy ? [agy] : []), ...signIn];
-    const profile = seatbelt({ deny: all, write: [...new Set([path.join(home, '.gemini'), real(tmp), '/private/tmp', '/private/var/folders'])], cwd: real(cwd), local: true, gated: Boolean(gate), eyes, readable: [...new Set(readable)], hidden: gate ? [...new Set([home, real(home), '/Users', '/Volumes'])] : [], metadata: gate && agy ? [path.dirname(agy), home] : [] });
-    return { cmd: 'sandbox-exec', env: { DO_NOT_TRACK: '1', ...(gate ? proxyEnv(gate.url) : {}), ...(toolbox?.env ?? {}) }, unset: [], profile, serial: true, gated: Boolean(gate), signIn,
+    const profile = seatbelt({ deny: all, write: [...new Set([path.join(home, '.gemini'), ...writeTmp, '/private/var/folders'])], cwd: real(cwd), local: true, gated: Boolean(gate), eyes, readable: [...new Set(readable)], hidden: gate ? [...new Set([home, real(home), '/Users', '/Volumes'])] : [], metadata: gate && agy ? [path.dirname(agy), home] : [] });
+    return { cmd: 'sandbox-exec', env: { ...tmpEnv, DO_NOT_TRACK: '1', ...(gate ? proxyEnv(gate.url) : {}), ...(toolbox?.env ?? {}) }, unset: [], profile, serial: true, gated: Boolean(gate), signIn,
       args: ['-p', profile, 'agy', '-p', prompt, '--model', author.id, '--dangerously-skip-permissions', '--output-format', 'stream-json'],
       probe: file => ({ cmd: 'sandbox-exec', args: ['-p', profile, '/bin/cat', file] }),
       closed: `the whole command runs under a seatbelt profile of this harness: neither its shell nor its file tools can read the repository, the subject list, the caches or other sessions, it writes only in its folder, its own settings folder and temporary folders, and ${gate ? 'reaches only this machine\'s loopback, where a gate passes its own service\'s hosts and refuses every other (no downloads, no installs)' : 'reaches the network on port 443 and this machine\'s loopback only'} (its own permission prompts are off inside the profile)${HELD}`, eyesHeld: Boolean(eyes) };

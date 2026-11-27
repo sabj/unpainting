@@ -227,7 +227,7 @@ export async function runRounds({ first, ask, check, compile, look, sheet, forms
   const sum = k => (rounds.some(r => r.tokens?.[k] != null) ? rounds.reduce((a, r) => a + (r.tokens?.[k] ?? 0), 0) : null);
   return { ended, failure, state, checked, compiled, rounds, looks, lookUnits: { spent, budget }, compiles,
     // fresh input counts what was written to the provider's cache (cacheWrite, where the command says: it is priced apart)
-    tokens: { fresh: sum('fresh'), cached: sum('cached'), output: sum('output'), ...(sum('cacheWrite') != null ? { cacheWrite: sum('cacheWrite') } : {}) }, seconds: rounds.reduce((a, r) => a + (r.seconds ?? 0), 0),
+    tokens: { fresh: sum('fresh'), cached: sum('cached'), output: sum('output'), ...(sum('cacheWrite') != null ? { cacheWrite: sum('cacheWrite') } : {}), ...(sum('thinking') != null ? { thinking: sum('thinking') } : {}) }, seconds: rounds.reduce((a, r) => a + (r.seconds ?? 0), 0),
     costUSD: rounds.some(r => r.costUSD != null) ? +rounds.reduce((a, r) => a + (r.costUSD ?? 0), 0).toFixed(4) : null };
 }
 

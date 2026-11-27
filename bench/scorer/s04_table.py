@@ -123,7 +123,9 @@ def markdown(r):
     """SCORES.md from a results document (score04.py's results.json)."""
     j, w = r["judge"], r["weights"]
     wash = (r.get("snapshotScheme") or {}).get("name") == "progress10"   # a results document from before the schemes is film13
-    L = ["# 0.4 scores", "",
+    anchored = r.get("qualityMode") == "anchored"
+    gated = r.get("combinedMode") == "gated"
+    L = ["# 0.5.1 scores" if (anchored or gated) else "# 0.4 scores", "",
          f"Written {r['written']} by `npm run bench:score04`" + (f", repeat {r['repeat']} of the same paintings (a further scoring, no reading shared with another repeat)" if (r.get("repeat") or 1) > 1 else "") + f". **{r['series']}**", "",
          f"Judge label **{j['label']}**, panel **{j.get('panelName') or 'not named'}**, route `{j['route']}` ({j['endpoint']}), reasoning {j.get('reasoning') or 'not recorded'}; judges " + ", ".join(f"`{m}`" + (f" (served as `{(j.get('sentAs') or {}).get(m)}`)" if (j.get('sentAs') or {}).get(m, m) != m else "") for m in j["panel"]) +
          f"; {r['readings']} readings a judge, a judge's figure the median of its three, the panel's the mean of the judges'. "
@@ -137,12 +139,19 @@ def markdown(r):
     if gone:
         L += ["## Failed runs", "", f"{len(gone)} scheduled run{'s' if len(gone) != 1 else ''} left no painting to judge. Each is kept in the tables as FAILED and counts as the bottom of the scale in the summary; none is dropped.", ""]
         L += [f"- {p['label']}, {p['subject']}: {p['failed']}" for p in gone] + [""]
+    gate_floor = r.get("gateFloor") or GATE_FLOOR
+    q_hdr = "QUALITY (anchored craft, 10 × overall; 9.0 ref)" if anchored else "QUALITY (share of the original)"
+    c_hdr = f"COMBINED (Q × min(1, H/{gate_floor:.0f}))" if gated else f"COMBINED ({w['humanness']} parts human-ness to {w['quality']} part quality)"
     for sid in sorted({p["subject"] for p in r["paintings"]}):
         rows = [p for p in r["paintings"] if p["subject"] == sid]
         os_ = {k: v for k, v in r["originals"].items() if (v.get("subject") or k) == sid}
-        said = "; ".join(f"{'the original' if k == sid else k} scores {_f((v.get('quality') or {}).get('score'))} of 10 read alone" for k, v in os_.items()) or "no original was read (no painting of it to judge)"
-        L += [f"## {sid}", "", f"{said[0].upper() + said[1:]}; each painting's quality share is its score over its own original's.", "",
-              f"| Picture | HUMAN-NESS (mean of {r['snapshots']} {'stills in progress, from the first wash to just before the finish' if wash else 'film snapshots'}, % of 5) | QUALITY (share of the original) | COMBINED ({w['humanness']} parts human-ness to {w['quality']} part quality) | LIKENESS (of 5; not in combined) | adjusted for Auto: human-ness | quality | combined |",
+        if anchored:
+            said = "Reference standard anchored at 9.00/10 (assigned craft anchor, no measured spread); Q = 10 × overall (0–100)."
+        else:
+            said = "; ".join(f"{'the original' if k == sid else k} scores {_f((v.get('quality') or {}).get('score'))} of 10 read alone" for k, v in os_.items()) or "no original was read (no painting of it to judge)"
+            said = said[0].upper() + said[1:] + "; each painting's quality share is its score over its own original's."
+        L += [f"## {sid}", "", said, "",
+              f"| Picture | HUMAN-NESS (mean of {r['snapshots']} {'stills in progress, from the first wash to just before the finish' if wash else 'film snapshots'}, % of 5) | {q_hdr} | {c_hdr} | LIKENESS (of 5; not in combined) | adjusted for Auto: human-ness | quality | combined |",
               "|---|---|---|---|---|---|---|---|"]
         for p in rows:
             a = p["adjusted"]
@@ -172,10 +181,16 @@ def markdown(r):
            if wash else
            f"- HUMAN-NESS (scheme film13, the first one): {r['snapshots']} snapshots evenly through the painting's film and then the finished sheet, shown in order with only their percent complete, scored 1 to 5 under the rubric; the figure is the mean of the {r['snapshots']} film snapshots as a percentage of 5 (the finished sheet is shown but not counted). Thirds: the mean of snapshots 1-4, 5-8, 9-12. NOT comparable with scores under progress10. Tells: ")
           + "; ".join(f"({k}) {v}" for k, v in TELL.items()) + ".",
-          "- QUALITY: the picture alone, scored as a watercolour 0 to 10, not told whether it is an original or a painting; the share is the painting's score over its original's, read the same way. May pass 100%. The judge of a painting's quality never sees its original.",
+          ("- QUALITY (anchored 0.5.1): finished painting scored 0 to 10 on watercolour craft (wash_craft, value_light, colour_harmony, overall) against the subject's original anchored as the 9.0/10 assigned craft standard (not likeness); scaled Q = 10 × overall (0–100)."
+           if anchored else
+           "- QUALITY: the picture alone, scored as a watercolour 0 to 10, not told whether it is an original or a painting; the share is the painting's score over its original's, read the same way. May pass 100%. The judge of a painting's quality never sees its original."),
           "- LIKENESS: the original and the finished painting shown together: how well the painting is a painting of that picture (subject, composition, tones, colour; not a pixel-for-pixel copy), 1 to 5 with a reason. It has its own column and is NOT part of the combined figure. FLAGGED: at the bottom of the scale.",
-          "- LEVELS: Auto is the code planner alone. Every level is one fresh, independent session (10 looks, budget 3.0, 60 min, anti-cheat guard on, no judge feedback). L1 (fixed rounds): picture, script format and painting tips. L2 (fixed rounds): + prepared drawing, colour studies, named forms and traced shapes; nothing of Auto. L3 (fixed rounds): + Auto's plan and finished painting. L4 (open session with tools): L3's inputs in a sandboxed workspace with shell and painter tools.",
-          f"- COMBINED: ({w['humanness']} x human-ness + {w['quality']} x quality share) / {w['humanness'] + w['quality']}; the weights are written into results.json.",
+          ("- LEVELS (Option A, 0.5.1): Auto is the code planner alone. Every level is one fresh, independent session (budget 3.0 look units, 60 min author clock, anti-cheat guard on, no judge feedback). L1 (fixed rounds): source picture alone, blank paper. L2 (fixed rounds): + three unnumbered colour studies only, blank paper (no prepared drawing, named forms, or traced shapes). L3 (fixed rounds): + opt-in prepared drawing (OFF/blank unless selected), named forms, traced shapes, and Auto's plan & painting. L4 (open session with tools): L3's inputs in an isolated sandboxed workspace with shell and painter tools."
+           if (anchored or gated) else
+           "- LEVELS: Auto is the code planner alone. Every level is one fresh, independent session (10 looks, budget 3.0, 60 min, anti-cheat guard on, no judge feedback). L1 (fixed rounds): picture, script format and painting tips. L2 (fixed rounds): + prepared drawing, colour studies, named forms and traced shapes; nothing of Auto. L3 (fixed rounds): + Auto's plan and finished painting. L4 (open session with tools): L3's inputs in a sandboxed workspace with shell and painter tools."),
+          (f"- COMBINED (gated 0.5.1): Q × min(1, H / {gate_floor:.0f}) — quality is unpenalized once Human-ness H ≥ {gate_floor:.0f}%, and scaled linearly down when H < {gate_floor:.0f}%."
+           if gated else
+           f"- COMBINED: ({w['humanness']} x human-ness + {w['quality']} x quality share) / {w['humanness'] + w['quality']}; the weights are written into results.json."),
           "- ADJUSTED FOR AUTO: (painting - Auto) / max(top - Auto, top / 5), Auto being the subject's code-planner painting scored the same way; 0 is level with Auto.",
           "- ANTI-CHEAT and PROGRESSION: the painter's own cheat-risk record; ALGORITHMIC: `bench/scorer/classic.py` against the original, no judge; USAGE: the run's usage.json."]
     return "\n".join(L) + "\n"

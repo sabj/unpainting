@@ -73,7 +73,11 @@ test('the levels in fixed rounds with the stand-in (Option A): L2 visual studies
     assert.match(p3, /prepared drawing is optional and OFF by default/);
     assert.equal(x3.seen.final.choice.tools.medium, 'none', 'L3 defaults to blank paper unless script explicitly opts into prepared drawing');
     assert.deepEqual(x3.seen.final.script.passages.find(p => p.id === 's1').regions, [[[30, 40], [60, 40], [60, 70], [30, 70]]]);
-    assert.deepEqual(r3.record.author.session.shapeReuse, { passages: 5, reuse: 1, share: 0.2 }); assert.deepEqual(JSON.parse(read(out('L3'), 'folder/script.json')).passages.find(p => p.id === 's1').shapes, [1]);
+    assert.deepEqual(r3.record.author.session.shapeReuse, { passages: 5, reuse: 1, share: 0.2 });
+    assert.deepEqual(JSON.parse(read(out('L3'), 'folder/script.json')).passages.find(p => p.id === 's1').regions, [[[30, 40], [60, 40], [60, 70], [30, 70]]], 'effective hand-in stores resolved script for exact replay');
+    assert.deepEqual(JSON.parse(read(out('L3'), 'folder/raw-script.json')).passages.find(p => p.id === 's1').shapes, [1], 'raw authored script with numbered shapes preserved beside resolved script');
+    assert.equal(JSON.parse(read(out('L3'), 'folder/choice.json')).medium, 'none', 'effective choice.json records medium: none when L3 opt-in drawing was not selected');
+    assert.doesNotMatch(p3, /"medium": "pencil \(graphite\)"|"medium": "ink"/, 'brief never tells models to send refused display medium strings');
     assert.doesNotMatch(p3, /your-previous-painting|YOUR PREVIOUS SCRIPT|level L2\)/); assert.equal(k3.lookUnits.budget, 3); assert.equal(r3.record.author.previousTry, undefined); assert.equal(r3.record.author.session.ladder, null);
     assert.deepEqual(r3.record.author.autoHanded, { plan: true, painting: true, from: 'prepared/x', paintingSha256: 'a1', planSha256: 'b2' });
     // the brief is the same text at every level outside its marked level block (no added coaching)

@@ -50,7 +50,7 @@ export function resolveTools(tools, base) {
   if (tools.linesEdit || tools.medium) {
     if (!base.vectors) throw new Error('lines edit: this subject\'s drawing has no vector strokes to choose from');
     // (the line file is not needed to check an edit: only the strokes are chosen)
-    lines = applyLinesEdit(base.vectors, base.lines ?? { lines: [] }, tools.linesEdit ?? null, listing, { medium: tools.medium ?? null, forms: base.mask ? { ...base.mask, list: base.forms } : null });
+    lines = applyLinesEdit(base.vectors, base.lines ?? { lines: [] }, tools.linesEdit ?? null, listing, { medium: tools.medium ?? null, forms: base.mask ? { ...base.mask, list: base.forms } : null, startDropped: Boolean(tools.startDropped) });
     record.lines = { file: tools.lines ?? null, ...lines.record }; said.push(`Your drawing: ${linesLine(lines.record)}.`); warnings.push(...lines.warnings);
   }
   // the pen's ink (choice.mjs "ink"): laid over the run's settings as `ink` (command.mjs: inkfast 1 or 0)
@@ -83,7 +83,7 @@ export async function writeTools(dir, tools, base) {
     sets.push(['masks', f.receipt]); Object.assign(out, { receipt: f.receipt, mask: f.mask });
   }
   if (tools.linesEdit || tools.medium) {
-    const l = writeLinesEdit({ dir: path.join(dir, 'lines'), stem: base.stem, edit: tools.linesEdit ?? null, listing: got.listing, medium: tools.medium ?? null, forms: base.mask ? { ...base.mask, list: base.forms } : null });
+    const l = writeLinesEdit({ dir: path.join(dir, 'lines'), stem: base.stem, edit: tools.linesEdit ?? null, listing: got.listing, medium: tools.medium ?? null, forms: base.mask ? { ...base.mask, list: base.forms } : null, startDropped: Boolean(tools.startDropped) });
     sets.push(...l.sets); Object.assign(out, { opening: l.opening, closing: l.closing, order: l.order, laidAs: l.laidAs });
   }
   return { ...out, sets };

@@ -38,7 +38,7 @@ Every judge gives three readings; a judge's figure is the median of its three (p
 needs all three. The panel's figure is the mean of the judges'. A judge short of three valid readings leaves the
 figure empty and is named: never a smaller panel.
 """
-import hashlib, json, os, re, statistics
+import hashlib, json, math, os, re, statistics
 
 READINGS = 3
 LETTERS = "abcdefghij"
@@ -229,18 +229,33 @@ def progress(d, frames, side=PROGRESS_SIDE):
 def stills(prog, w, count):
     """The frames of `count` stills at equal steps of progress from the first wash (frame w) to just before the finish.
     The steps start from the sheet as it stood before the first wash (frame w - 1, whose content does not depend on
-    how densely the washes were filmed): step k is the first frame from w on whose progress has reached
-    prog[w - 1] + k (1 - prog[w - 1]) / count, so step 0 is the first wash's own frame. Each still is a frame of its
-    own, before the last (the finished sheet)."""
+    how densely the washes were filmed). When a broad early wash jumps across several progress targets at once, the
+    remaining stills are re-spaced across the remaining progress (prog[i] .. 1.0) rather than piling duplicate stills on
+    one plateau. Each still is a frame of its own, before the last (the finished sheet)."""
     end = len(prog) - 2   # the last frame is the finished sheet, never one of the stills
     if end - w + 1 < count:
         raise Refusal(f"{end - w + 1} frames from the first wash (frame {w}) to just before the finished sheet; the {count} stills need at least {count}")
-    base, idx = prog[w - 1], []
+    idx = []
+    anchor = prog[w - 1]
+    anchor_k = 0
     for k in range(count):
-        t = base + k * (1.0 - base) / count
-        i = next((i for i in range(w, end + 1) if prog[i] >= t - 1e-9), end)
-        idx.append(max(i, idx[-1] + 1) if idx else i)
-    for k in range(count - 1, -1, -1):   # a film that leaps at its end: the stills stay frames of their own, before the finish
+        if k == 0:
+            i = w
+        else:
+            steps_left = count - anchor_k
+            t = anchor + (k - anchor_k) * (1.0 - anchor) / steps_left
+            lo = idx[-1] + 1
+            hi = end - (count - 1 - k)
+            i = next((j for j in range(lo, hi + 1) if prog[j] >= t - 1e-9), hi)
+            # If this frame jumped past the next progress target, re-anchor the remaining steps from prog[i]
+            # so later stills distribute across the remaining visual progress instead of stacking on one plateau.
+            if k + 1 < count:
+                next_t = anchor + (k + 1 - anchor_k) * (1.0 - anchor) / steps_left
+                if prog[i] >= next_t - 1e-9 and prog[i] < 1.0 - 1e-6:
+                    anchor = prog[i]
+                    anchor_k = k
+        idx.append(i)
+    for k in range(count - 1, -1, -1):   # safety clamp so stills stay strictly increasing before the finish
         idx[k] = min(idx[k], end - (count - 1 - k))
     return idx
 
@@ -300,6 +315,24 @@ def tells(x):
     return sorted({str(t).strip().lower().strip("()") for t in (x or [])} & set(LETTERS))
 
 
+def _finite_clamp(val, lo, hi):
+    if isinstance(val, bool):
+        raise ValueError("bool is not a numeric score")
+    v = float(val)
+    if not math.isfinite(v):
+        raise ValueError(f"non-finite score {v!r}")
+    return max(lo, min(hi, v))
+
+
+def _finite_in(val, lo, hi):
+    if isinstance(val, bool):
+        raise ValueError("bool is not a numeric score")
+    v = float(val)
+    if not math.isfinite(v) or v < lo or v > hi:
+        raise ValueError(f"score {v!r} out of [{lo}, {hi}]")
+    return v
+
+
 def parse_sequence(raw, n):
     """A sequence reply as {human, why, snapshots: [{score, tells, note}]}, or None when it is not one of n snapshots."""
     try:
@@ -308,7 +341,7 @@ def parse_sequence(raw, n):
         if not isinstance(s, list) or len(s) != n or not isinstance(q.get("human"), bool):
             return None
         return {"human": q["human"], "why": str(q.get("why", ""))[:300],
-                "snapshots": [{"score": max(1.0, min(5.0, float(x["score"]))), "tells": tells(x.get("tells")), "note": str(x.get("note", ""))[:200]} for x in s]}
+                "snapshots": [{"score": _finite_clamp(x["score"], 1.0, 5.0), "tells": tells(x.get("tells")), "note": str(x.get("note", ""))[:200]} for x in s]}
     except Exception:
         return None
 
@@ -318,7 +351,7 @@ def parse_single(raw):
     for m in reversed(re.findall(r"\{[^{}]*\}", re.sub(r"```(?:json)?", "", raw or ""))):
         try:
             d = json.loads(m)
-            return {k: max(0.0, min(10.0, float(d[k]))) for k in CRITERIA + ("overall",)}
+            return {k: _finite_clamp(d[k], 0.0, 10.0) for k in CRITERIA + ("overall",)}
         except Exception:
             pass
     return None
@@ -329,7 +362,7 @@ def parse_anchored(raw):
     for m in reversed(re.findall(r"\{[^{}]*\}", re.sub(r"```(?:json)?", "", raw or ""))):
         try:
             d = json.loads(m)
-            out = {k: max(0.0, min(10.0, float(d[k]))) for k in ANCHORED_CRITERIA + ("overall",)}
+            out = {k: _finite_in(d[k], 0.0, 10.0) for k in ANCHORED_CRITERIA + ("overall",)}
             if d.get("critique"):
                 out["critique"] = str(d["critique"])[:300]
             return out
@@ -343,9 +376,8 @@ def parse_likeness(raw):
     for m in reversed(re.findall(r"\{[^{}]*\}", re.sub(r"```(?:json)?", "", raw or ""))):
         try:
             d = json.loads(m)
-            v = float(d["likeness"])
-            if 1 <= v <= 5:
-                return {"likeness": v, "why": str(d.get("why", ""))[:200]}
+            v = _finite_in(d["likeness"], 1.0, 5.0)
+            return {"likeness": v, "why": str(d.get("why", ""))[:200]}
         except Exception:
             pass
     return None

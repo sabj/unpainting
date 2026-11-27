@@ -158,19 +158,16 @@ export function checkOwnLines(own, sheet, warnings = []) {
  * (each {vectors, lines} or null), laidAs ('pencil' | 'ink' | null: the medium the files declare), state (id -> {do,
  * weight}), record, warnings}. Nothing given is altered; no prepared stroke's shape changes.
  */
-export function applyLinesEdit(vectors, lines, edit, listing, { medium = null, forms = null } = {}) {
+export function applyLinesEdit(vectors, lines, edit, listing, { medium = null, forms = null, startDropped = false } = {}) {
   if (medium != null && !DRAWING_MEDIA.includes(medium)) throw new Error(`"medium" is one of ${DRAWING_MEDIA.join(', ')}`);
   if (!edit && medium == null) throw new Error('lines edit: neither lines nor a medium is chosen');
   const warnings = [], rules = edit ? checkLinesEdit(edit, listing, warnings) : [], state = new Map(), matched = rules.map(() => 0);
   const own = edit ? checkOwnLines(edit.own, { widthMm: vectors.sheetMm, heightMm: vectors.heightMm }, warnings) : [];
-  // every line starts as Auto lays it (drawing-default.mjs): on a pencil drawing the lines tagged drop start dropped,
-  // but for those that place a form, which start drawn at the lay-in's darkness (a rule that draws hatching draws it as
-  // drawn); and each drawn line at Auto's time (drawing-phases.mjs: a pencil lay-in in phases with the washes, a pen
-  // drawing whole before them)
-  const auto = autoRule(vectors, lines, forms), startsAs = new Map(vectors.strokes.map(s => [s.seq, auto.draws(s) ? 'auto' : 'drop']));
+  // every line starts as Auto lays it (drawing-default.mjs) unless opt-in `startDropped` starts all prepared lines dropped
+  const auto = autoRule(vectors, lines, forms), startsAs = new Map(vectors.strokes.map(s => [s.seq, startDropped ? 'drop' : (auto.draws(s) ? 'auto' : 'drop')]));
   vectors = { ...vectors, strokes: vectors.strokes.map(s => (auto.draws(s) ? auto.stroke(s) : s)) };
   for (const s of listing.strokes) {
-    const st = { do: startsAs.get(s.id) ?? 'auto', weight: 1 };
+    const st = { do: startsAs.get(s.id) ?? (startDropped ? 'drop' : 'auto'), weight: 1 };
     rules.forEach((r, i) => { if (!r.test(s)) return; matched[i]++; if (r.do) st.do = r.do; if (r.weight != null) st.weight = r.weight; });
     state.set(s.id, st);
   }
@@ -227,9 +224,9 @@ export function linesLine(r) {
  * edit or null; `medium` the chosen medium or null. Returns {order, opening, closing (absolute stems or null), laidAs,
  * record, warnings, sets: the run settings that paint it}.
  */
-export function writeLinesEdit({ dir, stem, edit, listing, medium = null, forms = null }) {
+export function writeLinesEdit({ dir, stem, edit, listing, medium = null, forms = null, startDropped = false }) {
   const vectors = JSON.parse(fs.readFileSync(`${stem}-vectors.json`, 'utf8')), lines = JSON.parse(fs.readFileSync(`${stem}-lines.json`, 'utf8'));
-  const got = applyLinesEdit(vectors, lines, edit, listing, { medium, forms }); fs.mkdirSync(dir, { recursive: true });
+  const got = applyLinesEdit(vectors, lines, edit, listing, { medium, forms, startDropped }); fs.mkdirSync(dir, { recursive: true });
   const put = (name, part) => { if (!part) return null; const to = path.join(dir, name); fs.writeFileSync(`${to}-vectors.json`, JSON.stringify(part.vectors)); fs.writeFileSync(`${to}-lines.json`, JSON.stringify(part.lines)); return to; };
   const opening = put('opening', got.opening), closing = put('closing', got.closing);
   fs.writeFileSync(path.join(dir, 'lines-edit.json'), JSON.stringify({ edit, medium, of: { vectorsSha256: sha256(fs.readFileSync(`${stem}-vectors.json`)) }, record: got.record }, null, 1) + '\n');

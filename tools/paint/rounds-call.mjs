@@ -14,7 +14,7 @@ import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { spawn } from 'node:child_process';
-import { readTranscript, cleanEnv } from './session.mjs';
+import { readTranscript, cleanEnv, museFiles, transcriptFile } from './session.mjs';
 import { museUsage } from '../../bench/scripts/runners.mjs';
 
 /** Minutes a model may take over one round's reply. */
@@ -41,7 +41,14 @@ const mediaOf = f => (/\.jpe?g$/i.test(f) ? 'image/jpeg' : /\.webp$/i.test(f) ? 
  * continue the conversation. {cmd, args, env, stdin, parse(stdout) -> {text, tokens, costUSD, id}}.
  */
 export function roundCall(author, { text, images, cwd, state, resume }) {
-  const split = (cli, out) => { const t = readTranscript(cli, out), s = t.tokenSplit?.reported ? t.tokenSplit : null; return { text: t.text, costUSD: t.costUSD, tokens: s ? { fresh: s.freshIn ?? 0, cached: s.cachedIn ?? 0, output: s.out ?? 0, ...(s.cacheWriteIn != null ? { cacheWrite: s.cacheWriteIn } : {}) } : null }; };
+  const split = (cli, out) => { const t = readTranscript(cli, out), s = t.tokenSplit?.reported ? t.tokenSplit : null; return { text: t.text, costUSD: t.costUSD, tokens: s ? { fresh: s.freshIn ?? 0, cached: s.cachedIn ?? 0, output: s.out ?? 0, ...(s.cacheWriteIn != null ? { cacheWrite: s.cacheWriteIn } : {}), ...(s.thinking != null ? { thinking: s.thinking } : {}) } : null }; };
+  const deltaTokens = (prev, cur) => {
+    if (!cur) return null;
+    if (!prev) return { ...cur };
+    const out = {};
+    for (const k of Object.keys(cur)) out[k] = Math.max(0, (cur[k] ?? 0) - (prev[k] ?? 0));
+    return out;
+  };
   const effort = author.effort && author.effort !== 'n/a' ? author.effort : null;
   if (author.cli === 'claude') {
     const content = [{ type: 'text', text }, ...images.map(f => ({ type: 'image', source: { type: 'base64', media_type: mediaOf(f), data: fs.readFileSync(f).toString('base64') } }))];
@@ -55,7 +62,18 @@ export function roundCall(author, { text, images, cwd, state, resume }) {
     const pics = images.flatMap(f => ['-i', f]);
     return { cmd: 'codex', env: {}, unset: ['DO_NOT_TRACK'],
       args: ['exec', '--json', '-m', author.id, ...(effort ? ['-c', `model_reasoning_effort="${effort}"`] : []), '-s', 'read-only', '--skip-git-repo-check', '-C', cwd, ...(resume ? ['resume', state.id, ...pics, '--', text] : [...pics, '--', text])],
-      parse: out => { let id = state.id ?? null; for (const l of out.split('\n')) { try { const d = JSON.parse(l); if (d.type === 'thread.started' && d.thread_id) id = d.thread_id; } catch { /* not an event */ } } return { ...split('codex', out), id }; } };
+      parse: out => {
+        let id = state.id ?? null;
+        for (const l of out.split('\n')) { try { const d = JSON.parse(l); if (d.type === 'thread.started' && d.thread_id) id = d.thread_id; } catch { /* not an event */ } }
+        // codex exec resume emits cumulative thread totals in turn.completed; subtract prior totals so rounds never double-count
+        const got = split('codex', out), raw = got.tokens;
+        if (raw) {
+          const prev = resume ? state.codexSoFar : null;
+          got.tokens = deltaTokens(prev, raw);
+          state.codexSoFar = raw;
+        }
+        return { ...got, id };
+      } };
   }
   if (author.cli === 'agy') {
     const rel = images.map(f => path.relative(cwd, f)), allow = ['read_file', 'read_file(*)', ...images.flatMap(f => [`read_file(${f})`, `read_file(${path.relative(cwd, f)})`])];
@@ -67,8 +85,23 @@ export function roundCall(author, { text, images, cwd, state, resume }) {
     const promptFile = path.join(cwd, `prompt-${crypto.randomBytes(4).toString('hex')}.txt`);
     return { cmd: 'muse', env: {}, before: () => fs.writeFileSync(promptFile, text),
       args: ['exec', '--model', author.id, ...(effort ? ['--effort', effort] : []), '--contributor-mode', 'off', '--no-foreign-personal-context', '--disable-web-tools', '--disable-reminders', '--disable-shell', '--disable-write', '--disable-request-user-input', '--session-id', state.uuid, ...images.flatMap(f => ['--image', f]), '--prompt-file', promptFile],
-      // its tokens are in its own session log, input and output in one running total (no cached split is reported)
-      parse: out => { fs.writeFileSync(path.join(cwd, 'muse-session.txt'), state.uuid + '\n'); const u = museUsage(cwd); return { text: out.trim(), costUSD: null, tokens: null, tokensTotal: u.tokens ?? null, id: state.uuid }; } };
+      // read full token split (fresh/cached/output/thinking) from Muse's session.jsonl with cumulative delta tracking; fall back to museUsage
+      parse: out => {
+        fs.writeFileSync(path.join(cwd, 'muse-session.txt'), state.uuid + '\n');
+        const logRoot = museFiles(os.homedir()).sessions;
+        const logFile = transcriptFile({ log: { root: logRoot, id: state.uuid } }, '');
+        if (logFile && fs.existsSync(logFile)) {
+          const got = split('muse', fs.readFileSync(logFile, 'utf8'));
+          if (got.tokens) {
+            const raw = got.tokens, prev = resume ? state.museSoFar : null;
+            const d = deltaTokens(prev, raw);
+            state.museSoFar = raw;
+            return { text: out.trim(), costUSD: null, tokens: d, tokensTotal: (d.fresh ?? 0) + (d.cached ?? 0) + (d.output ?? 0), id: state.uuid };
+          }
+        }
+        const u = museUsage(cwd);
+        return { text: out.trim(), costUSD: null, tokens: null, tokensTotal: u.tokens ?? null, id: state.uuid };
+      } };
   }
   throw new Error(`author ${author.key}: rounds cannot call "${author.cli}" (${Object.keys(ROUNDS_CLIS).join(', ')} can)`);
 }

@@ -212,6 +212,7 @@ const pencilDraw=(target,gs,pigment,options)=>{
  // --washplan script:FILE.json: the washes are a painting script written by an author (script-washes.mjs,
  // docs/painting-script.md): passages in painting order, each laid in whole strokes; no study is read
  const SCRIPT=WASH_PLAN.startsWith('script:')?JSON.parse(fs.readFileSync(path.resolve(root,WASH_PLAN.slice(7)),'utf8')):null;
+ ctx.AUTHORED_SCRIPT=Boolean(SCRIPT);
  if(SCRIPT){valueOptions.touchLeastMm2=TOUCH_LEAST_MM2;valueOptions.finalWidth=FINAL_W;}
  // --thingmasks RECEIPT.json (default auto: IMAGE.named-sam.json beside the source, when there is one): the source's named
  // forms (a reviewed SAM id map bound to the source by its receipt) for the study wash plan; --things names the label file
@@ -605,7 +606,12 @@ const BRUSH = PB ? Math.max(3 * SC, Math.round(PB.washR)) : Math.max(3 * SC, Mat
 const UPRIGHT = opt('heading', 'sweep') === 'sheet' ? true : 'sweep';
 
 // Masking fluid goes on a few deliberate lights only: large enough (--maskmin) and surrounded by paint (--maskcount largest).
+// For authored scripts (--washplan script:...), never infer masking fluid from source pixels: only authored `lights` reserve paper.
 const highlights = (() => {
+  if (ctx.AUTHORED_SCRIPT) {
+    console.log('authored script: automatic source highlight masking disabled (only authored lights reserve paper)');
+    return new Uint8Array(n);
+  }
   const pale = new Uint8Array(n);
   // --white chooses a medium; --highlightwhite is the numeric density threshold.
   for (let i = 0; i < n; i++) pale[i] = ctx.SRC[i] < num('highlightwhite', 0.05) ? 1 : 0;

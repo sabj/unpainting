@@ -9,7 +9,7 @@ import crypto from 'node:crypto';
 import sharp from 'sharp';
 import { seenAsk } from './seen.mjs';
 
-export const BRIEF_VERSION = 'brief 4';
+export const BRIEF_VERSION = 'brief 5';
 export const BRIEF_FILE = path.join(path.dirname(new URL(import.meta.url).pathname), 'BRIEF.md');
 /** The marks round the level block and the level data: everything outside them is the same text at every level. */
 export const LEVEL_START = '<!-- LEVEL BLOCK -->', LEVEL_END = '<!-- END LEVEL BLOCK -->';
@@ -29,9 +29,10 @@ export function pictureLine(p, i = null) {
 export function pictureOf(name, { medium, studies }) {
   const stem = name.split('/').pop().replace(/\.(jpg|png)$/, ''), st = /^study-(\d)$/.exec(stem);
   if (st) return [`STUDY ${st[1]}`, `${studies[st[1] - 1]?.role ?? 'study'}: the subject simplified into flat shapes, lights left as paper (the studies run coarse to fine).`];
+  const optMedium = /^ink\b|^pen\b/i.test(String(medium ?? '')) ? 'pen' : 'pencil';
   return ({
     source: ['SUBJECT', 'the picture to paint.'],
-    drawing: ['DRAWING', `the optional prepared ${medium} drawing (OFF by default — the sheet starts blank unless you set \`"medium": "${medium}"\` or select lines in \`"lines"\`).`],
+    drawing: ['DRAWING', `the optional prepared ${medium} drawing (OFF by default — the sheet starts blank unless you set \`"medium": "${optMedium}"\` or select prepared lines in \`"lines"\`).`],
     forms: ['NAMED FORMS', 'each named form of the subject as one flat colour.'],
     'traced-shapes': ['TRACED SHAPES', 'study 1\'s flat shapes traced into outlines, each in its colour, the larger ones numbered. A passage may name them by number (`shapes`, `reserve`, `along`). A traced edge may cut across a form or miss one.'],
     'auto-painting': ['AUTO\'S PAINTING', 'the finished painting of this subject by Auto, this project\'s automatic painter, as it dried at full size.'],
@@ -143,7 +144,7 @@ export const briefRecord = b => ({ version: b.version, templateSha256: b.templat
  * preparePacket()'s (its pictures in `dir`); `handed` the level's handed folders (level4.mjs); `data` [{name, what}]
  * the data files beside the inputs; `v` {steps, reverts, showCost}. The rest as briefFor.
  */
-export async function sessionBrief({ level, packet, handed, data = [], medium, studies, sheet, v, ...rest }) {
+export async function sessionBrief({ level, packet, handed, data = [], medium, studies, sheet, v, preparedDrawing = true, ...rest }) {
   const sized = async file => { const m = await sharp(file).metadata(); return { px: [m.width, m.height], pxPerMm: +(1400 * m.width / 1480 / sheet.widthMm).toFixed(1) }; };
   const pictures = [];
   for (const f of packet.files) { const [label, what] = pictureOf(f, { medium, studies }); pictures.push({ name: f, label, what, ...(await sized(path.join(packet.dir, f))) }); }
@@ -152,6 +153,8 @@ export async function sessionBrief({ level, packet, handed, data = [], medium, s
     const name = `${h.folder}/${f.name}`;
     if (f.picture) { const [label, what] = pictureOf(name, { medium, studies }); pictures.push({ name, label, what, ...(await sized(f.from)) }); seen.push(name); } else files.push({ name, what: f.what });
   }
-  const notes = handed.some(h => h.folder === 'auto-result') ? ['Auto\'s plan and Auto\'s painting are given to read. What you hand in is your own script: Auto\'s plan is not a script and cannot be handed in.'] : [];
+  const notes = [];
+  if (preparedDrawing === 'opt-in') notes.push('The prepared drawing is optional and OFF by default (blank paper). Set `"medium"` to `"pencil"` or `"pen"` in `choice.json` (or select prepared lines in `"lines"`) only if you choose to lay it.');
+  if (handed.some(h => h.folder === 'auto-result')) notes.push('Auto\'s plan and Auto\'s painting are given to read. What you hand in is your own script: Auto\'s plan is not a script and cannot be handed in.');
   return briefFor({ ...rest, sheet, given: levelBlock({ level, pictures, files, notes, session: { ...v, seen } }) });
 }

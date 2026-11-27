@@ -11,6 +11,7 @@ import { checkAuthored, preparePacket, gridImage, SCRIPT_PAINTS_MOST } from './a
 import { BOX } from '../../src/crop/box.mjs';
 import { briefFor, levelBlock, levelData, briefRecord, pictureOf } from './brief.mjs';
 import { readChoice, choiceKind } from './choice.mjs';
+import { applyPreparedDrawingPolicy } from './levels.mjs';
 import { runPictures } from './sheet.mjs';
 import { tinyTouchWarning } from './plan-data.mjs';
 import { runRounds, transcriptText, shapeReuse, stateHash } from './rounds.mjs';
@@ -68,15 +69,7 @@ export async function roundsRun(r, x) {
   const prepDraw = x.terms?.preparedDrawing ?? !bare;
   const only = bare ? ['source.png'] : studiesOnly ? ['source.png', ...(record.studies ?? []).map((_, i) => `study-${i + 1}.png`)] : null;
   const packet = await preparePacket({ dir, root: x.root, run: { ...record, masks: record.masks.receipt && allowForms ? { ...record.masks } : null }, drawingPng: pics.drawing, briefFile: null, formsPicture: false, only });
-  const laid = state => {
-    if (prepDraw === false) return { ...state, drawing: { ...(state.drawing ?? {}), medium: 'none' } };
-    if (prepDraw === 'opt-in') {
-      const hasExplicitMedium = Boolean(state.drawing?.medium);
-      const hasPreparedRules = Boolean(state.drawing?.lines?.rules?.length);
-      if (!hasExplicitMedium && !hasPreparedRules) return { ...state, drawing: { ...(state.drawing ?? {}), medium: 'none' } };
-    }
-    return state;
-  };
+  const choiceFor = state => applyPreparedDrawingPolicy(choiceOf(state), prepDraw);
   // every picture goes out once, in round 0, and stays in the conversation: recorded as given, never priced
   const images = [], names = [];
   for (const f of packet.files) { const name = `${path.basename(f, '.png')}.jpg`; images.push(await sent(path.join(dir, f), path.join(dir, 'sent', name))); names.push([f, name]); }
@@ -122,10 +115,10 @@ export async function roundsRun(r, x) {
   try {
     res = await runRounds({
       first: { text, images }, ask, sheet, forms, budget: x.looksMost, wallMinutes: x.wallMinutes ?? null, say: line => x.say(r, line),
-      check: async state => { const script = checkAuthored(numbered && namesShapes(state.script) ? resolveNumbered(state.script, numbered) : state.script, { sheetWidthMm: W }).script, choice = choiceOf(laid(state)); if (choice.tools) await x.toolsCheck(r, choice.tools); return script; },
-      compile: (state, checked, n) => x.compile(r, choiceOf(laid(state)), checked, path.join(dir, 'plans', String(n)), { hideForms: !allowForms }),
+      check: async state => { const script = checkAuthored(numbered && namesShapes(state.script) ? resolveNumbered(state.script, numbered) : state.script, { sheetWidthMm: W }).script, choice = choiceFor(state); if (choice.tools) await x.toolsCheck(r, choice.tools); return script; },
+      compile: (state, checked, n) => x.compile(r, choiceFor(state), checked, path.join(dir, 'plans', String(n)), { hideForms: !allowForms }),
       look: async (state, checked, compiled, want, n) => {
-        const got = await x.look(r, choiceOf(laid(state)), checked, path.join(dir, 'look-paints', String(n)), { plan: n, look: n }, compiled, want);
+        const got = await x.look(r, choiceFor(state), checked, path.join(dir, 'look-paints', String(n)), { plan: n, look: n }, compiled, want);
         if (!got.ok) return got;
         // the sheet only: the model's own painting as it dried, on the millimetre grid
         const file = await sent(await gridImage(got.painted.painting, W), path.join(dir, 'looks', String(n), 'sheet.jpg')), numbers = await sheetNumbers(got.painted.painting);
@@ -137,17 +130,26 @@ export async function roundsRun(r, x) {
   } finally { ask.close?.(); }
   fs.writeFileSync(path.join(dir, 'rounds.json'), JSON.stringify({ schema: 'unpaint-paint/rounds@1', author: author.key, model: author.id ?? null, cli: author.cli, level: x.level, subject: spec.id, ended: res.ended, failure: res.failure, lookUnits: res.lookUnits, tokens: res.tokens, costUSD: res.costUSD, modelSeconds: res.seconds, wallSeconds: Math.round((Date.now() - t0) / 1000), picturesGiven: names.map(([, n]) => n), rounds: res.rounds, looks: res.looks }, null, 1) + '\n');
   fs.writeFileSync(path.join(dir, 'rounds.md'), transcriptText(res, { title: `${author.name}, ${spec.id}, level ${x.level}: fixed rounds` }));
-  const choice = res.state ? choiceOf(laid(res.state)) : null, submitted = choice ? { kind: 'script', what: choiceKind(choice), script: 'script.json', settings: {}, ...(choice.tools ? { tools: { lines: choice.tools.lines, medium: choice.tools.medium, ink: choice.tools.ink } } : {}), hash: stateHash(res.state) } : null;
+  const choice = res.state ? choiceFor(res.state) : null, submitted = choice ? { kind: 'script', what: choiceKind(choice), script: 'script.json', settings: {}, ...(choice.tools ? { tools: { lines: choice.tools.lines, medium: choice.tools.medium, ink: choice.tools.ink } } : {}), hash: stateHash(res.state) } : null;
   if (res.state) {
-    // what it handed in, as a session's folder holds it: a later level's --previous reads it from here
+    // Effective hand-in bundle for exact replay: resolved script (numbered shapes expanded), effective medium,
+    // and materialized lines-edit (prepending drop-all rule if opt-in startDropped applied). Raw authored script kept beside it when distinct.
     const folder = path.join(dir, 'folder'); fs.mkdirSync(folder, { recursive: true });
-    fs.writeFileSync(path.join(folder, 'script.json'), JSON.stringify(res.state.script, null, 1) + '\n');
-    if (choice.tools?.linesEdit) fs.writeFileSync(path.join(folder, 'my-lines.json'), JSON.stringify(choice.tools.linesEdit, null, 1) + '\n');
-    fs.writeFileSync(path.join(folder, 'choice.json'), JSON.stringify({ kind: 'script', script: 'script.json', ...(choice.tools?.linesEdit ? { lines: 'my-lines.json' } : {}), ...(res.state.drawing?.medium ? { medium: res.state.drawing.medium } : {}), ...(res.state.drawing?.ink ? { ink: res.state.drawing.ink } : {}) }, null, 1) + '\n');
+    const resolvedScript = res.checked ?? res.state.script;
+    fs.writeFileSync(path.join(folder, 'script.json'), JSON.stringify(resolvedScript, null, 1) + '\n');
+    if (res.checked && JSON.stringify(res.state.script) !== JSON.stringify(res.checked)) {
+      fs.writeFileSync(path.join(folder, 'raw-script.json'), JSON.stringify(res.state.script, null, 1) + '\n');
+    }
+    let effectiveLines = choice.tools?.linesEdit ?? null;
+    if (effectiveLines && choice.tools?.startDropped) {
+      effectiveLines = { ...effectiveLines, rules: [{ where: {}, do: 'drop' }, ...(effectiveLines.rules ?? [])] };
+    }
+    if (effectiveLines) fs.writeFileSync(path.join(folder, 'my-lines.json'), JSON.stringify(effectiveLines, null, 1) + '\n');
+    fs.writeFileSync(path.join(folder, 'choice.json'), JSON.stringify({ kind: 'script', script: 'script.json', ...(effectiveLines ? { lines: 'my-lines.json' } : {}), ...(choice.tools?.medium ? { medium: choice.tools.medium } : {}), ...(choice.tools?.ink ? { ink: choice.tools.ink } : {}) }, null, 1) + '\n');
   }
   const t = res.tokens, reported = t.fresh != null || t.cached != null || t.output != null, total = res.rounds.reduce((a, q) => a + (q.tokensTotal ?? 0), 0);
   Object.assign(record.author, { seconds: res.seconds, tokensIn: reported ? (t.fresh ?? 0) + (t.cached ?? 0) : null, tokensOut: reported ? t.output ?? 0 : null, tokens: reported ? (t.fresh ?? 0) + (t.cached ?? 0) + (t.output ?? 0) : total || null, costUSD: res.costUSD,
-    tokenSplit: reported ? { reported: true, freshIn: t.fresh ?? 0, cachedIn: t.cached ?? 0, out: t.output ?? 0, from: 'each round\'s own report, added up (rounds.json has them a round)' } : undefined });
+    tokenSplit: reported ? { reported: true, freshIn: t.fresh ?? 0, cachedIn: t.cached ?? 0, out: t.output ?? 0, ...(t.cacheWrite != null ? { cacheWriteIn: t.cacheWrite } : {}), ...(t.thinking != null ? { thinking: t.thinking } : {}), from: 'each round\'s own report, added up (rounds.json has them a round)' } : undefined });
   record.author.session = { work: 'rounds', ended: res.ended, level: x.level, ladder: record.author.ladder ?? null, previousLevel: record.author.previousTry?.level ?? null, tryNumber: r.record.author.tryNumber ?? 1, budget: record.author.budget ?? null, budgetReached: res.ended === 'wall clock' ? { what: `${x.wallMinutes} minutes on the clock`, safetyStop: true } : null, looksMost: x.looksMost,
     ownMinutes: +(res.seconds / 60).toFixed(1), wallMinutes: +((Date.now() - t0) / 60000).toFixed(1), waitMinutes: null,
     lookUnits: res.lookUnits, steps: { taken: res.rounds.length, budget: null, what: 'rounds (model replies)' }, looks: res.looks.filter(l => !l.failed), looksNotPainted: res.looks.filter(l => l.failed).length,
