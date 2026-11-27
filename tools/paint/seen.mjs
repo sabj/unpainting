@@ -38,7 +38,7 @@ export function logReads(cli, commands, files) {
   const out = {};
   for (const f of files) {
     if (cli === 'codex') { out[f] = null; continue; }
-    const tool = cli === 'claude' ? /^Read\s/ : /^(read_file|view_file|view_image|read_image)\s/;
+    const tool = (cli === 'claude' || cli === 'mlx') ? /^Read\s/ : /^(read_file|view_file|view_image|read_image)\s/;
     out[f] = commands.some(c => tool.test(c) && (c.includes(`/${f}`) || c.trim().endsWith(` ${f}`)));
   }
   return out;

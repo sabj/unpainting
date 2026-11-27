@@ -32,8 +32,9 @@ export const EYES_ONLY_WORDS = 'the pictures are for looking at with your own im
 
 /** The model command's own program, which views pictures: where it is found and where that leads. Throws when it is not installed. */
 export function viewersOf(cli, which = c => execFileSync('/usr/bin/which', [c], { encoding: 'utf8' }).trim()) {
-  let at; try { at = which(cli); } catch { at = null; }
-  if (!at) throw new Error(`eyes only: the \`${cli}\` command is not on PATH, so its image viewer cannot be told from a script; the session is not started`);
+  const bin = cli === 'mlx' ? 'claude' : cli;
+  let at; try { at = which(bin); } catch { at = null; }
+  if (!at) throw new Error(`eyes only: the \`${bin}\` command is not on PATH, so its image viewer cannot be told from a script; the session is not started`);
   let real = at; try { real = fs.realpathSync(at); } catch { /* as found */ }
   // muse is a shell launcher that execs a sibling muse-bin-* program beside it; seatbelt checks the exec'd program's path
   const siblings = cli === 'muse' ? [...new Set([path.dirname(at), path.dirname(real)])].flatMap(d => {

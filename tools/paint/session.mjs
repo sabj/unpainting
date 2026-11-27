@@ -207,6 +207,7 @@ export function ledgerShowings(ledger) {
 const SPLIT_FROM = {
   agy: 'agy reports input (fresh), cache_read (cached) and output per response; thinking tokens it reports apart, and its total is input + output',
   claude: 'claude reports input, cache_creation (counted as fresh input, and also shown as cacheWriteIn), cache_read (cached) and output',
+  mlx: 'local rapid-mlx via claude reports input, cache_read and output tokens ($0 local inference)',
   codex: 'codex reports input (cached included; fresh = input - cached) and output per turn',
   muse: 'muse keeps input (cached included; fresh = input - cached), output and reasoning tokens per request in its own session log, subagents included; reasoning is shown apart',
 };
@@ -535,26 +536,31 @@ export function sessionCall(author, { prompt, cwd, deny = [], images = [], home 
   // model command's own program reads them. A command that is not installed has no viewer to name: it is not started.
   const eyes = eyesOnly ? { pictures: eyesOnly, viewers: viewersOf(author.cli) } : null;
   const HELD = eyes ? '; its pictures (the subject, the studies, an earlier painting, a look\'s pictures) are read by the model command\'s own program only, to look at: every other program is refused them' : '';
-  if (author.cli === 'claude' && gate) {
-    // closed: the whole command under this harness's profile (its own sandbox off: two do not nest), out only through
-    // the gate; of the home folder it reads only its program and the login keychain (its sign-in: the accepted
-    // exposure, SIGN_IN_EXPOSURE); measured, it signs in and answers without ~/.claude or ~/.claude.json
+  if ((author.cli === 'claude' || author.cli === 'mlx') && gate) {
+    const isMlx = author.cli === 'mlx';
     const bin = (() => { try { return real(execFileSync('/usr/bin/which', ['claude'], { encoding: 'utf8' }).trim()); } catch { return null; } })();
-    const signIn = [path.join(home, 'Library', 'Keychains')];
+    const signIn = isMlx ? [] : [path.join(home, 'Library', 'Keychains')];
     const profile = seatbelt({ deny: all, write: [...new Set(writeTmp)], cwd: real(cwd), ownDirs, local: true, gated: true, eyes,
       readable: [...new Set([...(toolbox?.readable ?? []), ...(bin ? [path.dirname(bin)] : []), ...signIn])], hidden: [...new Set([home, real(home), '/Users', '/Volumes'])], metadata: [path.join(home, '.local', 'bin'), path.join(home, '.local', 'bin', 'claude'), home] });
     const settings = { sandbox: { enabled: false }, permissions: { deny: all.map(d => `Read(/${d}/**)`) } };
-    return { cmd: 'sandbox-exec', env: { ...tmpEnv, CLAUDE_CODE_DISABLE_AUTO_MEMORY: '1', BASH_DEFAULT_TIMEOUT_MS: '120000', BASH_MAX_TIMEOUT_MS: '600000', DISABLE_TELEMETRY: '1', DISABLE_ERROR_REPORTING: '1', CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: '1', ...proxyEnv(gate.url), ...(toolbox?.env ?? {}) }, unset: [], profile, gated: true, signIn,
-      // its own permission prompts off inside the profile, as agy's and codex's are: headless, a prompt is a refusal (the
-      // 22 Nov preflight: a compound shell command "requires approval" and a Write to seen.md was refused as sensitive)
-      args: ['-p', profile, 'claude', '-p', prompt, '--model', author.id, ...(author.effort ? ['--effort', author.effort] : []), '--allowedTools', 'Read Write Edit Glob Grep Bash', '--dangerously-skip-permissions', '--settings', JSON.stringify(settings), '--setting-sources', 'project', '--no-session-persistence', '--output-format', 'stream-json', '--verbose'],
+    const mlxEnv = isMlx ? {
+      ANTHROPIC_BASE_URL: process.env.RAPID_MLX_URL ?? 'http://127.0.0.1:7659',
+      ANTHROPIC_AUTH_TOKEN: 'rapid-mlx',
+      ANTHROPIC_API_KEY: 'rapid-mlx',
+      NO_PROXY: '127.0.0.1,localhost',
+      no_proxy: '127.0.0.1,localhost',
+    } : {};
+    return { cmd: 'sandbox-exec', env: { ...tmpEnv, CLAUDE_CODE_DISABLE_AUTO_MEMORY: '1', BASH_DEFAULT_TIMEOUT_MS: '120000', BASH_MAX_TIMEOUT_MS: '600000', DISABLE_TELEMETRY: '1', DISABLE_ERROR_REPORTING: '1', CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: '1', ...proxyEnv(gate.url), ...mlxEnv, ...(toolbox?.env ?? {}) }, unset: [], profile, ...(isMlx ? { serial: true } : {}), gated: true, signIn,
+      args: ['-p', profile, 'claude', '-p', prompt, '--model', author.id, ...(author.effort && !isMlx ? ['--effort', author.effort] : []), '--allowedTools', 'Read Write Edit Glob Grep Bash', '--dangerously-skip-permissions', '--settings', JSON.stringify(settings), '--setting-sources', 'project', '--no-session-persistence', '--output-format', 'stream-json', '--verbose'],
       probe: file => ({ cmd: 'sandbox-exec', args: ['-p', profile, '/bin/cat', file] }),
-      closed: `the whole command runs under a seatbelt profile of this harness (its own sandbox off): nothing of the home folder can be listed or read but its program and the login keychain (${SIGN_IN_EXPOSURE}), it writes only in its folder and temporary folders, and reaches only this machine's loopback, where a gate passes its own service's hosts and refuses every other (its own permission prompts are off inside the profile)${HELD}`, eyesHeld: Boolean(eyes) };
+      closed: `the whole command runs under a seatbelt profile of this harness (its own sandbox off): nothing of the home folder can be listed or read but its program${isMlx ? '' : ` and the login keychain (${SIGN_IN_EXPOSURE})`}, it writes only in its folder and temporary folders, and reaches only this machine's loopback${isMlx ? ' (local rapid-mlx only, zero internet)' : ', where a gate passes its own service\'s hosts and refuses every other'} (its own permission prompts are off inside the profile)${HELD}`, eyesHeld: Boolean(eyes) };
   }
-  if (author.cli === 'claude') {
+  if (author.cli === 'claude' || author.cli === 'mlx') {
+    const isMlx = author.cli === 'mlx';
     const settings = { sandbox: { enabled: true, autoAllowBashIfSandboxed: true, allowUnsandboxedCommands: false }, permissions: { deny: all.map(d => `Read(/${d}/**)`) } };
-    return { cmd: 'claude', env: { ...tmpEnv, CLAUDE_CODE_DISABLE_AUTO_MEMORY: '1', BASH_DEFAULT_TIMEOUT_MS: '120000', BASH_MAX_TIMEOUT_MS: '600000' }, unset: [],
-      args: ['-p', prompt, '--model', author.id, ...(author.effort ? ['--effort', author.effort] : []), '--allowedTools', 'Read Write Edit Glob Grep Bash', '--settings', JSON.stringify(settings), '--setting-sources', 'project', '--no-session-persistence', '--output-format', 'stream-json', '--verbose'],
+    const mlxEnv = isMlx ? { ANTHROPIC_BASE_URL: process.env.RAPID_MLX_URL ?? 'http://127.0.0.1:7659', ANTHROPIC_AUTH_TOKEN: 'rapid-mlx', ANTHROPIC_API_KEY: 'rapid-mlx', NO_PROXY: '127.0.0.1,localhost', no_proxy: '127.0.0.1,localhost' } : {};
+    return { cmd: 'claude', env: { ...tmpEnv, CLAUDE_CODE_DISABLE_AUTO_MEMORY: '1', BASH_DEFAULT_TIMEOUT_MS: '120000', BASH_MAX_TIMEOUT_MS: '600000', ...mlxEnv }, unset: [], ...(isMlx ? { serial: true } : {}),
+      args: ['-p', prompt, '--model', author.id, ...(author.effort && !isMlx ? ['--effort', author.effort] : []), '--allowedTools', 'Read Write Edit Glob Grep Bash', '--settings', JSON.stringify(settings), '--setting-sources', 'project', '--no-session-persistence', '--output-format', 'stream-json', '--verbose'],
       probe: null, eyesHeld: false, closed: 'its shell runs in the command\'s own sandbox (writes only in its folder, network held to the command\'s allowed hosts) and neither its shell nor its file tools can read the repository, the subject list, the caches or other sessions' };
   }
   if (author.cli === 'codex') {
@@ -716,7 +722,7 @@ export function readTranscript(cli, out) {
       if (u) { add('freshIn', (u.input_tokens || 0) - (u.cached_tokens || 0)); add('cachedIn', u.cached_tokens || 0); add('out', u.output_tokens || 0); add('thinking', u.reasoning_tokens || 0); tokensIn = (tokensIn ?? 0) + (u.input_tokens || 0); tokensOut = (tokensOut ?? 0) + (u.output_tokens || 0); tokens = tokensIn + tokensOut; }
       continue;
     }
-    if (cli === 'claude') {
+    if (cli === 'claude' || cli === 'mlx') {
       if (d.type === 'assistant') for (const b of d.message?.content ?? []) {
         if (b.type === 'text' && b.text?.trim()) text = b.text;
         if (b.type !== 'tool_use') continue;
@@ -725,8 +731,8 @@ export function readTranscript(cli, out) {
       }
       if (d.type === 'user') for (const b of d.message?.content ?? []) if (b.type === 'tool_result') ended(byId.get(b.tool_use_id), { failed: Boolean(b.is_error), output: typeof b.content === 'string' ? b.content : (b.content ?? []).map(x => x.text ?? '').join('\n') });
       if (d.type === 'result') { const u = d.usage ?? {}; if (d.result) text = String(d.result); const tin = ['input_tokens', 'cache_creation_input_tokens', 'cache_read_input_tokens'].reduce((a, k) => a + (u[k] || 0), 0); add('freshIn', (u.input_tokens || 0) + (u.cache_creation_input_tokens || 0)); add('cacheWriteIn', u.cache_creation_input_tokens || 0); add('cachedIn', u.cache_read_input_tokens || 0); add('out', u.output_tokens || 0);
-        // several turns of one session (a command run again in the same folder) are one cost: their results add up
-        tokensIn = (tokensIn ?? 0) + tin; tokensOut = (tokensOut ?? 0) + (u.output_tokens || 0); tokens = (tokens ?? 0) + tin + (u.output_tokens || 0); if (d.total_cost_usd != null) costUSD = (costUSD ?? 0) + d.total_cost_usd; }
+        tokensIn = (tokensIn ?? 0) + tin; tokensOut = (tokensOut ?? 0) + (u.output_tokens || 0); tokens = (tokens ?? 0) + tin + (u.output_tokens || 0);
+        if (cli === 'mlx') costUSD = 0; else if (d.total_cost_usd != null) costUSD = (costUSD ?? 0) + d.total_cost_usd; }
     } else {
       if (d.type === 'item.completed' && d.item) {
         const it = d.item;

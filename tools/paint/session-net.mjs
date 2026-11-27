@@ -17,6 +17,7 @@ const PROBE = "import sys, numpy, PIL, scipy, skimage, cv2; print(f'Python {sys.
 export const PROVIDER_HOSTS = Object.freeze({
   agy: [/(^|\.)googleapis\.com$/, /(^|\.)googleusercontent\.com$/],
   claude: [/^api\.anthropic\.com$/],
+  mlx: [],
   // codex, signed in with a ChatGPT account, asks chatgpt.com (measured without a model: under the session's profile
   // its model list is fetched there through the gate). auth.openai.com (where that sign-in is renewed) and
   // api.openai.com (asked when it is signed in with an API key) are read from the program's own text, not yet measured

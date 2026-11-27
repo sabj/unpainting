@@ -29,6 +29,10 @@
     { "key": "opus-high", "name": "Claude Opus 5.5 (high)", "id": "claude-opus-5-5", "effort": "high", "cli": "claude" },
     { "key": "opus-xhigh", "name": "Claude Opus 5.5 (xhigh)", "id": "claude-opus-5-5", "effort": "xhigh", "cli": "claude" },
     { "key": "wonderfull-m", "name": "Muse Wonder Full (medium)", "id": "muse-wonder-full-1.0", "effort": "medium", "cli": "muse" },
+    { "key": "glimmer-m", "name": "Muse Glimmer (medium)", "id": "muse-glimmer-1.0", "effort": "medium", "cli": "muse" },
+    { "key": "glimmer-local-m", "name": "Muse Glimmer 30B (MLX)", "id": "muse-glimmer-30b-8bit", "effort": "medium", "cli": "mlx" },
+    { "key": "qwen38-27b-m", "name": "Qwen 3.8 27B (MLX)", "id": "qwen3.8-27b-4bit", "effort": "medium", "cli": "mlx" },
+    { "key": "gemma4-31b-m", "name": "Gemma 4 31B (MLX)", "id": "gemma-4-31b-8bit", "effort": "medium", "cli": "mlx" },
     { "key": "dry-rounds", "name": "Scripted stand-in", "id": null, "effort": null, "cli": "dry" }
   ]
 }

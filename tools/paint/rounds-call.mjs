@@ -25,14 +25,11 @@ export const ROUNDS_CLIS = Object.freeze({
   codex: 'the `codex` command, logged in',
   agy: 'the `agy` command, logged in',
   muse: 'the `muse` command, logged in',
+  mlx: 'local rapid-mlx server (RAPID_MLX_URL, default http://127.0.0.1:7659) via `claude`',
   dry: 'nothing: a scripted stand-in',
 });
 
-/**
- * Replies asked for at once, a provider's command: every (model, picture) run is independent and they all run together,
- * held only by each provider's rate limits (agy: three at once in separate folders did not interrupt one another).
- */
-export const ROUNDS_AT_ONCE = Object.freeze({ claude: 6, codex: 6, agy: 3, muse: 3, dry: 12 });
+export const ROUNDS_AT_ONCE = Object.freeze({ claude: 6, codex: 6, agy: 3, muse: 3, mlx: 1, dry: 12 });
 
 const mediaOf = f => (/\.jpe?g$/i.test(f) ? 'image/jpeg' : /\.webp$/i.test(f) ? 'image/webp' : 'image/png');
 
@@ -50,13 +47,27 @@ export function roundCall(author, { text, images, cwd, state, resume }) {
     return out;
   };
   const effort = author.effort && author.effort !== 'n/a' ? author.effort : null;
-  if (author.cli === 'claude') {
+  if (author.cli === 'claude' || author.cli === 'mlx') {
+    const isMlx = author.cli === 'mlx';
     const content = [{ type: 'text', text }, ...images.map(f => ({ type: 'image', source: { type: 'base64', media_type: mediaOf(f), data: fs.readFileSync(f).toString('base64') } }))];
-    return { cmd: 'claude', env: { CLAUDE_CODE_DISABLE_AUTO_MEMORY: '1' },
-      args: ['-p', '--input-format', 'stream-json', '--output-format', 'stream-json', '--verbose', '--model', author.id, ...(effort ? ['--effort', effort] : []), '--tools', '', '--strict-mcp-config', '--mcp-config', '{"mcpServers":{}}', '--disable-slash-commands', '--setting-sources', 'project', ...(resume ? ['--resume', state.uuid] : ['--session-id', state.uuid])],
+    const mlxEnv = isMlx ? {
+      ANTHROPIC_BASE_URL: process.env.RAPID_MLX_URL ?? 'http://127.0.0.1:7659',
+      ANTHROPIC_AUTH_TOKEN: 'rapid-mlx',
+      ANTHROPIC_API_KEY: 'rapid-mlx',
+      NO_PROXY: '127.0.0.1,localhost',
+      no_proxy: '127.0.0.1,localhost',
+      DISABLE_TELEMETRY: '1',
+      CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: '1',
+    } : {};
+    return { cmd: 'claude', env: { CLAUDE_CODE_DISABLE_AUTO_MEMORY: '1', ...mlxEnv }, ...(isMlx ? { serial: true } : {}),
+      args: ['-p', '--input-format', 'stream-json', '--output-format', 'stream-json', '--verbose', '--model', author.id, ...(effort && !isMlx ? ['--effort', effort] : []), '--tools', '', '--strict-mcp-config', '--mcp-config', '{"mcpServers":{}}', '--disable-slash-commands', '--setting-sources', 'project', ...(resume ? ['--resume', state.uuid] : ['--session-id', state.uuid])],
       stdin: JSON.stringify({ type: 'user', message: { role: 'user', content } }) + '\n',
-      // (claude's own cost figure is the session's running total: a resumed call's cost is what it added)
-      parse: out => { const got = split('claude', out), total = got.costUSD; if (total != null) { got.costUSD = +(resume ? Math.max(0, total - (state.costSoFar ?? 0)) : total).toFixed(6); state.costSoFar = total; } return { ...got, id: state.uuid }; } };
+      parse: out => {
+        const got = split(author.cli, out), total = got.costUSD;
+        if (isMlx) got.costUSD = 0;
+        else if (total != null) { got.costUSD = +(resume ? Math.max(0, total - (state.costSoFar ?? 0)) : total).toFixed(6); state.costSoFar = total; }
+        return { ...got, id: state.uuid };
+      } };
   }
   if (author.cli === 'codex') {
     const pics = images.flatMap(f => ['-i', f]);
@@ -151,7 +162,7 @@ export function roundsAsker(author, { dir, minutes = ROUND_MINUTES, run = launch
     const mine = images.map((f, i) => { const to = path.join(cwd, round === 0 ? path.basename(f) : `round-${round}-${i + 1}${path.extname(f)}`); fs.copyFileSync(f, to); return to; });
     if (round === 0) firstImages.push(...mine);
     // claude and muse continue under the id given them; codex and agy under the id their first call reported
-    const canResume = author.cli === 'claude' || author.cli === 'muse' || Boolean(state.id);
+    const canResume = author.cli === 'claude' || author.cli === 'mlx' || author.cli === 'muse' || Boolean(state.id);
     let got = round > 0 && !canResume ? { ok: false, seconds: 0, error: 'the command reported no conversation id to continue' } : await once({ text, images: mine, round, resume: round > 0, stem: `R${round}`, maxMinutes }), continuedBy = round > 0 ? 'the command\'s own resume' : null;
     if (!got.ok && round > 0) {
       // the command could not continue: once more as a fresh call that carries the transcript, and the record says so
