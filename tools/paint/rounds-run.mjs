@@ -40,9 +40,12 @@ export function choiceOf(state) {
 }
 
 /** The plan in numbers as a look's text gives it: the script's own counts and washes, nothing against the subject or a study. */
-export function planText(compiled) {
+export function planText(compiled, { hideForms = false } = {}) {
   const s = compiled.summary ?? {};
-  return `YOUR SCRIPT IN NUMBERS: ${s.passages != null ? `${s.passages} passages, ` : ''}${s.washes ?? '?'} washes, ${s.strokes ?? '?'} strokes, widest wash brush ${s.widestBrushMm ?? '?'} mm${s.washesByStage ? `, washes by stage ${s.washesByStage.join('/')}` : ''}${s.dryings != null ? `, ${s.dryings} dryings` : ''}.${tinyTouchWarning(s)}\n\nEACH PASSAGE, IN PAINTING ORDER (id | stage | widest brush | strokes | area | how it is laid | what the plan expects on the sheet there | the named forms its strokes cover | what):\n\n${(compiled.table ?? []).join('\n')}`;
+  const cols = hideForms
+    ? 'id | stage | widest brush | strokes | area | how it is laid | what the plan expects on the sheet there | what'
+    : 'id | stage | widest brush | strokes | area | how it is laid | what the plan expects on the sheet there | the named forms its strokes cover | what';
+  return `YOUR SCRIPT IN NUMBERS: ${s.passages != null ? `${s.passages} passages, ` : ''}${s.washes ?? '?'} washes, ${s.strokes ?? '?'} strokes, widest wash brush ${s.widestBrushMm ?? '?'} mm${s.washesByStage ? `, washes by stage ${s.washesByStage.join('/')}` : ''}${s.dryings != null ? `, ${s.dryings} dryings` : ''}.${tinyTouchWarning(s)}\n\nEACH PASSAGE, IN PAINTING ORDER (${cols}):\n\n${(compiled.table ?? []).join('\n')}`;
 }
 
 /**
@@ -55,19 +58,35 @@ export async function roundsRun(r, x) {
   // the one guard, resource management only: the water-step ceiling of the subject (ten times Auto's)
   x.guard(r);
   const pics = await runPictures(record);
-  // level 1: the subject alone; nothing prepared is sent, named or laid on the sheet
+  // Level boundaries (Option A, 0.5.1):
+  //   L1 (bare): subject alone; no studies, no drawing, no forms, no traced shapes; prepared drawing never laid.
+  //   L2 (studiesOnly): subject + 3 colour studies only; no prepared drawing, no forms, no traced shapes; prepared drawing never laid.
+  //   L3 (preparedDrawing === 'opt-in'): full packet + Auto, with prepared drawing OFF by default unless script explicitly selects medium or prepared lines.
   const bare = Boolean(x.terms?.noInputs);
-  const packet = await preparePacket({ dir, root: x.root, run: { ...record, masks: record.masks.receipt && !bare ? { ...record.masks } : null }, drawingPng: pics.drawing, briefFile: null, formsPicture: false, only: bare ? ['source.png'] : null });
-  // at level 1 the prepared drawing is never laid: only lines of the model's own, whatever medium its answer names for them
-  const laid = state => (bare ? { ...state, drawing: { ...(state.drawing ?? {}), medium: 'none' } } : state);
+  const studiesOnly = Boolean(x.terms?.studiesOnly);
+  const allowForms = x.terms?.namedForms ?? !bare;
+  const prepDraw = x.terms?.preparedDrawing ?? !bare;
+  const only = bare ? ['source.png'] : studiesOnly ? ['source.png', ...(record.studies ?? []).map((_, i) => `study-${i + 1}.png`)] : null;
+  const packet = await preparePacket({ dir, root: x.root, run: { ...record, masks: record.masks.receipt && allowForms ? { ...record.masks } : null }, drawingPng: pics.drawing, briefFile: null, formsPicture: false, only });
+  const laid = state => {
+    if (prepDraw === false) return { ...state, drawing: { ...(state.drawing ?? {}), medium: 'none' } };
+    if (prepDraw === 'opt-in') {
+      const hasExplicitMedium = Boolean(state.drawing?.medium);
+      const hasPreparedRules = Boolean(state.drawing?.lines?.rules?.length);
+      if (!hasExplicitMedium && !hasPreparedRules) return { ...state, drawing: { ...(state.drawing ?? {}), medium: 'none' } };
+    }
+    return state;
+  };
   // every picture goes out once, in round 0, and stays in the conversation: recorded as given, never priced
   const images = [], names = [];
   for (const f of packet.files) { const name = `${path.basename(f, '.png')}.jpg`; images.push(await sent(path.join(dir, f), path.join(dir, 'sent', name))); names.push([f, name]); }
   // what the level adds (levels.mjs), each handed once in round 0. No level is handed another level's result; the
   // replay level L4-retry alone is handed the model's own earlier painting to look at and its script as text.
   const data = [], shapesData = [], notes = []; let numbered = null;
-  const forms = bare ? [] : packet.forms ?? [];
+  const forms = allowForms ? packet.forms ?? [] : [];
   if (bare) notes.push('Nothing else is given: no drawing, study or list of forms, and nothing is on the sheet before you start. Lines of your own (`lines`) are drawn where you put them.');
+  else if (studiesOnly) notes.push('Three colour studies are given for visual value and colour reference. No prepared drawing, named forms, or traced shapes are given, and nothing is on the sheet before you start. Lines of your own (`lines`) are drawn where you put them.');
+  else if (prepDraw === 'opt-in') notes.push('The prepared drawing is optional and OFF by default (blank paper). Set `"medium"` to `"pencil"` or `"pen"` (or select lines in `"lines"`) only if you choose to lay it.');
   if (forms.length) data.push({ title: 'The named forms (number. name (kind): box in sheet mm)', text: forms.map(f => `- ${f.id}. ${f.name} (${f.kind})${f.boxMm ? `: box x ${f.boxMm[0]} to ${f.boxMm[2]}, y ${f.boxMm[1]} to ${f.boxMm[3]} mm` : ''}`).join('\n') });
   if (x.terms?.previous) {
     const prev = previousHanded(x.previous, { subject: spec.id, author: author.key });
@@ -104,13 +123,13 @@ export async function roundsRun(r, x) {
     res = await runRounds({
       first: { text, images }, ask, sheet, forms, budget: x.looksMost, wallMinutes: x.wallMinutes ?? null, say: line => x.say(r, line),
       check: async state => { const script = checkAuthored(numbered && namesShapes(state.script) ? resolveNumbered(state.script, numbered) : state.script, { sheetWidthMm: W }).script, choice = choiceOf(laid(state)); if (choice.tools) await x.toolsCheck(r, choice.tools); return script; },
-      compile: (state, checked, n) => x.compile(r, choiceOf(laid(state)), checked, path.join(dir, 'plans', String(n))),
+      compile: (state, checked, n) => x.compile(r, choiceOf(laid(state)), checked, path.join(dir, 'plans', String(n)), { hideForms: !allowForms }),
       look: async (state, checked, compiled, want, n) => {
         const got = await x.look(r, choiceOf(laid(state)), checked, path.join(dir, 'look-paints', String(n)), { plan: n, look: n }, compiled, want);
         if (!got.ok) return got;
         // the sheet only: the model's own painting as it dried, on the millimetre grid
         const file = await sent(await gridImage(got.painted.painting, W), path.join(dir, 'looks', String(n), 'sheet.jpg')), numbers = await sheetNumbers(got.painted.painting);
-        const words = `${sheetLine(numbers)}${got.stoppedText ? `\n${got.stoppedText}` : ''}\n\n${planText(compiled)}`;
+        const words = `${sheetLine(numbers)}${got.stoppedText ? `\n${got.stoppedText}` : ''}\n\n${planText(compiled, { hideForms: !allowForms })}`;
         fs.writeFileSync(path.join(dir, 'looks', String(n), 'numbers.txt'), words + '\n');
         return { ok: true, images: [file], text: words, painted: { ...got.painted, sheetNumbers: numbers } };
       },

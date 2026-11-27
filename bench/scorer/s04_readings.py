@@ -81,6 +81,33 @@ Blur and smear are failures, not a safe middle. 5 is a competent amateur; 9-10 i
 Reply with JSON only, no prose: {{"composition_values":n,"edges_detail":n,"marks_texture":n,"overall":n}}"""
 CRITERIA = ("composition_values", "edges_detail", "marks_texture")
 
+QUALITY_ANCHORED = """You are a demanding master watercolour juror judging the watercolour craft of Image 2 (the CANDIDATE painting).
+Style expected: {style}.
+
+Image 1 is a REFERENCE watercolour that calibrates the 9.0/10 craft standard on this scale (a candidate can match or exceed 9.0 if its craft warrants it).
+Judge WATERCOLOUR CRAFT ALONE — not whether Image 2 copies Image 1's exact subject or layout (likeness is scored separately). Even if Image 2 depicts a different scene or simplifies the scene loosely, judge how well Image 2 works as a painting in its own right.
+
+Rules of craft:
+- Loose, economical, expressive watercolour (broad flowing wet washes, suggested forms, luminous preserved white paper, varied hard/soft/lost edges) is a strength ONLY when the washes, edges, and values genuinely cohere like a skilled painter's work. Do NOT excuse sloppy, blocky, flat, striped, or amateur paint as "loose."
+- Conversely, if crisp pencil or pen linework carries the drawing while the washes sitting over it are flat, patchy, timid, muddy, or pasted-on, judge the washes harshly (in pen-and-wash, expressive ink linework counts as part of the craft, but washes must still show transparent value and edge control).
+- Apply a low band whenever there is a visible, consequential defect ANYWHERE on the sheet (even localized opaque black/tar smears, neon/radioactive patches, or dead slabs ruin a watercolour):
+  - 0.0–2.5: Catastrophic paint failure — ANY radioactive/neon oversaturation, opaque pitch-black/tar/navy blobs or slabs, severe digital/rendering artifacts, or chaotic unreadable messes.
+  - 2.6–4.5: Poor watercolour — garish/unnatural colour clashes, heavy muddy overworking, crude pasted-on cutout shapes, or harsh dry-stripe fills that fight the form.
+  - 4.6–6.0: Mediocre/amateur — readable picture, but washes are visibly flat, timid, washed-out, patchy, overworked, or lacking clear light-to-dark value hierarchy and convincing wet-edge variety.
+  - 6.1–7.5: Competent/good — genuine transparent washes, clear light-to-dark structure, believable pigment harmony, and varied edges, with some stiff or simplified passages.
+  - 7.6–8.5: Strong/skilled — luminous preserved paper whites, confident graded or wet-in-wet washes, deliberate hard/soft/lost edge control, cohesive colour harmony and depth.
+  - 8.6–10.0: Master-level — rivals or exceeds the 9.0/10 reference benchmark in watercolour craft and expressive control.
+
+Rate from 0.0 to 10.0 (decimals allowed):
+- wash_craft: transparency, wet/dry edge variety, brushwork quality, absence of slabs/stripes/artifacts.
+- value_light: light-to-dark structure, preserved white paper, modelling of form and depth.
+- colour_harmony: believable, cohesive watercolour pigments and temperature control.
+- overall: holistic watercolour craft score respecting the scale and defect bands above.
+
+Reply with JSON only, no prose: {{"wash_craft":n,"value_light":n,"colour_harmony":n,"overall":n,"critique":"one blunt sentence"}}"""
+ANCHORED_CRITERIA = ("wash_craft", "value_light", "colour_harmony")
+QUALITY_MODES = ("blind", "anchored")
+
 LIKENESS = """Two pictures follow. The first is an original picture. The second is a painting made of it, in this style: {style}.
 Judge one thing only: how well is the second a painting OF the first? Look at the subject, the composition and the placing of the big shapes, the pattern of light and dark, and the colour. It is a painting, not a copy: do not ask for it to match the original mark for mark or pixel for pixel, and do not judge how well it is painted.
 Score its likeness from 1 to 5:
@@ -120,8 +147,9 @@ def sequence_prompt(scheme, rubric, style, n, drawing):
     return SEQ_PROGRESS.format(rubric=rubric, n=n, style=style, count=SCHEMES[scheme]["count"], drawing=SEQ_DRAWING if drawing else "")
 
 
-def prompt_hashes(rubric, scheme=DEFAULT_SCHEME):
-    return {"sequence": sha(sequence_prompt(scheme, rubric, "{style}", "{n}", True)), "single": sha(SINGLE), "likeness": sha(LIKENESS)}
+def prompt_hashes(rubric, scheme=DEFAULT_SCHEME, quality_mode="blind"):
+    q = QUALITY_ANCHORED if quality_mode == "anchored" else SINGLE
+    return {"sequence": sha(sequence_prompt(scheme, rubric, "{style}", "{n}", True)), "single": sha(q), "likeness": sha(LIKENESS)}
 
 
 def film(painting, least=2):
@@ -296,6 +324,20 @@ def parse_single(raw):
     return None
 
 
+def parse_anchored(raw):
+    """A reference-anchored quality reply as {wash_craft, value_light, colour_harmony, overall, critique}, or None."""
+    for m in reversed(re.findall(r"\{[^{}]*\}", re.sub(r"```(?:json)?", "", raw or ""))):
+        try:
+            d = json.loads(m)
+            out = {k: max(0.0, min(10.0, float(d[k]))) for k in ANCHORED_CRITERIA + ("overall",)}
+            if d.get("critique"):
+                out["critique"] = str(d["critique"])[:300]
+            return out
+        except Exception:
+            pass
+    return None
+
+
 def parse_likeness(raw):
     """A likeness reply as {likeness: 1 to 5, why}, or None."""
     for m in reversed(re.findall(r"\{[^{}]*\}", re.sub(r"```(?:json)?", "", raw or ""))):
@@ -376,14 +418,16 @@ def human(by_judge, panel, scheme="film13", drawing=False):
     return out
 
 
-def quality(by_judge, panel):
-    """The single-image figure (0 to 10) from {judge: [three readings]}: the mean of the judges' medians."""
+def quality(by_judge, panel, criteria=CRITERIA):
+    """The quality figure (0 to 10) from {judge: [three readings]}: the mean of the judges' medians."""
     ok, faults = _full(by_judge, panel, "overall")
     if faults:
         return {"score": None, "judges": {}, "criteria": None, "spread": None, "faults": faults}
     med = {m: statistics.median(r["overall"] for r in rs) for m, rs in ok.items()}
-    crit = {c: sum(statistics.median(r[c] for r in rs) for rs in ok.values()) / len(ok) for c in CRITERIA}
-    return {"score": sum(med.values()) / len(med), "judges": med, "criteria": crit, "spread": max(med.values()) - min(med.values()), "faults": []}
+    crit = {c: sum(statistics.median(r[c] for r in rs) for rs in ok.values()) / len(ok) for c in criteria if all(c in r for rs in ok.values() for r in rs)}
+    critiques = {m: rs[0].get("critique") for m, rs in ok.items() if rs[0].get("critique")}
+    return {"score": sum(med.values()) / len(med), "judges": med, "criteria": crit or None, "spread": max(med.values()) - min(med.values()),
+            **({"critiques": critiques} if critiques else {}), "faults": []}
 
 
 def likeness(by_judge, panel):

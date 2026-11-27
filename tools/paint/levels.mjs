@@ -22,11 +22,11 @@ export const LEVEL_MINUTES = 60;
 export const DEFAULT_RETRIES = 1;
 
 export const LEVELS = Object.freeze({
-  L1: { work: 'rounds', previousTry: false, codePlan: false, autoPlan: false, autoPainting: false, shapesData: false, noInputs: true, what: 'the picture, the script format and the painting tips; nothing prepared (fixed rounds)' },
-  L2: { work: 'rounds', previousTry: false, codePlan: false, autoPlan: false, autoPainting: false, shapesData: true, what: 'L1 and the prepared studies: the drawing, the named forms and the studies\' traced shapes; nothing of Auto (fixed rounds)' },
-  L3: { work: 'rounds', previousTry: false, codePlan: false, autoPlan: true, autoPainting: true, shapesData: true, what: 'L2 and Auto\'s plan and finished painting, to improve on (fixed rounds)' },
-  L4: { work: 'session', previousTry: false, codePlan: false, autoPlan: true, autoPainting: true, shapesData: true, what: 'L3\'s inputs in an open session with tools (sandbox, painter commands, its own files), the anti-cheat guard on' },
-  'L4-retry': { work: null, replayOnly: true, previousTry: true, codePlan: false, autoPlan: false, autoPainting: false, shapesData: true, what: 'the old level 4 of 23-24 Nov, for replaying those runs only: the traced shapes and its own earlier result (--previous); nothing of Auto' },
+  L1: { work: 'rounds', previousTry: false, codePlan: false, autoPlan: false, autoPainting: false, shapesData: false, noInputs: true, studiesOnly: false, preparedDrawing: false, namedForms: false, what: 'the picture, the script format and the painting tips; nothing prepared (fixed rounds)' },
+  L2: { work: 'rounds', previousTry: false, codePlan: false, autoPlan: false, autoPainting: false, shapesData: false, noInputs: false, studiesOnly: true, preparedDrawing: false, namedForms: false, what: 'L1 and three unnumbered colour studies for visual value/colour reference; no prepared drawing, named forms, or traced shapes (fixed rounds)' },
+  L3: { work: 'rounds', previousTry: false, codePlan: false, autoPlan: true, autoPainting: true, shapesData: true, noInputs: false, studiesOnly: false, preparedDrawing: 'opt-in', namedForms: true, what: 'L2 plus opt-in prepared drawing (blank unless selected), named forms, traced shapes, and Auto\'s plan and painting (fixed rounds)' },
+  L4: { work: 'session', previousTry: false, codePlan: false, autoPlan: true, autoPainting: true, shapesData: true, noInputs: false, studiesOnly: false, preparedDrawing: 'opt-in', namedForms: true, what: 'L3\'s inputs (with opt-in prepared drawing) in an open session with tools (sandbox, painter commands, its own files), the anti-cheat guard on' },
+  'L4-retry': { work: null, replayOnly: true, previousTry: true, codePlan: false, autoPlan: false, autoPainting: false, shapesData: true, noInputs: false, studiesOnly: false, preparedDrawing: true, namedForms: true, what: 'the old level 4 of 23-24 Nov, for replaying those runs only: the traced shapes and its own earlier result (--previous); nothing of Auto' },
 });
 
 /** The benchmark's levels (the replay-only level is not one). */
@@ -55,5 +55,7 @@ export function handedAt(level, { tryNumber = 1, retries = DEFAULT_RETRIES, prev
   if (!level.previousTry && (previous || tryNumber > 1)) throw new Error(`--level ${level.name} is one fresh session, handed no other level's result: --previous and --try belong to the replay level L4-retry only`);
   if (level.previousTry && tryNumber > retries) throw new Error(`--level ${level.name}, try ${tryNumber}: this benchmark gives ${retries} ${retries === 1 ? 'retry' : 'retries'} at a level (--retries sets it)`);
   if (level.previousTry && !previous) throw new Error(`--level ${level.name} replays an old retry: it starts from the model's own earlier result. Name that run's folder with --previous`);
-  return { previous: Boolean(previous), plan: level.codePlan, autoPlan: level.autoPlan, auto: level.autoPainting, shapes: level.shapesData, ...(level.noInputs ? { noInputs: true } : {}) };
+  return { previous: Boolean(previous), plan: level.codePlan, autoPlan: level.autoPlan, auto: level.autoPainting, shapes: level.shapesData,
+    studiesOnly: Boolean(level.studiesOnly), preparedDrawing: level.preparedDrawing ?? true, namedForms: level.namedForms ?? !level.noInputs,
+    ...(level.noInputs ? { noInputs: true } : {}) };
 }

@@ -298,13 +298,13 @@ async function toolFiles(r, choice) {
  * planPreview}. A choice the planner refuses is a result. Nothing of this machine's paths is in what the model reads.
  */
 const planned = new Map();
-function compileChoice(r, choice, script, plate, edit = null) {
+function compileChoice(r, choice, script, plate, edit = null, opts = {}) {
   // the same choice of the same subject is planned once in a run, whoever asks (every session starts from the code planner's plan)
-  const key = `${r.spec.id}:${r.spec.variant ?? ''}:${choiceKey(choice, script ? JSON.stringify(script) : edit ? JSON.stringify(edit) : '')}`;
-  if (!planned.has(key)) planned.set(key, compileOnce(r, choice, script, plate, edit));
+  const key = `${r.spec.id}:${r.spec.variant ?? ''}:${opts.hideForms ? 'nf:' : ''}${choiceKey(choice, script ? JSON.stringify(script) : edit ? JSON.stringify(edit) : '')}`;
+  if (!planned.has(key)) planned.set(key, compileOnce(r, choice, script, plate, edit, opts));
   return planned.get(key);
 }
-async function compileOnce(r, choice, script, plate, edit) {
+async function compileOnce(r, choice, script, plate, edit, opts = {}) {
   const { spec, record } = r, scriptFile = `${plate}.script.json`, editFile = `${plate}.plan-edit.json`;
   try {
     const mine = await specWith(r, choice);
@@ -319,7 +319,8 @@ async function compileOnce(r, choice, script, plate, edit) {
       const why = fs.readFileSync(`${plate}.log`, 'utf8').split('\n').filter(l => /(^|\s)(Error|TypeError|RangeError)\b/.test(l)).pop()?.trim().slice(0, 400);
       return { ok: false, error: tidy(faults ? faults.slice(0, 12000) : why ?? `the planner ended with exit ${done.exit ?? done.signal} and no plan`), seconds: done.seconds };
     }
-    const numbers = await planNumbers({ plate, planPreview: results.planPreview, run: runOf(record, mine), script });
+    const baseRun = runOf(record, mine);
+    const numbers = await planNumbers({ plate, planPreview: results.planPreview, run: opts.hideForms ? { ...baseRun, masks: null } : baseRun, script, hideForms: Boolean(opts.hideForms) });
     // the painter's own count of an edit it applied, with its notes (a colour laid as the nearest that can be, a smaller brush)
     let editRecord = null; if (edit) { try { editRecord = JSON.parse(fs.readFileSync(path.join(plate, 'plan-edit-record.json'), 'utf8')); } catch { /* the session's own count stands */ } }
     return { ok: true, ...numbers, passes: passesOf(path.join(plate, 'value-plan.json')), planPreview: results.planPreview, seconds: done.seconds, plate, editRecord, toolFiles: await toolFiles(r, choice) };
@@ -721,7 +722,7 @@ const roundsLent = {
     throw new Error(`no prepared folder of ${r.spec.id} holds Auto's water-step count, so the water-step guard has no ceiling; prepare the subject once:\n  ${prepareLine(r.spec)}`);
   },
   toolsCheck: async (r, tools) => { try { resolveTools(tools, await baseOf(r)); } catch (e) { throw new Error(tidy(e.message)); } },
-  compile: (r, choice, script, plate) => compileChoice(r, choice, script, plate),
+  compile: (r, choice, script, plate, opts) => compileChoice(r, choice, script, plate, null, opts),
   look: (r, choice, script, plate, at, compiled, ask) => paintLook(r, choice, script, plate, at, null, compiled, { ...ask, sheetOnly: true }),
   paintChoice: (r, fin) => paintChoice(r, fin),
   // level 3: Auto's plan in numbers and its finished painting, prepared for this code (prepare --level L3); never made here

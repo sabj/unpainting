@@ -96,13 +96,13 @@ class Job:
             return self._content
 
 
-def jobs_for(paintings, originals, rubric, data_uri):
+def jobs_for(paintings, originals, rubric, data_uri, quality_mode="blind"):
     """Every job, painting by painting: Auto's first (the others are adjusted against it), each painting's three
     jobs, and its original's quality just after the first painting of it, so a painting can be complete early."""
     out, seen = [], set()
     for e in sorted(paintings, key=lambda e: not e.get("auto")):
         sid = e.get("original")
-        if sid in originals and sid not in seen:
+        if quality_mode == "blind" and sid in originals and sid not in seen:
             seen.add(sid)
             o = originals[sid]
             out.append(Job("original--" + sid, "single", [(o["target"], ONE_PX)], [R.SINGLE.format(style=o["style"])], ONE_CTX, ONE_TOKENS, R.parse_single, data_uri))
@@ -112,11 +112,17 @@ def jobs_for(paintings, originals, rubric, data_uri):
         said = "% of the finished picture on the sheet" if e.get("scheme") == "progress10" else "% complete"
         texts = [head + "\nOpening: the untouched paper (not scored)"] + [f"Snapshot {k + 1}: {p}{said}" for k, (_, p) in enumerate(snaps)]
         out.append(Job(e["id"], "sequence", [(e["opening"], SNAP_PX)] + [(f, SNAP_PX) for f, _ in snaps], texts, SEQ_CTX, SEQ_TOKENS, lambda raw, n=len(snaps): R.parse_sequence(raw, n), data_uri))
-        out.append(Job(e["id"], "single", [(e["painting"], ONE_PX)], [R.SINGLE.format(style=e["style"])], ONE_CTX, ONE_TOKENS, R.parse_single, data_uri))
+        if quality_mode == "anchored":
+            out.append(Job(e["id"], "single", [(e["target"], ONE_PX), (e["painting"], ONE_PX)],
+                           [R.QUALITY_ANCHORED.format(style=e["style"]) + "\nImage 1 (9.0/10 REFERENCE STANDARD):", "Image 2 (CANDIDATE PAINTING TO SCORE):"],
+                           ONE_CTX, ONE_TOKENS, R.parse_anchored, data_uri))
+        else:
+            out.append(Job(e["id"], "single", [(e["painting"], ONE_PX)], [R.SINGLE.format(style=e["style"])], ONE_CTX, ONE_TOKENS, R.parse_single, data_uri))
         out.append(Job(e["id"], "likeness", [(e["target"], ONE_PX), (e["painting"], ONE_PX)], [R.LIKENESS.format(style=e["style"]) + "\nThe original:", "The painting made of it:"], ONE_CTX, ONE_TOKENS, R.parse_likeness, data_uri))
-    for sid, o in originals.items():
-        if sid not in seen:
-            out.append(Job("original--" + sid, "single", [(o["target"], ONE_PX)], [R.SINGLE.format(style=o["style"])], ONE_CTX, ONE_TOKENS, R.parse_single, data_uri))
+    if quality_mode == "blind":
+        for sid, o in originals.items():
+            if sid not in seen:
+                out.append(Job("original--" + sid, "single", [(o["target"], ONE_PX)], [R.SINGLE.format(style=o["style"])], ONE_CTX, ONE_TOKENS, R.parse_single, data_uri))
     return out
 
 
@@ -214,6 +220,8 @@ def main(argv=None, judge=s04_judge, env=None, say=print):
     ap.add_argument("--fresh", action="store_true", help="read every picture again: no kept reading is reused (the new readings replace the kept ones)")
     ap.add_argument("--repeat", type=int, default=1, metavar="N", help="score the same paintings a further time, kept apart from repeat 1 (results-repeat-N.json, SCORES-repeat-N.md): for measuring the judges' noise")
     ap.add_argument("--concurrency", type=int, default=CONCURRENCY, metavar="N", help=f"hosted route: readings in flight at once for each judge, every judge at once (default {CONCURRENCY}). The local route holds one model at a time and reads one reading after another")
+    ap.add_argument("--quality-mode", default="blind", choices=R.QUALITY_MODES, help="quality judging mode: blind (0.4 single image vs original share) or anchored (0.5.1 reference=9.0 harsh craft scale, Q = 10 x overall)")
+    ap.add_argument("--combined-mode", default="weighted", choices=T.COMBINED_MODES, help="combined formula: weighted (0.4 2:1 H:Q) or gated (0.5.1 Q * min(1, H / 65))")
     a = ap.parse_args(argv)
     if a.repeat < 1:
         ap.error("--repeat is 1 or more")
@@ -260,7 +268,7 @@ def main(argv=None, judge=s04_judge, env=None, say=print):
     data_uri = lambda f, px: SP.data_uri(load_rgb(f), px)
     names = ("results.json", "SCORES.md") if a.repeat == 1 else (f"results-repeat-{a.repeat}.json", f"SCORES-repeat-{a.repeat}.md")
     done, written = set(), set()
-    whole = lambda e: {(e["id"], "sequence"), (e["id"], "single"), (e["id"], "likeness"), ("original--" + e["original"], "single")} <= done
+    whole = lambda e: ({(e["id"], "sequence"), (e["id"], "single"), (e["id"], "likeness")} | (set() if a.quality_mode == "anchored" else {("original--" + e["original"], "single")})) <= done
 
     def on_done(key, kind):
         # results.json and SCORES.md are rewritten as each painting completes, so a page can show the scores as they come
@@ -269,14 +277,14 @@ def main(argv=None, judge=s04_judge, env=None, say=print):
         if now and len(written) + len(now) < len(paintings):
             written.update(e["id"] for e in now)
             ready = [e for e in paintings if e["id"] in written]
-            res, faults = results(a, cfg, jrec, rubric, rubric_sha, ready, failed, {k: v for k, v in originals.items() if ("original--" + k, "single") in done}, got)
+            res, faults = results(a, cfg, jrec, rubric, rubric_sha, ready, failed, {k: v for k, v in originals.items() if a.quality_mode == "anchored" or ("original--" + k, "single") in done}, got)
             res["inProgress"] = {"paintingsScored": len(ready), "of": len(paintings), "note": "scoring is still running: this file is rewritten as each painting completes"}
             write(os.path.join(a.out, names[0]), json.dumps(res, indent=1))
             write(os.path.join(a.out, names[1]), T.markdown(res))
             say("so far", os.path.join(a.out, names[0]), f"{len(ready)} of {len(paintings)} paintings scored", flush=True)
 
     got = {}
-    read_all(jobs_for(paintings, originals, rubric, data_uri), cfg, judge, a.out, say, jrec=jrec, rubric_sha=rubric_sha, fresh=a.fresh, repeat=a.repeat, concurrency=a.concurrency, on_done=on_done, got=got)
+    read_all(jobs_for(paintings, originals, rubric, data_uri, quality_mode=a.quality_mode), cfg, judge, a.out, say, jrec=jrec, rubric_sha=rubric_sha, fresh=a.fresh, repeat=a.repeat, concurrency=a.concurrency, on_done=on_done, got=got)
     res, faults = results(a, cfg, jrec, rubric, rubric_sha, paintings, failed, originals, got)
     write(os.path.join(a.out, names[0]), json.dumps(res, indent=1))
     write(os.path.join(a.out, names[1]), T.markdown(res))
@@ -286,18 +294,24 @@ def main(argv=None, judge=s04_judge, env=None, say=print):
 
 def results(a, cfg, jrec, rubric, rubric_sha, paintings, failed, originals, got):
     """(the results document, its faults) for these paintings and originals from the readings in `got`."""
+    qmode = getattr(a, "quality_mode", "blind")
+    cmode = getattr(a, "combined_mode", "weighted")
+    crit = R.ANCHORED_CRITERIA if qmode == "anchored" else R.CRITERIA
     faults, rows = [], []
     for e in paintings:
         h = R.human(got[(e["id"], "sequence")], cfg["panel"], a.snapshots, bool(e["drawing"]))
-        q = R.quality(got[(e["id"], "single")], cfg["panel"])
+        q = R.quality(got[(e["id"], "single")], cfg["panel"], criteria=crit)
         lk = R.likeness(got[(e["id"], "likeness")], cfg["panel"])
         faults += [f"{e['id']}, human-ness: {x}" for x in h["faults"]] + [f"{e['id']}, quality: {x}" for x in q["faults"]] + [f"{e['id']}, likeness: {x}" for x in lk["faults"]]
         rows.append({**{k: e[k] for k in ("id", "label", "subject", "auto", "author", "level", "original", "commit", "folder", "painting", "target", "style", "classic", "usage")}, "failed": None,
                      "opening": e["opening"], "drawingFrame": {"file": e["drawing"][0], "pct": e["drawing"][1]} if e["drawing"] else None, "firstWash": e["firstWash"],
                      "snapshots": [{"file": f, "pct": p, **({"frame": e["frames"][k]} if k < len(e["frames"]) else {"finished": True})} for k, (f, p) in enumerate(e["snapshots"])], "human": h, "quality": q, "likeness": lk, "cheat": cheat_summary(e["cheat"])})
     for sid, o in originals.items():
-        o["quality"] = R.quality(got[("original--" + sid, "single")], cfg["panel"])
-        faults += [f"original of {sid}, quality: {x}" for x in o["quality"]["faults"]]
+        if qmode == "anchored":
+            o["quality"] = {"score": 9.0, "judges": {}, "criteria": None, "spread": 0.0, "anchored": True, "faults": []}
+        else:
+            o["quality"] = R.quality(got[("original--" + sid, "single")], cfg["panel"])
+            faults += [f"original of {sid}, quality: {x}" for x in o["quality"]["faults"]]
     # the failed runs: rows with no reading, counted as failures by the table and the summary
     none_h = {"percent": None, "meanOf5": None, "thirds": None, "perSnapshot": None, "drawing": None, "finished": None, "tells": {}, "yes": 0, "of": 0, "why": None, "judges": {}, "faults": []}
     for e in failed:
@@ -310,9 +324,13 @@ def results(a, cfg, jrec, rubric, rubric_sha, paintings, failed, originals, got)
             n = sum(1 for by in list(got.values()) for r in by.get(m, []) if r and r.get("reasoningTokens"))
             if n:
                 faults.append(f"{m} reasoned in {n} readings although the panel's reasoning setting is off: its figures are not read as the panel's other routes read them")
-    T.derive(rows, originals)
-    res = {"schema": "unpaint-bench/score04@1", "written": time.strftime("%Y-%m-%d %H:%M"), "series": SERIES + " " + SCHEME_NOTE[a.snapshots], "judge": jrec,
-           "rubric": {"path": os.path.relpath(RUBRIC, REPO), "sha256": rubric_sha}, "prompts": R.prompt_hashes(rubric, a.snapshots),
+    T.derive(rows, originals, quality_mode=qmode, combined_mode=cmode)
+    series = SERIES + " " + SCHEME_NOTE[a.snapshots]
+    if qmode == "anchored" or cmode == "gated":
+        series = f"0.5.1 series (qualityMode={qmode}, combinedMode={cmode}): NOT comparable with 0.4 or 0.5 blind scores. " + SCHEME_NOTE[a.snapshots]
+    res = {"schema": "unpaint-bench/score04@1", "written": time.strftime("%Y-%m-%d %H:%M"), "series": series, "judge": jrec,
+           "qualityMode": qmode, "combinedMode": cmode, "gateFloor": T.GATE_FLOOR if cmode == "gated" else None,
+           "rubric": {"path": os.path.relpath(RUBRIC, REPO), "sha256": rubric_sha}, "prompts": R.prompt_hashes(rubric, a.snapshots, quality_mode=qmode),
            "weights": dict(T.WEIGHTS), "readings": R.READINGS, "repeat": a.repeat, "fresh": bool(a.fresh), "snapshots": R.SCHEMES[a.snapshots]["count"], "snapshotScheme": {**R.SCHEMES[a.snapshots], "note": SCHEME_NOTE[a.snapshots]}, "pictureLongSidePx": {"stills": SNAP_PX, "alone": ONE_PX, "likeness": ONE_PX}, "faults": faults, "failedRuns": [{"id": e["id"], "subject": e["subject"], "author": e["author"], "level": e["level"], "why": e["failed"]} for e in failed], "originals": originals, "paintings": rows}
     return res, faults
 

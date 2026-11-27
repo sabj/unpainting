@@ -22,8 +22,8 @@ import { labOf } from '../../src/eval/colour.mjs';
 
 /** Kinds of named form that take rounds only, and the widest round allowed inside them (mm). */
 const LIVING = new Set(['face', 'eye', 'animal', 'fur', 'figure', 'hair', 'clothing']), MOST_ROUND_MM = 17;
-/** A passage is "in" a form when this share of its footprint lies on it; a form is judged when it has this many cells. */
-const IN_FORM_SHARE = 0.1, FORM_LEAST_CELLS = 50;
+/** A passage is "in" a form when this share of its footprint lies on it (0.5 avoids false alarms when a 38mm sky/background mop clips a figure's edge); a form is judged when it has this many cells. */
+const IN_FORM_SHARE = 0.5, FORM_LEAST_CELLS = 50;
 /** A form's mean lightness may differ from the study's by this much (L*), and its darks by this much, before it is marked. */
 const MEAN_L_OFF = 6, DARK_L_OFF = 10;
 
@@ -93,12 +93,13 @@ export function formsTableDried(study, plan, dried) {
 }
 
 /** The table the author reads: one line a passage, with the faults a number can show said in capitals. */
-export function numbersTable(rows, covered = {}) {
+export function numbersTable(rows, covered = {}, { hideForms = false } = {}) {
   return rows.map(r => {
-    const forms = covered[r.id] ?? [], living = forms.filter(f => LIVING.has(f.kind) && f.share >= IN_FORM_SHARE), flags = [];
+    const forms = hideForms ? [] : (covered[r.id] ?? []), living = forms.filter(f => LIVING.has(f.kind) && f.share >= IN_FORM_SHARE), flags = [];
     if (r.brushMm > MOST_ROUND_MM + 0.01 && living.length) flags.push(`BRUSH OVER ${MOST_ROUND_MM} mm IN ${living.map(f => `${f.name} (${Math.round(100 * f.share)}% of its footprint)`).join(', ')}`);
     if (!r.strokes) flags.push('NOTHING LAID');
-    return `${r.id} | stage ${r.stage ?? '?'} | brush ${r.brushMm || '?'} mm | ${r.strokes} strokes | ${Math.round(r.areaMm2)} mm2 | ${r.move ?? '?'} | ${r.L != null ? `the sheet there after it: L* ${Math.round(r.L)}, rgb ${r.rgb?.join('/')}` : 'value not computed'}${r.charges ? ` | ${r.charges} charges` : ''} | covers ${forms.slice(0, 4).map(f => `${f.name} ${Math.round(100 * f.share)}%`).join(', ') || 'no named form'} | ${r.what.slice(0, 70)}${flags.length ? ` | !! ${flags.join('; ')}` : ''}`;
+    const covCol = hideForms ? '' : ` | covers ${forms.slice(0, 4).map(f => `${f.name} ${Math.round(100 * f.share)}%`).join(', ') || 'no named form'}`;
+    return `${r.id} | stage ${r.stage ?? '?'} | brush ${r.brushMm || '?'} mm | ${r.strokes} strokes | ${Math.round(r.areaMm2)} mm2 | ${r.move ?? '?'} | ${r.L != null ? `the sheet there after it: L* ${Math.round(r.L)}, rgb ${r.rgb?.join('/')}` : 'value not computed'}${r.charges ? ` | ${r.charges} charges` : ''}${covCol} | ${r.what.slice(0, 70)}${flags.length ? ` | !! ${flags.join('; ')}` : ''}`;
   });
 }
 

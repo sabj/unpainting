@@ -39,35 +39,41 @@ async function world(dir) {
 }
 const read = (out, f) => fs.readFileSync(path.join(out, 'author', f), 'utf8');
 
-test('the levels in fixed rounds with the stand-in: L2 the studies and traced shapes, no Auto; L3 and Auto\'s plan and painting; L1 by itself; no level handed another\'s result', async () => {
+test('the levels in fixed rounds with the stand-in (Option A): L2 visual studies only (no drawing/forms/shapes); L3 opt-in drawing + forms + shapes + Auto; L1 bare', async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'rounds-ladder-'));
   try {
     const w = await world(dir), out = l => path.join(dir, l);
-    // level 2: the subject, the drawing, the studies and the traced shapes go out once; the forms as names and boxes, never their picture; nothing of Auto
+    // level 2 (Option A): the subject and colour studies ONLY; no prepared drawing, no named forms, no traced shapes, nothing of Auto; prepared drawing forced off
     const r2 = w.run('L2', out('L2')), x2 = w.lent('L2'); await roundsRun(r2, x2);
     const k2 = JSON.parse(read(out('L2'), 'rounds.json')), p2 = read(out('L2'), 'rounds-prompt.txt');
-    assert.deepEqual(k2.picturesGiven, ['source.jpg', 'drawing.jpg', 'study-1.jpg', 'study-2.jpg', 'traced-shapes.jpg']); assert.doesNotMatch(p2, /forms\.png|forms picture/); assert.match(p2, /1\. cat face \(face\): box x 40 to 80, y 60 to 100 mm/);
-    assert.match(p2, /## Data: traced shapes[\s\S]*\n1, #c89664, 900 mm², box 30-60,40-70\n/); assert.doesNotMatch(p2, /\n2, #/, 'a shape too small to be numbered is not listed'); assert.ok(p2.indexOf('## Data: traced shapes') > p2.indexOf('## Appendix C')); assert.match(p2, /may cut across a form/); assert.match(p2, /`traced-shapes\.jpg`, TRACED SHAPES: .* px per mm\./);
-    assert.equal(x2.seen.autoAsked, undefined, 'L2 asks for nothing of Auto'); assert.doesNotMatch(p2, /auto-painting|Auto's plan|CODE PLANNER'S PLAN|your-previous-painting|YOUR PREVIOUS SCRIPT/); assert.equal(r2.record.author.autoHanded, undefined);
+    assert.deepEqual(k2.picturesGiven, ['source.jpg', 'study-1.jpg', 'study-2.jpg']);
+    assert.doesNotMatch(p2, /drawing\.jpg|forms\.png|forms picture|cat face|traced-shapes|auto-painting|Auto's plan|CODE PLANNER'S PLAN|your-previous-painting|YOUR PREVIOUS SCRIPT/);
+    assert.match(p2, /Three colour studies are given for visual value and colour reference/);
+    assert.ok(x2.seen.compiled.every(c => c.choice.tools.medium === 'none'), 'L2 never lays the prepared drawing');
+    assert.equal(x2.seen.final.choice.tools.medium, 'none');
+    assert.equal(x2.seen.autoAsked, undefined, 'L2 asks for nothing of Auto'); assert.equal(r2.record.author.autoHanded, undefined);
     assert.match(p2, /fixed rounds/); assert.doesNotMatch(p2, /LOOKS_MOST|LOOKS_WHOLE/); assert.match(p2, /3 look units for this try, enough for 10 looks of the whole script/);
     assert.deepEqual([r2.record.author.brief.version, r2.record.author.brief.sha256.length], [BRIEF_VERSION, 64]);
     assert.equal(k2.ended, 'done'); assert.deepEqual(k2.rounds.map(q => q.kind), ['script', 'edits', 'edits', 'done']);
-    // a look sends back the sheet only, with the sheet's own numbers
-    assert.deepEqual(k2.rounds[1].sent.images, ['looks/1/sheet.jpg']); assert.match(k2.rounds[1].sent.text, /THE SHEET AS IT DRIED/); assert.doesNotMatch(k2.rounds[1].sent.text, /TOO DARK|TOO PALE|study/i);
+    // a look sends back the sheet only, with the sheet's own numbers and no named-form leak
+    assert.deepEqual(k2.rounds[1].sent.images, ['looks/1/sheet.jpg']); assert.match(k2.rounds[1].sent.text, /THE SHEET AS IT DRIED/); assert.doesNotMatch(k2.rounds[1].sent.text, /TOO DARK|TOO PALE|study|named forms/i);
     assert.ok(x2.seen.looks.every(l => l.ask.until === 1 || l.ask.until == null)); assert.equal(x2.seen.looks.length, 3);
     // the record: a session-shaped record cli.mjs writes usage.json from, and the transcript; no previous level, no ladder
     const s2 = r2.record.author.session;
     assert.deepEqual([s2.work, s2.level, s2.looks.length, s2.editRounds, s2.rewrites, s2.submitted.kind, s2.ladder, s2.previousLevel], ['rounds', 'L2', 3, 2, 0, 'script', null, null]);
     assert.ok(r2.record.author.tokenSplit.reported && r2.record.author.tokensOut > 0); assert.ok(s2.rounds.every(q => q.tokens && q.seconds != null));
-    for (const f of ['rounds.md', 'folder/script.json', 'folder/choice.json', 'looks/2/numbers.txt', 'sent/source.jpg', 'sent/traced-shapes.jpg']) assert.ok(fs.existsSync(path.join(out('L2'), 'author', f)), f);
-    // the shape named by number reaches the painter as its outline, and the share of washes that reuse a shape is recorded
-    assert.deepEqual(x2.seen.final.script.passages.find(p => p.id === 's1').regions, [[[30, 40], [60, 40], [60, 70], [30, 70]]]);
-    assert.deepEqual(r2.record.author.session.shapeReuse, { passages: 5, reuse: 1, share: 0.2 }); assert.deepEqual(JSON.parse(read(out('L2'), 'folder/script.json')).passages.find(p => p.id === 's1').shapes, [1]);
-    // level 3: a fresh conversation with L2's inputs and Auto's plan in numbers and Auto's finished painting; nothing of the model's own L2
+    for (const f of ['rounds.md', 'folder/script.json', 'folder/choice.json', 'looks/2/numbers.txt', 'sent/source.jpg', 'sent/study-1.jpg']) assert.ok(fs.existsSync(path.join(out('L2'), 'author', f)), f);
+    // level 3 (Option A): full packet (opt-in prepared drawing, named forms, traced shapes, Auto plan & painting); blank paper unless script opts in
     const r3 = w.run('L3', out('L3')), x3 = w.lent('L3'); await roundsRun(r3, x3);
     const k3 = JSON.parse(read(out('L3'), 'rounds.json')), p3 = read(out('L3'), 'rounds-prompt.txt');
     assert.deepEqual(k3.picturesGiven, ['source.jpg', 'drawing.jpg', 'study-1.jpg', 'study-2.jpg', 'traced-shapes.jpg', 'auto-painting.jpg']); assert.equal(x3.seen.autoAsked, 1);
+    assert.match(p3, /1\. cat face \(face\): box x 40 to 80, y 60 to 100 mm/);
+    assert.match(p3, /## Data: traced shapes[\s\S]*\n1, #c89664, 900 mm², box 30-60,40-70\n/); assert.doesNotMatch(p3, /\n2, #/, 'a shape too small to be numbered is not listed'); assert.ok(p3.indexOf('## Data: traced shapes') > p3.indexOf('## Appendix C')); assert.match(p3, /may cut across a form/); assert.match(p3, /`traced-shapes\.jpg`, TRACED SHAPES: .* px per mm\./);
     assert.match(p3, /### Auto's plan/); assert.match(p3, /`auto-painting\.jpg`, AUTO'S PAINTING: the finished painting of this subject by Auto/); assert.match(p3, /THE CODE PLANNER'S PLAN IN NUMBERS\n121 washes/); assert.match(p3, /cannot be handed in/);
+    assert.match(p3, /prepared drawing is optional and OFF by default/);
+    assert.equal(x3.seen.final.choice.tools.medium, 'none', 'L3 defaults to blank paper unless script explicitly opts into prepared drawing');
+    assert.deepEqual(x3.seen.final.script.passages.find(p => p.id === 's1').regions, [[[30, 40], [60, 40], [60, 70], [30, 70]]]);
+    assert.deepEqual(r3.record.author.session.shapeReuse, { passages: 5, reuse: 1, share: 0.2 }); assert.deepEqual(JSON.parse(read(out('L3'), 'folder/script.json')).passages.find(p => p.id === 's1').shapes, [1]);
     assert.doesNotMatch(p3, /your-previous-painting|YOUR PREVIOUS SCRIPT|level L2\)/); assert.equal(k3.lookUnits.budget, 3); assert.equal(r3.record.author.previousTry, undefined); assert.equal(r3.record.author.session.ladder, null);
     assert.deepEqual(r3.record.author.autoHanded, { plan: true, painting: true, from: 'prepared/x', paintingSha256: 'a1', planSha256: 'b2' });
     // the brief is the same text at every level outside its marked level block (no added coaching)

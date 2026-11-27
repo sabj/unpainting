@@ -93,9 +93,28 @@ ink        "waterproof" | "soluble"                      the pen's ink
 lines      {"format": "lines-edit 1", "own": [{"points": [[x, y], ...], "medium": "pen" | "pencil", "widthMm": <mm>, "dark": <0..1>, "when": "before" | "after"}, ...]}
 ```
 
-## One example passage
+## Two example passages
 
-A neutral example of the format, not of this subject: every field in it is one the painter reads.
+Neutral examples of the format, not of this subject: every field is one the painter reads.
+
+1. Broad wet-in-wet sky/background with a `38 mm` flooded mop, followed immediately by a damp `into` colour drop (no dry overlap stripes, soft luminous transitions):
+
+```json
+[
+  { "id": "p01", "what": "example: broad flooded mop wet sky wash", "stage": 1, "kind": "wash",
+    "brush": "mop", "paper": "wet", "edges": "lost",
+    "region": [[6, 6], [274, 6], [274, 96], [6, 96]],
+    "paint": { "pigments": { "cerulean": 2, "ultramarine": 1 }, "dilution": "pale", "swatch": "#b9cfe3" },
+    "handling": { "direction": 0, "load": "flooded", "speed": "fast", "hold": "side", "start": "belly" } },
+  { "id": "p02", "what": "example: soft cloud shadow dropped wet-in-wet into p01", "stage": 1, "kind": "wash",
+    "brush": "flat", "into": "p01", "wait": "damp", "paper": "damp", "edges": "lost",
+    "region": [[90, 32], [230, 28], [225, 68], [85, 72]],
+    "paint": { "pigments": { "ultramarine": 2, "rose": 1, "sienna": 1 }, "dilution": "medium", "swatch": "#8b8ca6" },
+    "handling": { "direction": -6, "load": "loaded", "speed": "medium", "hold": "side" } }
+]
+```
+
+2. Shaped dry strokes (written point by point, placed by start/direction, or along a traced shape):
 
 ```json
 { "id": "p07", "what": "example: three strokes in one passage", "stage": 3, "kind": "strokes",
@@ -109,10 +128,7 @@ A neutral example of the format, not of this subject: every field in it is one t
   ] }
 ```
 
-The first stroke is written point by point: a curve of six points with a pressure at each and the hand's speed at
-five. The second is placed by its start, direction and length and laid as the named mark `comma` with brush `r4`. The
-third runs down traced shape 12's long axis with brush `r4` (only where traced shapes are given). `r10` and `r4` are
-brushes the script names in `brushes`.
+In Example 1, `p01` wets its own footprint first and glides across in broad flooded passes (`mop` at `38 mm`), and `p02` drops into the still-damp sheet (`into: "p01"`, `wait: "damp"`) so the two hues merge softly without hard stripes. In Example 2, the first stroke is written point by point with pressure and speed, the second is placed by start/direction/length as a `comma` mark with `r4`, and the third runs down traced shape 12's long axis (only where traced shapes are given). `mop`, `flat`, `r10` and `r4` are brushes the script names in `brushes`.
 
 ## Budget and rules
 
@@ -133,12 +149,18 @@ brushes the script names in `brushes`.
 
 The tips are painters' practice, given at every level alike. None of it is checked; any of it may be set aside.
 
-Brushes:
+Brushes and wet-in-wet washes:
 
-- Sky, background, ground and water: large soft washes with the big brushes (the mop, the flat).
-- Inside a face, a figure, an animal, fur, hair or clothing: rounds, seldom wider than 17 mm. A base wash with the 17,
-  13 or 10 mm round (17 for a form wider than about 60 mm); shapes dropped into it with the 10 or 7 mm; glazes with
-  the 13, 10 or 7 mm; crisp marks with the 3 mm or the rigger.
+- Broad connected areas (sky, background, ground, water, or an initial light veil across a large passage): reach for the
+  `38 mm` mop or `25.4 mm` flat where it fits, laid on wet paper (`paper: "wet"`, `edges: "lost"`, `load: "flooded"`).
+  A narrow brush on dry paper turns a big sky or background into visible stripes and hard seams; a flooded mop on wet
+  paper lays one seamless, luminous wash.
+- Wet-in-wet gradients and colour shifts: instead of one flat monotone wash, immediately chain a second wash or shaped
+  strokes into it while damp (`into: "<prev id>"`, `wait: "damp"`, `paper: "damp"`, `edges: "lost"`). This is the
+  cleanest way to build soft clouds, atmospheric depth, sunlit-to-shadow transitions, and glowing fur or foliage masses.
+- Inside faces, animals, figures, or narrow features where precision or reserved lights need control: use rounds of
+  `17 mm` or less (17, 13 or 10 mm for a base wash; 10 or 7 mm for damp drops and glazes; 3 mm or the rigger for crisp
+  accents).
 
 One way to paint a soft form (a face, fur, an animal, hair, a figure, clothing; the sky or background as one form):
 

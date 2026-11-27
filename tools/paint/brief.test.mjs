@@ -33,8 +33,18 @@ test('the brief: every placeholder filled, the same outside the level block at e
   assert.doesNotMatch(withoutLevel(l1.text).replace(tips(l1.text), ''), /usually|advice|tends to|good painters|what has worked|is for the few|read(s)? (well|badly)/i);
 });
 
-test('the example passage is a passage the parser takes: a curved stroke with pressures and speeds, a placed stroke laid as its mark, a stroke along a shape, per-stroke brushes', () => {
-  const text = fs.readFileSync(BRIEF_FILE, 'utf8'), example = JSON.parse(/## One example passage[\s\S]*?```json\n([\s\S]*?)```/.exec(text)[1]);
+test('the example passages are passages the parser takes: flooded mop wet-in-wet + damp into, and shaped dry strokes', () => {
+  const text = fs.readFileSync(BRIEF_FILE, 'utf8');
+  const blocks = [...text.slice(text.indexOf('## Two example passages')).matchAll(/```json\n([\s\S]*?)```/g)].map(m => JSON.parse(m[1]));
+  assert.ok(blocks.length >= 2, 'two JSON examples in BRIEF.md');
+  // Example 1: 38mm flooded mop wet-in-wet + damp into drop
+  const mopScript = { format: 'painting-script 2', sheet: { widthMm: 280, heightMm: 180 }, palette: ['cerulean', 'ultramarine', 'rose', 'sienna'], brushes: { mop: { shape: 'round', widthMm: 38 }, flat: { shape: 'flat', widthMm: 25.4 } }, passages: blocks[0] };
+  const checkedMop = checkAuthored(mopScript, { sheetWidthMm: 280 }).script;
+  assert.equal(checkedMop.passages.length, 2);
+  assert.equal(checkedMop.passages[0].paper, 'wet'); assert.equal(checkedMop.passages[1].into, 'p01'); assert.equal(checkedMop.passages[1].wait, 'damp');
+  assert.ok(passageStrokes(checkedMop.passages[0], checkedMop.brushes, 1).length > 0);
+  // Example 2: shaped strokes
+  const example = blocks[1];
   const script = { format: 'painting-script 2', sheet, palette: ['ultramarine', 'sienna'], brushes: { r10: { shape: 'round', widthMm: 10 }, r4: { shape: 'round', widthMm: 3 } }, passages: [example] };
   const shapes = { shapes: Array.from({ length: 12 }, (_, i) => ({ n: i + 1, polygons: [[[100, 60], [110, 60], [112, 120], [102, 120]]] })) };
   assert.throws(() => checkAuthored(script, { sheetWidthMm: 200 }), /name study shapes by number/, 'without traced shapes `along` is refused');

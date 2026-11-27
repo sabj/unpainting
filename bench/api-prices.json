@@ -37,6 +37,14 @@
    "output": 50,
    "verified": "2026-11-24"
   },
+  "gpt-6.2-astra": {
+   "label": "Codex Astra 6.2",
+   "source": "OpenRouter / OpenAI list pricing, 2026-11-26",
+   "input": 8,
+   "cachedInput": 0.8,
+   "output": 40,
+   "verified": "2026-11-26"
+  },
   "gpt-6-luna": {
    "label": "Codex Luna",
    "source": "https://developers.openai.com/api/docs/pricing",

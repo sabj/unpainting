@@ -10,6 +10,8 @@ Anti-cheat, the algorithmic measurements and usage are shown beside, never blend
 """
 
 WEIGHTS = {"humanness": 2, "quality": 1}
+GATE_FLOOR = 65.0
+COMBINED_MODES = ("weighted", "gated")
 TELL = {"a": "speckle for lines", "b": "cut wash edges", "c": "flat slabs", "d": "feature before its form", "e": "whole sheet faint",
         "f": "a region arriving finished", "g": "a wipe", "h": "nothing changes", "i": "lines that do not describe", "j": "texture dumped late"}
 
@@ -20,19 +22,25 @@ def headroom_adjusted(x, auto, top):
     return (x - auto) / max(top - auto, top / 5)
 
 
-def combined(h, q, w=WEIGHTS):
+def combined(h, q, w=WEIGHTS, mode="weighted", gate=GATE_FLOOR):
     if h is None or q is None:
         return None
+    if mode == "gated":
+        return q * min(1.0, max(0.0, h) / float(gate))
     return (w["humanness"] * h + w["quality"] * q) / (w["humanness"] + w["quality"])
 
 
-def derive(paintings, originals, w=WEIGHTS):
+def derive(paintings, originals, w=WEIGHTS, quality_mode="blind", combined_mode="weighted", gate=GATE_FLOOR):
     """Adds share, combined and the Auto adjustment to each painting (in place) and returns them."""
     for p in paintings:
-        o = (originals.get(p.get("original") or p["subject"]) or {}).get("quality", {}).get("score")
         q = p["quality"]["score"]
-        p["share"] = 100 * q / o if q is not None and o else None
-        p["combined"] = combined(p["human"]["percent"], p["share"], w)
+        if quality_mode == "anchored":
+            p["share"] = 10.0 * q if q is not None else None
+        else:
+            o = (originals.get(p.get("original") or p["subject"]) or {}).get("quality", {}).get("score")
+            p["share"] = 100 * q / o if q is not None and o else None
+        p["combined"] = combined(p["human"]["percent"], p["share"], w, mode=combined_mode, gate=gate)
+        p["deltaAuto"] = None
     for p in paintings:
         autos = [a for a in paintings if a["auto"] and a["subject"] == p["subject"]]
         if p.get("failed"):
@@ -45,6 +53,8 @@ def derive(paintings, originals, w=WEIGHTS):
             p["adjusted"] = {"auto": None, "note": f"{len(autos)} Auto paintings of {p['subject']} among the inputs; the adjustment needs exactly one"}
         else:
             a = autos[0]
+            if p["combined"] is not None and a["combined"] is not None:
+                p["deltaAuto"] = round(p["combined"] - a["combined"], 2)
             p["adjusted"] = {"auto": a["id"], "note": None,
                              "humanness": headroom_adjusted(p["human"]["percent"], a["human"]["percent"], 100),
                              "quality": headroom_adjusted(p["quality"]["score"], a["quality"]["score"], 10),

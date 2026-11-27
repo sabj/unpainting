@@ -9,7 +9,7 @@ import crypto from 'node:crypto';
 import sharp from 'sharp';
 import { seenAsk } from './seen.mjs';
 
-export const BRIEF_VERSION = 'brief 3';
+export const BRIEF_VERSION = 'brief 4';
 export const BRIEF_FILE = path.join(path.dirname(new URL(import.meta.url).pathname), 'BRIEF.md');
 /** The marks round the level block and the level data: everything outside them is the same text at every level. */
 export const LEVEL_START = '<!-- LEVEL BLOCK -->', LEVEL_END = '<!-- END LEVEL BLOCK -->';
@@ -31,7 +31,7 @@ export function pictureOf(name, { medium, studies }) {
   if (st) return [`STUDY ${st[1]}`, `${studies[st[1] - 1]?.role ?? 'study'}: the subject simplified into flat shapes, lights left as paper (the studies run coarse to fine).`];
   return ({
     source: ['SUBJECT', 'the picture to paint.'],
-    drawing: ['DRAWING', `the ${medium} drawing laid on the sheet before the first wash. \`"medium"\` replaces it (\`"none"\`: no drawing).`],
+    drawing: ['DRAWING', `the optional prepared ${medium} drawing (OFF by default — the sheet starts blank unless you set \`"medium": "${medium}"\` or select lines in \`"lines"\`).`],
     forms: ['NAMED FORMS', 'each named form of the subject as one flat colour.'],
     'traced-shapes': ['TRACED SHAPES', 'study 1\'s flat shapes traced into outlines, each in its colour, the larger ones numbered. A passage may name them by number (`shapes`, `reserve`, `along`). A traced edge may cut across a form or miss one.'],
     'auto-painting': ['AUTO\'S PAINTING', 'the finished painting of this subject by Auto, this project\'s automatic painter, as it dried at full size.'],

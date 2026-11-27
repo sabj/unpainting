@@ -593,7 +593,7 @@ export function museFiles(home) {
   const program = at ? fs.readdirSync(at).filter(f => /^\.?muse/.test(f)).map(f => path.join(at, f)) : [];
   const settings = path.join(home, '.config', 'muse'), data = path.join(home, '.local', 'share', 'muse'), signIn = [settings, path.join(home, 'Library', 'Keychains')];
   return { readable: [...new Set([...program, ...signIn])], write: [settings, data], signIn, sessions: path.join(data, 'sessions'), env: { MUSE_NO_AUTO_UPDATE: '1' },
-    metadata: [...new Set([...(at ? [at, path.dirname(at)] : []), path.join(home, '.config'), path.join(home, '.local'), path.join(home, '.local', 'share'), home])] };
+    metadata: [...new Set([...(at ? [at, path.dirname(at)] : []), path.join(home, '.config'), path.join(home, '.local'), path.join(home, '.local', 'share'), home, path.dirname(home)])] };
 }
 
 /** The folder Muse keeps a session's log in (its data folder: sessions/<year>/<month>/<day>/<session id>), or null while there is none. */

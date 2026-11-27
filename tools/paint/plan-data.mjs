@@ -12,7 +12,7 @@ import { gridImage } from './author.mjs';
 import { passageNumbers, formsCovered, formValues, formsTable, formsTableDried, numbersTable, onGrid } from './step-back.mjs';
 
 /** Kinds of named form that take rounds only, and the widest round inside them (mm), as the step back marks them. */
-const LIVING = new Set(['face', 'eye', 'animal', 'fur', 'figure', 'hair', 'clothing']), MOST_ROUND_MM = 17, IN_FORM_SHARE = 0.1;
+const LIVING = new Set(['face', 'eye', 'animal', 'fur', 'figure', 'hair', 'clothing']), MOST_ROUND_MM = 17, IN_FORM_SHARE = 0.5;
 
 function boxOf(q) {
   let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
@@ -84,17 +84,17 @@ export async function beside(images, { height = 900, gap = 16 } = {}) {
  * Reads the plan preview only for the form table. With `painting` (the dried sheet of a look's painting) the form
  * table sets the DRIED sheet against the study and the plan (formsTableDried) and `dried` is true.
  */
-export async function planNumbers({ plate, planPreview, run, script = null, painting = null }) {
+export async function planNumbers({ plate, planPreview, run, script = null, painting = null, hideForms = false }) {
   const plan = JSON.parse(fs.readFileSync(path.join(plate, 'value-plan.json'), 'utf8')), rows = planRows(plan), W = run.sheet.widthMm;
   const study = run.studies[Math.min(1, run.studies.length - 1)];
   let formTable = [], covered = {};
-  if (run.masks?.mask && planPreview) {
+  if (!hideForms && run.masks?.mask && planPreview) {
     const { data, info } = await sharp(run.masks.mask).greyscale().raw().toBuffer({ resolveWithObject: true }), mask = { data, width: info.width, height: info.height };
     const inStudy = formValues(await onGrid(study.abs, mask), mask, run.masks.forms), inPlan = formValues(await onGrid(planPreview, mask), mask, run.masks.forms);
     formTable = painting ? formsTableDried(inStudy, inPlan, formValues(await onGrid(painting, mask), mask, run.masks.forms)) : formsTable(inStudy, inPlan);
     if (script) covered = formsCovered(plan, mask, run.masks.forms, W);
   }
-  const table = script ? numbersTable(passageNumbers(plan, script), covered) : rowsTable(rows);
+  const table = script ? numbersTable(passageNumbers(plan, script), covered, { hideForms }) : rowsTable(rows);
   return { summary: planSummary(plan), rows, table, formTable, dried: Boolean(painting), marked: { washes: table.filter(l => l.includes('!!')).length, forms: formTable.filter(l => l.includes('!!')).length } };
 }
 

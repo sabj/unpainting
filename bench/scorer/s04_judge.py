@@ -23,7 +23,7 @@ READINGS_LABEL = "3x"
 # reading, 23 Nov 2026: a whole batch came back without a score). OpenRouter: reasoning effort "low", with room for
 # the thinking beside the answer; local: Ollama's think "low". SENT is what each setting sends on each route.
 REASONING = "low"
-SENT = {"off": {"effort": "none", "think": False}, "low": {"effort": "low", "think": "low"}}
+SENT = {"off": {"effort": "none", "think": False}, "low": {"effort": "low", "think": "low"}, "medium": {"effort": "medium", "think": "medium"}}
 # What a judge is asked before a batch is read (probe): one short answer, no picture.
 PROBE = 'Answer with exactly this JSON object and nothing else: {"ok": true}'
 HOSTED = {"together": ("https://api.together.xyz/v1/chat/completions", "TOGETHER_API_KEY"),
@@ -36,6 +36,10 @@ PANELS = {
               "openrouter": {"zai-org/GLM-5.3-Flash": "z-ai/glm-5.3-flash", "Qwen/Qwen3.8-27B": "qwen/qwen3.8-27b", "google/gemma-4-31b-it": "google/gemma-4-31b-it"},
               # GLM-5.3-Flash has no local tag here: name the one the server holds in JUDGE_LOCAL_TAGS
               "local": {"Qwen/Qwen3.8-27B": "qwen3.8:27b-mlx", "google/gemma-4-31b-it": "gemma4:31b-mlx"}},
+    "open3v2": {"what": "the 0.5.1 panel: GLM-5.3-Flash, Kimi-K3.1-Pro and Gemma-4-31B at medium reasoning, zero data retention",
+                "reasoning": "medium",
+                "models": ("zai-org/GLM-5.3-Flash", "moonshotai/Kimi-K3.1-Pro", "google/gemma-4-31b-it"),
+                "openrouter": {"zai-org/GLM-5.3-Flash": "z-ai/glm-5.3-flash", "moonshotai/Kimi-K3.1-Pro": "moonshotai/kimi-k3.1-pro", "google/gemma-4-31b-it": "google/gemma-4-31b-it"}},
     "j1": {"what": "the J1 panel of the V1 to V5 rounds (score_painting.py), hosted only",
            "models": ("moonshotai/Kimi-K3", "zai-org/GLM-5.3-Flash", "Qwen/Qwen3.5-9B"),
            "openrouter": {"moonshotai/Kimi-K3": "moonshotai/kimi-k3", "zai-org/GLM-5.3-Flash": "z-ai/glm-5.3-flash", "Qwen/Qwen3.5-9B": "qwen/qwen3.5-9b"},
@@ -90,7 +94,10 @@ def settings(env=None):
             raise RouteError(f"the {name} panel cannot be read on the {route} route: it has no name there for {', '.join(short)}. " +
                              ("Pull the model on the judge server and name its tag in JUDGE_LOCAL_TAGS (judge=tag), or use JUDGE_ROUTE=openrouter. " if route == "local" else "") +
                              "Another panel must be asked for by name (JUDGE_PANEL); none stands in.")
-    label = f"{name}-{route}-{READINGS_LABEL}"
+    reasoning = env.get("JUDGE_REASONING") or (PANELS[name].get("reasoning") if name in PANELS else None) or REASONING
+    if reasoning not in SENT:
+        raise RouteError(f"JUDGE_REASONING must be one of {', '.join(SENT)}, not {reasoning!r}")
+    label = f"{name}-{route}-{READINGS_LABEL}" + (f"-{reasoning}" if reasoning != REASONING and name == "open3" else "")
     if route == "local":
         try:
             cfg = local_route.settings({**env, **({"JUDGE_LOCAL_PANEL": ",".join(names[m] for m in models)} if models else {})})
@@ -98,10 +105,10 @@ def settings(env=None):
             raise RouteError(str(e)) from None
         if models is None:
             models, names = list(cfg["panel"]), {m: m for m in cfg["panel"]}
-        return {**cfg, "panel": models, "names": names, "panelName": name, "reasoning": REASONING, "route": "local", "label": label}
+        return {**cfg, "panel": models, "names": names, "panelName": name, "reasoning": reasoning, "route": "local", "label": label}
     url, key_name = HOSTED[route]
     return {"route": route, "label": label, "url": url, "host": url.split("/")[2], "panel": models, "names": names, "panelName": name,
-            "reasoning": REASONING, "keyName": key_name, "env": env}
+            "reasoning": reasoning, "keyName": key_name, "env": env}
 
 
 def sent_name(cfg, model):
