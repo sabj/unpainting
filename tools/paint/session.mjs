@@ -495,7 +495,7 @@ export function seatbelt({ deny, write, cwd, ownDirs = [], local = false, gated 
   // gated: nothing goes out but to this machine's loopback, where the session's gate (session-net.mjs) passes the
   // model's own service only; readable: folders read again after the denials (the toolbox's Python)
   // other sessions' folders, by name: a working session's (unpaint-session-), its isolated home (unpaint-iso-) and a level 1 attempt's (unpaint-bench-)
-  const closedOff = `(deny file-read* file-write* ${deny.map(d => `(subpath ${q(d)})`).join(' ')} (regex #"/unpaint-session-") (regex #"/unpaint-iso-") (regex #"/unpaint-bench-"))`;
+  const closedOff = `(deny file-read* file-write* ${deny.map(d => `(subpath ${q(d)})`).join(' ')} (regex #"/unpaint-session-") (regex #"/unpaint-bench-") (regex #"/unpaint-iso-"))`;
   return ['(version 1)', '(allow default)',
     '(deny file-write*)', `(allow file-write* ${write.map(d => `(subpath ${q(d)})`).join(' ')} (literal "/dev/null") (literal "/dev/dtracehelper") (regex #"^/dev/tty"))`,
     closedOff,
@@ -583,7 +583,13 @@ export function sessionCall(author, { prompt, cwd, deny = [], images = [], home 
     const own = museFiles(home), id = crypto.randomUUID(), signIn = gate ? own.signIn : [];
     const museDataRoot = isoHome ? path.join(isoHome, 'data') : path.join(home, '.local', 'share');
     const museSessions = path.join(museDataRoot, 'muse', 'sessions');
-    if (isoHome) fs.mkdirSync(museSessions, { recursive: true });
+    if (isoHome) {
+      fs.mkdirSync(museSessions, { recursive: true });
+      // Symlink ~/Library/Keychains into isoHome so macOS Keychain lookup works under isolated HOME without exposing ~/.agents/skills
+      fs.mkdirSync(path.join(isoHome, 'Library'), { recursive: true });
+      const kcLink = path.join(isoHome, 'Library', 'Keychains');
+      if (!fs.existsSync(kcLink)) fs.symlinkSync(path.join(home, 'Library', 'Keychains'), kcLink);
+    }
     const museWrite = isoHome ? [isoHome, path.join(home, '.config', 'muse')] : own.write;
     const museEnv = isoHome
       ? { ...own.env, HOME: isoHome, XDG_CONFIG_HOME: path.join(home, '.config'), XDG_DATA_HOME: museDataRoot }
