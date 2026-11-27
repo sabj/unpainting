@@ -11,7 +11,7 @@ export function createOperationsUI(sheet, send) {
  const status=document.createElement('span');status.id='mask-status';
  controls.append(label,remove,boundary,status);document.getElementById('replay-controls').after(controls);
  const timeline=document.createElement('div');controls.after(timeline);const log=createStatusLog(timeline);
- const tools=document.querySelector('[data-tool="dryer"]').parentElement;
+ const tools=document.querySelector('.panel [data-tool="dryer"]').parentElement;
  for(const [kind,text,title] of [['mask','Mask','Paint masking fluid'],['lift','Lift','Lift mobile paint with a damp tool; staining remains'],['blot','Blot','Blot wet paint with tissue']]){
   const b=document.createElement('button');b.type='button';b.dataset.tool=kind;b.textContent=text;b.title=title;b.setAttribute('aria-pressed','false');tools.append(b);
  }
@@ -35,9 +35,9 @@ export function createOperationsUI(sheet, send) {
    if(backdrop.width!==w)backdrop.width=w;if(backdrop.height!==h)backdrop.height=h;bg.clearRect(0,0,w,h);
   if(toggle.checked){tint(masks.resist,[129,159,177,115],false,undefined,bg);tint(masks.clip,[177,116,46,210],true,undefined,bg);}
   // Dry everything is shown by its progress bar, not by tinting the whole sheet.
-  if(operation?.mask&&operation.kind!=='dry'&&(toggle.checked||!['mask','unmask','clip','unclip'].includes(operation.kind))){const colour=['dry','dryer','clip','unclip'].includes(operation.kind)?[231,148,70,100]:operation.kind==='blot'||operation.kind==='lift'?[185,143,199,120]:[99,165,195,90];tint(operation.mask,colour,false,undefined,bg);
+  if(operation?.mask&&operation.kind!=='dry'&&(toggle.checked||!['mask','unmask','clip','unclip'].includes(operation.kind))){const colour=['dry','dryer','clip','unclip'].includes(operation.kind)?[231,148,70,100]:operation.kind==='blot'||operation.kind==='lift'?[185,143,199,120]:[99,165,195,90];tint(operation.mask,colour,false,operation.rect?{x:operation.rect[0],y:operation.rect[1],w:operation.rect[2],h:operation.rect[3]}:undefined,bg);
    const tool={dryer:'≈ Heat',dry:'≈ Drying',lift:'▱ Damp lifting tool',blot:'▧ Tissue',water:'◦ Clean water'}[operation.kind];
-   if(tool){const i=operation.mask.indexOf(1);if(i>=0){const x=Math.min(w-110,Math.max(2,i%w)),y=Math.max(14,Math.floor(i/w));bg.font='10px sans-serif';bg.fillStyle='#faf6e9ee';bg.fillRect(x,y-12,108,16);bg.fillStyle='#544439';bg.fillText(tool,x+3,y);}}
+   if(tool){const i=operation.mask.indexOf(1);if(i>=0){const x=Math.min(w-110,Math.max(2,(operation.rect?.[0]??0)+i%(operation.rect?.[2]??w))),y=Math.max(14,(operation.rect?.[1]??0)+Math.floor(i/(operation.rect?.[2]??w)));bg.font='10px sans-serif';bg.fillStyle='#faf6e9ee';bg.fillRect(x,y-12,108,16);bg.fillStyle='#544439';bg.fillText(tool,x+3,y);}}
   }
    backdropDirty=false;
   }

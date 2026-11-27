@@ -568,7 +568,7 @@ async function sessionRun(r) {
       started.call = call;
       // the profile is tried before the model is started: a file of the repository must not be readable under it
       if (call.probe) {
-        const can = file => { const p = call.probe(file); try { execFileSync(p.cmd, p.args, { stdio: 'pipe' }); return true; } catch { return false; } };
+        const can = file => { const p = call.probe(file); try { execFileSync(p.cmd, p.args, { stdio: 'ignore' }); return true; } catch { return false; } };
         if (can(path.join(ROOT, 'package.json'))) throw new Error('the session\'s sandbox does not hold: a file of the repository can be read under it; the session is not started');
         if (!can(path.join(cwd, 'README.md'))) throw new Error('the session\'s sandbox cannot be started on this machine (its own folder is not readable under it); the session is not started');
         // ... and a picture must not be readable by a program, while the data beside it is

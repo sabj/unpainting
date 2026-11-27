@@ -120,3 +120,26 @@ test('per-dry storage census counts bytes without scanning plane values',()=>{
  assert.equal(stats.nonzeroPlanes,null);
  assert.throws(()=>layerStorageStats({layers:[[plane]]}),/pixel scan/);
 });
+
+
+test('four-word crop scans preserve odd rows, distant edge words and arbitrary float bits',()=>{
+ let seed=29;
+ const rnd=()=>seed=(Math.imul(seed,1664525)+1013904223)>>>0;
+ for(const w of [1,3,4,7,16,31])for(let sample=0;sample<12;sample++){
+  const h=19,n=w*h,plane=new Float32Array(n),bits=new Uint32Array(plane.buffer);
+  for(let q=0;q<7;q++)bits[(3+rnd()%5)*w+rnd()%w]=[0x80000000,0x7fc01234,0xffc04567,0x3f000000][rnd()%4];
+  const expected=bits.slice(),zero=new Float32Array(n);
+  const sheet={w,h,n,K:1,G:[zero],D:[zero],P:[zero],layers:[[plane],[zero]]};
+  assert.equal(compactLowerLayers(sheet,{from:0}).packed,1);
+  const restored=sheet.layers[0][0];
+  assert.deepEqual(new Uint32Array(restored.buffer,restored.byteOffset,n),expected);
+ }
+});
+
+test('an examined dense plane does not census references again after unrelated layer metadata changes',()=>{
+ const sheet=setup();sheet.layers[1][0].fill(1);compactLowerLayers(sheet);
+ // Leave just the examined plane eligible, and make any reference census fail.
+ sheet.layers=[sheet.layers[1],[new Float32Array(sheet.n)]];sheet.K=1;sheet._layerVer=1;
+ sheet.G=new Proxy(sheet.G,{getOwnPropertyDescriptor(){throw Error('unnecessary reference census');}});
+ assert.deepEqual(compactLowerLayers(sheet,{from:0}),{packed:0,savedBytes:0});
+});

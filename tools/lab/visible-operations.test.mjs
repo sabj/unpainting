@@ -84,3 +84,44 @@ test('carrying on mid-stroke never deposits a lift bead at the unvisited endpoin
  assert.equal(touches,1);assert.equal(done,0);assert.equal(progress,0);
  assert.equal(sheet.G[0][24*64+60],0,'the far endpoint was never visited');
 });
+
+test('GPU hand blot/lift transfer only the footprint and match whole-mask CPU pixels',async()=>{
+ const {handToolOperation,footprintRect}=await import('../../demos/lab/worker/operations.js');
+ for(const kind of ['blot','lift'])for(const [a,b,r] of [[{x:20.2,y:15.5},{x:30,y:20},3.2],[{x:-2,y:0},{x:2,y:3},4]]){
+  const cpu=fresh(),gpu=fresh();
+  for(const sheet of [cpu,gpu]){
+   sheet.W.fill(2);sheet.M.fill(1);sheet.G[0].fill(.7);sheet.P[0].fill(.9);sheet.D[0].fill(.2);sheet.s.fill(.3);
+   sheet.resist=new Uint8Array(sheet.n);sheet.resist[15*64+20]=1;
+  }
+  const calls=[],rect=footprintRect(64,48,a,b,r);
+  const phys={ensureFresh:async(s,bounds)=>calls.push(['down',bounds]),up:(s,bounds)=>calls.push(['up',bounds]),syncAll:()=>assert.fail('full read'),upload:()=>assert.fail('full upload')};
+  applyHandOperation(cpu,kind,footprint(64,48,a,b,r));
+  const local=await handToolOperation(gpu,kind,a,b,r,phys);
+  assert.deepEqual(calls,[['down',rect],['up',rect]]);assert.equal(local.mask.length,rect[2]*rect[3]);assert.ok(local.mask.length<gpu.n);
+  for(const name of ['W','G','D','P','M','s','ever'])assert.deepEqual(gpu[name],cpu[name],name);
+ }
+});
+test('localized mask extends film without resetting resistFrom and skips unchanged GPU uploads',async()=>{
+ const {handToolOperation}=await import('../../demos/lab/worker/operations.js');
+ const sheet=fresh(),calls=[],phys={syncAll:async()=>calls.push('sync'),upload:()=>calls.push('upload')};
+ const a={x:10,y:10},b={x:30,y:30};
+ sheet.layers.push([new Float32Array(sheet.n)]);
+ await handToolOperation(sheet,'mask',a,a,3,phys);const from=sheet.resistFrom;
+ await handToolOperation(sheet,'mask',a,a,3,phys);assert.deepEqual(calls,['sync','upload']);
+ sheet.layers.push([new Float32Array(sheet.n)]);
+ await handToolOperation(sheet,'mask',b,b,3,phys);assert.equal(sheet.resistFrom,from);
+ sheet.G[0].fill(1);liftResist(sheet);assert.equal(sheet.G[0][10*64+10],0);assert.equal(sheet.G[0][30*64+30],0);assert.equal(sheet.G[0][0],1);
+});
+
+test('localized hand tools retain full-sheet mask geometry in recorded tapes',async()=>{
+ const {handToolOperation}=await import('../../demos/lab/worker/operations.js');
+ const {tapeSheet}=await import('../../demos/lab/media/sheet.js');
+ const sheet=fresh(),tape=[],a={x:8,y:10},b={x:14,y:12},mask=Array.from(footprint(64,48,a,b,3));
+ sheet._tape=true;tapeSheet(tape);
+ try{
+  await handToolOperation(sheet,'mask',a,b,3);
+  assert.deepEqual(tape[0],{k:'r',m:mask});
+  await handToolOperation(sheet,'blot',a,b,3);
+  assert.deepEqual(tape[1].m,mask);assert.equal(tape[1].k,'b');
+ }finally{tapeSheet(null);}
+});

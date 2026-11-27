@@ -102,19 +102,19 @@ export function moveChain(pts, S, hx, hy, seg, seg0, dx, dy, hold = false) {
 }
 
 // Signed distance from (X, Y) in a cone segment's frame (X across, >= 0; Y along from A) to a cone of radii r1 at A and
-// r2 at h (Quilez's uneven capsule).
-function coneDist(X, Y, h, r1, r2) {
-  if (Math.abs(r1 - r2) >= h) return Math.min(Math.hypot(X, Y) - r1, Math.hypot(X, Y - h) - r2);
-  const b = (r1 - r2) / h, a = Math.sqrt(1 - b * b), k = -b * X + a * Y;
-  if (k < 0) return Math.hypot(X, Y) - r1;
-  if (k > a * h) return Math.hypot(X, Y - h) - r2;
+// r2 at h (Quilez's uneven capsule), with precomputed b = (r1 - r2) / h and a = sqrt(1 - b^2) (a < 0 when degenerate).
+// Endcap distances use world-frame squared distances (d1sq, d2sq) so adjacent segments sharing a joint get bit-identical distances.
+function coneDist(X, Y, h, r1, r2, b, a, d1sq, d2sq) {
+  if (a < 0) { const d1 = Math.sqrt(d1sq) - r1, d2 = Math.sqrt(d2sq) - r2; return d1 < d2 ? d1 : d2; }
+  const k = -b * X + a * Y;
+  if (k < 0) return Math.sqrt(d1sq) - r1;
+  if (k > a * h) return Math.sqrt(d2sq) - r2;
   return X * a + Y * b - r1;
 }
 // Signed distance to a box of half-extents (a, b) with corners rounded at rc.
 function boxDist(u, v, a, b, rc) {
-  const qx = Math.abs(u) - a + rc, qy = Math.abs(v) - b + rc, mx = qx > 0 ? qx : 0, my = qy > 0 ? qy : 0;
-  // hypot only off a corner: with one part 0 it is the other exactly (Math.hypot is slow)
-  return (my === 0 ? mx : mx === 0 ? my : Math.hypot(mx, my)) + Math.min(Math.max(qx, qy), 0) - rc;
+  const qx = (u < 0 ? -u : u) - a + rc, qy = (v < 0 ? -v : v) - b + rc, mx = qx > 0 ? qx : 0, my = qy > 0 ? qy : 0;
+  return (my === 0 ? mx : mx === 0 ? my : Math.hypot(mx, my)) + (qx > qy ? (qx < 0 ? qx : 0) : (qy < 0 ? qy : 0)) - rc;
 }
 
 /**
@@ -135,47 +135,65 @@ export function footprint(g, w, h, pad, visit, cut = Infinity) {
   if (X1 < X0 || Y1 < Y0) return null;
   g.onBox?.(X0, Y0, X1, Y1);
   if (flat) return flatFootprint(g, w, X0, Y0, X1, Y1, visit, cut);
-  // per segment: origin, axis, length and the radii at its two ends, flat (7 numbers a segment)
-  const ns = S - 1, seg = g._seg && g._seg.length === 7 * ns ? g._seg : (g._seg = new Float64Array(7 * ns));
+  // per segment: origin, axis, length, end radii, precomputed cone slope (b, a), and end vertex (11 numbers a segment)
+  const ns = S - 1, seg = g._seg && g._seg.length === 11 * ns ? g._seg : (g._seg = new Float64Array(11 * ns));
   const on = g._on && g._on.length >= ns ? g._on : (g._on = new Int32Array(ns));
   for (let j = 0; j < ns; j++) {
-    const ax = pts[2 * j], ay = pts[2 * j + 1], ex = pts[2 * j + 2] - ax, ey = pts[2 * j + 3] - ay, L = Math.hypot(ex, ey), o = 7 * j;
-    seg[o] = ax; seg[o + 1] = ay; seg[o + 2] = L > 1e-9 ? ex / L : 1; seg[o + 3] = L > 1e-9 ? ey / L : 0; seg[o + 4] = L; seg[o + 5] = rad[j]; seg[o + 6] = rad[j + 1];
+    const ax = pts[2 * j], ay = pts[2 * j + 1], bx = pts[2 * j + 2], by = pts[2 * j + 3], ex = bx - ax, ey = by - ay, L = Math.sqrt(ex * ex + ey * ey), o = 11 * j;
+    const r1 = rad[j], r2 = rad[j + 1];
+    seg[o] = ax; seg[o + 1] = ay; seg[o + 2] = L > 1e-9 ? ex / L : 1; seg[o + 3] = L > 1e-9 ? ey / L : 0; seg[o + 4] = L; seg[o + 5] = r1; seg[o + 6] = r2;
+    if (L > 1e-6 && Math.abs(r1 - r2) < L) { const cb = (r1 - r2) / L; seg[o + 7] = cb; seg[o + 8] = Math.sqrt(1 - cb * cb); }
+    else { seg[o + 7] = 0; seg[o + 8] = -1; }
+    seg[o + 9] = bx; seg[o + 10] = by;
   }
-  const start = cut < Infinity ? cut + 1e-9 : Infinity;
+  // Values depending only on this row, kept with the geometry's other scratch.
+  const rowSeg = g._rowSeg && g._rowSeg.length >= 4 * ns ? g._rowSeg : (g._rowSeg = new Float64Array(4 * ns));
+  const start = cut < Infinity ? cut + 1e-9 : Infinity, obs = g.observedMask ?? null;
   for (let y = Y0; y <= Y1; y++) {
-    const py = y + 0.5;
+    const py = y + 0.5, row = y * w;
     // the segments whose capsule (wider radius, widened by cut) reaches this row, and the span of the row they can reach
     let n = 0, xa = X0, xb = X1;
     if (start < Infinity) {
       let lo = Infinity, hi = -Infinity;
       for (let j = 0; j < ns; j++) {
-        const o = 7 * j, ax = seg[o], ay = seg[o + 1], bx = ax + seg[o + 2] * seg[o + 4], by = ay + seg[o + 3] * seg[o + 4], Rc = Math.max(seg[o + 5], seg[o + 6]) + start + 1e-6;
-        if (py < Math.min(ay, by) - Rc || py > Math.max(ay, by) + Rc) continue;
+        const o = 11 * j, ax = seg[o], ay = seg[o + 1], bx = seg[o + 9], by = seg[o + 10], Rc = (seg[o + 5] > seg[o + 6] ? seg[o + 5] : seg[o + 6]) + start + 1e-6;
+        if (py < (ay < by ? ay : by) - Rc || py > (ay > by ? ay : by) + Rc) continue;
         // the part of the axis within Rc of the row in y, then Rc either side in x
         let ta = 0, tb = 1;
         if (by !== ay) { const t1 = (py - Rc - ay) / (by - ay), t2 = (py + Rc - ay) / (by - ay); ta = Math.max(0, Math.min(t1, t2)); tb = Math.min(1, Math.max(t1, t2)); }
         const xA = ax + (bx - ax) * ta, xB = ax + (bx - ax) * tb;
-        lo = Math.min(lo, xA, xB) - Rc; hi = Math.max(hi, xA, xB) + Rc; on[n++] = o;
+        const xLo = (xA < xB ? xA : xB) - Rc, xHi = (xA > xB ? xA : xB) + Rc;
+        if (xLo < lo) lo = xLo; if (xHi > hi) hi = xHi;
+        on[n++] = o;
       }
       if (!n) continue;
       xa = Math.max(X0, Math.floor(lo - 0.5)); xb = Math.min(X1, Math.ceil(hi - 0.5));
-    } else for (let j = 0; j < ns; j++) on[n++] = 7 * j;
+    } else for (let j = 0; j < ns; j++) on[n++] = 11 * j;
+    for (let q = 0; q < n; q++) {
+      const o = on[q], r = 4*q, dy = py-seg[o+1], dy2 = py-seg[o+10];
+      rowSeg[r] = dy*seg[o+3]; rowSeg[r+1] = dy*seg[o+2];
+      rowSeg[r+2] = dy*dy; rowSeg[r+3] = dy2*dy2;
+    }
     for (let x = xa; x <= xb; x++) {
+      // A read-only union prediction has already accounted for this cell. The
+      // physical brush always evaluates every contact and has no observed mask.
+      if (obs && obs[row + x]) continue;
       const px = x + 0.5;
       let best = start, across = 0;
       for (let q = 0; q < n; q++) {
-        const o = on[q], ax = seg[o], ay = seg[o + 1], ex = seg[o + 2], ey = seg[o + 3], L = seg[o + 4], r1 = seg[o + 5], r2 = seg[o + 6];
-        const dx = px - ax, dy = py - ay, Y = dx * ex + dy * ey, Xs = -dx * ey + dy * ex;
+        const o = on[q], ax = seg[o], ex = seg[o + 2], ey = seg[o + 3], L = seg[o + 4], r1 = seg[o + 5], r2 = seg[o + 6];
+        const r = 4*q, dx = px - ax, Y = dx * ex + rowSeg[r], Xs = -dx * ey + rowSeg[r+1];
         // the cone lies inside the capsule of its wider radius round its axis: a segment that cannot come nearer than the
         // nearest so far is passed over (the result is the same)
         const Yc = Y < 0 ? Y : Y > L ? Y - L : 0;
-        if (Math.sqrt(Xs * Xs + Yc * Yc) - (r1 > r2 ? r1 : r2) >= best) continue;
-        const d = L > 1e-6 ? coneDist(Math.abs(Xs), Y, L, r1, r2) : Math.hypot(dx, dy) - Math.max(r1, r2);
-        if (d < best) { best = d; const t = L > 1e-6 ? Math.max(0, Math.min(1, Y / L)) : 0, r = r1 + (r2 - r1) * t; across = r > 1e-6 ? Math.max(-1, Math.min(1, Xs / r)) : 0; }
+        const lim = best + (r1 > r2 ? r1 : r2);
+        if (lim <= 0 || Xs * Xs + Yc * Yc >= lim * lim) continue;
+        const d1sq = dx * dx + rowSeg[r+2], dx2 = px - seg[o+9], d2sq = dx2 * dx2 + rowSeg[r+3];
+        const d = L > 1e-6 ? coneDist(Xs < 0 ? -Xs : Xs, Y, L, r1, r2, seg[o + 7], seg[o + 8], d1sq, d2sq) : Math.sqrt(d1sq) - (r1 > r2 ? r1 : r2);
+        if (d < best) { best = d; const t = L > 1e-6 ? (Y <= 0 ? 0 : Y >= L ? 1 : Y / L) : 0, r = r1 + (r2 - r1) * t; across = r > 1e-6 ? Math.max(-1, Math.min(1, Xs / r)) : 0; }
       }
       if (best === start && start < Infinity) continue;
-      visit(y * w + x, best, across, x, y);
+      visit(row + x, best, across, x, y);
     }
   }
   return [X0, Y0, X1, Y1];
@@ -226,6 +244,7 @@ function flatFootprint(g, w, X0, Y0, X1, Y1, visit, cut) {
     }
     let p = 0;
     for (let x = xa; x <= xb; x++) {
+      if (g.observedMask?.[y * w + x]) continue;
       const px = x + 0.5, U = px * bx + py * by, V = px * nx + py * ny;
       while (p > 0 && vsS[p - 1] >= V) p--;
       while (p < k && vsS[p] < V) p++;
@@ -260,15 +279,17 @@ function flatFootprint(g, w, X0, Y0, X1, Y1, visit, cut) {
  * lost (lane units, negative when it took up). Conserves water and every pigment between lane and cell.
  */
 export function exchangeCell(sheet, i, lane, capL, freeAt, a, share, hb, g, buf) {
-  const K = sheet.K, W = sheet.W[i], start = lane.water;
+  const K = sheet.K, W = sheet.W[i], start = lane.water, G = sheet.G, lp = lane.pig;
   // 1. the films in contact trade equal volumes: colour passes even where the heads are level
   if (W > 1e-9 && lane.water > 1e-12 && hb > 0) {
-    const X = TUFT.mix * a * share * Math.min(W, hb, lane.water / g);
+    const X = TUFT.mix * a * share * Math.min(W, hb, lane.water / g), invLw = 1 / lane.water, invW = 1 / W;
     for (let k = 0; k < K; k++) {
-      const cb = lane.pig[k] / lane.water, cp = sheet.G[k][i] / W;
-      let d = X * (cb - cp);
-      if (d > 0) d = Math.min(d, lane.pig[k] / g); else d = Math.max(d, -sheet.G[k][i]);
-      sheet.G[k][i] += d; lane.pig[k] -= d * g;
+      const lpk = lp[k], gpk = G[k][i];
+      if (lpk === 0 && gpk === 0) continue;
+      let d = X * (lpk * invLw - gpk * invW);
+      if (d > 0) { const capG = lpk / g; if (d > capG) d = capG; }
+      else if (d < -gpk) d = -gpk;
+      G[k][i] = gpk + d; lp[k] = lpk - d * g;
     }
   }
   // 2. the films level: the tuft pours into a lower film and drinks from a higher one
@@ -276,8 +297,11 @@ export function exchangeCell(sheet, i, lane, capL, freeAt, a, share, hb, g, buf)
   if (J > 0) {
     const give = Math.min(J, Math.max(0, lane.water - freeAt) / g);
     if (give > 0) {
-      const f = give * g / lane.water;
-      for (let k = 0; k < K; k++) { buf[k] = lane.pig[k] * f / g; lane.pig[k] -= buf[k] * g; }
+      const f = give / lane.water;
+      for (let k = 0; k < K; k++) {
+        const lpk = lp[k];
+        if (lpk !== 0) { const bk = lpk * f; buf[k] = bk; lp[k] = lpk - bk * g; } else buf[k] = 0;
+      }
       lane.water -= give * g;
       if (sheet.M[i]) deposit(sheet, i, give, buf); else soak(sheet, i, give, buf, give);
     }
@@ -285,7 +309,7 @@ export function exchangeCell(sheet, i, lane, capL, freeAt, a, share, hb, g, buf)
     const take = Math.min(-J, W, Math.max(0, capL - lane.water) / g);
     if (take > 0) {
       const f = take / W;
-      for (let k = 0; k < K; k++) { const q = sheet.G[k][i] * f; sheet.G[k][i] -= q; lane.pig[k] += q * g; }
+      for (let k = 0; k < K; k++) { const gpk = G[k][i]; if (gpk !== 0) { const q = gpk * f; G[k][i] = gpk - q; lp[k] += q * g; } }
       sheet.W[i] -= take; lane.water += take * g; sheet.wetDirty = 1;
     }
   }
@@ -295,14 +319,21 @@ export function exchangeCell(sheet, i, lane, capL, freeAt, a, share, hb, g, buf)
   //    through a standing film only once it is thinner than the sheet's film (poreFilm). Both pulled at full head, a
   //    loaded flat's first touch filled the pores (0.32 of 0.375 mm) and fixed the paint they drank on the fibres where
   //    each lane and each sweep laid it, so a wash laid in sweeps dried in lanes and bands the film could not level.
-  //    A nearly dry tuft (no free head) still leaves its paint where the pores pull it: dry brush is unchanged.
-  const cap = sheet.paper.capacity[i], dryness = cap > 0 ? Math.max(0, 1 - sheet.s[i] / cap) : 0;
-  if (dryness > 0 && lane.water > 1e-12) {
-    const free = hb > 0 ? hb : 0, push = free * (1 - SIZING * free / (free + TUFT.poreFilm)) + (hb < 0 ? hb : 0);
-    const Jp = Math.min(a * share * Math.max(0, push + TUFT.pore * dryness) * Math.exp(-sheet.W[i] / TUFT.poreFilm), lane.water / g, share * cap - sheet.s[i]); // only the pores it touches
+  //    Below retention, the dry pores still draw from connected liquid among the damp hairs. TUFT.pore is the
+  //    effective head after sizing, not the full capillary suction: scale its conductance by the retained liquid
+  //    share (1 + hb / suck), which vanishes only for a bone-dry tuft.
+  const cap = sheet.paper.capacity[i], si = sheet.s[i], dryness = cap > 0 ? Math.max(0, 1 - si / cap) : 0;
+  if (dryness > 0 && lane.water > 1e-12 && share * cap > si) {
+    const free = hb > 0 ? hb : 0, push = free * (1 - SIZING * free / (free + TUFT.poreFilm));
+    const pull = TUFT.pore * dryness * (hb < 0 ? Math.max(0, 1 + hb / TUFT.suck) : 1);
+    const wNow = sheet.W[i], expW = wNow > 0 ? Math.exp(-wNow / TUFT.poreFilm) : 1;
+    const Jp = Math.min(a * share * (push + pull) * expW, lane.water / g, share * cap - si); // only the pores it touches
     if (Jp > 1e-12) {
-      const f = Jp * g / lane.water;
-      for (let k = 0; k < K; k++) { buf[k] = lane.pig[k] * f / g; lane.pig[k] -= buf[k] * g; }
+      const f = Jp / lane.water;
+      for (let k = 0; k < K; k++) {
+        const lpk = lp[k];
+        if (lpk !== 0) { const bk = lpk * f; buf[k] = bk; lp[k] = lpk - bk * g; } else buf[k] = 0;
+      }
       lane.water -= Jp * g;
       depositDry(sheet, i, Jp, buf);
     }
@@ -310,13 +341,12 @@ export function exchangeCell(sheet, i, lane, capL, freeAt, a, share, hb, g, buf)
   return start - lane.water;
 }
 
-/** How far a lane's liquid reaches into the tooth below the hills, as a share of the paper's relief, from its head hb
- *  (of a full head Hb): past the deepest pit for a loaded tuft (or the brush's own `bridge` share when it has one),
- *  less as the free film thins, to the paper's median at no free film, and only the crests once it holds none and the
- *  fibres it touches must draw the paint out of it. A nearly dry tuft so leaves its paint on the crests with white
- *  hollows between (dry brush; looks/drybrush-real.jpg), where it once reached a third of the way into every pit and
- *  laid an even, pale film. */
-export function toothReach(hb, Hb, p, bridge, wander = 1) {
-  const x = Math.max(-1, Math.min(1, hb / Math.max(1e-6, Hb))), full = (bridge > 0 ? bridge : 3) * (0.55 + 0.45 * Math.min(1, p)) * wander;
-  return x >= 0 ? full * Math.sqrt(x) : 1.5 * x;
+/** Reach below the paper's local mean, in relief units. Pressure bends bristles onto crests even with no free film.
+ *  Liquid bridges their gaps as the tuft fills: the connected liquid share grows as saturation cubed. Film head
+ *  alone cannot set contact (its capillary curve is already almost flat at half load). A loaded tuft spans the pits;
+ *  a damp one leaves their hollows white. */
+export function toothReach(sat, p, bridge, wander = 1) {
+  const pressure = Math.max(0, Math.min(1, p)), contact = -0.7 + 0.5 * pressure;
+  const full = (bridge > 0 ? bridge : 3) * (0.55 + 0.45 * pressure) * wander;
+  return contact + (full - contact) * Math.max(0, Math.min(1, sat)) ** 3;
 }

@@ -38,7 +38,7 @@ A painting needs three things: the picture, a line drawing of it, and simplified
 
 While a painting runs, a guard stops the code from reading the target's pixels: [how it paints](docs/how-it-paints.md), [the guard](docs/honesty.md).
 
-<p align="center"><img src="docs/img/cheat-white-ships.webp" width="912" alt="Sargent's White Ships four times: the target; cheat #1, a hill-climber that keeps random dabs only when they match the photo better; cheat #2, the painter's own strokes replayed with their paint taken from the photo's pixels, with an inset heat map of where it read the photo; and the 0.4 painter building up stroke by stroke."></p>
+<p align="center"><img src="docs/img/cheat-white-ships.webp" width="912" alt="Sargent's White Ships four times: the target; cheat #1, a hill-climber that keeps random dabs only when they match the photo better; cheat #2, the painter's own strokes replayed with their paint taken from the photo's pixels, with an inset heat map of where it read the photo; and the painter's run building up stroke by stroke."></p>
 
 ## Try it
 
@@ -58,7 +58,7 @@ npm run example:animal      # Tiepolo, Punchinello Riding a Camel: a drawing and
 npm run example:portrait    # Sargent, A Tramp: one simplified picture, no drawing
 ```
 
-<p align="center"><img src="docs/img/build-white-ships.webp" width="840" alt="Sargent's White Ships beside two paintings building from blank paper and rewinding: 0.3 and prior (middle) beside 0.4 onwards (right)"></p>
+<p align="center"><img src="docs/img/build-white-ships.webp" width="560" alt="Sargent's White Ships beside a benchmark painting by Sol, built from blank paper with the brush outline following each recorded stroke, then rewound"></p>
 
 [Getting started](docs/running.md) covers your own image, the benchmark's pictures and model painters. `ffmpeg` is needed for MP4 videos (`--video 0` skips them). Python 3 is needed for tracing a drawing, finding regions and scoring.
 

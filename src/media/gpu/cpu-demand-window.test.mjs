@@ -152,3 +152,34 @@ test('with no window yet (fast demand), a read-ahead serves whole-tile demands w
   assert.deepEqual(b.rect, a.rect); for (let k = 0; k < a.host.length; k++) assert.deepEqual(b.host[k], a.host[k]);
   assert.equal(a.downloads.length, 2); assert.equal(b.downloads.length, 1);
 });
+
+test('batched exposed rectangles preserve old bits and read every union hole exactly once',()=>{
+  const run=batched=>{
+    const f=fixture(),downloads=[];
+    f.rp.forEach((p,k)=>{for(let i=0;i<f.n;i++)p[i]=k*1000+i;});
+    f.host.forEach(p=>bits(p).fill(0x7fc12345));
+    const down=r=>{downloads.push(r);f.copy(f.host,f.rp,r);};
+    const win=new CpuDemandWindow(f.width,f.height,f.host,down,1,null,batched?rs=>rs.forEach(down):null);
+    for(const r of [[5,4,3,3],[2,2,2,2],[12,9,2,2],[0,0,1,1]]){
+      win.require(r);f.host.forEach(p=>{bits(p)[r[1]*f.width+r[0]]=0x80000000;});
+    }
+    return {host:f.host.map(p=>bits(p).slice()),rect:win.rect,area:downloads.reduce((n,r)=>n+r[2]*r[3],0)};
+  };
+  const before=run(false),after=run(true);assert.deepEqual(after.host,before.host);assert.deepEqual(after.rect,before.rect);
+  assert.equal(after.area,after.rect[2]*after.rect[3]);assert.ok(after.area<before.area);
+});
+
+test('batched local demands avoid an oversized speculative stroke read without losing CPU writes',()=>{
+  const f=fixture(),reads=[];
+  f.rp.forEach((p,k)=>{for(let i=0;i<f.n;i++)p[i]=k*1000+i;});
+  const down=r=>{reads.push(r);f.copy(f.host,f.rp,r);};
+  const win=new CpuDemandWindow(f.width,f.height,f.host,down,1,()=>{throw Error('oversized prefetch');},rs=>rs.forEach(down));
+  win.prefetch([0,0,f.width,f.height]);
+  win.require([3,2,2,2]);f.host.forEach(p=>{bits(p)[2*f.width+3]=0x80000000;});
+  win.require([5,2,2,2]);
+  assert.equal(reads.reduce((sum,r)=>sum+r[2]*r[3],0),8);
+  f.host.forEach((p,k)=>{
+    assert.equal(bits(p)[2*f.width+3],0x80000000);
+    for(const i of [2*f.width+4,2*f.width+5,2*f.width+6,3*f.width+3,3*f.width+6])assert.equal(p[i],f.rp[k][i]);
+  });
+});

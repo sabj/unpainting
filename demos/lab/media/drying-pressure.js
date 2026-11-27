@@ -50,16 +50,16 @@ export function dryingPressure(order, count, index, width, sink, fluxX, fluxY, p
     anchor[gauge] = 1; gauges[label] = pressure[gauge];
   }
   for (let q = 0; q < count; q++) { const i = sorted[q]; pressure[i] -= gauges[component[i]]; }
-  // Incomplete Cholesky on the symmetric five-point stencil. Natural grid
-  // order has only west/north entries below the diagonal, and no fill terms
-  // between these neighbours. Anchor columns are excluded from the solve.
-  for (let q = 0; q < count; q++) {
-    const i = sorted[q];
-    if (anchor[i]) { diagonal[i] = 1; continue; }
-    const l = edges[4 * i], u = edges[4 * i + 2];
-    if (l >= 0 && !anchor[l]) west[i] = -1 / diagonal[l];
-    if (u >= 0 && !anchor[u]) north[i] = -1 / diagonal[u];
-    diagonal[i] = Math.sqrt(Math.max(1e-14, degree[i] - west[i] ** 2 - north[i] ** 2));
+  // Incomplete Cholesky on the symmetric five-point stencil (only needed when solver === 'ic').
+  if (solver !== 'mg') {
+    for (let q = 0; q < count; q++) {
+      const i = sorted[q];
+      if (anchor[i]) { diagonal[i] = 1; continue; }
+      const l = edges[4 * i], u = edges[4 * i + 2];
+      if (l >= 0 && !anchor[l]) west[i] = -1 / diagonal[l];
+      if (u >= 0 && !anchor[u]) north[i] = -1 / diagonal[u];
+      diagonal[i] = Math.sqrt(Math.max(1e-14, degree[i] - west[i] ** 2 - north[i] ** 2));
+    }
   }
   const precondition = solver === 'mg' ? multigridPreconditioner(sorted, count, edges, anchor, degree, width, r, z, component) : () => {
     for (let q = 0; q < count; q++) {

@@ -10,10 +10,10 @@
 import os from 'node:os';
 import fs from 'node:fs';
 import path from 'node:path';
-import { coherent, layersOf } from '../../src/media/sheet.mjs';
+import { DEFAULTS, coherent, layersOf } from '../../src/media/sheet.mjs';
 import { renderLayers } from '../../src/media/km.mjs';
 import { attachGpu, gpuStats } from '../../src/media/gpu/link.mjs';
-import { generateSpecimen, nativePlateStudy, nativePlateWashes, nativePlateSeed, simulateNativePassages, lamellarCoverage, NATIVE_PAINT_LIMITS, NATIVE_TRANSPORT } from '../../demos/fungi/mushrooms.mjs';
+import { generateSpecimen, nativePlateStudy, nativePlateWashes, nativePlateSeed, simulateNativePassages, lamellarCoverage, NATIVE_PAINT_LIMITS, NATIVE_TRANSPORT, nativeDrySchedule } from '../../demos/fungi/mushrooms.mjs';
 import { nodeMaskRasterizer } from './mask.mjs';
 import { lstarDiff, fingerprint, checksum, verdict, table } from './score.mjs';
 
@@ -38,32 +38,34 @@ function rssSampler() {
   return () => { clearInterval(t); return Math.max(peak, process.memoryUsage().rss); };
 }
 
-// The GPU sheet's step always answers "still wet" (it does not count wet cells per step), and the plate's drying loop
-// waits for a step that answers "dry". So on the GPU each step then reads the GPU's own wet-cell counter (the one its
-// dry() reads; 32 bytes) and answers "dry" when it is zero. anyWet is the CPU's rule (sheet.mjs wetBoxes), kept to check
-// the counter against it at the end of each plate.
+// Regular stroke-to-stroke steps do not consume a wet answer. Only passage
+// drying needs it: observe once per batch instead of synchronizing every step.
+// anyWet checks the CPU wetBoxes rule against the final downloaded state.
 export const anyWet = ({ M, s, n, paper }) => { for (let i = 0; i < n; i++) if (M[i] || s[i] > 0.02 * paper.capacity[i]) return true; return false; };
-function reportWet(sheet) {
+export function reportWet(sheet) {
   const link = sheet._gpu, plain = link.step.bind(link);
-  link.step = (sh, o) => { plain(sh, o); link.call({ op: 'counters' }); return link.ctrl[1] !== 0; };
+  return async ({transport,maxSteps,checkpoint}) => nativeDrySchedule({maxSteps,batchSize:16,checkpoint,advance:async(count,dt)=>{
+    for(let i=0;i<count;i++)plain(sheet,{...DEFAULTS,...transport,dt});
+    link.call({op:'counters'});return link.ctrl[1]!==0;
+  }});
 }
 
 async function paintPlate(typeId, index, width, backend) {
   const genome = generateSpecimen(`bench-${index}`, typeId), study = nativePlateWashes(nativePlateStudy({ genome, scene: 'plain' }));
-  let sheet = null, info = null;
+  let sheet = null, info = null, dryGpu = null;
   const onSheet = s => {
     sheet = s;
-    if (backend === 'gpu') { info = attachGpu(s, NATIVE_TRANSPORT, { mode: 'on', log: () => {} }); reportWet(s); }
+    if (backend === 'gpu') { info = attachGpu(s, NATIVE_TRANSPORT, { mode: 'on', log: () => {} }); dryGpu = reportWet(s); }
   };
   global.gc?.(); const stop = rssSampler(), t0 = performance.now();
   try {
-    const result = await simulateNativePassages(study, { width, seed: nativePlateSeed(genome, 'plain'), maskFor: nodeMaskRasterizer({ coverage: lamellarCoverage }), yieldWork: async () => {}, onSheet, limits: { ...NATIVE_PAINT_LIMITS, maxMs: 3.6e6 } });
+    const result = await simulateNativePassages(study, { width, seed: nativePlateSeed(genome, 'plain'), maskFor: nodeMaskRasterizer({ coverage: lamellarCoverage }), yieldWork: async () => {}, onSheet, onDry: backend === 'gpu' ? options => dryGpu(options) : null, limits: { ...NATIVE_PAINT_LIMITS, maxMs: 3.6e6 } });
     coherent(sheet);
     if (anyWet(sheet)) throw new Error(`${typeId} ${width} ${backend}: the finished sheet is still wet`);
     const seconds = (performance.now() - t0) / 1000, peakRss = stop();
     const n = sheet.n, rgb = renderLayers(layersOf(sheet), sheet.pigments, Buffer.alloc(n * 3).map((_, i) => PAPER[i % 3]), n, 1);
     const g = backend === 'gpu' ? gpuStats(sheet) : null;
-    return { plate: typeId, seed: `bench-${index}`, width: sheet.w, height: sheet.h, backend, adapter: info?.adapter ?? null, seconds, strokes: result.strokes, segments: result.strokeSegments, flowSteps: result.steps, strokesPerSecond: result.strokes / seconds, peakRssMiB: peakRss / 2 ** 20, gpuSteps: g?.steps ?? null, gpuStrokes: g?.strokes ?? null, rgb };
+    return { plate: typeId, seed: `bench-${index}`, width: sheet.w, height: sheet.h, backend, adapter: info?.adapter ?? null, fallback: info?.fallback ?? false, seconds, strokes: result.strokes, segments: result.strokeSegments, flowSteps: result.steps, timings: result.timings, strokesPerSecond: result.strokes / seconds, peakRssMiB: peakRss / 2 ** 20, gpuSteps: g?.steps ?? null, gpuStrokes: g?.strokes ?? null, rgb };
   } finally { stop(); sheet?._gpu?.close(); }
 }
 
@@ -72,6 +74,8 @@ async function main() {
   const before = o.compare ? JSON.parse(fs.readFileSync(o.compare, 'utf8')) : null;
   const backends = o.cpuOnly ? ['cpu'] : ['cpu', 'gpu'];
   const rows = [], runs = [];
+  fs.mkdirSync(path.dirname(o.out), { recursive: true });
+  const save = complete => fs.writeFileSync(o.out, JSON.stringify({ format: 'unpainting-render-bench', version: 1, node: process.version, platform: `${os.platform()} ${os.arch()}`, cpu: os.cpus()[0]?.model, sizes: o.sizes, cpuOnly: o.cpuOnly, complete, runs }, null, 1));
   for (const width of o.sizes) for (let i = 0; i < o.count; i++) {
     const typeId = PLATES[i], done = {};
     for (const backend of backends) {
@@ -94,6 +98,7 @@ async function main() {
       runs.push({ key, ...keep, cpuGpu: agree, verdict: verdict(r, prior) });
       rows.push({ plate: r.plate, cells: `${r.width}x${r.height}`, backend, seconds: r.seconds, strokes: r.strokes, sps: r.strokesPerSecond, mem: r.peakRssMiB, meanL: backend === 'gpu' ? agree.mean : null, worstL: backend === 'gpu' ? agree.worst : null, fp: `${r.fingerprint}/${r.checksum}`, verdict: verdict(r, prior) });
     }
+    save(false);
   }
   const f = d => v => v.toFixed(d);
   const text = table([
@@ -104,8 +109,7 @@ async function main() {
   ], rows);
   console.log(text);
   console.log('dL*: CPU sheet against GPU sheet, same plate and size. Peak RSS: resident set sampled every 50 ms during the plate.');
-  fs.mkdirSync(path.dirname(o.out), { recursive: true });
-  fs.writeFileSync(o.out, JSON.stringify({ format: 'unpainting-render-bench', version: 1, node: process.version, platform: `${os.platform()} ${os.arch()}`, cpu: os.cpus()[0]?.model, sizes: o.sizes, cpuOnly: o.cpuOnly, runs }, null, 1));
+  save(true);
   console.log(`wrote ${o.out}`);
 }
 

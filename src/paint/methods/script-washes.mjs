@@ -338,7 +338,7 @@ export function planScriptWashes({ script: given, k, w, h, pigments, paperRGB = 
       brush: { kind: p.brush ?? 'sized to the wash', contact: p.handling?.hold === 'side' ? 'side/belly' : 'point', width: `${strokes[0]?.radiusMm * 2} mm`, widthMm: strokes[0]?.radiusMm * 2 },
       resolution: { question: 'wash', minimumWashBodyCells: 4, estimatedSupportWidthCells: 0, estimateMethod: 'script', mmPerCell: cellMm },
       layer: stage, break: null, load: { water: how.water, pigment: 'the mix at its strength; calibrated delivery', reload: 'existing finite instrument route' },
-      edges: { hardCells: [], softCells: [], policy: p.edges ?? 'mixed' }, outline: [], strokes, softEdges: [], depthMm: 0, uncoveredShare: 0, widestBrushMm: Math.max(...strokes.map(st => 2 * st.radiusMm)),
+      edges: { hardCells: [], softCells: [], policy: p.edges ?? 'mixed' }, outline: [], strokes, softEdges: [], depthMm: 0, uncoveredShare: 0, widestBrushMm: strokes.reduce((m, st) => Math.max(m, 2 * st.radiusMm), 0),
       protectedLights: p.leave ? [p.leave] : [], failureSigns: 'Lost lights, muddy overlaps, stripes.', stop: 'after the passage', script: { passage: p.id, kind: p.kind, paper: p.paper ?? 'dry', into: p.into ?? null, wait: p.wait ?? null, underShare: under.share, underFilm: under.film, glaze: p.glaze ?? null, handling: p.handling ?? null } };
     { const laneLap = kind === 'wash' ? lapOf(strokes) : null; if (laneLap != null) intent.laneLap = laneLap; } sh._valuePlan = intent; instructions.push({ ...intent, area, plannedPigmentMass: strength * area });
     polygons.push({ stage, thing: what, kind, colour: null, loops: (charge ? [] : regionsOf(p)).map(P => ({ points: P })) });

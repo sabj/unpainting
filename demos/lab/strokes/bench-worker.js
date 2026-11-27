@@ -28,6 +28,12 @@ const gpuOps = p => {
     instrument: async (sheet, points, reach, fn) => { const rect = p.rect(points, reach); await p.ensureFresh(sheet, rect); fn(); p.up(sheet, rect); },
     step: async (sheet, n, O) => { if (O !== lastO) { p.setOptions(O); lastO = O; } return p.step(n); },
     read: sheet => p.syncAll(sheet),
+    standing: async sheet => {
+      await p.sheet.levelReady();
+      const water = new Float32Array(await p.sheet.readWords('W', sheet.n * 4));
+      let count = 0; for (const w of water) if (w > 1e-3) count++;
+      return count;
+    },
     fix: sheet => p.fix(sheet),
   };
 };
@@ -40,21 +46,45 @@ function colour(sheet, pigments, surface) {
   return rgba;
 }
 
-let run = 0;
-onmessage = async ({ data }) => {
+// A new request cancels at the next ops boundary, then waits for the old run
+// to release the shared GPU. No two load/step/read sequences can overlap.
+let run = 0, pending = Promise.resolve();
+const cancelled = Symbol('cancelled');
+onmessage = ({ data }) => {
   if (data.type !== 'run') return;
-  const mine = ++run, { mmPerCell, backends } = data;
-  const g = backends.includes('gpu') ? await gpu() : null;
-  postMessage({ type: 'caps', gpu: !!g, gpuName: g?.name ?? '', gpuError: physError });
-  for (const s of BENCH_STROKES) for (const backend of backends) {
-    if (mine !== run) return;
-    if (backend === 'gpu' && !g) continue;
-    const t = performance.now();
+  const mine = ++run;
+  pending = pending.catch(() => {}).then(async () => {
+    const check = () => { if (mine !== run) throw cancelled; };
+    const send = (message, transfer = []) => { check(); postMessage({ ...message, gen: data.gen }, transfer); };
+    const guarded = ops => Object.fromEntries(Object.entries(ops).map(([name, fn]) => [name, async (...args) => {
+      check(); const result = await fn(...args); check(); return result;
+    }]));
     try {
-      const { sheet, pigments, steps } = await layBenchStroke(s, { mmPerCell, wash: WASH, glaze: GLAZE, ops: backend === 'gpu' ? gpuOps(g) : cpuOps() });
-      const rgba = colour(sheet, pigments, s.paper);
-      postMessage({ type: 'stroke', id: s.id, backend, w: sheet.w, h: sheet.h, rgba, steps, ms: performance.now() - t }, [rgba.buffer]);
-    } catch (e) { postMessage({ type: 'stroke', id: s.id, backend, error: String(e?.message ?? e) }); }
-  }
-  if (mine === run) postMessage({ type: 'done' });
+      check();
+      const { mmPerCell, backends } = data;
+      const g = backends.includes('gpu') ? await gpu() : null;
+      check();
+      send({ type: 'caps', gpu: !!g, gpuName: g?.name ?? '', gpuError: physError });
+      for (const s of BENCH_STROKES) for (const backend of backends) {
+        check();
+        if (backend === 'gpu' && !g) continue;
+        // CPU ops resolve synchronously: yield so queued reruns can cancel too.
+        await new Promise(resolve => setTimeout(resolve, 0));
+        check();
+        const t = performance.now();
+        try {
+          const { sheet, pigments, steps } = await layBenchStroke(s, { mmPerCell, wash: WASH, glaze: GLAZE, ops: guarded(backend === 'gpu' ? gpuOps(g) : cpuOps()) });
+          check();
+          const rgba = colour(sheet, pigments, s.paper);
+          send({ type: 'stroke', id: s.id, backend, w: sheet.w, h: sheet.h, rgba, steps, ms: performance.now() - t }, [rgba.buffer]);
+        } catch (e) {
+          check(); if (e === cancelled) throw e;
+          send({ type: 'stroke', id: s.id, backend, error: String(e?.message ?? e) });
+        }
+      }
+      send({ type: 'done' });
+    } catch (e) {
+      if (e !== cancelled) send({ type: 'error', error: String(e?.message ?? e) });
+    }
+  });
 };

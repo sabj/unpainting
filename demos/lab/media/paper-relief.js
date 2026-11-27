@@ -20,6 +20,12 @@
 // wash comes out with the grain the crops have (src/media/paper-relief.test.mjs, src/media/settling.test.mjs). The
 // relief is weak past 1.2 mm: with more there, settled pigment gathered into millimetre basins and dried as a soft
 // mottle (looks/grain-1.jpg), where the crops show a fine pepper, densest at 0.3 to 0.5 mm.
+//
+// Strength varies across the sheet. A real sheet is not equally toothy everywhere: the felt, the sizing and the
+// pressing leave patches a centimetre or a few across that granulate more or less. So the relief's local amplitude is
+// scaled by a slow seeded field (wavelengths about 10 to 40 mm, factor about 0.65 to 1.35, mean square 1, so the sheet's
+// RMS is unchanged). It scales the relief's height only, not its spectrum: the pepper stays 0.2 to 0.5 mm, some
+// patches show more of it. Every grid, CPU and GPU, reads the same field (paperRelief).
 // DOM free.
 
 export const RELIEF_PRESETS = Object.freeze({
@@ -37,6 +43,8 @@ export const HEIGHT_SPAN_UM = 100;
 const HOLLOW_MM = 1;
 
 const TILES = [{ n: 1024, dx: 0.025 }, { n: 1024, dx: 0.02 }];
+// the strength field: one 128 mm periodic tile at 1 mm, wavelengths STRENGTH_MM, factor 1 + STRENGTH_SWING tanh(g)
+const STRENGTH = { n: 128, dx: 1 }, STRENGTH_MM = [10, 40], STRENGTH_SWING = 0.35;
 
 function fft1(re, im, inv) {
   const n = re.length;
@@ -90,6 +98,50 @@ function makeTile({ n, dx }, p, seed) {
   return out;
 }
 
+// the strength field for one seed: a factor about 0.65 to 1.35 with mean square 1, smooth below a centimetre
+const STRENGTH_CACHE = new Map();
+function strengthOf(seed) {
+  if (STRENGTH_CACHE.has(seed)) return STRENGTH_CACHE.get(seed);
+  const { n, dx } = STRENGTH, [lo, hi] = STRENGTH_MM, g = rng(seed * 977 + 13), re = new Float64Array(n * n), im = new Float64Array(n * n), L = n * dx;
+  for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
+    const fx = (x <= n / 2 ? x : x - n) / L, fy = (y <= n / 2 ? y : y - n) / L, f = Math.hypot(fx, fy);
+    const a = f === 0 ? 0 : Math.sqrt(f ** -2 * Math.exp(-((f * lo) ** 2)) * (1 - Math.exp(-((f * hi) ** 2))));
+    re[y * n + x] = a * g(); im[y * n + x] = a * g();
+  }
+  fft2(re, im, n, true);
+  let m = 0, v = 0; for (let i = 0; i < n * n; i++) m += re[i]; m /= n * n;
+  for (let i = 0; i < n * n; i++) v += (re[i] - m) ** 2; const sd = Math.sqrt(v / (n * n)) || 1;
+  const z = new Float32Array(n * n); let ms = 0;
+  for (let i = 0; i < n * n; i++) { z[i] = 1 + STRENGTH_SWING * Math.tanh((re[i] - m) / sd); ms += z[i] * z[i]; }
+  const k = 1 / Math.sqrt(ms / (n * n)); for (let i = 0; i < n * n; i++) z[i] *= k;
+  const t = { n, dx, z }; STRENGTH_CACHE.set(seed, t); return t;
+}
+
+// A scanned sheet's relief instead of the generated tiles: a grey height map (scan.data, width, height), one pixel
+// `mmPerPx` on the sheet, its broad relief past SCAN_HIGHPASS_MM taken out (a scan's lighting and tilt), scaled to the
+// base preset's RMS. A 1024 px square from its middle, mirrored at its seams into a 2048 px periodic tile. A scan
+// carries its own variation of strength across the sheet, so the strength field is not applied to it.
+const SCAN_HIGHPASS_MM = 5;
+// the scans by id: the preset itself is plain data (papers are cloned and keyed by their options), the pixels stay here
+const SCANS = new Map();
+/** A relief preset from a scan: { data, width, height } of grey heights; id names it (the cache key). */
+export function scanRelief(scan, { id, mmPerPx, base = 'cold' }) {
+  if (!id || !(mmPerPx > 0) || !scan?.data) throw new Error('paper-relief: scanRelief needs scan data, an id and mmPerPx');
+  SCANS.set(id, scan);
+  return Object.freeze({ ...presetOf(base), scanId: id, mmPerPx });
+}
+function scanTile(p) {
+  const scan = SCANS.get(p.scanId); if (!scan) throw new Error(`paper-relief: scan ${p.scanId} was not loaded (scanRelief)`);
+  const { data, width, height } = scan, m = 1024, n = 2 * m;
+  if (width < m || height < m) throw new Error(`paper-relief: scan ${p.scanId} is under ${m} px on a side`);
+  const x0 = (width - m) >> 1, y0 = (height - m) >> 1, z = new Float64Array(n * n);
+  for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) { const sx = x < m ? x : n - 1 - x, sy = y < m ? y : n - 1 - y; z[y * n + x] = data[(y0 + sy) * width + x0 + sx]; }
+  const low = boxPeriodic(z, n, Math.max(1, Math.round(SCAN_HIGHPASS_MM / 2 / p.mmPerPx)));
+  let v = 0; for (let i = 0; i < n * n; i++) { z[i] -= low[i]; v += z[i] * z[i]; }
+  const k = 1 / (Math.sqrt(v / (n * n)) || 1), out = new Float32Array(n * n); for (let i = 0; i < n * n; i++) out[i] = z[i] * k;
+  return { n, dx: p.mmPerPx, z: out };
+}
+
 const CACHE = new Map();
 function presetOf(relief) {
   const p = typeof relief === 'string' ? RELIEF_PRESETS[relief] : relief;
@@ -98,7 +150,7 @@ function presetOf(relief) {
 }
 /** The relief's tiles and constants for one preset and seed, made once. */
 function fieldOf(relief, seed) {
-  const p = presetOf(relief), key = JSON.stringify(p);
+  const p = presetOf(relief), key = p.scanId ? `scan:${p.scanId}:${p.mmPerPx}:${p.rmsUm}` : JSON.stringify(p);
   if (!CACHE.has(key)) CACHE.set(key, preset(p));
   const F = CACHE.get(key), g = rng(seed * 31 + 7);
   // the seed places the two tiles on the sheet: a different piece of the same paper
@@ -106,7 +158,7 @@ function fieldOf(relief, seed) {
 }
 // the tiles of one preset (the same for every seed) and the RMS of height about its millimetre mean
 function preset(p) {
-  const tiles = TILES.map((t, j) => ({ ...t, z: makeTile(t, p, 101 * j + 1) }));
+  const tiles = p.scanId ? [scanTile(p)] : TILES.map((t, j) => ({ ...t, z: makeTile(t, p, 101 * j + 1) }));
   const F = { p, tiles, off: tiles.map(() => [0, 0]), hollowRms: 0 };
   // the RMS of height about its millimetre mean, at the tiles' own resolution (what a hollow is measured in)
   const A = tiles[0], n = A.n, r = Math.round(HOLLOW_MM / 2 / A.dx), z = new Float64Array(n * n);
@@ -129,19 +181,27 @@ function boxPeriodic(f, n, r) {
   return out;
 }
 
+/** Internal tile/strength data for one relief preset and seed (shared with paper-gpu.mjs). */
+export function reliefFieldData(relief = 'cold', seed = 1) {
+  const F = fieldOf(relief, seed);
+  const S = F.p.scanId ? null : strengthOf(seed);
+  return { tiles: F.tiles, off: F.off, rmsUm: F.p.rmsUm, hollowRmsUm: F.hollowRms * F.p.rmsUm, preset: F.p, strength: S };
+}
+
 /**
  * The relief on a grid of w x h cells of `mmPerCell`: each cell's mean height in micrometres (zUm), the height a sheet
  * reads (0.5 + z / HEIGHT_SPAN_UM, clamped to 0..1), and hollowRmsUm, the RMS of the relief about its millimetre mean
- * at full resolution (the unit makePaper measures a hollow in). `relief` a preset name or object.
+ * at full resolution (the unit makePaper measures a hollow in). `relief` a preset name or object. The relief's local
+ * strength is scaled by the seed's centimetre-scale strength field (see the head of this file).
  */
 export function paperRelief(w, h, mmPerCell, { seed = 1, relief = 'cold' } = {}) {
   if (!(mmPerCell > 0)) throw new Error('paper-relief: mmPerCell must be positive');
-  const F = fieldOf(relief, seed), rms = F.p.rmsUm, n = w * h;
+  const F = fieldOf(relief, seed), S = F.p.scanId ? null : strengthOf(seed), rms = F.p.rmsUm, n = w * h;
   // samples a cell: sub-cells no wider than 0.04 mm, a third of the finest wavelength the relief carries (up to 8 a side)
   const k = Math.max(1, Math.min(8, Math.ceil(mmPerCell / 0.04))), zUm = new Float32Array(n), height = new Float32Array(n);
   for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
     let s = 0;
-    for (let a = 0; a < k; a++) for (let b = 0; b < k; b++) s += sampleAt(F, (x + (b + 0.5) / k) * mmPerCell, (y + (a + 0.5) / k) * mmPerCell);
+    for (let a = 0; a < k; a++) for (let b = 0; b < k; b++) { const u = (x + (b + 0.5) / k) * mmPerCell, v = (y + (a + 0.5) / k) * mmPerCell; s += S ? sampleAt(F, u, v) * bilinear(S, u, v) : sampleAt(F, u, v); }
     const i = y * w + x; zUm[i] = (rms * s) / (k * k);
     height[i] = Math.min(1, Math.max(0, 0.5 + zUm[i] / HEIGHT_SPAN_UM));
   }

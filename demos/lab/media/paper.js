@@ -2,6 +2,7 @@
 import { paperRelief, HEIGHT_SPAN_UM } from './paper-relief.js';
 import { grainSurface } from './grain-field.js';
 import { cockleField } from './cockle.js';
+import { fibreThroat } from './fibre-throat.js';
 // a unit of the paper's height is this many mm of the water's surface (sheet.mjs DEFAULTS.slope)
 export const SURFACE_MM = 0.1;
 // Paper: a surface height made of fibres and tooth, and the capacity of its pores. Rough watercolour paper is a
@@ -90,16 +91,17 @@ function buildPaper(w, h, { seed = 1, fibres = 0.5, tooth = 0.5, fibreLength = 1
   // as sunk below their own fibres and the hollows as raised, so a light brush touched the hollows and skipped the hills.
   const toothLo = tl, toothSpan = th - tl || 1;
   const rel = new Float32Array(n); for (let i = 0; i < n; i++) rel[i] = height[i] - (toothLo + toothSpan * toothH[i]);
-  const sorted = Float32Array.from(rel).sort();
-  const gridSpread = Math.max(1e-4, sorted[Math.floor(n * 0.9)] - sorted[Math.floor(n * 0.1)]);
   // On a physical sheet the spread is the paper's own, at full resolution (10th to 90th percentile of a relief of that
   // RMS about its millimetre mean, 2.56 RMS), so a brush reaches the same depth into the same paper on any grid; and
   // subRelief is the part of it a cell's mean hides (the RMS finer than the cell), which softens a cell's contact by
   // the share of its area that stands above a level, where the cell's mean alone would switch it at once.
-  let reliefSpread = gridSpread, subRelief = 0;
+  let reliefSpread, subRelief = 0;
   if (RF) {
     const full = RF.hollowRmsUm / HEIGHT_SPAN_UM; let v = 0; for (let i = 0; i < n; i++) v += rel[i] * rel[i];
     reliefSpread = 2.56 * full; subRelief = Math.sqrt(Math.max(0, full * full - v / n));
+  } else {
+    const sorted = Float32Array.from(rel).sort();
+    reliefSpread = Math.max(1e-4, sorted[Math.floor(n * 0.9)] - sorted[Math.floor(n * 0.1)]);
   }
   // zUm, reliefOf (physical sheets): the relief in micrometres and the seed and preset it was made from (sub-cell grain
   // evaluates the same field finer, subcell-grain.mjs); hollow: each cell's depth below the tooth level in RMS units
@@ -111,7 +113,10 @@ function buildPaper(w, h, { seed = 1, fibres = 0.5, tooth = 0.5, fibreLength = 1
   const ck = physMm > 0 ? cockleField(w, h, physMm, { seed, rmsMm: 0.03, ...cockle }) : null;
   let surface = null;
   if (ck && ck.some(v => v !== 0)) { surface = new Float32Array(n); for (let i = 0; i < n; i++) surface[i] = valley[i] + ck[i] / SURFACE_MM; }
-  return { w, h, n, height, grainH: G.grainH, capacity, valley, ...(surface ? { surface } : {}), proud, tooth: toothH, toothLo, toothSpan, fdx, fdy, grain, relief: reliefSpread, subRelief, mmPerCell: physMm, ...toothHollow(G.grainH, toothH, toothLo, toothSpan, G.unit), ...(RF ? { zUm: RF.zUm, reliefUm: RF.rmsUm, reliefOf: { seed, relief } } : {}) };
+  // fibre: the fibre lying in each cell; fibreHalf: half a fibre's mean length in cells; throat: how hard a wet front finds it
+  // to push into the cell, from the fibre it has to cross and how proud the cell stands (fibre-throat.mjs)
+  const fibreHalf = 0.45 * fibreLength * fs, throat = fibreThroat({ w, h, fibre: fib, proud, fdx, fdy }, fibreHalf);
+  return { w, h, n, height, grainH: G.grainH, capacity, valley, ...(surface ? { surface } : {}), proud, fibre: fib, fibreHalf, throat, tooth: toothH, toothLo, toothSpan, fdx, fdy, grain, relief: reliefSpread, subRelief, mmPerCell: physMm, ...toothHollow(G.grainH, toothH, toothLo, toothSpan, G.unit), ...(RF ? { zUm: RF.zUm, reliefUm: RF.rmsUm, reliefOf: { seed, relief } } : {}) };
 }
 
 /**

@@ -1,6 +1,6 @@
 // The lab's colour render from the WebGPU physics buffers: the same Kubelka-Munk compositing as worker.js renderCpu(), as one
 // compute pass over the sheet. The result sits in a buffer of packed RGBA8 rows; it is copied straight into a WebGPU canvas,
-// or read back as pixels when the page draws with a 2D canvas. The sheet's fields never leave the GPU for this.
+// or read back as pixels when the page draws with a 2D canvas. Also folds superseded TOP layers into BASE on GPU without CPU glaze().
 const WGSL = /* wgsl */ `
 struct C { w: u32, h: u32, n: u32, K: u32, hasTop: u32, pitch: u32, p0: u32, p1: u32, kk: array<vec4<f32>, 16>, ss: array<vec4<f32>, 16> }
 @group(0) @binding(0) var<uniform> c: C;
@@ -9,7 +9,7 @@ struct C { w: u32, h: u32, n: u32, K: u32, hasTop: u32, pitch: u32, p0: u32, p1:
 @group(0) @binding(3) var<storage, read> D: array<f32>;
 @group(0) @binding(4) var<storage, read> TOP: array<f32>;
 @group(0) @binding(5) var<storage, read> W: array<f32>;
-@group(0) @binding(6) var<storage, read> BASE: array<f32>;
+@group(0) @binding(6) var<storage, read_write> BASE: array<f32>;
 @group(0) @binding(7) var<storage, read> GR: array<f32>;
 @group(0) @binding(8) var<storage, read_write> OUT: array<u32>;
 
@@ -54,6 +54,23 @@ fn compose(@builtin(global_invocation_id) g: vec3<u32>) {
   let rgb = R * gr * sheen + vec3<f32>(-reflection, 0.0, reflection);
   OUT[g.y * c.pitch + g.x] = byte(rgb.x) | (byte(rgb.y) << 8u) | (byte(rgb.z) << 16u) | (255u << 24u);
 }
+// Fold the superseded TOP dried wash directly into BASE reflectance on GPU (replaces CPU glaze(baseR, layer) + upload).
+@compute @workgroup_size(8, 8)
+fn fold_top(@builtin(global_invocation_id) g: vec3<u32>) {
+  if (g.x >= c.w || g.y >= c.h) { return; }
+  let i = g.y * c.w + g.x;
+  var xt = 0.0;
+  for (var k = 0u; k < c.K; k++) { xt += TOP[k * c.n + i]; }
+  if (xt <= 1e-7) { return; }
+  var Kc = vec3<f32>(0.0); var Sc = vec3<f32>(0.0);
+  for (var k = 0u; k < c.K; k++) { let f = TOP[k * c.n + i] / xt; Kc += f * c.kk[k].xyz; Sc += f * c.ss[k].xyz; }
+  var R = vec3<f32>(BASE[3u * i], BASE[3u * i + 1u], BASE[3u * i + 2u]);
+  for (var ch = 0u; ch < 3u; ch++) {
+    let rt = layerRT(Kc[ch], Sc[ch], xt);
+    R[ch] = rt.x + rt.y * rt.y * R[ch] / max(1.0 - rt.x * R[ch], 1e-6);
+  }
+  BASE[3u * i] = R.x; BASE[3u * i + 1u] = R.y; BASE[3u * i + 2u] = R.z;
+}
 `;
 
 export class Composer {
@@ -63,19 +80,21 @@ export class Composer {
     d.pushErrorScope('validation');
     this.module = d.createShaderModule({ code: WGSL });
     this.pipeline = d.createComputePipeline({ layout: 'auto', compute: { module: this.module, entryPoint: 'compose' } });
+    this.foldPipeline = d.createComputePipeline({ layout: 'auto', compute: { module: this.module, entryPoint: 'fold_top' } });
     this.ubo = d.createBuffer({ size: 32 + 16 * 16 * 2, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
     this.ready = d.popErrorScope().then(err => { if (err) this.error = err.message; });
+    this.baseAhead = false;
   }
   /** Bind to a GpuSheet's buffers; allocates the output and the two fields the sheet does not hold (base, graphite). */
   attach(gs, baseR, graphite) {
     const d = this.device; this.release();
-    const { w, h, n } = gs, K = this.K;
+    const { w, h, n } = gs;
     this.gs = gs; this.w = w; this.h = h; this.n = n;
     this.pitchBytes = Math.ceil((w * 4) / 256) * 256; this.pitch = this.pitchBytes / 4;
     const mk = (size, usage) => d.createBuffer({ size: Math.max(16, size), usage });
-    this.base = mk(n * 12, GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST);
+    this.base = mk(n * 12, GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST | GPUBufferUsage.COPY_SRC);
     this.gr = mk(n * 4, GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST);
-    this.out = mk(this.pitchBytes * h, GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC);
+    this.out = mk(this.pitchBytes * h, GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST);
     this.rb = mk(this.pitchBytes * h, GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST);
     const u = new ArrayBuffer(32 + 16 * 16 * 2), F = new Float32Array(u, 32);
     this.pigments.forEach((p, k) => { F.set([...p.K, 0], k * 4); F.set([...p.S, 0], 64 + k * 4); });
@@ -88,10 +107,43 @@ export class Composer {
     const b = this.gs.b, e = (binding, buffer) => ({ binding, resource: { buffer } });
     this.group = this.device.createBindGroup({ layout: this.pipeline.getBindGroupLayout(0), entries: [
       e(0, this.ubo), e(1, b.G), e(2, b.P), e(3, b.D), e(4, b.TOP), e(5, b.W), e(6, this.base), e(7, this.gr), e(8, this.out)] });
+    this.foldGroup = this.device.createBindGroup({ layout: this.foldPipeline.getBindGroupLayout(0), entries: [
+      e(0, this.ubo), e(4, b.TOP), e(6, this.base)] });
   }
-  release() { for (const k of ['base', 'gr', 'out', 'rb']) { this[k]?.destroy(); this[k] = null; } }
-  setBase(baseR) { this.device.queue.writeBuffer(this.base, 0, baseR); }
+  release() {
+    this.baseAhead = false;
+    for (const k of ['base', 'gr', 'out', 'rb', 'baseRb']) { this[k]?.destroy(); this[k] = null; }
+  }
+  setBase(baseR) { this.device.queue.writeBuffer(this.base, 0, baseR); this.baseAhead = false; }
   setGraphite(g) { this.device.queue.writeBuffer(this.gr, 0, g); }
+  /** Glaze the current GPU TOP layer directly into GPU BASE reflectance without any CPU readback or glaze(). */
+  foldTop() {
+    const d = this.device, { w, h, n } = this;
+    this.uhead.set([w, h, n, this.K, 1, this.pitch, 0, 0]);
+    d.queue.writeBuffer(this.ubo, 0, this.ubytes, 0, 32);
+    const enc = d.createCommandEncoder(), pass = enc.beginComputePass();
+    pass.setPipeline(this.foldPipeline); pass.setBindGroup(0, this.foldGroup);
+    pass.dispatchWorkgroups(Math.ceil(w / 8), Math.ceil(h / 8)); pass.end();
+    d.queue.submit([enc.finish()]);
+    this.baseAhead = true;
+  }
+  /** Pull GPU BASE back into CPU baseR only when GPU folding has moved BASE ahead. */
+  async syncBase(baseR) {
+    if (!this.baseAhead || !this.base) return false;
+    const d = this.device, bytes = this.n * 12;
+    if (!this.baseRb || this.baseRb.size < bytes) {
+      this.baseRb?.destroy();
+      this.baseRb = d.createBuffer({ size: Math.max(16, bytes), usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST });
+    }
+    const enc = d.createCommandEncoder();
+    enc.copyBufferToBuffer(this.base, 0, this.baseRb, 0, bytes);
+    d.queue.submit([enc.finish()]);
+    await this.baseRb.mapAsync(GPUMapMode.READ, 0, bytes);
+    baseR.set(new Float32Array(this.baseRb.getMappedRange(0, bytes)));
+    this.baseRb.unmap();
+    this.baseAhead = false;
+    return true;
+  }
   /** Draw into `ctx` (a configured WebGPU canvas context) when given; otherwise only fill the output buffer. */
   draw(ctx = null, timer = null) {
     const d = this.device, { w, h, n } = this, hasTop = this.gs.hasTop;
@@ -100,6 +152,21 @@ export class Composer {
     const enc = d.createCommandEncoder(), pass = timer ? timer.pass(enc, 'compose') : enc.beginComputePass();
     pass.setPipeline(this.pipeline); pass.setBindGroup(0, this.group); pass.dispatchWorkgroups(Math.ceil(w / 8), Math.ceil(h / 8)); pass.end();
     if (ctx) enc.copyBufferToTexture({ buffer: this.out, bytesPerRow: this.pitchBytes, rowsPerImage: h }, { texture: ctx.getCurrentTexture() }, { width: w, height: h });
+    d.queue.submit([enc.finish()]);
+  }
+  /** Blit pre-rendered RGBA pixels (e.g. 2x sub-cell super-sampled dry finish) straight into the WebGPU canvas. */
+  presentRgba(ctx, rgba) {
+    if (!ctx || !this.out) return;
+    const d = this.device, { w, h, pitchBytes } = this, rowBytes = w * 4;
+    if (pitchBytes === rowBytes) {
+      d.queue.writeBuffer(this.out, 0, rgba, 0, rowBytes * h);
+    } else {
+      const padded = new Uint8Array(pitchBytes * h);
+      for (let y = 0; y < h; y++) padded.set(rgba.subarray(y * rowBytes, (y + 1) * rowBytes), y * pitchBytes);
+      d.queue.writeBuffer(this.out, 0, padded);
+    }
+    const enc = d.createCommandEncoder();
+    enc.copyBufferToTexture({ buffer: this.out, bytesPerRow: pitchBytes, rowsPerImage: h }, { texture: ctx.getCurrentTexture() }, { width: w, height: h });
     d.queue.submit([enc.finish()]);
   }
   /** The last drawn pixels, top row first. Waits for the GPU. */

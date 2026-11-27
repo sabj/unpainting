@@ -49,24 +49,81 @@ export function sweepAngle(points) {
   return th;
 }
 
-function distance(inside, gw, gh) {
+// Sequential, callback-free transforms can share row workspace; returned fields
+// still own their buffers because a plan keeps several distances alive at once.
+let distanceLo = new Int32Array(0), distanceHi = new Int32Array(0);
+function distance(inside, gw, gh, out = null) {
   // two-pass chamfer distance (in grid cells) from each inside cell to the nearest outside cell
-  const D = new Float32Array(gw * gh), R2 = Math.SQRT2;
-  for (let i = 0; i < D.length; i++) D[i] = inside[i] ? 1e9 : 0;
-  for (let y = 0; y < gh; y++) for (let x = 0; x < gw; x++) { const i = y * gw + x; if (!D[i]) continue; let d = D[i]; if (x) d = Math.min(d, D[i - 1] + 1); if (y) { d = Math.min(d, D[i - gw] + 1); if (x) d = Math.min(d, D[i - gw - 1] + R2); if (x < gw - 1) d = Math.min(d, D[i - gw + 1] + R2); } else d = Math.min(d, 1); if (!x || x === gw - 1) d = Math.min(d, 1); D[i] = d; }
-  for (let y = gh - 1; y >= 0; y--) for (let x = gw - 1; x >= 0; x--) { const i = y * gw + x; if (!D[i]) continue; let d = D[i]; if (x < gw - 1) d = Math.min(d, D[i + 1] + 1); if (y < gh - 1) { d = Math.min(d, D[i + gw] + 1); if (x < gw - 1) d = Math.min(d, D[i + gw + 1] + R2); if (x) d = Math.min(d, D[i + gw - 1] + R2); } else d = Math.min(d, 1); D[i] = d; }
+  const n = gw * gh, D = out ?? new Float32Array(n), R2 = Math.SQRT2;
+  if (distanceLo.length < gh) { distanceLo = new Int32Array(gh); distanceHi = new Int32Array(gh); }
+  const lo = distanceLo, hi = distanceHi;
+  D.fill(0);
+  for (let y = 0; y < gh; y++) {
+    const row = y * gw, end = row + gw;
+    let a = row, b = end - 1;
+    while (a+3 < end && !(inside[a] || inside[a+1] || inside[a+2] || inside[a+3])) a += 4;
+    while (a < end && !inside[a]) a++;
+    while (b-3 >= a && !(inside[b] || inside[b-1] || inside[b-2] || inside[b-3])) b -= 4;
+    while (b >= a && !inside[b]) b--;
+    lo[y] = a-row; hi[y] = b-row;
+    for (let i = a; i <= b; i++) if (inside[i]) D[i] = 1e9;
+  }
+  for (let y = 0; y < gh; y++) {
+    const row = y * gw;
+    for (let x = lo[y]; x <= hi[y]; x++) {
+      const i = row + x;
+      let d = D[i];
+      if (!d) continue;
+      if (x) { const v = D[i - 1] + 1; if (v < d) d = v; }
+      if (y) {
+        let v = D[i - gw] + 1; if (v < d) d = v;
+        if (x) { v = D[i - gw - 1] + R2; if (v < d) d = v; }
+        if (x < gw - 1) { v = D[i - gw + 1] + R2; if (v < d) d = v; }
+      } else if (1 < d) d = 1;
+      if ((!x || x === gw - 1) && 1 < d) d = 1;
+      D[i] = d;
+    }
+  }
+  for (let y = gh - 1; y >= 0; y--) {
+    const row = y * gw;
+    for (let x = hi[y]; x >= lo[y]; x--) {
+      const i = row + x;
+      let d = D[i];
+      if (!d) continue;
+      if (x < gw - 1) { const v = D[i + 1] + 1; if (v < d) d = v; }
+      if (y < gh - 1) {
+        let v = D[i + gw] + 1; if (v < d) d = v;
+        if (x < gw - 1) { v = D[i + gw + 1] + R2; if (v < d) d = v; }
+        if (x) { v = D[i + gw - 1] + R2; if (v < d) d = v; }
+      } else if (1 < d) d = 1;
+      D[i] = d;
+    }
+  }
   return D;
 }
 
 /** Clears the 4-connected parts of `m` smaller than `least` cells. */
 function dropSmall(m, gw, gh, least) {
-  const seen = new Uint8Array(m.length), stack = [];
-  for (let s0 = 0; s0 < m.length; s0++) {
+  const n = m.length, seen = new Uint8Array(n), stack = new Int32Array(n), part = new Int32Array(n);
+  for (let s0 = 0; s0 < n; s0++) {
     if (!m[s0] || seen[s0]) continue;
-    const part = []; stack.push(s0); seen[s0] = 1;
-    while (stack.length) { const i = stack.pop(), x = i % gw; part.push(i); for (const j of [x ? i - 1 : -1, x < gw - 1 ? i + 1 : -1, i - gw, i + gw]) if (j >= 0 && j < m.length && m[j] && !seen[j]) { seen[j] = 1; stack.push(j); } }
-    if (part.length < least) for (const i of part) m[i] = 0;
+    let sp = 0, pp = 0; stack[sp++] = s0; seen[s0] = 1;
+    while (sp) {
+      const i = stack[--sp], x = i % gw;
+      part[pp++] = i;
+      if (x && m[i - 1] && !seen[i - 1]) { seen[i - 1] = 1; stack[sp++] = i - 1; }
+      if (x < gw - 1 && m[i + 1] && !seen[i + 1]) { seen[i + 1] = 1; stack[sp++] = i + 1; }
+      const u = i - gw; if (u >= 0 && m[u] && !seen[u]) { seen[u] = 1; stack[sp++] = u; }
+      const d = i + gw; if (d < n && m[d] && !seen[d]) { seen[d] = 1; stack[sp++] = d; }
+    }
+    if (pp < least) for (let k = 0; k < pp; k++) m[part[k]] = 0;
   }
+}
+
+function invertMask(m) {
+  const o = new Uint8Array(m.length);
+  for (let i = 0; i < o.length; i++) o[i] = 1 - m[i];
+  return o;
 }
 
 /** A polyline with points no closer than `gap` (its ends kept). */
@@ -381,70 +438,103 @@ export function laneFill(loops, { kitMm, growMm = 0, keepOut = null, spine = tru
   const gw = Math.ceil((x1 - x0) / pitch) + 2 * pad + 1, gh = Math.ceil((y1 - y0) / pitch) + 2 * pad + 1, gn = gw * gh;
   const fill = ls => {
     const m = new Uint8Array(gn);
-    for (let gy = 0; gy < gh; gy++) {
-      const v = oy + (gy + .5) * pitch, xs = [];
-      for (const l of ls) for (let q = 0; q < l.points.length; q++) { const P = l.points[q], Q = l.points[(q + 1) % l.points.length]; if ((P[1] <= v) !== (Q[1] <= v)) xs.push(P[0] + (v - P[1]) / (Q[1] - P[1]) * (Q[0] - P[0])); }
+    if (!ls.length) return m;
+    let allY0 = Infinity, allY1 = -Infinity;
+    const spans = new Array(ls.length);
+    for (let k = 0; k < ls.length; k++) {
+      const P = ls[k].points;
+      let ly0 = Infinity, ly1 = -Infinity;
+      for (let q = 0; q < P.length; q++) { const y = P[q][1]; if (y < ly0) ly0 = y; if (y > ly1) ly1 = y; }
+      spans[k] = [ly0, ly1];
+      if (ly0 < allY0) allY0 = ly0;
+      if (ly1 > allY1) allY1 = ly1;
+    }
+    const gy0 = Math.max(0, Math.floor((allY0 - oy) / pitch - 0.5));
+    const gy1 = Math.min(gh - 1, Math.ceil((allY1 - oy) / pitch - 0.5));
+    const xs = [];
+    for (let gy = gy0; gy <= gy1; gy++) {
+      const v = oy + (gy + .5) * pitch;
+      xs.length = 0;
+      for (let k = 0; k < ls.length; k++) {
+        const [ly0, ly1] = spans[k];
+        if (v < ly0 || v > ly1) continue;
+        const P = ls[k].points;
+        for (let q = 0, len = P.length; q < len; q++) {
+          const A = P[q], B = P[q + 1 < len ? q + 1 : 0];
+          if ((A[1] <= v) !== (B[1] <= v)) xs.push(A[0] + (v - A[1]) / (B[1] - A[1]) * (B[0] - A[0]));
+        }
+      }
+      if (xs.length < 2) continue;
       xs.sort((a, b) => a - b);
-      for (let q = 0; q + 1 < xs.length; q += 2) for (let gx = Math.max(0, Math.ceil((xs[q] - ox) / pitch - .5)); gx < gw && ox + (gx + .5) * pitch < xs[q + 1]; gx++) m[gy * gw + gx] = 1;
+      const row = gy * gw;
+      for (let q = 0; q + 1 < xs.length; q += 2) for (let gx = Math.max(0, Math.ceil((xs[q] - ox) / pitch - .5)); gx < gw && ox + (gx + .5) * pitch < xs[q + 1]; gx++) m[row + gx] = 1;
     }
     return m;
   };
   const inside = fill(loops);
   if (growMm > 0) {
-    const out = distance(Uint8Array.from(inside, v => 1 - v), gw, gh), barred = keepOut?.length ? fill(keepOut) : null;
+    const out = distance(invertMask(inside), gw, gh), barred = keepOut?.length ? fill(keepOut) : null;
     for (let i = 0; i < gn; i++) if (!inside[i] && out[i] * pitch <= growMm && !barred?.[i]) inside[i] = 1;
   }
   let area = 0; for (let i = 0; i < gn; i++) area += inside[i];
   if (!area) return { strokes: [], brushMm: 0, angle: 0, depthMm: 0, areaMm2: 0, uncovered: 0 };
   const covered = new Uint8Array(gn), strokes = [];
-  const at = (x, y) => { const gx = Math.floor((x - ox) / pitch), gy = Math.floor((y - oy) / pitch); return gx >= 0 && gy >= 0 && gx < gw && gy < gh ? gy * gw + gx : -1; };
-  // a turn from one lane's end to the next lane's start stays on the part (no more than a brush's tip off it): it is
-  // short (no longer than three lane steps) and its points every half cell lie on the part or its grown margin
-  // (`off`: each cell's distance to the part, in grid cells; `reach`: mm the turn may run off the part)
-  const turnOnPart = (A, B, off, reach) => {
-    const len = Math.hypot(B[0] - A[0], B[1] - A[1]), steps = Math.ceil(len / (pitch / 2));
-    for (let s = 1; s < steps; s++) { const i = at(A[0] + (B[0] - A[0]) * s / steps, A[1] + (B[1] - A[1]) * s / steps); if (i < 0 || off[i] * pitch > reach + pitch) return false; }
-    return true;
-  };
   // a round's footprint: a disc of the half-width its pressure gives, every half cell along the path
   const stamp = (pts, r) => {
     for (let q = 0; q + 1 < pts.length; q++) {
       const A = pts[q], B = pts[q + 1], len = Math.hypot(B[0] - A[0], B[1] - A[1]), steps = Math.max(1, Math.ceil(len / (pitch / 2)));
       for (let s = 0; s <= steps; s++) {
         const t = s / steps, cx = A[0] + (B[0] - A[0]) * t, cy = A[1] + (B[1] - A[1]) * t, hr = halfAt(r, (A[2] ?? 1) + ((B[2] ?? 1) - (A[2] ?? 1)) * t), rc = hr / pitch;
-        const gx = (cx - ox) / pitch, gy = (cy - oy) / pitch;
-        for (let y = Math.max(0, Math.floor(gy - rc)); y <= Math.min(gh - 1, Math.ceil(gy + rc)); y++) for (let x = Math.max(0, Math.floor(gx - rc)); x <= Math.min(gw - 1, Math.ceil(gx + rc)); x++) if ((x + .5 - gx) ** 2 + (y + .5 - gy) ** 2 <= rc * rc) covered[y * gw + x] = 1;
+        const gx = (cx - ox) / pitch, gy = (cy - oy) / pitch, r2 = rc * rc;
+        const y0s = Math.max(0, Math.floor(gy - rc)), y1s = Math.min(gh - 1, Math.ceil(gy + rc));
+        const x0s = Math.max(0, Math.floor(gx - rc)), x1s = Math.min(gw - 1, Math.ceil(gx + rc));
+        for (let y = y0s; y <= y1s; y++) {
+          const dy2 = (y + .5 - gy) ** 2, row = y * gw;
+          for (let x = x0s; x <= x1s; x++) if ((x + .5 - gx) ** 2 + dy2 <= r2) covered[row + x] = 1;
+        }
       }
     }
   };
+  const at = (x, y) => { const gx = Math.floor((x - ox) / pitch), gy = Math.floor((y - oy) / pitch); return gx >= 0 && gy >= 0 && gx < gw && gy < gh ? gy * gw + gx : -1; };
+  const turnOnPart = (A, B, off, reach) => {
+    const len = Math.hypot(B[0] - A[0], B[1] - A[1]), steps = Math.ceil(len / (pitch / 2));
+    for (let s = 1; s < steps; s++) { const i = at(A[0] + (B[0] - A[0]) * s / steps, A[1] + (B[1] - A[1]) * s / steps); if (i < 0 || off[i] * pitch > reach + pitch) return false; }
+    return true;
+  };
   let first = null;
+  const scratchStack = new Int32Array(gn), scratchCompInv = new Uint8Array(gn), scratchDist = new Float32Array(gn);
   // one part (a 0/1 grid) laid in lanes by the brushes of `kit` that are no wider than `widest`
   const layPart = (part, widest, depth) => {
     const cells = []; for (let i = 0; i < gn; i++) if (part[i]) cells.push(i);
     if (!cells.length) return;
-    const P = cells.map(i => [ox + (i % gw + .5) * pitch, oy + (((i / gw) | 0) + .5) * pitch]);
-    let mx = 0, my = 0; for (const [x, y] of P) { mx += x; my += y; } mx /= P.length; my /= P.length;
-    let a = 0, b = 0, c = 0; for (const [x, y] of P) { const dx = x - mx, dy = y - my; a += dx * dx; b += dx * dy; c += dy * dy; }
+    const P = new Array(cells.length);
+    let mx = 0, my = 0;
+    for (let idx = 0; idx < cells.length; idx++) {
+      const i = cells[idx], x = ox + (i % gw + .5) * pitch, y = oy + (((i / gw) | 0) + .5) * pitch;
+      P[idx] = [x, y]; mx += x; my += y;
+    }
+    mx /= P.length; my /= P.length;
+    let a = 0, b = 0, c = 0; for (let idx = 0; idx < P.length; idx++) { const dx = P[idx][0] - mx, dy = P[idx][1] - my; a += dx * dx; b += dx * dy; c += dy * dy; }
     const mean = (a + c) / 2, d = Math.sqrt(((a - c) / 2) ** 2 + b * b), long = Math.sqrt((mean + d) / Math.max(1e-9, mean - d));
     let th = long >= (depth ? LEFT_LONG : LONG) ? 0.5 * Math.atan2(2 * b, a - c) : 0;
     // a part that is not long overall but whose edges mostly run one way (a mass of slanting shadow streaks) is laid along
     // its edges: level lanes would end in a step at every slanting edge
     if (!th && !depth) {
       let jxx = 0, jxy = 0, jyy = 0;
-      for (const i of cells) { const x = i % gw; const gx = (x < gw - 1 ? part[i + 1] : 0) - (x ? part[i - 1] : 0), gy = (i + gw < gn ? part[i + gw] : 0) - (i >= gw ? part[i - gw] : 0); if (gx || gy) { jxx += gx * gx; jxy += gx * gy; jyy += gy * gy; } }
+      for (let idx = 0; idx < cells.length; idx++) { const i = cells[idx], x = i % gw; const gx = (x < gw - 1 ? part[i + 1] : 0) - (x ? part[i - 1] : 0), gy = (i + gw < gn ? part[i + gw] : 0) - (i >= gw ? part[i - gw] : 0); if (gx || gy) { jxx += gx * gx; jxy += gx * gy; jyy += gy * gy; } }
       const tr = jxx + jyy, dd = Math.sqrt(((jxx - jyy) / 2) ** 2 + jxy * jxy);
       if (tr > 0 && 2 * dd / tr >= EDGE_COHERENT) th = 0.5 * Math.atan2(2 * jxy, jxx - jyy) + Math.PI / 2;
     }
     const tx = Math.cos(th), ty = Math.sin(th);
     // the lanes' normal points down the sheet (or right, for an upright shape), so the lanes go top down
     let nx = -ty, ny = tx; if (ny < -1e-6 || (Math.abs(ny) <= 1e-6 && nx < 0)) { nx = -nx; ny = -ny; }
-    const D = distance(part, gw, gh); let deep = 0, meanD = 0; for (const i of cells) { if (D[i] > deep) deep = D[i]; meanD += D[i] / cells.length; }
+    const D = distance(part, gw, gh); let deep = 0, meanD = 0; for (let idx = 0; idx < cells.length; idx++) { const di = D[cells[idx]]; if (di > deep) deep = di; meanD += di / cells.length; }
     // the part's own flow (the main part of a wash, not a bare corner laid again): its lanes bent along its middle line
     // (wash-form.mjs cellsBend), so they run round a curving shape instead of straight across it, each with its own waver
     const bend = depth ? null : cellsBend(P, tx, ty, nx, ny, pitch, Math.min(2 * deep, 4 * meanD) * pitch);
     const bend_ = bend ? bend.c : () => 0;
     let v0 = Infinity, v1 = -Infinity, u0 = Infinity, u1 = -Infinity;
-    for (const [x, y] of P) { const u = x * tx + y * ty, v = x * nx + y * ny - bend_(u); if (v < v0) v0 = v; if (v > v1) v1 = v; if (u < u0) u0 = u; if (u > u1) u1 = u; }
+    for (let idx = 0; idx < P.length; idx++) { const x = P[idx][0], y = P[idx][1], u = x * tx + y * ty, v = x * nx + y * ny - bend_(u); if (v < v0) v0 = v; if (v > v1) v1 = v; if (u < u0) u0 = u; if (u > u1) u1 = u; }
     v0 -= pitch / 2; v1 += pitch / 2; u0 -= pitch; u1 += pitch;
     // the brush is held to the part's typical width (four times its mean depth: a strip's width), not its widest: a mass of
     // shadow streaks with lit stone between them is laid streak by streak, not blotted over with a mop
@@ -503,7 +593,7 @@ export function laneFill(loops, { kitMm, growMm = 0, keepOut = null, spine = tru
         // where washes meet; src/media/tuft-section.mjs). A turn is laid by the brush's side at the tip's pressure, so
         // the lane ends that meet in a turn are not carried past the outline as an end that lifts is (the brush going
         // round would push the wash out past it).
-        off ??= distance(Uint8Array.from(part, vv => 1 - vv), gw, gh);
+        off ??= distance(invertMask(part), gw, gh);
         // the turn is judged between the ends as they will be laid (an end carried past the outline is not kept in a
         // turn) and must stay on the part to within a grid cell: a turn across a gap (a window's glazing bar, the paper
         // between two panes) would paint it
@@ -520,6 +610,12 @@ export function laneFill(loops, { kitMm, growMm = 0, keepOut = null, spine = tru
           const st = join.st;
           if (st._endExt && st.points.length > 2) st.points.pop();
           if (startExt) pts.shift();
+          // Ease wide wash brushes toward the tip around tight 180° hairpin turns so the towed tuft does not swing a sharp spike past the outline.
+          if (r >= 6) {
+            const turnEnd = st.points[st.points.length - 1];
+            turnEnd[2] = Math.min(turnEnd[2], 0.45);
+            pts[0][2] = Math.min(pts[0][2], 0.45);
+          }
           stamp([st.points[st.points.length - 1], pts[0]], r); stamp(pts, r); st.points.push(...pts); st._endExt = endExt;
           open.splice(open.indexOf(st), 1); next.push(st);
         } else { stamp(pts, r); const st = { kind: 'sweep', radiusMm: +r.toFixed(3), points: pts, _endExt: endExt }; strokes.push(st); next.push(st); }
@@ -529,17 +625,37 @@ export function laneFill(loops, { kitMm, growMm = 0, keepOut = null, spine = tru
     });
     if (depth >= 3) return;
     // what the lanes left bare, less the slivers the wet wash closes by itself, laid with a smaller brush
-    const raw = Uint8Array.from(part, (vv, i) => (vv && !covered[i] ? 1 : 0)), o = BARE_WIDE_MM / 2 / pitch;
-    const shrunk = Uint8Array.from(distance(raw, gw, gh), dd => (dd > o ? 1 : 0)), back = distance(Uint8Array.from(shrunk, vv => 1 - vv), gw, gh);
-    const bare = Uint8Array.from(raw, (vv, i) => (vv && back[i] <= o + 1 ? 1 : 0));
+    const raw = new Uint8Array(gn), o = BARE_WIDE_MM / 2 / pitch;
+    let anyRaw = false;
+    for (let i = 0; i < gn; i++) if (part[i] && !covered[i]) { raw[i] = 1; anyRaw = true; }
+    if (!anyRaw) return;
+    const dRaw = distance(raw, gw, gh, scratchDist), shrunkInv = new Uint8Array(gn);
+    for (let i = 0; i < gn; i++) shrunkInv[i] = dRaw[i] > o ? 0 : 1;
+    const back = distance(shrunkInv, gw, gh, scratchDist), bare = new Uint8Array(gn), oLim = o + 1;
+    let anyBare = false;
+    for (let i = 0; i < gn; i++) if (raw[i] && back[i] <= oLim) { bare[i] = 1; anyBare = true; }
+    if (!anyBare) return;
     dropSmall(bare, gw, gh, BARE_LEAST_MM2 / (pitch * pitch));
     // each bare part on its own, a little grown into what is laid so its lanes meet the wash
     const seen = new Uint8Array(gn);
+    const compCells = [];
     for (let s0 = 0; s0 < gn; s0++) {
       if (!bare[s0] || seen[s0]) continue;
-      const comp = new Uint8Array(gn), stack = [s0]; seen[s0] = 1;
-      while (stack.length) { const i = stack.pop(), x = i % gw; comp[i] = 1; for (const j of [x ? i - 1 : -1, x < gw - 1 ? i + 1 : -1, i - gw, i + gw]) if (j >= 0 && j < gn && bare[j] && !seen[j]) { seen[j] = 1; stack.push(j); } }
-      const near = distance(Uint8Array.from(comp, vv => 1 - vv), gw, gh), grown = Uint8Array.from(near, (dd, i) => (part[i] && dd * pitch <= 1 ? 1 : 0));
+      compCells.length = 0;
+      let sp = 0;
+      scratchStack[sp++] = s0; seen[s0] = 1;
+      while (sp) {
+        const i = scratchStack[--sp], x = i % gw;
+        compCells.push(i);
+        if (x && bare[i - 1] && !seen[i - 1]) { seen[i - 1] = 1; scratchStack[sp++] = i - 1; }
+        if (x < gw - 1 && bare[i + 1] && !seen[i + 1]) { seen[i + 1] = 1; scratchStack[sp++] = i + 1; }
+        const u = i - gw; if (u >= 0 && bare[u] && !seen[u]) { seen[u] = 1; scratchStack[sp++] = u; }
+        const d2 = i + gw; if (d2 < gn && bare[d2] && !seen[d2]) { seen[d2] = 1; scratchStack[sp++] = d2; }
+      }
+      scratchCompInv.fill(1);
+      for (let idx = 0; idx < compCells.length; idx++) scratchCompInv[compCells[idx]] = 0;
+      const near = distance(scratchCompInv, gw, gh, scratchDist), grown = new Uint8Array(gn);
+      for (let i = 0; i < gn; i++) if (part[i] && near[i] * pitch <= 1) grown[i] = 1;
       layPart(grown, brush - 1e-6, depth + 1);
     }
   };

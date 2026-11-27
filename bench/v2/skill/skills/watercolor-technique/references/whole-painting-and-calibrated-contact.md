@@ -18,7 +18,7 @@ Review the picture as well as the material measurements. Check its intermediate 
 
 Preserve useful drawing geometry when testing a technique change. Check the opening drawing, broad wash, dried layer and finish against their separate jobs. If a gap or scratch already exists when paint is laid down, first inspect whether the brush touched the paper and released paint; changing a later drying stage may not address it.
 
-Save checkpoints at simulation cell density and record physical dimensions, paper settings, palette, brush load, operation order and source version. A smaller view of the whole picture helps check composition; fine ink and texture need inspection at the simulation's original resolution. Enlarging an export does not add simulation detail.
+Save checkpoints at simulation cell density and record physical dimensions, paper settings, palette, brush load, operation order and source version. A smaller view of the whole picture helps check composition; inspect fine ink and texture at native density and in the finer final render. The final render can reconstruct deposited wash edges and the same paper's sub-cell grain while conserving pigment. Resizing an exported image alone adds no detail; a finer render does not rerun water flow.
 
 ## Keep comparisons bounded
 

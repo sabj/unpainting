@@ -3,10 +3,10 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
 import { renderSetting, outOf, paintHere, renderer } from './render.mjs';
 import { namedPaths, jobInputs, workerArgs, homePaths, workerEnv } from './render-ship.mjs';
-import { claim, claims, release, markStarted, waitRank, places, podPlacesKept, costOf, paintOnPool, WorkerFailure, WorkersFailed, registerClient, podsDaemon, daemonProcessAlive, DAEMON_GONE_GRACE_S } from './render-pool.mjs';
+import { claim, claims, release, markStarted, waitRank, places, podPlacesKept, costOf, paintOnPool, WorkerFailure, WorkersFailed, registerClient, miniCheckout, podsDaemon, daemonProcessAlive, DAEMON_GONE_GRACE_S } from './render-pool.mjs';
 import { paintJob } from './render-worker.mjs';
 import { shellWords, keptCommand } from './render-replay.mjs';
 
@@ -83,16 +83,16 @@ test('the worker\'s environment keeps what changes the painting and none of this
 test('places: one painting a worker, a claim held while its process lives, waiting jobs in their order', () => {
   const dir = tmp();
   assert.equal(claim(dir, 'pod-a', { job: 1, kind: 'look' }), true); assert.equal(claim(dir, 'pod-a', { job: 2, kind: 'look' }), false);
-  markStarted(dir, 'pod-a'); assert.ok(claims(dir)['pod-a'].started);
+  markStarted(dir, 'pod-a', 1); assert.ok(claims(dir)['pod-a'].started);
   assert.equal(claim(dir, 'mini-0', { job: 3, pid: 999999, kind: 'look' }, () => true), true);
   assert.deepEqual(Object.keys(claims(dir, pid => pid === process.pid)), ['pod-a']);
   assert.equal(claim(dir, 'mini-0', { job: 4, kind: 'look' }, pid => pid === process.pid), true, 'a dead process\'s claim is cleared');
-  release(dir, 'pod-a'); assert.equal(claim(dir, 'pod-a', { job: 5, kind: 'look' }), true);
+  release(dir, 'pod-a', 1); assert.equal(claim(dir, 'pod-a', { job: 5, kind: 'look' }), true);
   fs.mkdirSync(path.join(dir, 'waiting'));
   for (const [id, since] of [['b', 2], ['a', 1], ['c', 3]]) fs.writeFileSync(path.join(dir, 'waiting', `${id}.json`), JSON.stringify({ id, pid: process.pid, since }));
   assert.deepEqual(['a', 'b', 'c'].map(id => waitRank(dir, id)), [0, 1, 2]);
   fs.writeFileSync(path.join(dir, 'waiting', 'f.json'), JSON.stringify({ id: 'f', pid: process.pid, since: 9, kind: 'painting' }));
-  assert.equal(waitRank(dir, 'f'), 0, 'a painting does not wait behind looks: they wait for other places');
+  assert.equal(waitRank(dir, 'f'), 3, 'looks and paintings can share pod slots');
   // a waiter that cannot take any place free now does not hold back a later one that can (a pod-only job while the mini alone is free)
   assert.equal(waitRank(dir, 'c', undefined, w => w.id !== 'a'), 1, 'a, which could take no free place, is skipped'); assert.equal(waitRank(dir, 'c', undefined, () => false), 0);
   const mini = { host: 'mini', slots: 2 }, free = new Set(places({ mini, local: 0, commit: 'abc', kind: 'look', only: ['mini'] }).map(p => p.slot));
@@ -104,7 +104,7 @@ test('benchmark jobs go first: an operator\'s job takes a place only while none 
   const dir = tmp(); fs.mkdirSync(path.join(dir, 'waiting'));
   assert.equal(claim(dir, 'mini-0', { job: 'p1', kind: 'profile' }), true);
   assert.equal(claim(dir, 'mini-1', { job: 'p2', kind: 'operator look' }), false, 'one operator job in the whole pool');
-  release(dir, 'mini-0');
+  release(dir, 'mini-0', 'p1');
   fs.writeFileSync(path.join(dir, 'waiting', 'b.json'), JSON.stringify({ id: 'b', pid: process.pid, since: 1, kind: 'look' }));
   assert.equal(claim(dir, 'mini-0', { job: 'p3', kind: 'profile' }), false, 'a benchmark job is waiting');
   assert.equal(claim(dir, 'mini-0', { job: 'b', kind: 'look' }), true);
@@ -112,7 +112,7 @@ test('benchmark jobs go first: an operator\'s job takes a place only while none 
   const d2 = tmp(); fs.mkdirSync(path.join(d2, 'waiting'));
   fs.writeFileSync(path.join(d2, 'waiting', 'f.json'), JSON.stringify({ id: 'f', pid: process.pid, since: 1, kind: 'painting' }));
   assert.equal(claim(d2, 'mini-0', { job: 'op', kind: 'operator look' }), true, 'only a job waiting for the same kind of place blocks it');
-  release(d2, 'mini-0'); fs.writeFileSync(path.join(d2, 'waiting', 'l.json'), JSON.stringify({ id: 'l', pid: process.pid, since: 2, kind: 'look' }));
+  release(d2, 'mini-0', 'op'); fs.writeFileSync(path.join(d2, 'waiting', 'l.json'), JSON.stringify({ id: 'l', pid: process.pid, since: 2, kind: 'look' }));
   assert.equal(claim(d2, 'mini-0', { job: 'op', kind: 'operator look' }), false, 'a session\'s look waits for the mini too');
 });
 
@@ -208,4 +208,149 @@ test('a full-size painting goes to a pod, and to the mini only when the operator
   assert.deepEqual(places({ pods: [], mini, commit, kind: 'painting', only: ['mini'] }).map(p => p.slot), ['mini-0', 'mini-1', 'mini-2']);
   // a look named for the mini alone leaves this Mac out
   assert.deepEqual(places({ pods: [], mini, commit, kind: 'look', only: ['mini'] }).map(p => p.worker.kind), ['mini', 'mini', 'mini']);
+});
+
+test('stale claim recovery serializes contenders and release/start require the current job token', async () => {
+  const dir = tmp();
+  assert.equal(claim(dir, 'local-0', { pid: 999999, job: 'dead', kind: 'look' }, () => true), true);
+  let contender;
+  assert.equal(claim(dir, 'local-0', { job: 'new', kind: 'look' }, () => {
+    contender = claim(dir, 'local-0', { job: 'racer', kind: 'look' }, () => false);
+    return false;
+  }), true);
+  assert.equal(contender, false, 'a second stale observer cannot enter the mutation');
+  assert.equal(await release(dir, 'local-0', 'dead'), false);
+  assert.equal(markStarted(dir, 'local-0', 'dead'), false);
+  assert.equal(claims(dir)['local-0'].job, 'new');
+  assert.equal(markStarted(dir, 'local-0', 'new'), true);
+  assert.equal(await release(dir, 'local-0', 'new'), true);
+});
+
+test('concurrent processes recovering a dead claim admit exactly one painter', async () => {
+  const dir = tmp();
+  claim(dir, 'local-0', { pid: 999999, job: 'dead', kind: 'look' }, () => true);
+  fs.mkdirSync(path.join(dir, 'claims', 'local-0.json.locks', '999999-abandoned'), { recursive: true });
+  const module = new URL('./render-pool.mjs', import.meta.url).href;
+  const script = `import {claim} from ${JSON.stringify(module)}; console.log(claim(process.argv[1], 'local-0', {job: process.argv[2], kind: 'look', pid: process.ppid}));`;
+  const attempts = await Promise.all(Array.from({ length: 8 }, (_, j) => new Promise((resolve, reject) => {
+    const child = spawn(process.execPath, ['--input-type=module', '-e', script, dir, String(j)]);
+    let out = ''; child.stdout.on('data', d => { out += d; }); child.on('error', reject);
+    child.on('close', code => code === 0 ? resolve(out.trim()) : reject(new Error(`claim child ${code}`)));
+  })));
+  assert.equal(attempts.filter(x => x === 'true').length, 1);
+});
+
+test('FIFO ranks local-only finals and looks by their shared open slots', () => {
+  const dir = tmp(), waiting = path.join(dir, 'waiting'); fs.mkdirSync(waiting);
+  for (const [id, kind, only, since] of [['final', 'painting', ['local', 'mini'], 1], ['look', 'look', ['local'], 2], ['pod', 'painting', ['pod'], 0]]) {
+    fs.writeFileSync(path.join(waiting, `${id}.json`), JSON.stringify({ id, kind, only, since, pid: process.pid }));
+  }
+  assert.equal(waitRank(dir, 'look'), 1);
+  assert.equal(waitRank(dir, 'final'), 0);
+  assert.equal(waitRank(dir, 'look', undefined, w => w.only.includes('local')), 1);
+});
+
+test('client allowlists persist and the pods daemon excludes clients that cannot use pods', () => {
+  const dir = tmp(), f = registerClient(dir, { sessions: 8, commit: 'abc', only: 'local,mini' });
+  assert.deepEqual(JSON.parse(fs.readFileSync(f)).only, ['local', 'mini']);
+  const source = new URL('../cloud/render-pool-pods.py', import.meta.url).pathname;
+  const script = `import ast, json, pathlib, sys
+source, pool = sys.argv[1:]
+module = ast.parse(pathlib.Path(source).read_text())
+fn = next(n for n in module.body if isinstance(n, ast.FunctionDef) and n.name == 'live_clients')
+ns = dict(POOL=pathlib.Path(pool), json=json, alive=lambda pid: True)
+exec(compile(ast.Module(body=[fn], type_ignores=[]), source, 'exec'), ns)
+assert ns['live_clients']() == []
+for only, expected in [(None, 1), (['pod'], 1), ([], 0), (['mini'], 0)]:
+ p = pathlib.Path(pool) / 'clients' / 'test.json'
+ p.write_text(json.dumps(dict(pid=123, sessions=3, commit='def', only=only)))
+ assert len(ns['live_clients']()) == expected, only
+`;
+  execFileSync('python3', ['-c', script, source, dir]);
+});
+
+test('benchmark inherits a no-pod allowlist unless --pool explicitly overrides it', () => {
+  const cli = new URL('./run-benchmark.mjs', import.meta.url).pathname;
+  const args = [cli, '--out', tmp(), '--models', 'astra', '--levels', 'L3'];
+  const run = extra => execFileSync(process.execPath, [...args, ...extra], { encoding: 'utf8', env: { ...process.env, UNPAINT_POOL_ONLY: 'local,mini' } });
+  assert.match(run([]), /UNPAINT_POOL_ONLY=local,mini/);
+  assert.match(run(['--pool', 'pod']), /UNPAINT_POOL_ONLY=pod/);
+});
+
+test('mini checkout serializes installs and publishes readiness only after checkout and npm succeed', async () => {
+  const home = tmp(), bin = path.join(home, 'bin'), commit = 'a'.repeat(40), tree = path.join(home, 'work', 'unpainting-c-aaaaaaaa');
+  fs.mkdirSync(bin); fs.mkdirSync(path.join(home, 'work', 'unpainting-04-worker'), { recursive: true });
+  fs.writeFileSync(path.join(bin, 'git'), `#!/bin/sh
+if [ "$1" = -C ]; then cd "$2" || exit 1; shift 2; fi
+case "$1" in
+ rev-parse) cat .head ;;
+ worktree) mkdir -p "$5" && echo "$6" > "$5/.head" ;;
+ checkout) test "$FAIL_CHECKOUT" != 1 && echo "$4" > .head ;;
+esac
+`, { mode: 0o755 });
+  fs.writeFileSync(path.join(bin, 'npm'), `#!/bin/sh
+mkdir .installing || exit 99
+trap 'rmdir .installing' EXIT
+printf 'install\\n' >> "$HOME/installs"
+mkdir -p node_modules
+sleep .1
+test "$FAIL_INSTALL" != 1
+`, { mode: 0o755 });
+  let failInstall = '1', failCheckout = '0';
+  const remote = {
+    w: { host: 'fake' }, run: async () => ({ code: 0 }),
+    script: input => new Promise((resolve, reject) => {
+      const child = spawn('zsh', ['-s'], { env: { ...process.env, HOME: home, PATH: `${bin}:/usr/bin:/bin`, FAIL_INSTALL: failInstall, FAIL_CHECKOUT: failCheckout } });
+      let out = '', err = ''; child.stdout.on('data', d => { out += d; }); child.stderr.on('data', d => { err += d; });
+      child.on('error', reject); child.on('close', code => resolve({ code, out, err })); child.stdin.end(input);
+    }),
+  };
+  await assert.rejects(miniCheckout(remote, commit, '/repo'), WorkerFailure);
+  assert.ok(fs.existsSync(path.join(tree, 'node_modules')), 'partial install is present');
+  assert.equal(fs.existsSync(path.join(tree, '.ready')), false);
+  failInstall = '0'; failCheckout = '1';
+  await assert.rejects(miniCheckout(remote, commit, '/repo'), WorkerFailure);
+  assert.equal(fs.existsSync(path.join(tree, '.ready')), false);
+  failCheckout = '0';
+  const made = await Promise.all([miniCheckout(remote, commit, '/repo'), miniCheckout(remote, commit, '/repo')]);
+  assert.equal(made[0].tree, tree); assert.equal(made[1].tree, tree);
+  assert.ok(fs.existsSync(path.join(tree, '.ready')));
+  assert.equal(fs.readFileSync(path.join(home, 'installs'), 'utf8').trim().split('\n').length, 2, 'one failed install and exactly one successful install');
+  // Reap a stale setup-lock left behind by a SIGKILLed setup shell (dead pid).
+  fs.rmSync(path.join(tree, '.ready'), { force: true });
+  fs.mkdirSync(`${tree}.setup-lock`, { recursive: true });
+  fs.writeFileSync(`${tree}.setup-lock/pid`, '999999\n');
+  const recovered = await miniCheckout(remote, commit, '/repo');
+  assert.equal(recovered.tree, tree);
+  assert.ok(fs.existsSync(path.join(tree, '.ready')));
+});
+
+test('mixed plan previews and benchmark final never deadlock and contended markStarted persists', async () => {
+  const dir = tmp(), waiting = path.join(dir, 'waiting');
+  fs.mkdirSync(waiting, { recursive: true });
+  const only = ['local', 'mini'], mini = { host: 'mini', slots: 2 }, commit = 'b'.repeat(40);
+  for (let i = 0; i < 4; i++) {
+    fs.writeFileSync(path.join(waiting, `plan-${i}.json`), JSON.stringify({ id: `plan-${i}`, pid: process.pid, since: 100 + i, commit, kind: 'plan', only }));
+  }
+  fs.writeFileSync(path.join(waiting, 'final-0.json'), JSON.stringify({ id: 'final-0', pid: process.pid, since: 500, commit, kind: 'painting', only }));
+  const open = places({ mini, local: 2, commit, kind: 'painting', only });
+  assert.equal(open.length, 4);
+  const openSlots = new Set(open.map(p => p.slot));
+  const couldTake = w => places({ mini, local: 2, commit: w.commit, kind: w.kind, only: w.only }).some(p => openSlots.has(p.slot));
+  // Final outranks all 4 older plan previews, so it immediately claims a slot instead of deadlocking.
+  assert.equal(waitRank(dir, 'final-0', () => true, couldTake), 0);
+  assert.ok(claim(dir, open[0].slot, { job: 'final-0', kind: 'painting', only, worker: open[0].worker.name }, () => true));
+  // Contended markStarted retries instead of dropping the started timestamp.
+  const locks = path.join(dir, 'claims', `${open[0].slot}.json.locks`);
+  const blocker = path.join(locks, `${process.pid}-00000000-0000-0000-0000-000000000000`);
+  fs.mkdirSync(blocker, { recursive: true });
+  fs.writeFileSync(path.join(blocker, 'ticket.json'), JSON.stringify({ ticket: 0 }));
+  setTimeout(() => fs.rmSync(blocker, { recursive: true, force: true }), 25);
+  assert.equal(await markStarted(dir, open[0].slot, 'final-0'), true);
+  assert.ok(claims(dir, () => true)[open[0].slot].started > 0);
+  // Multiple plan previews claim slots in parallel across the pool (never serialized one-at-a-time).
+  const dir2 = tmp();
+  assert.ok(claim(dir2, 'local-0', { job: 'plan-a', kind: 'plan', only, worker: 'this Mac' }, () => true));
+  assert.ok(claim(dir2, 'local-1', { job: 'plan-b', kind: 'plan', only, worker: 'this Mac' }, () => true));
+  assert.ok(claim(dir2, 'mini-0', { job: 'plan-c', kind: 'plan', only, worker: 'Mac mini' }, () => true));
 });

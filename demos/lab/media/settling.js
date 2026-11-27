@@ -1,12 +1,22 @@
 // Generated from src/media/settling.mjs by tools/lab/sync-site-media.mjs. Edit the source.
+import { grainMobility, GRAIN_PATH_MM } from './grain-water.js';
 // Settling: suspended pigment falling through the film to the paper, at the Stokes speed of its particles, faster into
 // the paper's hollows, and the finest particles reaching the fibres by Brownian diffusion as the film thins. The same
 // rule for the CPU step (sheet.mjs), the row-band step (sheet-kernel.mjs) and the GPU step (gpu/stepfull.wgsl).
 //
 //   v = (rho_p - rho_w) g d^2 / (18 mu)                       Stokes' law, a sphere of diameter d in water
 //   D = k T / (3 pi mu d)                                     Stokes-Einstein diffusion of the same particle
-//   moved = G [1 - exp(-(v B / h + D / l^2) dt)],  B = 1 + gamma hollow,  l = min(h, FIBRE_GAP_MM)
+//   moved = G [1 - exp(-(v / h + v gamma hollow M / L + D / l^2) dt)]
+//   M = grainMobility(W), L = GRAIN_PATH_MM, l = min(h, FIBRE_GAP_MM)
 //                                                             of what is suspended, in one step of dt
+//
+// Vertical landing and collection in a hollow are separate processes. Landing
+// keeps the Stokes v/h rate. Hollow capture has a finite encounter time L/v and
+// needs a connected film; its accumulated exposure is integral(M dt). Previously
+// multiplying v/h by (1 + gamma hollow) made that exposure depend on fractional
+// drying, not time standing: with dh/dt = -e, integral(v/h dt) = (v/e) log(h0/h).
+// L is a coarse-grained bed-collection closure, shared by all pigments; v, gamma
+// and Brownian diffusion retain each pigment's own material dependence.
 //
 // The diffusion term is what deposits a staining organic (phthalo, quinacridone, 0.05 to 0.2 um): it falls a few
 // micrometres in the minutes a wash dries, but diffuses to the surface fibres standing in the film and sticks, at the
@@ -53,8 +63,8 @@ export const settleSpeed = p => { const { dUm, rhoP } = particleOf(p); return st
 /** The pigment's diffusion coefficient in mm^2/s. */
 export const settleDiffusion = p => diffusionMm2PerS(particleOf(p).dUm);
 
-/** The share of a cell's suspended pigment that settles in one step: 1 - exp(-(v B / h + D / l^2) dt). */
+/** Landing, residence-dependent hollow capture and Brownian deposition in one fixed-depth step. */
 export function settleShare(vMmS, dMm2S, gg, hollow, dt, filmMm) {
   const h = Math.max(MIN_FILM_MM, filmMm), l = Math.min(h, FIBRE_GAP_MM);
-  return -Math.expm1(-((vMmS * (1 + gg * hollow)) / h + dMm2S / (l * l)) * dt);
+  return -Math.expm1(-(vMmS / h + vMmS * gg * hollow * grainMobility(filmMm) / GRAIN_PATH_MM + dMm2S / (l * l)) * dt);
 }

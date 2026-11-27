@@ -1,6 +1,6 @@
 // Generated from src/media/grain-field.mjs by tools/lab/sync-site-media.mjs. Edit the source.
 // The surface granulating pigment answers to: the paper's relief seen at a fixed length in millimetres, not at the
-// cell. Settling pigment is pulled towards a hollow (settling.mjs, B = 1 + gamma hollow) and settled grains roll to
+// cell. Settling pigment is collected in a hollow over its wet residence (settling.mjs) and settled grains roll to
 // the lowest neighbour (sheet.mjs slide); both read this field instead of each cell's own mean height.
 //
 // Why. Read cell by cell, the relief's finest octaves (0.12 to 0.5 mm, paper-relief.mjs) made the hollow nearly
@@ -14,27 +14,11 @@
 // grid. The flow (valley), the brush's contact (height, proud) and the paper's look are not changed. DOM free.
 
 import { paperRelief, HEIGHT_SPAN_UM } from './paper-relief.js';
+import { gaussianField } from './gaussian-field.js';
+export { gaussianField } from './gaussian-field.js';
 
 // the Gaussian sigma of the low-pass in millimetres: its autocorrelation falls to half at about 1.7 sigma
 export const GRAIN_MM = 0.2;
-
-/** A separable Gaussian blur of a w x h field, sigma in cells, edges clamped; mean kept. */
-export function gaussianField(a, w, h, sigma) {
-  if (!(sigma > 0)) return Float32Array.from(a);
-  const r = Math.max(1, Math.ceil(3 * sigma)), k = new Float64Array(2 * r + 1);
-  let t = 0; for (let i = -r; i <= r; i++) { k[i + r] = Math.exp(-(i * i) / (2 * sigma * sigma)); t += k[i + r]; }
-  for (let i = 0; i < k.length; i++) k[i] /= t;
-  const tmp = new Float64Array(w * h), out = new Float32Array(w * h);
-  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
-    let v = 0; for (let i = -r; i <= r; i++) v += k[i + r] * a[y * w + Math.min(w - 1, Math.max(0, x + i))];
-    tmp[y * w + x] = v;
-  }
-  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
-    let v = 0; for (let i = -r; i <= r; i++) v += k[i + r] * tmp[Math.min(h - 1, Math.max(0, y + i)) * w + x];
-    out[y * w + x] = v;
-  }
-  return out;
-}
 
 // the grid the unit is measured on: fine enough to hold the relief's finest octave, wide enough for many millimetres
 const UNIT_MM = 0.04, UNIT_SIDE_MM = 20, HOLLOW_MM = 1;
@@ -76,7 +60,8 @@ export function grainSurface(height, w, h, mmPerCell, reliefOf, { grainMm = GRAI
 /** A field of cell means on cells of `mmPerCell` low-passed at `grainMm`: what grainH is, on any grid. */
 export const grainField = (height, w, h, mmPerCell, grainMm = GRAIN_MM) => gaussianField(height, w, h, grainMm / mmPerCell);
 
-// the cell the slide's rate was fitted on: the painter's own sheets, 0.26 mm a cell (1086 cells on 282 mm)
+// the cell the legacy slide control was fitted on: 0.26 mm (1086 cells on 282 mm).
+// The sheet also applies grainDrag(v), converting that control to Stokes mobility.
 const SLIDE_REF_MM = 0.26;
 /**
  * The slide's rate on a sheet of `mmPerCell`. On the grain field the slope between neighbours is the field's gradient

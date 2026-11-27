@@ -78,7 +78,7 @@ Choose a representation per region:
 - Drawing with wash: narrow structural lines established before paint.
 - Higher simulation cell density: features that must remain resolved paint marks.
 
-A local density increase needs valid surrounding water and pigment context. Higher density cannot repair incorrect geometry, layer order or moisture. Upscaling an export adds no simulation detail.
+A local density increase needs valid surrounding water and pigment context. Higher density cannot repair incorrect geometry, layer order or moisture. A finer final render can reconstruct deposited wash edges and the same paper's sub-cell grain while conserving pigment; resizing an exported image alone adds no detail and neither method reruns water flow.
 
 ## Useful subject decisions
 

@@ -45,15 +45,57 @@ export function makeInkRes({ N, W2, H2, paperOpts, pigments, main, inkAt = 0, gr
   const seen = finePigments.map(() => new Float32Array(nH)), inkLo = finePigments.map(() => new Float32Array(nL));
   const white = Buffer.alloc(nL * 3, 255), whiteH = Buffer.alloc(nH * 3, 255);
   const totalBuf = finePigments.map(() => new Float32Array(nH)), carryAdd = new Float32Array(nL);
+  const layerSum = finePigments.map(() => new Float32Array(nH));
+  const layerCount = new Int32Array(K);
+  const activeLo = finePigments.map(() => new Int32Array(HH).fill(WH)), activeHi = finePigments.map(() => new Int32Array(HH).fill(-1));
+  // Include previously carried cells too: removing a mark must carry its
+  // negative delta even when its current total is now zero.
+  const carriedLo = finePigments.map(() => new Int32Array(HH).fill(WH)), carriedHi = finePigments.map(() => new Int32Array(HH).fill(-1));
+  const layerLo = finePigments.map(() => new Int32Array(HH).fill(WH)), layerHi = finePigments.map(() => new Int32Array(HH).fill(-1));
+  let layerVerSeen = -1;
   const fineTotal = k => {
     if (totalVersion[k] === materialVersion) return total[k];
     const out = totalBuf[k], G = fine.G[k], D = fine.D[k], P = fine.P[k], layers = fine.layers;
-    if (layers.length === 0) {
-      for (let i = 0; i < nH; i++) out[i] = G[i] + D[i] + P[i];
-    } else {
-      out.fill(0);
-      for (const L of layers) { const a = L[k]; for (let i = 0; i < nH; i++) out[i] += a[i]; }
-      for (let i = 0; i < nH; i++) out[i] += G[i] + D[i] + P[i];
+    const lv = fine._layerVer || 0;
+    if (lv !== layerVerSeen) { layerSum.forEach(a => a.fill(0)); layerLo.forEach(a => a.fill(WH)); layerHi.forEach(a => a.fill(-1)); layerCount.fill(0); layerVerSeen = lv; }
+    if (layers.length < layerCount[k]) { layerSum[k].fill(0); layerLo[k].fill(WH); layerHi[k].fill(-1); layerCount[k] = 0; }
+    const lsum = layerSum[k], lLo = layerLo[k], lHi = layerHi[k];
+    for (let m = layerCount[k]; m < layers.length; m++) {
+      const a = layers[m][k];
+      if (a === fine._zeroLayer) continue;
+      for (let y = 0; y < HH; y++) {
+        const row = y * WH;
+        let x = 0;
+        // Empty groups need neither a rounded addition nor per-cell bounds work.
+        for (; x + 3 < WH; x += 4) {
+          const i = row + x;
+          if (!(a[i] || a[i+1] || a[i+2] || a[i+3])) continue;
+          for (let q = 0; q < 4; q++) if (a[i+q]) { lsum[i+q] += a[i+q]; if (x+q < lLo[y]) lLo[y] = x+q; if (x+q > lHi[y]) lHi[y] = x+q; }
+        }
+        for (; x < WH; x++) if (a[row+x]) { lsum[row+x] += a[row+x]; if (x < lLo[y]) lLo[y] = x; if (x > lHi[y]) lHi[y] = x; }
+      }
+    }
+    layerCount[k] = layers.length;
+    const lo = activeLo[k], hi = activeHi[k];
+    const gb = new Uint32Array(G.buffer,G.byteOffset,nH), db = new Uint32Array(D.buffer,D.byteOffset,nH), pb = new Uint32Array(P.buffer,P.byteOffset,nH);
+    out.fill(0);
+    for (let y = 0; y < HH; y++) {
+      const row = y * WH, end = row + WH;
+      let a = row, b = end - 1;
+      // Inspect raw words so signed zeros and non-finite inputs retain the same
+      // arithmetic. The layer sum's support is cached independently of wet ink.
+      while (a+3 < end && !(gb[a]|db[a]|pb[a]|gb[a+1]|db[a+1]|pb[a+1]|gb[a+2]|db[a+2]|pb[a+2]|gb[a+3]|db[a+3]|pb[a+3])) a += 4;
+      while (a < end && !(gb[a]|db[a]|pb[a])) a++;
+      while (b-3 >= a && !(gb[b]|db[b]|pb[b]|gb[b-1]|db[b-1]|pb[b-1]|gb[b-2]|db[b-2]|pb[b-2]|gb[b-3]|db[b-3]|pb[b-3])) b -= 4;
+      while (b >= a && !(gb[b]|db[b]|pb[b])) b--;
+      const x0 = Math.min(a-row,lLo[y]), x1 = Math.max(b-row,lHi[y]);
+      let first = WH, last = -1;
+      for (let x = x0; x <= x1; x++) {
+        const i = row+x;
+        out[i] = layers.length ? lsum[i] + (G[i] + D[i] + P[i]) : G[i] + D[i] + P[i];
+        if (out[i] !== 0) { if (x < first) first = x; last = x; }
+      }
+      lo[y] = first; hi[y] = last;
     }
     totalVersion[k] = materialVersion;
     return total[k] = out;
@@ -142,20 +184,27 @@ export function makeInkRes({ N, W2, H2, paperOpts, pigments, main, inkAt = 0, gr
     try { return carryImpl(); } finally { census.inkres.carryMs += performance.now() - t; }
   }
   function carryImpl() {
-    coherent(main); // bring the GPU's copy down first, so what is written here is added to the real state
-    let wrote = false;
+    let wrote = false, wholeWrite = false;
     for (let k = 0; k < K; k++) {
       const T = fineTotal(k), S = seen[k], add = carryAdd;
-      let any = false, i = 0;
+      let any = false, yLo = H2, yHi = -1;
+      const aLo = activeLo[k], aHi = activeHi[k], cLo = carriedLo[k], cHi = carriedHi[k];
       for (let yl = 0; yl < H2; yl++) {
         const rowL = yl * W2;
         for (let dy = 0; dy < N; dy++) {
-          for (let xl = 0; xl < W2; xl++) {
+          const y = yl * N + dy, lo = Math.min(aLo[y], cLo[y]), hi = Math.max(aHi[y], cHi[y]);
+          cLo[y] = lo; cHi[y] = hi;
+          const xl0 = Math.floor(lo / N), xl1 = Math.floor(hi / N);
+          let i = y * WH + xl0 * N;
+          for (let xl = xl0; xl <= xl1; xl++) {
             const idxL = rowL + xl;
             for (let dx = 0; dx < N; dx++, i++) {
-              const d = T[i] - S[i];
-              // Add 1e-6 epsilon guard against float jitter / rounding accumulation
-              if (Math.abs(d) >= 1e-6) { add[idxL] += d; any = true; S[i] = T[i]; }
+              const ti = T[i], si = S[i];
+              if (ti !== si) {
+                const d = ti - si;
+                // Add 1e-6 epsilon guard against float jitter / rounding accumulation
+                if (d >= 1e-6 || d <= -1e-6) { add[idxL] += d; any = true; S[i] = ti; if (yl < yLo) yLo = yl; if (yl > yHi) yHi = yl; }
+              }
             }
           }
         }
@@ -163,7 +212,10 @@ export function makeInkRes({ N, W2, H2, paperOpts, pigments, main, inkAt = 0, gr
       if (!any) continue;
       wrote = true;
       const inv = 1 / (N * N), D = main.D[chans[k]], G = main.G[chans[k]], L = inkLo[k], M = main.M;
-      for (let i = 0; i < nL; i++) {
+      // The fine sheet already identifies the changes. Read only their actual
+      // recipient and pigment before adding, never a whole-sheet round trip.
+      const cells=[];for(let i=yLo*W2,end=(yHi+1)*W2;i<end;i++)if(add[i])cells.push(i);
+      const apply=()=>{for (const i of cells) {
         const ai = add[i];
         if (ai) {
           add[i] = 0;
@@ -182,18 +234,30 @@ export function makeInkRes({ N, W2, H2, paperOpts, pigments, main, inkAt = 0, gr
           }
           L[i] += applied;
         }
-      }
+      }};
+      if(main._gpu?.editPigmentCells&&!main._gpu.paused)main._gpu.editPigmentCells(main,chans[k],Uint32Array.from(cells),apply);
+      else {coherent(main);apply();wholeWrite=true;}
     }
     if (wrote) {
       renderVersion = -1; // Reset renderVersion so downstream composition detects carried ink
       invalidatePaperCertificate(main); // new pigment has not been fixed by the earlier dry
-      main._gpu?.cpuWroteAll?.(); // and the GPU's copy takes the new ink back up
+      if(wholeWrite)main._gpu?.cpuWroteAll?.();
     }
   }
 
   /** The fine sheet dried: its water gone and its pigment fixed, as the painting's sheet is at the end of a pass. */
   function settle() {
-    for (let k = 0; k < K; k++) { const G = fine.G[k], D = fine.D[k]; for (let i = 0; i < nH; i++) if (G[i]) { D[i] += G[i]; G[i] = 0; } }
+    for (let k = 0; k < K; k++) {
+      const G = fine.G[k], D = fine.D[k];
+      let i = 0;
+      // Scan the reservoir itself: settle also accepts direct fine-sheet edits
+      // that have not yet invalidated a total or optical cache.
+      for (; i+3 < nH; i += 4) {
+        if (!(G[i] || G[i+1] || G[i+2] || G[i+3])) continue;
+        for (let q = i; q < i+4; q++) if (G[q]) { D[q] += G[q]; G[q] = 0; }
+      }
+      for (; i < nH; i++) if (G[i]) { D[i] += G[i]; G[i] = 0; }
+    }
     fine.W.fill(0); fine.s.fill(0); fine.M.fill(0); fine.ever.fill(0); wetOn = false;
     fix(fine);
     certifyDryFixed(fine);
@@ -365,6 +429,10 @@ export function makeInkRes({ N, W2, H2, paperOpts, pigments, main, inkAt = 0, gr
     Object.assign(fine,st.fields);
     seen.forEach((v,k)=>v.set(st.seen[k])); inkLo.forEach((v,k)=>v.set(st.inkLo[k]));
     wetOn=st.wetOn;Object.assign(stats,st.stats);
+    layerVerSeen=-1;
+    // Restored seen planes may contain a removed mark outside current ink.
+    // Start conservatively; the normal carry then preserves those deltas.
+    carriedLo.forEach(a=>a.fill(0));carriedHi.forEach(a=>a.fill(WH-1));
     changed();totalVersion.fill(-1);renderVersion=-1;
   }
   return { N, width: WH, height: HH, draw, settle, compose, composeKept, composeFine, nativeInk, carry, wet, stats, fine, remapInk, changed, exportState, importState, channel, channels: chans, erased };

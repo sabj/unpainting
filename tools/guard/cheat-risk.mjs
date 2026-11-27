@@ -230,26 +230,32 @@ export async function cheatRisk({ run, target, sheetMm, marks, keys = '', keybox
   const pm = await sharp(paint).metadata();
   // compared at the painting's own scale up to 540 px wide: upsampling a small painting erases its 2-4 px band
   const W = Math.min(540, pm.width), H = Math.round(W * pm.height / pm.width);
-  const P = await luminance(paint, W, H), T = await luminance(target, W, H);
-  const hf = corr(band(P, W, H), band(T, W, H));
   const { frames, basis } = readFrames(run, mk);
   const picks = pickStages(frames), prog = {}, Ls = {};
+  const [P, T, first] = await Promise.all([
+    luminance(paint, W, H),
+    luminance(target, W, H),
+    frames.length ? luminance(path.join(run, frames[0].src), W, H) : Promise.resolve(null),
+  ]);
+  const hf = corr(band(P, W, H), band(T, W, H));
   // paper white: the brightest 5% of the first saved frame (blank sheet), else of the painting
-  const first = frames.length ? await luminance(path.join(run, frames[0].src), W, H) : P;
-  const paperL = Math.max(0.5, Float32Array.from(first).sort()[Math.floor(first.length * 0.95)]);
+  const paperL = Math.max(0.5, Float32Array.from(first ?? P).sort()[Math.floor((first ?? P).length * 0.95)]);
   const fin = stat(P, W, H, paperL);
   fs.mkdirSync(stagesDir, { recursive: true });
-  for (const p of STAGES) {
-    const f = picks[p]; if (!f) continue;
-    const file = p === 100 ? paint : path.join(run, f.src);
-    Ls[p] = await luminance(file, W, H);
-    const s = stat(Ls[p], W, H, paperL), rel = (a, b) => +(a / Math.max(1e-6, b)).toFixed(2);
+  const stageFiles = STAGES.map(p => ({ p, f: picks[p], file: picks[p] ? (p === 100 ? paint : path.join(run, picks[p].src)) : null })).filter(x => x.f);
+  const [stageLums, , strip] = await Promise.all([
+    Promise.all(stageFiles.map(({ p, file }) => (p === 100 ? Promise.resolve(P) : luminance(file, W, H)))),
+    Promise.all(stageFiles.map(({ p, file }) => sharp(file).flatten({ background: '#fff' }).jpeg({ quality: 88 }).toFile(path.join(stagesDir, `stage-${String(p).padStart(3, '0')}.jpg`)))),
+    frames.length ? writeStrip([target, ...STAGES.map(p => (p === 100 ? paint : path.join(run, picks[p].src)))], path.join(stagesDir, 'strip.jpg'), W, H) : Promise.resolve(null),
+  ]);
+  const rel = (a, b) => +(a / Math.max(1e-6, b)).toFixed(2);
+  stageFiles.forEach(({ p, f }, idx) => {
+    Ls[p] = stageLums[idx];
+    const s = stat(Ls[p], W, H, paperL);
     prog[p] = { frame: f.src, at: +(f.position ?? 1).toFixed(2), stage: (f.stage ?? '') + (f.step ? ' ' + f.step : ''), dark: rel(s.dark, fin.dark), p95: rel(s.p95, fin.p95), mean: rel(s.mean, fin.mean), hf: rel(s.hfe, fin.hfe) };
-    await sharp(file).flatten({ background: '#fff' }).jpeg({ quality: 88 }).toFile(path.join(stagesDir, `stage-${String(p).padStart(3, '0')}.jpg`));
-  }
+  });
   const sweeps = [];
   for (let i = 1; i < STAGES.length; i++) { const a = STAGES[i - 1], b = STAGES[i]; if (Ls[a] && Ls[b]) sweeps.push({ from: a, to: b, front: +sweepFront(Ls[a], Ls[b], W, H).toFixed(2) }); }
-  const strip = frames.length ? await writeStrip([target, ...STAGES.map(p => (p === 100 ? paint : path.join(run, picks[p].src)))], path.join(stagesDir, 'strip.jpg'), W, H) : null;
   let keyStages = null;
   if (keys) {
     keyStages = {}; const kfin = stat(await luminance(`${keys}-stage-100.png`, W, H, keybox), W, H);

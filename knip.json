@@ -1,9 +1,11 @@
 {
   "$schema": "https://unpkg.com/knip@5/schema.json",
   "entry": [
+    "src/**/*.test.mjs",
     "tools/**/*.mjs",
     "bench/scripts/*.mjs",
     "bench/scripts/pipeline/*.mjs",
+    "bench/v6/*.test.mjs",
     "bench/v4v5/**/*.mjs",
     "demos/lab/lab.js",
     "demos/lab/worker.js",

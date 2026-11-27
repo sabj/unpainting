@@ -243,7 +243,36 @@ const extentAlong = (P, deg) => { const a = deg * Math.PI / 180, c = Math.cos(a)
  * `character` (wash-form.mjs laneCharacter) lays each lane as a named mark: its own stroke, the mark's pressure and
  * speed along it, a flat's blade.
  */
-export function sweeps(polys, { widthMm, deg = 0, pressure = 0.8, perLoad = null, lights = [], rng, hand = 1, path = null, character = null }) {
+export function sweeps(polys, opts) {
+  return everyPartLaid(polys, sweepsOf(polys, opts), opts);
+}
+
+/**
+ * Every part of a wash's region with open paper gets a lane: a part no lane of the wash reached (a small part, the
+ * hand's turn carrying its only lane off it, or its lane cut away by a light) is given one stroke along its own long
+ * axis through its open middle, held to its chord. A part wholly under the lights stays paper.
+ */
+function everyPartLaid(polys, strokes, { widthMm, pressure = 0.8, lights = [] }) {
+  const reach = widthMm / 2, extra = [];
+  for (const P of polys) {
+    if (!P || P.length < 3 || !(areaOf([P]) > 0)) continue;
+    const near = st => st.points.some(([x, y]) => inside([P], x, y) || P.some(([px, py]) => Math.hypot(px - x, py - y) < reach));
+    if (strokes.some(near)) continue;
+    const { mx, my, deg } = axisOf([P]);
+    let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+    for (let k = 0; k < P.length; k++) { const [px, py] = P[k]; if (px < x0) x0 = px; if (px > x1) x1 = px; if (py < y0) y0 = py; if (py > y1) y1 = py; }
+    // the open point nearest the part's middle: its centroid, else a grid point inside it and out of the lights
+    let at = open([P], lights, mx, my) ? [mx, my] : null;
+    for (let n = 6; !at && n <= 24; n *= 2) for (let i = 1; i < n && !at; i++) for (let j = 1; j < n && !at; j++) { const x = x0 + (x1 - x0) * i / n, y = y0 + (y1 - y0) * j / n; if (open([P], lights, x, y)) at = [x, y]; }
+    if (!at) continue;
+    const [t0, t1] = chordAt([P], at[0], at[1], deg, lights), a = deg * Math.PI / 180, inset = Math.min(0.25 * (t1 - t0), widthMm * 0.15), list = Array.isArray(pressure) ? pressure.map(Number) : [pressure];
+    const pts = [0, 0.25, 0.5, 0.75, 1].map(f => { const t = t0 + inset + (t1 - t0 - 2 * inset) * f; return pt(at[0] + Math.cos(a) * t, at[1] + Math.sin(a) * t, pressureAt(list, f)); });
+    extra.push({ kind: 'sweep', radiusMm: round3(widthMm / 2), points: pts, charge: 1 });
+  }
+  return extra.length ? [...strokes, ...extra] : strokes;
+}
+
+function sweepsOf(polys, { widthMm, deg = 0, pressure = 0.8, perLoad = null, lights = [], rng, hand = 1, path = null, character = null }) {
   const fn = pathBend(path), side = fn ? (rng.next() < 0.5 ? -1 : 1) : 1, phase = fn && path === 'wobble' ? rng.range(0, 6.28) : 0, bendFn = fn ? pathBend(path, side, phase) : null;
   const opts = { widthMm, pressure, perLoad, lights, rng, hand, character };
   if (deg === 'form') return formSweeps(polys, opts, bendFn);
@@ -256,7 +285,7 @@ export function sweeps(polys, { widthMm, deg = 0, pressure = 0.8, perLoad = null
   const lay = (ps, d) => bent(ps, d, bendFn ? pathOver(ps, d, bendFn) : null, opts);
   if (!own.length) return lay(polys, deg);
   // the main region first, then each short part along its own length, top down
-  const top = P => Math.min(...P.map(q => q[1]));
+  const top = P => { let m = Infinity; for (let i = 0; i < P.length; i++) if (P[i][1] < m) m = P[i][1]; return m; };
   return [...(rest.length ? lay(rest.map(q => q.P), deg) : []),
     ...own.sort((p, q) => top(p.P) - top(q.P)).flatMap(q => lay([q.P], q.deg))];
 }
@@ -284,7 +313,7 @@ const FORM_TIP = 0.3;
 
 /** A wash laid with the form: each outline along its long axis bent along its middle line, top down. */
 function formSweeps(polys, opts, bendFn) {
-  const top = P => Math.min(...P.map(q => q[1])), W = opts.widthMm;
+  const top = P => { let m = Infinity; for (let i = 0; i < P.length; i++) if (P[i][1] < m) m = P[i][1]; return m; }, W = opts.widthMm;
   return [...polys].filter(P => P.length >= 3).sort((p, q) => top(p) - top(q)).flatMap(P => {
     const d = formAxis(P), ml = midline(P, d, W), mid = ml.o((ml.u0 + ml.u1) / 2), L = ml.u1 - ml.u0;
     const o = u => ml.o(u) - mid + (bendFn ? L * bendFn(Math.max(0, Math.min(1, (u - ml.u0) / L))) : 0);

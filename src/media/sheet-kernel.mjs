@@ -1,3 +1,4 @@
+import { grainSlide, grainMobility, grainDrag } from './grain-water.mjs';
 // One step of sheet.mjs's stepBox, cut into phases that row bands run side by side (sheet-par.mjs), bit-identical to
 // a serial step. Cross-band face sums are added by the receiving band in raster order; writes another band reads wait
 // for the next phase; the wet front's in-place scan uses recomputed or snapshotted neighbour rows. The chamfer edge
@@ -348,7 +349,7 @@ function phaseS3(C, ya, yb) {
         const hol = granFill > 0 ? hollow[i] * Math.max(0, 1 - dep[i] * granFill) : hollow[i];
         const gg = prm[pk + 4], down = Gk[i] * settleShare((coSettle > 0 ? (1 - coSettle) * prm[pk + 9] + coSettle * vMix : prm[pk + 9]) * settle, prm[pk + 10] * settle, gg, hol, dt, Wi);
         const shape = Math.max(0, 1 + (hh - 1) * gg);
-        const up = Dk[i] * shape * (prm[pk + 5] * wetting * dt + prm[pk + 6] * turnover);
+        const up = Dk[i] * shape * (prm[pk + 5] * wetting * dt + prm[pk + 6] * turnover * grainMobility(Wi));
         const dn = Math.min(Gk[i], Math.max(0, down)), u = Math.min(Dk[i], Math.max(0, up));
         Dk[i] += dn - u; Gk[i] += u - dn;
         if (rewet) { const t = topLayer[k], r = Math.min(t[i], (t[i] * rewetLift * dt) / omega); t[i] -= r; Gk[i] += r; }
@@ -369,8 +370,8 @@ function phaseS3(C, ya, yb) {
 function slideCell(C, q, mode, ya, yb, y, flags) {
   const { ctrl, prm, w, W, D, dSlide, wl, wf, surf } = C;
   const i = wl[q], Wi = W[i]; if (Wi <= 0) return;
-  const fg = wf[q], oFilm = prm[P.film], slide = prm[P.slide], dt = prm[P.dt], n3 = ctrl[N3], ex = PRIV.ex, w_ = w;
-  const film = Math.min(3, 0.12 / Math.max(0.04, Wi)) * (Wi > oFilm ? 1 : Wi / oFilm);
+  const fg = wf[q], slide = prm[P.slide], dt = prm[P.dt], n3 = ctrl[N3], ex = PRIV.ex, w_ = w;
+  const film = grainSlide(Wi);
   const up = mode === 0 ? y > ya : mode === 2, down = mode === 0 ? y < yb : mode === 1, side = mode === 0;
   for (let n = 0; n < n3; n++) {
     const k = ctrl[ACT3 + n], pk = PK + k * PKS, gg = prm[pk + 4]; const Dk = D[k]; if (gg <= 0 || Dk[i] <= 0) continue;
@@ -381,7 +382,7 @@ function slideCell(C, q, mode, ya, yb, y, flags) {
     ex[2] = fg & 2 ? Math.max(0, here - S[i + w_] - rep) : 0; sum += ex[2];
     ex[3] = fg & 8 ? Math.max(0, here - S[i - w_] - rep) : 0; sum += ex[3];
     if (sum <= 0) continue;
-    let moved = Dk[i] * Math.min(0.2, slide * gg * film * sum * dt); const dd = dSlide[k];
+    let moved = Dk[i] * Math.min(0.2, slide * grainDrag(prm[pk + 9]) * gg * film * sum * dt); const dd = dSlide[k];
     // slideCap (sheet.mjs): no move reverses the slope it rolled down
     const cap = prm[P.slideCap] || 0, fill = prm[P.fill];
     if (cap > 0 && fill > 0) { let lim = Infinity; for (let e = 0; e < 4; e++) if (ex[e] > 0) lim = Math.min(lim, cap * ex[e] / (fill * (1 + ex[e] / sum))); if (moved > lim) moved = lim; }

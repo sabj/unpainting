@@ -71,7 +71,7 @@ function autoRuns(subjects, commit) {
 }
 
 function parse(argv) {
-  const o = { set: 'core', models: null, levels: [...BENCHMARK_LEVELS], pictures: null, pool: 'mini,pod', cap: '8', start: false, out: null };
+  const o = { set: 'core', models: null, levels: [...BENCHMARK_LEVELS], pictures: null, pool: process.env.UNPAINT_POOL_ONLY ?? 'mini,pod', cap: '8', start: false, out: null };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i], v = () => { const x = argv[++i]; if (x == null) throw new Error(`${a} needs a value`); return x; };
     if (a === '--start') o.start = true;

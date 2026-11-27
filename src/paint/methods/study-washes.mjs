@@ -23,7 +23,7 @@ import { outlineLoops, loopsMask } from './wash-strokes.mjs';
 import { laneFill } from './sweep-fill.mjs';
 import { filmLab } from './puddles.mjs';
 import { valueMix as mixToValue, valueRefOf } from './value-mix.mjs';
-import { kmeans, roundMask, dilate } from './study-shapes.mjs';
+import { kmeans, roundMask, dilate, erode, maskBounds } from './study-shapes.mjs';
 import { touchesFrom } from './touch-layer.mjs';
 import { namedForms, formCoverage } from './named-forms.mjs';
 import { brushCeilingMm, kitUnder } from './form-brush.mjs';
@@ -84,22 +84,60 @@ const WET_LEAST_CELLS = 40;
 /** A wash is laid only when it darkens what is under it by this much L*. */
 const VISIBLE_STEP = 2;
 
+const POW22_U8 = Float32Array.from({ length: 256 }, (_, v) => (v / 255) ** 2.2);
+
 /** Mean linear light of the w x h sRGB image on a pw x ph grid. */
 function toGrid(rgb, w, h, pw, ph) {
-  const pn = pw * ph, lin = [0, 1, 2].map(() => new Float32Array(pn)), cnt = new Float32Array(pn);
-  for (let y = 0; y < h; y++) { const py = Math.min(ph - 1, ((y + .5) * ph / h) | 0); for (let x = 0; x < w; x++) { const q = py * pw + Math.min(pw - 1, ((x + .5) * pw / w) | 0), i = y * w + x; cnt[q]++; for (let c = 0; c < 3; c++) lin[c][q] += (rgb[i * 3 + c] / 255) ** 2.2; } }
-  const out = new Uint8ClampedArray(pn * 3);
-  for (let q = 0; q < pn; q++) for (let c = 0; c < 3; c++) out[q * 3 + c] = Math.round(255 * (lin[c][q] / Math.max(1, cnt[q])) ** (1 / 2.2));
+  if (pw === w && ph === h) return Uint8ClampedArray.from(rgb);
+  const pn = pw * ph, lin0 = new Float32Array(pn), lin1 = new Float32Array(pn), lin2 = new Float32Array(pn), cnt = new Float32Array(pn);
+  const pxOf = new Int32Array(w);
+  for (let x = 0; x < w; x++) pxOf[x] = Math.min(pw - 1, ((x + .5) * pw / w) | 0);
+  for (let y = 0; y < h; y++) {
+    const pyRow = Math.min(ph - 1, ((y + .5) * ph / h) | 0) * pw, sRow = y * w * 3;
+    for (let x = 0; x < w; x++) {
+      const q = pyRow + pxOf[x], i3 = sRow + x * 3;
+      cnt[q]++;
+      lin0[q] += POW22_U8[rgb[i3]];
+      lin1[q] += POW22_U8[rgb[i3 + 1]];
+      lin2[q] += POW22_U8[rgb[i3 + 2]];
+    }
+  }
+  const out = new Uint8ClampedArray(pn * 3), inv22 = 1 / 2.2;
+  for (let q = 0; q < pn; q++) {
+    const c = cnt[q] > 1 ? cnt[q] : 1, q3 = q * 3;
+    out[q3] = Math.round(255 * (lin0[q] / c) ** inv22);
+    out[q3 + 1] = Math.round(255 * (lin1[q] / c) ** inv22);
+    out[q3 + 2] = Math.round(255 * (lin2[q] / c) ** inv22);
+  }
   return out;
 }
 
 /** Each cell's label replaced by the commonest label of its 3 x 3 neighbourhood (the anti-aliased rims of the study's shapes go). */
 function majority(lab, w, h) {
-  const out = Int32Array.from(lab), votes = new Map();
-  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
-    votes.clear(); let best = lab[y * w + x], bv = 0;
-    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { const yy = y + dy, xx = x + dx; if (yy < 0 || xx < 0 || yy >= h || xx >= w) continue; const v = lab[yy * w + xx], c = (votes.get(v) ?? 0) + 1; votes.set(v, c); if (c > bv) { bv = c; best = v; } }
-    if (bv >= 5) out[y * w + x] = best;
+  const out = Int32Array.from(lab), keys = new Int32Array(9), cnts = new Int32Array(9);
+  for (let y = 0; y < h; y++) {
+    const y0 = y > 0 ? y - 1 : 0, y1 = y + 1 < h ? y + 1 : h - 1, row = y * w;
+    for (let x = 0; x < w; x++) {
+      const center = lab[row + x];
+      // Fast interior check: if all 4 cardinal neighbours match center, center has >= 5 votes and wins.
+      if (y > 0 && y + 1 < h && x > 0 && x + 1 < w &&
+          lab[row + x - 1] === center && lab[row + x + 1] === center &&
+          lab[row - w + x] === center && lab[row + w + x] === center) continue;
+      const x0 = x > 0 ? x - 1 : 0, x1 = x + 1 < w ? x + 1 : w - 1;
+      let nk = 0, best = center, bv = 0;
+      for (let yy = y0; yy <= y1; yy++) {
+        const rr = yy * w;
+        for (let xx = x0; xx <= x1; xx++) {
+          const v = lab[rr + xx];
+          let idx = -1;
+          for (let k = 0; k < nk; k++) if (keys[k] === v) { idx = k; break; }
+          if (idx < 0) { keys[nk] = v; cnts[nk] = 1; idx = nk++; } else cnts[idx]++;
+          const c = cnts[idx];
+          if (c > bv) { bv = c; best = v; }
+        }
+      }
+      if (bv >= 5) out[row + x] = best;
+    }
   }
   return out;
 }
@@ -249,10 +287,19 @@ function studyShapes(rgb, pw, ph, paperRGB, { sliverCells, most = 0, clusters: K
   for (let q = 0; q < pn; q++) { const r = find(pc.labels[q]); if (!ids.has(r)) { ids.set(r, shapes.length); const c = centres[cluster[r]]; shapes.push({ root: r, cluster: cluster[r], cells: [], lab: c, chroma: Math.hypot(c[1], c[2]), border: new Map(), rim: 0 }); } label[q] = ids.get(r); shapes[label[q]].cells.push(q); }
   for (let q = 0; q < pn; q++) { const s = label[q], x = q % pw, y = (q / pw) | 0;
     for (const [xx, yy] of [[x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]]) { if (xx < 0 || yy < 0 || xx >= pw || yy >= ph) { shapes[s].rim++; continue; } const o = label[yy * pw + xx]; if (o !== s) { shapes[s].rim++; shapes[s].border.set(o, (shapes[s].border.get(o) ?? 0) + 1); } } }
+  const hist = new Int32Array(256);
+  const medianChannel = (cells, c) => {
+    hist.fill(0);
+    for (let idx = 0; idx < cells.length; idx++) hist[rgb[cells[idx] * 3 + c]]++;
+    const target = cells.length >> 1;
+    let acc = 0;
+    for (let v = 0; v < 256; v++) { acc += hist[v]; if (acc > target) return v; }
+    return 255;
+  };
   for (const s of shapes) {
     // the shape's own colour: the median sRGB of its cluster's cells in it (one flat colour, as the study laid it)
     const own = s.cells.filter(q => lab[q] === cluster[s.root]), use = own.length ? own : s.cells;
-    s.colour = [0, 1, 2].map(c => { const v = use.map(q => rgb[q * 3 + c]).sort((a, b) => a - b); return v[v.length >> 1]; });
+    s.colour = [medianChannel(use, 0), medianChannel(use, 1), medianChannel(use, 2)];
     s.lab = labOf(s.colour, 0, paperRGB); s.chroma = Math.hypot(s.lab[1], s.lab[2]);
     s.paper = s.lab[0] >= PAPER_L && s.chroma <= PAPER_CHROMA;
   }
@@ -419,16 +466,55 @@ export function planStudyWashes({ k, w, h, studies, flat = false, density = null
   const shifts = grids.map((g, i) => (i ? registerShift(grids[0], g, pw, ph, paperCol, Math.max(2, Math.round(0.02 * pw))) : [0, 0]));
   grids.forEach((g, i) => { grids[i] = shifted(g, pw, ph, shifts[i]); });
 
-  function loopsFor(labels, id) {
-    let x0 = pw, y0 = ph, x1 = -1, y1 = -1;
-    for (let q = 0; q < labels.length; q++) if (labels[q] === id) { const x = q % pw, y = (q / pw) | 0; if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
-    return x1 < 0 ? [] : outlineLoops(labels, id, { x0, y0, x1, y1 }, pw, ph, { cellMm: mmX, tolMm: TOL_MM });
+  function loopsByComponent(labels, count, bw, bh, xOff = 0, yOff = 0) {
+    if (!count) return [];
+    const bx0 = new Int32Array(count + 1).fill(bw), by0 = new Int32Array(count + 1).fill(bh);
+    const bx1 = new Int32Array(count + 1).fill(-1), by1 = new Int32Array(count + 1).fill(-1);
+    for (let y = 0; y < bh; y++) {
+      const row = y * bw;
+      for (let x = 0; x < bw; x++) {
+        const id = labels[row + x];
+        if (!id) continue;
+        if (x < bx0[id]) bx0[id] = x;
+        if (x > bx1[id]) bx1[id] = x;
+        if (y < by0[id]) by0[id] = y;
+        if (y > by1[id]) by1[id] = y;
+      }
+    }
+    const out = [];
+    for (let id = 1; id <= count; id++) {
+      if (bx1[id] < 0) continue;
+      const l = outlineLoops(labels, id, { x0: bx0[id], y0: by0[id], x1: bx1[id], y1: by1[id] }, bw, bh, { cellMm: mmX, tolMm: TOL_MM, xOff, yOff });
+      if (l.length) out.push(l);
+    }
+    return out;
   }
-  const maskLoops = (m, roundMm, avoid = null) => {
-    const r = roundMask(m, pw, ph, rC(roundMm / 2)); for (let q = 0; q < pn; q++) if ((avoid?.[q] && !m[q]) || reserve[q]) r[q] = 0;
-    const c = components(r, pw, ph, 4), loops = []; for (let id = 1; id <= c.count; id++) loops.push(...loopsFor(c.labels, id));
-    return loops;
+  const localizedLoops = (m, roundMm, avoid, keepOwn) => {
+    const box = maskBounds(m, pw, ph);
+    if (!box) return [];
+    const rad = rC(roundMm / 2), pad = rad + 2;
+    const X0 = Math.max(0, box.x0 - pad), X1 = Math.min(pw - 1, box.x1 + pad);
+    const Y0 = Math.max(0, box.y0 - pad), Y1 = Math.min(ph - 1, box.y1 + pad);
+    const bw = X1 - X0 + 1, bh = Y1 - Y0 + 1;
+    const sub = new Uint8Array(bw * bh);
+    for (let ly = 0; ly < bh; ly++) sub.set(m.subarray((Y0 + ly) * pw + X0, (Y0 + ly) * pw + X1 + 1), ly * bw);
+    const r = roundMask(sub, bw, bh, rad);
+    for (let ly = 0; ly < bh; ly++) {
+      const sRow = ly * bw, gRow = (Y0 + ly) * pw + X0;
+      for (let lx = 0; lx < bw; lx++) {
+        const si = sRow + lx, gi = gRow + lx;
+        if (keepOwn) {
+          if (sub[si]) r[si] = 1; else if (avoid?.[gi]) r[si] = 0;
+          if (reserve[gi]) r[si] = 0;
+        } else {
+          if ((avoid?.[gi] && !sub[si]) || reserve[gi]) r[si] = 0;
+        }
+      }
+    }
+    const c = components(r, bw, bh, 4);
+    return loopsByComponent(c.labels, c.count, bw, bh, X0, Y0);
   };
+  const maskLoops = (m, roundMm, avoid = null) => localizedLoops(m, roundMm, avoid, false).flat();
   // the plan cells a list of strokes covers: each point a disc of the tuft's width at its pressure
   const footprint = strokes => {
     const m = new Uint8Array(pn);
@@ -440,10 +526,21 @@ export function planStudyWashes({ k, w, h, studies, flat = false, density = null
   };
   // the same, one list of loops for each connected part (a part is laid on its own, along its own long axis)
   // (rounding closes gaps and notches but never takes away the shape's own cells: opened, a 2 mm mast falls into beads)
-  const partLoops = (m, roundMm, avoid = null) => {
-    const r = roundMask(m, pw, ph, rC(roundMm / 2)); for (let q = 0; q < pn; q++) { if (m[q]) r[q] = 1; else if (avoid?.[q]) r[q] = 0; if (reserve[q]) r[q] = 0; }
-    const c = components(r, pw, ph, 4), out = []; for (let id = 1; id <= c.count; id++) { const l = loopsFor(c.labels, id); if (l.length) out.push(l); }
-    return out;
+  const partLoops = (m, roundMm, avoid = null) => localizedLoops(m, roundMm, avoid, true);
+  // check if any cell in `cells` is within disc radius `rad` of a set cell in `mask`
+  const touchesMaskWithin = (cells, mask, rad) => {
+    const r2 = rad * rad;
+    const dxList = [], dyList = [];
+    for (let dy = -rad; dy <= rad; dy++) for (let dx = -rad; dx <= rad; dx++) if (dx * dx + dy * dy <= r2) { dxList.push(dx); dyList.push(dy); }
+    const dLen = dxList.length;
+    for (let idx = 0; idx < cells.length; idx++) {
+      const q = cells[idx], x = q % pw, y = (q / pw) | 0;
+      for (let d = 0; d < dLen; d++) {
+        const xx = x + dxList[d], yy = y + dyList[d];
+        if (xx >= 0 && xx < pw && yy >= 0 && yy < ph && mask[yy * pw + xx]) return true;
+      }
+    }
+    return false;
   };
   // each part filled in lanes (or one pull down its spine) of a brush sized to that part, the parts top down
   const fillParts = (parts, growMm, kitMm = washKitMm) => {
@@ -495,7 +592,24 @@ export function planStudyWashes({ k, w, h, studies, flat = false, density = null
   const stagesAt = [], touchLog = [], glazeLog = [];
   const STAGE = ['', 'first wash', 'charge', 'wash over', 'accent'];
   const underMix = cells => { const u = new Array(k).fill(0); for (const q of cells) for (let j = 0; j < k; j++) u[j] += laid[j][q] / cells.length; return u; };
-  const cellsIn = loops => { const m = loopsMask(loops, pw, ph, mmX), out = []; for (let q = 0; q < pn; q++) if (m[q]) out.push(q); return out; };
+  const loopsYRange = (loops, hh, mm) => {
+    let y0 = Infinity, y1 = -Infinity;
+    for (let k = 0; k < loops.length; k++) {
+      const P = loops[k].points;
+      for (let q = 0; q < P.length; q++) { const y = P[q][1]; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+    }
+    if (!(y1 >= y0)) return [0, -1];
+    return [Math.max(0, Math.floor(y0 / mm - 0.5)), Math.min(hh - 1, Math.ceil(y1 / mm - 0.5))];
+  };
+  const cellsIn = loops => {
+    const m = loopsMask(loops, pw, ph, mmX), out = [];
+    const [y0, y1] = loopsYRange(loops, ph, mmX);
+    for (let y = y0; y <= y1; y++) {
+      const row = y * pw;
+      for (let x = 0; x < pw; x++) if (m[row + x]) out.push(row + x);
+    }
+    return out;
+  };
   // the wash kit for a part: every wash brush, or inside a named form painted with rounds only those up to its ceiling
   // (a part that spans the form's boundary takes the smaller ceiling)
   const formBrushMm = studies[0].read?.formbrush ?? READ.formbrush;
@@ -542,8 +656,12 @@ export function planStudyWashes({ k, w, h, studies, flat = false, density = null
     }
     for (const st of fill.strokes) if (st.edge) { if (edgeCharge !== 1) st.charge = +((st.charge ?? 1) * edgeCharge).toFixed(3); delete st.edge; }
     for (const q of cells) for (let j = 0; j < k; j++) laid[j][q] += mix[j];
-    const sm = loopsMask(loops, w, h, cellMm), ids = new Uint8Array(n), box = { x0: w, y0: h, x1: -1, y1: -1 }; let area = 0;
-    for (let i = 0; i < n; i++) if (sm[i]) { ids[i] = 1; area++; const x = i % w, y = (i / w) | 0; if (x < box.x0) box.x0 = x; if (x > box.x1) box.x1 = x; if (y < box.y0) box.y0 = y; if (y > box.y1) box.y1 = y; }
+    const ids = loopsMask(loops, w, h, cellMm), box = { x0: w, y0: h, x1: -1, y1: -1 }; let area = 0;
+    const [sy0, sy1] = loopsYRange(loops, h, cellMm);
+    for (let y = sy0; y <= sy1; y++) {
+      const row = y * w;
+      for (let x = 0; x < w; x++) if (ids[row + x]) { area++; if (x < box.x0) box.x0 = x; if (x > box.x1) box.x1 = x; if (y < box.y0) box.y0 = y; if (y > box.y1) box.y1 = y; }
+    }
     if (!area) return null;
     const mixId = mixes.length; mixes.push({ mix: mix.map(v => v / strength), strength, stage });
     const sh = passage(ids, 1, box, strength, area, w); sh.mix = [...mix]; sh.graded = null; sh._follow = true; sh.firstWash = stage <= 2; sh._opening = 1; sh.dryAfter = true;
@@ -571,17 +689,24 @@ export function planStudyWashes({ k, w, h, studies, flat = false, density = null
 
   // a broken mass, laid in dabs: foliage (a green: hue between BROKEN_HUE degrees, some chroma), or a ragged shape (one
   // that loses BROKEN_LOST of itself when rounded by a 4 mm brush); never one larger than BROKEN_MOST of the sheet
+  const brokenCache = new WeakMap();
   const broken = shape => {
-    const c = shape.cells.length; if (flat || c < BROKEN_LEAST * pn || c > BROKEN_MOST * pn) return false;
-    const hue = (Math.atan2(shape.lab[2], shape.lab[1]) * 180 / Math.PI + 360) % 360;
-    if (shape.chroma >= 8 && hue >= BROKEN_HUE[0] && hue <= BROKEN_HUE[1]) return true;
-    // (nor is a long shape, a mast or a spar: it is laid in a pull along its length)
-    let mx = 0, my = 0; for (const q of shape.cells) { mx += q % pw; my += (q / pw) | 0; } mx /= c; my /= c;
-    let sa = 0, sb = 0, sc = 0; for (const q of shape.cells) { const dx = q % pw - mx, dy = ((q / pw) | 0) - my; sa += dx * dx; sb += dx * dy; sc += dy * dy; }
-    const mean = (sa + sc) / 2, dd = Math.sqrt(((sa - sc) / 2) ** 2 + sb * sb); if (Math.sqrt((mean + dd) / Math.max(1e-9, mean - dd)) >= BROKEN_LONG) return false;
-    const m = new Uint8Array(pn); for (const q of shape.cells) m[q] = 1; const o = roundMask(m, pw, ph, rC(2)); let kept = 0; for (const q of shape.cells) kept += o[q];
-    // (a shape that loses most of itself is not broken but thin: a mast, a rope, a frame, laid in a pull along its length)
-    return 1 - kept / c >= BROKEN_LOST && 1 - kept / c < BROKEN_THIN;
+    const cached = brokenCache.get(shape);
+    if (cached !== undefined) return cached;
+    const res = (() => {
+      const c = shape.cells.length; if (flat || c < BROKEN_LEAST * pn || c > BROKEN_MOST * pn) return false;
+      const hue = (Math.atan2(shape.lab[2], shape.lab[1]) * 180 / Math.PI + 360) % 360;
+      if (shape.chroma >= 8 && hue >= BROKEN_HUE[0] && hue <= BROKEN_HUE[1]) return true;
+      // (nor is a long shape, a mast or a spar: it is laid in a pull along its length)
+      let mx = 0, my = 0; for (const q of shape.cells) { mx += q % pw; my += (q / pw) | 0; } mx /= c; my /= c;
+      let sa = 0, sb = 0, sc = 0; for (const q of shape.cells) { const dx = q % pw - mx, dy = ((q / pw) | 0) - my; sa += dx * dx; sb += dx * dy; sc += dy * dy; }
+      const mean = (sa + sc) / 2, dd = Math.sqrt(((sa - sc) / 2) ** 2 + sb * sb); if (Math.sqrt((mean + dd) / Math.max(1e-9, mean - dd)) >= BROKEN_LONG) return false;
+      const m = new Uint8Array(pn); for (const q of shape.cells) m[q] = 1; const o = roundMask(m, pw, ph, rC(2)); let kept = 0; for (const q of shape.cells) kept += o[q];
+      // (a shape that loses most of itself is not broken but thin: a mast, a rope, a frame, laid in a pull along its length)
+      return 1 - kept / c >= BROKEN_LOST && 1 - kept / c < BROKEN_THIN;
+    })();
+    brokenCache.set(shape, res);
+    return res;
   };
   const isSkin = shape => { const hue = (Math.atan2(shape.lab[2], shape.lab[1]) * 180 / Math.PI + 360) % 360; return shape.chroma >= SKIN_C[0] && shape.chroma <= SKIN_C[1] && hue >= SKIN_HUE[0] && hue <= SKIN_HUE[1] && shape.lab[0] >= SKIN_L; };
   const isGreen = shape => { const hue = (Math.atan2(shape.lab[2], shape.lab[1]) * 180 / Math.PI + 360) % 360; return shape.chroma >= 8 && hue >= BROKEN_HUE[0] && hue <= BROKEN_HUE[1]; };
@@ -666,7 +791,7 @@ export function planStudyWashes({ k, w, h, studies, flat = false, density = null
     const c = components(lm, pw, ph, 4), cnt = new Int32Array(c.count + 1); for (const id of c.labels) if (id) cnt[id]++;
     for (let q = 0; q < pn; q++) { const id = c.labels[q]; if (id && cnt[id] * cellMm2 >= RESERVE_LEAST_MM2 && cnt[id] * cellMm2 <= RESERVE_MOST_MM2) { reserve[q] = 1; paperMask[q] = 1; } }
   }
-  { const pr = roundMask(paperMask, pw, ph, rC(ROUND_MM / 2)), pc = components(pr, pw, ph, 4); for (let id = 1; id <= pc.count; id++) keepOut.push(...loopsFor(pc.labels, id)); }
+  { const pr = roundMask(paperMask, pw, ph, rC(ROUND_MM / 2)), pc = components(pr, pw, ph, 4); keepOut.push(...loopsByComponent(pc.labels, pc.count, pw, ph).flat()); }
   const roundFirst = R1.round != null ? 2 * R1.round : ROUND_MM;   // @round is a radius (mm); ROUND_MM a brush width
   const painted = shapes.map((s, i) => i).filter(i => !shapes[i].paper);
   const isDark = i => !flat && shapes[i].lab[0] < DARK_L && !broken(shapes[i]);
@@ -697,14 +822,29 @@ export function planStudyWashes({ k, w, h, studies, flat = false, density = null
   // over any other painted neighbour (a thin rim of the study between two shapes is covered from both sides), so
   // neighbouring washes overlap instead of meeting at a hairline.
   const outlineOf = (list, roundMm = roundFirst, runUnder = null) => {
-    const m = new Uint8Array(pn); for (const i of list) for (const s of under(i)) for (const q of shapes[s].cells) m[q] = 1;
-    const own = Uint8Array.from(m);
-    if (runUnder != null && !flat) {
-      const g = dilate(own, pw, ph, rC(UNDER_MM)), o = dilate(own, pw, ph, Math.max(1, rC(OVER_MM)));
+    const m = new Uint8Array(pn);
+    let x0 = pw, y0 = ph, x1 = -1, y1 = -1;
+    for (const i of list) for (const s of under(i)) for (const q of shapes[s].cells) {
+      m[q] = 1;
+      const x = q % pw, y = (q / pw) | 0;
+      if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y;
+    }
+    const own = runUnder != null && !flat ? Uint8Array.from(m) : m;
+    if (runUnder != null && !flat && x1 >= 0) {
+      const rU = rC(UNDER_MM), rO = Math.max(1, rC(OVER_MM));
+      const g = dilate(own, pw, ph, rU), o = dilate(own, pw, ph, rO);
       // (over a neighbour's edge only where nothing is laid yet: over a wash already down there is no seam to close, and a
       // glaze run over the lit wall between two shadow streaks closes the streak's light)
       const bare = q => { for (let j = 0; j < k; j++) if (laid[j][q] > 0) return false; return true; };
-      for (let q = 0; q < pn; q++) if (g[q] && !own[q] && !paperMask[q] && !shapes[label[q]].paper && ((o[q] && bare(q)) || (!done.has(label[q]) && shapes[label[q]].lab[0] < runUnder - NEST_LIGHTER))) m[q] = 1;
+      const X0 = Math.max(0, x0 - rU), X1 = Math.min(pw - 1, x1 + rU);
+      const Y0 = Math.max(0, y0 - rU), Y1 = Math.min(ph - 1, y1 + rU);
+      for (let y = Y0; y <= Y1; y++) {
+        const row = y * pw;
+        for (let x = X0; x <= X1; x++) {
+          const q = row + x;
+          if (g[q] && !own[q] && !paperMask[q] && !shapes[label[q]].paper && ((o[q] && bare(q)) || (!done.has(label[q]) && shapes[label[q]].lab[0] < runUnder - NEST_LIGHTER))) m[q] = 1;
+        }
+      }
     }
     return { m: own, parts: partLoops(m, roundMm, paperMask) };
   };
@@ -784,8 +924,7 @@ export function planStudyWashes({ k, w, h, studies, flat = false, density = null
     const glaze = shadow ? { base: shadowBase.get(shadowKey) ?? null, scale: SHADOW_CHARGE, onMix: mix => { if (!shadowBase.has(shadowKey)) { const t = mix.reduce((a, v) => a + v, 0) || 1; shadowBase.set(shadowKey, mix.map(v => v / t)); } } } : {};
     // (the fill keeps inside the cut edge, overlapping it by a little: laid over it, the edge was a dark rim round a paler middle)
     const cutKit = dark ? darkKit : washKitMm, cut = !flat && !isBroken && (dark || own.length * cellMm2 >= CUT_FROM_MM2);
-    const cutOpts = (loops, parts) => { const eb = dark ? Math.min(...darkKit) : Math.min(CUT_BRUSH_MM, Math.max(...washKitMm)), band = 2 * (eb / 2) * (0.25 + 0.75 * EDGE_PRESS) - 1.4; const inner = new Uint8Array(pn), lm = loopsMask(loops, pw, ph, mmX), er = Math.max(0, rC(band)); const outside = dilate(Uint8Array.from(lm, v => 1 - v), pw, ph, er); for (let q = 0; q < pn; q++) inner[q] = lm[q] && !outside[q] ? 1 : 0; const ip = partLoops(inner, 0.5); return { kit: cutKit, edge: edgeStrokes(loops, eb), parts: ip.length ? ip : parts }; };
-    const darkOpts = cut ? cutOpts(loops, parts) : {};
+    const cutOpts = (loops, parts) => { const eb = dark ? Math.min(...darkKit) : Math.min(CUT_BRUSH_MM, Math.max(...washKitMm)), band = 2 * (eb / 2) * (0.25 + 0.75 * EDGE_PRESS) - 1.4; const lm = loopsMask(loops, pw, ph, mmX), er = Math.max(0, rC(band)); const inner = er > 0 ? erode(lm, pw, ph, er) : lm; const ip = partLoops(inner, 0.5); return { kit: cutKit, edge: edgeStrokes(loops, eb), parts: ip.length ? ip : parts }; };
     // a shadow or a dark is built by glazes, never one strong coat: two to four pale glazes, each over the last once it
     // is dry, each a little smaller (the parts of the shape that the finest study shows darker), laid after every
     // first wash so the painter works elsewhere while each dries
@@ -842,6 +981,7 @@ export function planStudyWashes({ k, w, h, studies, flat = false, density = null
         continue;
       }
     }
+    const darkOpts = cut ? cutOpts(loops, parts) : {};
     const made = isBroken ? dabMass(stage, what, m, loops, s.colour, own) : [wash(stage, shadow ? `${what}: a cool shadow glaze` : what, loops, target, { own, parts, move: soft ? 'beside damp' : 'wet on dry', grade: !flat && !shadow, ...glaze, ...darkOpts })].filter(Boolean);
     if (!made.length) continue;
     if (soft) softJoins++;
@@ -857,9 +997,9 @@ export function planStudyWashes({ k, w, h, studies, flat = false, density = null
   const steps = Math.max(GLAZE_STEPS.length, FOLIAGE_STEPS.length);
   for (let k = 0; k < steps; k++) {
     let sess = [], mask = new Uint8Array(pn);
+    const rad1 = rC(1);
     for (const g of glazeSteps.filter(x => x.k === k)) {
-      const gm = new Uint8Array(pn); for (const q of g.cells) gm[q] = 1; const near = dilate(gm, pw, ph, rC(1));
-      if (near.some((v, q) => v && mask[q])) { if (sess.length) layer(3, sess); sess = []; mask = new Uint8Array(pn); }
+      if (sess.length && touchesMaskWithin(g.cells, mask, rad1)) { layer(3, sess); sess = []; mask = new Uint8Array(pn); }
       // (a glaze moves a place by at most its cap: the dark is reached by overlap)
       let colour = g.colour;
       if (g.capL) { const Lnow = filmLab(underMix(g.cells), pigments, paperCol)[0], Lc = labOf(colour, 0, valueRef)[0]; if (Lc < Lnow - g.capL) colour = withL(colour, Lnow - g.capL); }
@@ -933,9 +1073,9 @@ export function planStudyWashes({ k, w, h, studies, flat = false, density = null
     for (const gr of groups) for (const t of gr.touches) touchLog.push({ layer: li + 1, name: t.name, wash: t.wash, areaMm2: t.areaMm2, length: t.length, width: t.width, L: t.glazeL ?? gr.lab[0], strokes: t.strokes.length, cx: t.cells.length ? +(((t.cells[0] % pw) + 0.5) * mmX).toFixed(1) : 0, cy: t.cells.length ? +((Math.floor(t.cells[0] / pw) + 0.5) * mmX).toFixed(1) : 0 });
     const stage = 4; let sess = [], sessMask = new Uint8Array(pn), touches = 0;
     const flush = () => { if (sess.length) layer(stage, sess); sess = []; sessMask = new Uint8Array(pn); };
+    const rad15 = rC(1.5);
     for (const [j, gr] of groups.entries()) {
-      const m = new Uint8Array(pn); for (const q of gr.cells) m[q] = 1;
-      const near = dilate(m, pw, ph, rC(1.5)); if (sess.length >= SESSION_MOST || gr.cells.some(q => sessMask[q]) || near.some((v, q) => v && sessMask[q])) flush();
+      if (sess.length >= SESSION_MOST || (sess.length && (gr.cells.some(q => sessMask[q]) || touchesMaskWithin(gr.cells, sessMask, rad15)))) flush();
       // the passage is where its marks lay paint (their footprints), not the study's cells: charged for the cells, marks that
       // reach past them were spread thin over the extra paper and dried pale
       // its large changes are glazes, laid in lanes over their own cells, before its marks

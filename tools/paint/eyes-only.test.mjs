@@ -84,3 +84,29 @@ test('a refused read or a script that names a picture disqualifies the try, in l
   const n = guardRecord(named, { held: true }); assert.equal(n.cheat.disqualified, true); assert.equal(n.cheat.reason, 'scripts refer to the picture files: previous/final-beside-subject.jpg, inputs/source.png');
   assert.equal(guardRecord({ blocked: [], scripts: [], commands: named.commands }, { held: false }).cheat.disqualified, false, 'a command that only names a picture is recorded, not a disqualification');
 });
+
+test('comments and required seen.md notes mentioning picture names do not trigger false-positive disqualifications', () => {
+  const pictures = ['inputs/source.png', 'auto-result/auto-painting.png'];
+  const clean = pictureReadsByCode({
+    pictures,
+    scripts: [
+      { name: 'generate_v1.py', text: '# Look at auto-painting.png vs source.png!\nimport json\ndata = json.load(open("resources/shapes.json"))\n' },
+      { name: 'build.mjs', text: '// compared visually with inputs/source.png\n/* auto-result/auto-painting.png note */\nconsole.log("ok");\n' },
+    ],
+    steps: [
+      { kind: 'shell', text: "/bin/zsh -lc \"cat > seen.md <<'EOF'\nauto-result/auto-painting.png: Too blue and speckled.\nEOF\npython3 - <<'PY'\nimport json\nprint(len(json.load(open('resources/shapes.json'))))\nPY\"", output: '12' },
+      { kind: 'shell', text: "/bin/zsh -lc \"python3 - <<'PY'\nimport json\nopen('seen.md','w').write('auto-result/auto-painting.png: Broad pale wash.')\nPY\"", output: '' },
+      { kind: 'shell', text: "/bin/zsh -lc \"printf '%s\\n' 'auto-result/auto-painting.png: Notes' > seen.md\npython3 - <<'PY'\nprint(1)\nPY\"", output: '1' },
+      { kind: 'shell', text: "python3 - <<'EOF'\n# keep sketchy lines seen in source.png!\nimport json\njson.load(open('drawing/lines.json'))\nEOF", output: '' },
+    ],
+  });
+  assert.deepEqual(clean, { blocked: [], scripts: [], commands: [] });
+  assert.equal(guardRecord(clean, { held: true }).cheat.disqualified, false);
+  // Real code read inside a script that also writes seen.md still disqualifies
+  const stillCheat = pictureReadsByCode({
+    pictures,
+    steps: [{ kind: 'shell', text: "python3 - <<'PY'\nopen('seen.md','w').write('auto-result/auto-painting.png: ok')\nfrom PIL import Image\nImage.open('inputs/source.png')\nPY", output: '' }],
+  });
+  assert.equal(stillCheat.scripts.length, 1);
+  assert.equal(guardRecord(stillCheat, { held: true }).cheat.disqualified, true);
+});

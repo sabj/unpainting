@@ -2939,3 +2939,49 @@ test('a field region that reaches the grid edge still closes (a morph never empt
  const data=m.prepareImplicitPair(m.withFieldPlatePair(m.createMorphPair(ga,gb,{composition,...m.orbitViewOptions(st)}),st.fieldPlate));
  for(const t of [.4,.4675,.47,.48,.49,.5,.55])assert.equal(m.sampleImplicitMorph(data,t).bodies.length,3,`every member present at ${t}`);
 });
+
+test('GPU drying batches retain the dt boundary, limits and checkpoint cancellation',async()=>{
+  const {nativeDrySchedule}=await import('./mushrooms.mjs');
+  const calls=[],checks=[];
+  const r=await nativeDrySchedule({maxSteps:51,batchSize:25,advance:async(n,dt)=>{calls.push([n,dt]);return calls.length<3;},checkpoint:async j=>checks.push(j)});
+  assert.deepEqual(calls,[[16,.6],[25,2],[10,2]]);
+  assert.deepEqual(checks,[16,41]);assert.deepEqual(r,{dry:true,steps:51});
+  assert.deepEqual(await nativeDrySchedule({maxSteps:99,batchSize:8,advance:async()=>true,checkpoint:async()=>false}),{dry:false,steps:8});
+  await assert.rejects(nativeDrySchedule({maxSteps:10,batchSize:0}),RangeError);
+});
+
+test('browser WebGPU overrides and unavailable GPU preserve CPU rendering',async()=>{
+  const {nativeWebGpuEnabled,browserNativeDry}=await import('./mushrooms.mjs');
+  assert.equal(nativeWebGpuEnabled(''),true);
+  assert.equal(nativeWebGpuEnabled('?physics=cpu'),false);
+  assert.equal(nativeWebGpuEnabled('?nowebgpu=1'),false);
+  assert.equal(nativeWebGpuEnabled('?nowebgpu=0'),true);
+  const dry=browserNativeDry('?physics=cpu');
+  assert.equal(await dry({}),null);dry.close();
+});
+
+test('optional dry adapter can delegate to the original CPU schedule without changing layers',async()=>{
+  const {simulateNativePassages,nativeDrySchedule}=await import('./mushrooms.mjs');
+  const snapshots=[];
+  for(const adapter of [false,true]){
+    let sheet;
+    const result=await simulateNativePassages(tinyNativeStudy(),{width:48,seed:23,yieldWork:async()=>{},onSheet:s=>{sheet=s;},
+      onDry:adapter?async({maxSteps,flow,transport,checkpoint})=>nativeDrySchedule({maxSteps,advance:async(n,dt)=>flow({...transport,dt}),checkpoint}):null});
+    snapshots.push({layers:sheet.layers,steps:result.steps});
+  }
+  assert.deepEqual(snapshots[1],snapshots[0]);
+});
+
+test('async transport and explicit CPU override keep the reference brush and final layers',async()=>{
+  const {simulateNativePassages,browserNativeDry}=await import('./mushrooms.mjs');
+  const results=[];
+  for(const accelerated of [false,true]){
+    let sheet;const dry=browserNativeDry('?physics=cpu');
+    try{
+      const metrics=await simulateNativePassages(tinyNativeStudy(),{width:48,seed:37,yieldWork:async()=>{},onSheet:s=>{sheet=s;},
+        ...(accelerated?{onFlow:dry.flow,onDry:dry}:{})});
+      results.push({layers:sheet.layers,steps:metrics.steps,strokes:metrics.strokes});
+    }finally{dry.close();}
+  }
+  assert.deepEqual(results[1],results[0]);
+});

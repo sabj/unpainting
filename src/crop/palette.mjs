@@ -94,24 +94,44 @@ export function paletteOf(rgb, n, paper, {
   const estimate = (k, rescueCount = 0) => cached(`directions:${k}:${rescueCount}`, () => estimatePigments(paintD, n, k, { rescue: rescueCount }));
   // Fit one, two, three pigments and continue while the extra one removes a real share of the unexplained colour.
   // A threshold on hue spread cannot separate a one-colour sheet from a many-colour one.
+  // Deduplicate sampled paint densities by 24-bit RGB (+ ink mask) so unmix runs once per distinct colour.
+  const fitSample = cached('fit-sample-unique', () => {
+    const seen = new Map(), first = [], cnt = [];
+    for (let i = 0; i < n; i += 3) {
+      const skip = inkMask && inkMask[i];
+      const key = skip ? -1 : ((rgb[i * 3] << 16) | (rgb[i * 3 + 1] << 8) | rgb[i * 3 + 2]);
+      let j = seen.get(key);
+      if (j === undefined) { j = first.length; seen.set(key, j); first.push(i); cnt.push(1); }
+      else cnt[j]++;
+    }
+    const u = first.length, Du = new Float32Array(u * 3), counts = Uint32Array.from(cnt);
+    for (let j = 0; j < u; j++) {
+      const o = first[j] * 3;
+      Du[j * 3] = paintD[o]; Du[j * 3 + 1] = paintD[o + 1]; Du[j * 3 + 2] = paintD[o + 2];
+    }
+    return { u, Du, counts };
+  });
   const fitError = k => cached(`fit-error:${k}`, () => {
     if (k < 1) return Infinity;
     // estimatePigments seeds from three directions and can return fewer than asked; never index past its list.
     const dirs = estimate(k).slice(0, k);
     if (dirs.length < k) return Infinity;
-    // every third pixel: this is a ratio, not a total. Each pixel's unmix is independent, so only those are unmixed.
-    const ns = Math.ceil(n / 3), sampleD = new Float32Array(ns * 3);
-    for (let s = 0; s < ns; s++) for (let c = 0; c < 3; c++) sampleD[s * 3 + c] = paintD[s * 9 + c];
-    const A = unmix(sampleD, ns, dirs);
+    const { u, Du, counts } = fitSample;
+    const A = unmix(Du, u, dirs);
     let err = 0, mass = 0;
-    for (let i = 0; i < n; i += 3) {
-      const s = i / 3;
+    const dl = dirs.length;
+    for (let j = 0; j < u; j++) {
+      const w = counts[j], o = j * 3, aOff = j * dl;
+      let e0 = 0, m0 = 0;
       for (let c = 0; c < 3; c++) {
         let made = 0;
-        for (let j = 0; j < dirs.length; j++) made += A[s * dirs.length + j] * dirs[j][c];
-        err += Math.abs(paintD[i * 3 + c] - made);
-        mass += Math.abs(paintD[i * 3 + c]);
+        for (let p = 0; p < dl; p++) made += A[aOff + p] * dirs[p][c];
+        const dc = Du[o + c];
+        e0 += Math.abs(dc - made);
+        m0 += Math.abs(dc);
       }
+      err += e0 * w;
+      mass += m0 * w;
     }
     return mass > 0 ? err / mass : 0;
   });

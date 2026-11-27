@@ -28,6 +28,13 @@ export async function runTape(tape,api,resume=null){
   const operation=async(kind,fn,mask=null)=>api.operation?api.operation({kind,label:OPERATION_NAMES[kind],mask,index,done,total},fn):fn();
   if(m.k==='d'){await operation('dip',()=>dip(brush(m.b),{water:m.w,conc:m.c}));continue;}
   if(m.k==='D'){await operation('ink',()=>dipPen(pen(m.pen),m.ink,m.a));continue;}
+  if(m.k==='g'&&api.graphite&&!api.checkpoint){
+   // Only consecutive dry deposits commute with presentation. Never cross a
+   // wash, mask, flow or checkpoint boundary; preserve each mark's RNG/options.
+   const batch=[m];while(tape.marks[index+1]?.k==='g')batch.push(tape.marks[++index]);
+   const count=await api.graphite(batch,m=>pencilDraw(api.sheet(),[{points:m.points}],m.pigment,m.options));
+   done+=count;await api.progress(done,total);continue;
+  }
   if(m.k==='g'){
    await operation('paint',()=>api.mutate(()=>pencilDraw(api.sheet(),[{points:m.points}],m.pigment,m.options)));
    done++;await api.progress(done,total);
@@ -45,9 +52,9 @@ export async function runTape(tape,api,resume=null){
    const reach=flows.size?Math.max(w,h):isPen?tool.nib+tool.flex+tool.reach+tool.pad+6:strokeReach(tool,api.sheet().paper,Math.max(tool.radius,...pts.map(p=>p.r??tool.radius)));
    const contact=await api.touch(pts,reach,()=>{api.sheet().wetting=!!m.wt;
     if(isPen)penStroke(tool,api.sheet(),pts,{spacing:m.sp??.5,between});
-    else stroke(tool,api.sheet(),pts,{spacing:m.sp??.7,upright:m.u===2?'sweep':!!m.u,lift:m.lf!==0,between,...(m.vs!==undefined?{speed:m.vs}:{})});
+    else stroke(tool,api.sheet(),pts,{spacing:m.sp??.7,upright:m.u===2?'sweep':!!m.u,lift:m.lf!==0,...(flows.size?{between}:{}),...(m.vs!==undefined?{speed:m.vs}:{})});
     api.sheet().wetting=false;
-   });
+   },{between:flows.size>0});
    if(pts.length)await api.present(pts.at(-1),isPen?tool.nib/2:pts.at(-1).r??tool.radius,done,0,contact);
    await api.end();done++;await api.progress(done,total);
    if(api.checkpoint)await api.checkpoint(done,()=>({index:index+1,done,contactBrush:[...brushes].find(([,tool])=>tool===api.sheet()._contactBrush)?.[0],brushes:[...brushes].map(([id,t])=>[id,saveTool(t)]),pens:[...pens].map(([id,t])=>[id,saveTool(t)])}));

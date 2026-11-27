@@ -52,7 +52,7 @@ function signedZero(a) { const bits = new Uint32Array(a.buffer, a.byteOffset, a.
 // GPU_SIGNED_ZERO=ignore (Fast): a -0 pigment value is zero; strokes keep the active-pigment kernel instead of switching
 // every later stroke to the all-pigment one for bit-exact signed zeros
 const IGNORE_SIGNED_ZERO = process.env.GPU_SIGNED_ZERO === 'ignore';
-function brushPigments(m) { if (m.op !== 'stroke') return; if (IGNORE_SIGNED_ZERO) { m.data[35] = 0; return; } fullBrushPigments ||= m.data[35] !== 0; if (fullBrushPigments) m.data[35] = 1; }
+function brushPigments(m) { if (m.op !== 'stroke' && m.op !== 'sectionStroke') return; if (IGNORE_SIGNED_ZERO) { m.data[35] = 0; return; } fullBrushPigments ||= m.data[35] !== 0; if (fullBrushPigments) m.data[35] = 1; }
 
 const asyncDry=process.env.GPU_ASYNC_DRY==='1' && process.env.GPU_RESIDENT==='1';let workerWetMask=0,workerTopMask=0;const brushMasks=new Map();
 function strokeMask(m){if(!asyncDry)return;workerWetMask|=(m.info.mask??0)|(brushMasks.get(m.info.restore??m.info.state)??0);const mask=(workerWetMask|workerTopMask)>>>0;gpu.setAct(mask);brushMasks.set(m.info.state,mask);}
@@ -74,8 +74,13 @@ const padd = (k, ms, n = 1) => { const e = PROF[k] ??= { ms: 0, n: 0 }; e.ms += 
 let pendingSteps = 0;
 const flushSteps = async () => {
   if (!pendingSteps) return;
-  const n = pendingSteps, t = PROF ? performance.now() : 0; pendingSteps = 0; await gpu.advance(n);
-  if (PROF) { if (SERIAL_PROF) await gpu.idle(); padd('advance', performance.now() - t, n); }
+  const n = pendingSteps, t = PROF ? performance.now() : 0, efBefore = PROF?.['phase:efRefresh']?.ms ?? 0; pendingSteps = 0; await gpu.advance(n);
+  if (PROF) {
+    if (SERIAL_PROF) await gpu.idle();
+    const elapsed = performance.now() - t;
+    padd('advance', elapsed, n);
+    padd('advanceNonPressure', elapsed - ((PROF['phase:efRefresh']?.ms ?? 0) - efBefore), n);
+  }
 };
 
 async function handle(m) {
@@ -88,9 +93,9 @@ async function handle(m) {
   if (gpu?.device.dispatchProfile) gpu.device.dispatchProfile.op = m.op;
   if (SERIAL_PROF && m.op !== 'init' && m.op !== 'prof') {
     const t = performance.now();
-    if (m.op === 'stroke' || m.op === 'splat') {
+    if (m.op === 'stroke' || m.op === 'sectionStroke' || m.op === 'splat') {
       brushPigments(m); strokeMask(m);
-      const out = await (m.op === 'stroke' ? gpu.runStroke(m.data, {...m.info,slot:m.slot,seq:m.seq}) : gpu.runSplat(m.data, m.info)); if(out===null) return; ring.set(out, m.slot * RING_FLOATS); Atomics.store(done, m.slot, m.seq); Atomics.notify(done, m.slot);
+      const out = await (m.op === 'stroke' ? gpu.runStroke(m.data, {...m.info,slot:m.slot,seq:m.seq}) : m.op === 'sectionStroke' ? gpu.runSectionStroke(m.data, {...m.info,slot:m.slot,seq:m.seq}) : gpu.runSplat(m.data, m.info)); if(out===null) return; ring.set(out, m.slot * RING_FLOATS); Atomics.store(done, m.slot, m.seq); Atomics.notify(done, m.slot);
       padd(m.op, performance.now() - t); return;
     }
     await handleOp(m); await gpu.idle(); padd(m.op, performance.now() - t); return;
@@ -111,6 +116,19 @@ async function handleOp(m) {
       sheet = m.sheet; sheet.layers = m.top ? [m.top] : [];
       fullBrushPigments = [...sheet.G, ...sheet.D, ...sheet.P, ...(m.top ?? [])].some(signedZero);
       try { gpu = await GpuSheet.create(device, sheet, m.O); await gpu.idle(); } catch (e) { return fail(`the GPU sheet could not start (${e.message})`, 2); }
+      if (PROF) {
+        // Inclusive wall times, without extra submissions or waits. Nested reads
+        // can include earlier queued work; GPU timestamps measure execution.
+        for (const name of ['efRefresh', 'readWords', 'readStepStatus', 'readDryChunk', 'runSectionStroke', 'surfaceLevel']) {
+          if (typeof gpu[name] !== 'function') continue;
+          const original = gpu[name].bind(gpu);
+          gpu[name] = async (...args) => {
+            const start = performance.now();
+            try { return await original(...args); }
+            finally { padd(`phase:${name}`, performance.now() - start); }
+          };
+        }
+      }
       if(workerData.strokePlanMetadata)new Float64Array(workerData.strokePlanMetadata).set([gpu.strokePlanBudget.requestedMiB,gpu.strokePlanBudget.effectiveMiB,device.limits.maxStorageBufferBindingSize,device.limits.maxBufferSize]);
       const adapterInfo = Object.fromEntries(['vendor', 'architecture', 'device', 'description'].map(key => [key, String(adapter.info?.[key] ?? '')]));
       writeAdapterEvidence(workerData.adapterMetadata ? new Uint8Array(workerData.adapterMetadata) : null, { adapterInfo, dawnFlags: process.env.DAWN_FLAGS ? process.env.DAWN_FLAGS.split(' ') : [] });
@@ -137,9 +155,17 @@ async function handleOp(m) {
     case 'opts': gpu.setOptions(m.o); return;
     case 'act': if(!asyncDry)gpu.setAct(m.mask); return;
     case 'down': { const p = await gpu.readRect(m.rect); rectData.set(p); break; }
-    case 'paperGate': { rectData.set(await gpu.readPaperGate(m.indices)); break; }
+    case 'downRects': { rectData.set(await gpu.readRects(m.rects, m.mask)); break; }
+    case 'pigmentDown': { rectData.set(await gpu.readPigmentCells(m.k,m.cells)); break; }
+    case 'pigmentUp': {
+      fullBrushPigments ||= signedZero(m.data);
+      if(asyncDry){workerWetMask|=1<<m.k;gpu.setAct(workerWetMask|workerTopMask);}
+      gpu.writePigmentCells(m.k,m.cells,m.data,m.rect);break;
+    }
+    case 'paperGate': { rectData.set(await gpu.readPaperGate(m.indices, m.full)); break; }
     case 'paperDown': { const p = await gpu.readPaperRects(m.rects ?? [m.rect]); rectData.set(p); break; }
     case 'up': { fullBrushPigments ||= m.signedZero || signedZero(m.data ?? rectData); if(asyncDry){workerWetMask|=m.mask??0;gpu.setAct(workerWetMask|workerTopMask);} const [, , rw, rh] = m.rect; gpu.writeRect(m.rect, m.data ?? rectData.slice(0, rw * rh * gpu.planes()), m.logicalRect); break; }
+    case 'upRects': { fullBrushPigments ||= m.signedZero || signedZero(m.data); if(asyncDry){workerWetMask|=m.mask??0;gpu.setAct(workerWetMask|workerTopMask);} gpu.writeRects(m.rects,m.data,m.logicalRect,m.transferMask); break; }
     case 'upNoop': { fullBrushPigments ||= m.signedZero; if(asyncDry){workerWetMask|=m.mask??0;gpu.setAct(workerWetMask|workerTopMask);} gpu.writeRect(null, null, m.logicalRect); break; }
     case 'upReduced': {
       gpu.writeRect(m.rect, m.data ?? null, m.logicalRect);
@@ -196,10 +222,10 @@ async function handleOp(m) {
       const out=await gpu.brushState(m.state,m.seq); ring.set(m.splat ? new Float32Array([out[3]]) : out,m.slot*RING_FLOATS);
       Atomics.store(done,m.slot,m.seq); Atomics.notify(done,m.slot); break;
     }
-    case 'stroke': case 'splat': {
+    case 'stroke': case 'sectionStroke': case 'splat': {
       brushPigments(m); strokeMask(m);
       // not awaited: the next message is handled while the GPU lays this one; its brush state lands in the ring when it is done
-      (m.op === 'stroke' ? gpu.runStroke(m.data, {...m.info,slot:m.slot,seq:m.seq}) : gpu.runSplat(m.data, m.info)).then(out => { if(out===null) return; ring.set(out, m.slot * RING_FLOATS); Atomics.store(done, m.slot, m.seq); Atomics.notify(done, m.slot); }).catch(e => { console.error('gpu worker error', e); fail(e.stack ?? e.message); });
+      (m.op === 'stroke' ? gpu.runStroke(m.data, {...m.info,slot:m.slot,seq:m.seq}) : m.op === 'sectionStroke' ? gpu.runSectionStroke(m.data, {...m.info,slot:m.slot,seq:m.seq}) : gpu.runSplat(m.data, m.info)).then(out => { if(out===null) return; ring.set(out, m.slot * RING_FLOATS); Atomics.store(done, m.slot, m.seq); Atomics.notify(done, m.slot); }).catch(e => { console.error('gpu worker error', e); fail(e.stack ?? e.message); });
       // a stroke laid in parts (its flows wait for the edge feed's geometry, stepfull.mjs strokeEncoding) holds the next message
       if (gpu.encoding) await gpu.encoding;
       return;
@@ -225,7 +251,7 @@ async function handleOp(m) {
       new Uint8Array(rectData.buffer).set(data);ctrl[1]=data.length;break;
     }
     case 'dryStats': {const m=gpu.dryTelemetry??{};ctrl[1]=m.calls??0;ctrl[4]=m.fastChunk??50;ctrl[6]=m.lastWetCounter??-1;ctrl[12]=m.counterReads??0;ctrl[13]=Math.min(2147483647,Math.round((m.counterReadMs??0)*1000));ctrl[14]=m.fastIterations??0;ctrl[15]=m.fastChunks??0;break;}
-    case 'prof': { gpu.flushStrokes(); const b = new TextEncoder().encode(JSON.stringify({ ...(PROF ?? {}), levelStats: gpu.levelStats?.() ?? null, dryTelemetry: gpu.dryTelemetry ?? null, gpuDistanceBoxes: gpu.gpuDistanceBoxes ?? 0, edgeFluxThreads: edgePool?.threads() ?? 1, edgeFluxJobs: edgePool?.stats()?.edgeFlux ?? 0, pressureRestricts: edgePool?.stats()?.pressureRestricts ?? 0, capabilities: { wetCounterPolicy: 'on-demand; frontier maintained every step', fastDryChunkPolicy: 'adaptive 50/150/200; explicit override supported', maxStorageBuffersPerShaderStage: gpu.device.limits.maxStorageBuffersPerShaderStage, fusedWetScan: process.env.GPU_FUSE_WETSCAN !== '0' && gpu.device.limits.maxStorageBuffersPerShaderStage >= 10 }, timingScope: SERIAL_PROF ? 'legacy serialized worker wall time' : 'worker handling wall time; data-dependent readbacks include queued GPU work; unawaited stroke execution excluded', dispatchBatches: gpu.device.dispatchProfile?.snapshot(), timestamps: await gpu.timestamps.result(), optical: gpu.optical ? { ...gpu.optical.stats, timestamps: await gpu.optical.timestamps.result() } : null })); new Uint8Array(rectData.buffer).set(b); ctrl[1] = b.length; break; }
+    case 'prof': { gpu.flushStrokes(); await gpu.lvAdapt(); const b = new TextEncoder().encode(JSON.stringify({ ...(PROF ?? {}), edgeRefreshProfile: gpu.ef?.refreshProfile ?? null, sectionStats: gpu.sectionBrush ? { smallDispatches: gpu.sectionBrush.smallDispatches ?? 0, largeSteps: gpu.sectionBrush.largeSteps ?? 0, footprints: gpu.sectionBrush.footprints } : null, levelStats: gpu.levelStats?.() ?? null, dryTelemetry: gpu.dryTelemetry ?? null, gpuDistanceBoxes: gpu.gpuDistanceBoxes ?? 0, edgeFluxThreads: edgePool?.threads() ?? 1, edgeFluxJobs: edgePool?.stats()?.edgeFlux ?? 0, pressureRestricts: edgePool?.stats()?.pressureRestricts ?? 0, capabilities: { wetCounterPolicy: 'on-demand; frontier maintained every step', fastDryChunkPolicy: 'adaptive 50/150/200; explicit override supported', maxStorageBuffersPerShaderStage: gpu.device.limits.maxStorageBuffersPerShaderStage, fusedWetScan: process.env.GPU_FUSE_WETSCAN !== '0' && gpu.device.limits.maxStorageBuffersPerShaderStage >= 10 }, timingScope: SERIAL_PROF ? 'legacy serialized worker wall time' : 'worker handling wall time; data-dependent readbacks include queued GPU work; unawaited stroke execution excluded', dispatchBatches: gpu.device.dispatchProfile?.snapshot(), timestamps: await gpu.timestamps.result(), optical: gpu.optical ? { ...gpu.optical.stats, timestamps: await gpu.optical.timestamps.result() } : null })); new Uint8Array(rectData.buffer).set(b); ctrl[1] = b.length; break; }
     case 'close': clearInterval(keepAlive); process.exit(0);
   }
   if (m.wait !== false) ack();

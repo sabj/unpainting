@@ -43,6 +43,7 @@ import zlib from 'node:zlib';
 import path from 'node:path';
 import sharp from 'sharp';
 import {makePaper} from '../../src/media/paper.mjs';
+import {makePaperGpu} from '../../src/media/gpu/paper-gpu.mjs';
 import {paperRelief} from '../../src/media/paper-relief.mjs';
 import {subcellSpread} from '../../src/media/subcell-grain.mjs';
 import {createSheet, step, dry as physicalDry, layersOf, thickness, thicknessTotals, DEFAULTS, coherent} from '../../src/media/sheet.mjs';
@@ -70,6 +71,7 @@ import {fillSheetBase, WHITE_PAPER_RGB} from '../../src/paint/methods/sheet-tone
 import {sealAtBirth} from '../guard/seal-maps.mjs';
 import {createWetTrace} from './wet-trace.mjs';
 import {wetOnDryGate, passageReach} from '../painter/passage-dry-gate.mjs';
+import {parseTwoGrid, createTwoGridPapers, attachTwoGridBridge} from './two-grid-bridge.mjs';
 
 // Observe CPU pen contact while its GPU stroke is still open. Readbacks must
 // preserve unuploaded ink; they never advance, upload or end the physical stroke.
@@ -92,7 +94,7 @@ const { WASH_FLAT_SPLAY, ENTRY_FILE, JSONL, opt, num, optTrack, NATIVE_PAINT_MOD
   WASH_SESSION, phaseMark, w, h, n, FINAL_W, createBrush, physicalStroke: untracedStroke, candidateContact, TONE_MODE, 
   SHEET_TONE, CALIBRATED_PLAN, PAPER_RULE, paperRGB, WASH_SPLAT_SETTINGS, CODE_HASH, PIGS, SMALL, 
   setClip, COLOUR_TRACE, OUTLINE, STAGE_PLAN, REQUESTED_DRAW_MEDIUM, INK_WIDTH_FLOOR_MM, INK_DAMP, 
-  STYLE_INK_DEFAULT, INK_PROFILE, GRAPHITE_PROFILE, INK, GRAPHITE, SHEET_PIGS, GRAPHITE_AT } = ctx;
+  STYLE_INK_DEFAULT, INK_PROFILE, GRAPHITE_PROFILE, INK, GRAPHITE, SHEET_PIGS, GRAPHITE_AT, AUX_GPU } = ctx;
 Object.assign(ctx, { colourMass });
 // WET_TRACE=<file.jsonl>: a read-only record of the sheet's water under each stroke at landing and around each dry (wet-trace.mjs)
 const physicalStroke=(b,t,p,o)=>{const result=ctx.WET_TRACE&&t===ctx.sheet?ctx.WET_TRACE.stroke(b,t,p,o,untracedStroke):untracedStroke(b,t,p,o);if(t===ctx.sheet)ctx.NATIVE_CAPTURE?.('brush');return result;};
@@ -129,8 +131,8 @@ const stroke=(b,target,points,options)=>{
   const wetMove=['wet on wet','dry on wet'].includes(ctx.VALUE_ACTIVE.move);
   // 'beside damp' (tools/painter/beside-damp.mjs): laid against a neighbour still damp; no dry gate, no wet bed of its
   // own; at the passage's first stroke it waits until the neighbour has lost its shine
-  const beside=paint&&ctx.VALUE_ACTIVE.move==='beside damp';let besideWaits=0;
-  if(beside&&ctx.VALUE_PASSAGE&&!ctx.VALUE_PASSAGE.besideDone){ctx.VALUE_PASSAGE.besideDone=true;const nb=neighbors.filter(i=>!ctx.VALUE_OWN_CONTACT.has(i));if(nb.length)({waits:besideWaits}=waitBesideDamp({observe:()=>measurePaper(target,nb,SPEED_PAPER,{uniform:false}),step:o=>step(target,o),O}));JSONL.append(path.join(out,'value-commands.jsonl'),JSON.stringify({kind:'beside-damp',intent:ctx.VALUE_ACTIVE.id,neighbourCells:nb.length,waits:besideWaits})+'\n');}
+  const beside=paint&&ctx.VALUE_ACTIVE.move==='beside damp';let besideWaits=0,besideElapsed=0;
+  if(beside&&ctx.VALUE_PASSAGE&&!ctx.VALUE_PASSAGE.besideDone){ctx.VALUE_PASSAGE.besideDone=true;const nb=neighbors.filter(i=>!ctx.VALUE_OWN_CONTACT.has(i));if(nb.length)({waits:besideWaits,elapsed:besideElapsed}=waitBesideDamp({observe:()=>measurePaper(target,nb,SPEED_PAPER,{uniform:false}),step:o=>step(target,o),O}));JSONL.append(path.join(out,'value-commands.jsonl'),JSON.stringify({kind:'beside-damp',intent:ctx.VALUE_ACTIVE.id,neighbourCells:nb.length,waits:besideWaits,elapsed:besideElapsed})+'\n');}
   let paper=null,own=false;
   if(fastMode){
     if(paint&&!wetMove&&!beside){
@@ -171,12 +173,13 @@ const stroke=(b,target,points,options)=>{
   const id='value-contact-'+(++ctx.VALUE_COMMAND),record={id,commandId:ctx.VALUE_COMMAND,intent:ctx.VALUE_ACTIVE.id,phase:ctx.VALUE_ACTIVE.phase,valueBand:ctx.VALUE_ACTIVE.valueBand,regions:ctx.VALUE_ACTIVE.regions,crossesRegions:ctx.VALUE_ACTIVE.crossesRegions,kind:paint?'pigment':'clean-water',ownWetEdge:own,paper,wetWaits,primary,neighbors:neighborPaper,brushBefore:load,geometry:points,options};
   if(!Number.isFinite(load.waterMass)||load.pigmentMass.some(v=>!Number.isFinite(v)))throw Error('value-plan nonfinite brush');
   const previousCommand=target._commandId; target._commandId=ctx.VALUE_COMMAND;
-  let result; try { result=physicalStroke(b,target,points,options); } finally { target._commandId=previousCommand; }
+  const wetCells=target._gpu&&b.model==='section'?(target.clip?contact.cells.filter(i=>contact.primaryMask[i]&&target.clip[i]):contact.cells.filter(i=>contact.primaryMask[i])):null;
+  let result; try { result=physicalStroke(b,target,points,wetCells?{...options,_wetCells:wetCells}:options); } finally { target._commandId=previousCommand; }
   {const count=VALUE_COUNTS[ctx.VALUE_ACTIVE.valueBand-1];count.strokes++;count.contacts+=cells.length;}
   // Clean-water preparation belongs to this passage too. Otherwise the first
   // pigment stroke dries away the very wet bed prepared for merging its lanes.
   for(const i of contact.cells){ctx.VALUE_OWN_CONTACT.add(i);if(paint)ctx.VALUE_PIGMENT_CONTACT.add(i);}
-  JSONL.append(path.join(out,'value-commands.jsonl'),JSON.stringify({...record,status:'EXECUTED',brushAfter:measureBrush(b,{settle:false})})+'\n');return result;
+  JSONL.append(path.join(out,'value-commands.jsonl'),JSON.stringify({...record,status:'EXECUTED',brushAfter:b._pend?.hairs?null:measureBrush(b,{settle:false})})+'\n');return result;
  }
 
  return physicalStroke(b,target,points,options);
@@ -310,14 +313,23 @@ const PAPER_PHYSICAL_MM = num('paperphysical', 1) > 0 ? (PB ? PB.mmPerCell : num
 const PAPER_OPTS = { ...(PAPER_PHYSICAL_MM > 0 ? { mmPerCell: PAPER_PHYSICAL_MM } : {}), seed: 9, scale: SC, toothScale: num('toothscale', 0.2), fibres: num('paperfibres', 0.5), tooth: num('papertooth', 0.5), proudBlur: num('proudblur', 1),
   ...(CP_MM ? { coldPress: { mmPerCell: CP_MM } } : {}) }; ctx.PAPER_OPTS = PAPER_OPTS;
 if (CP_MM) console.log(`paper: cold press relief in micrometres at ${CP_MM.toFixed(3)} mm a cell (src/media/paper-relief.mjs)`);
-const paper = opt('paperscan', '') ? await (async () => {
+// --twogrid 1|2|4|8: water/pigment grid ratio. Default 1 (single-grid, unchanged).
+// 2 = 0.52/0.26 mm (4x fewer water cells, same pigment grid), 4 = 0.52/0.13 mm, 8 = 0.52/0.065 mm on a 0.26 mm sheet.
+const TWO_GRID_N = parseTwoGrid(num('twogrid', 1));
+if (TWO_GRID_N > 1 && opt('paperscan', '')) throw new Error('--twogrid: not with --paperscan');
+const TWO_GRID_SETUP = TWO_GRID_N > 1 ? await createTwoGridPapers({
+  W2, H2, sheetMmPerCell: PB ? PB.mmPerCell : num('sheetmm', DEFAULT_SHEET_MM) / W2,
+  N: TWO_GRID_N, paperOpts: PAPER_OPTS, auxDevice: AUX_GPU?.device ?? null,
+  cacheStep: (name, inputs, fn) => cachedStep({ ...RUN_CACHE, name, code: codeHash(root, [], { dependencies: ['src/media/paper.mjs'] }), track: optTrack, inputs }, fn),
+}) : null;
+const paper = TWO_GRID_SETUP ? TWO_GRID_SETUP.hostPaper : opt('paperscan', '') ? await (async () => {
   const { scanPaper } = await import('../../src/media/paper-scan.mjs');
   const file = path.resolve(root, opt('paperscan', ''));
   const { data, info } = await sharp(file).greyscale().raw().toBuffer({ resolveWithObject: true });
   const scan = { data: info.channels === 1 ? data : Uint8Array.from({ length: info.width * info.height }, (_, i) => data[i * info.channels]), width: info.width, height: info.height };
   console.log(`paper: scanned height from ${opt('paperscan', '')} (${info.width}x${info.height}), ${num('paperscanscale', 1)} cells a scan pixel, mix ${num('paperscanmix', 1)}`);
   return scanPaper(W2, H2, scan, { ...PAPER_OPTS, scanScale: num('paperscanscale', 1), scanMix: num('paperscanmix', 1) });
-})() : (await cachedStep({...RUN_CACHE,name:'paper',code:codeHash(root,[],{dependencies:['src/media/paper.mjs']}),track:optTrack,inputs:{W2,H2,PAPER_OPTS}},async()=>makePaper(W2,H2,PAPER_OPTS))).value;
+})() : (await cachedStep({...RUN_CACHE,name:'paper',code:codeHash(root,[],{dependencies:['src/media/paper.mjs']}),track:optTrack,inputs:{W2,H2,PAPER_OPTS}},async()=>AUX_GPU?makePaperGpu(AUX_GPU.device,W2,H2,PAPER_OPTS):makePaper(W2,H2,PAPER_OPTS))).value;
 // --physics key=value,...: override any sheet constant (src/media/sheet.mjs DEFAULTS)
 const PHYS = Object.fromEntries((opt('physics', '') || '').split(',').filter(Boolean).map(kv => { const [k, v] = kv.split('='); if (!(k in DEFAULTS) && k !== 'edgeFlowDepth') throw new Error(`--physics: no sheet constant ${k}`); return [k, Number(v)]; }));
 // Granulation is each pigment's own (gamma, floc from src/paint/methods/pigment-physics.mjs) on this paper, with no scale.
@@ -340,7 +352,7 @@ const ABLATE = new Set(opt('ablate', '').split(',').filter(Boolean));
 // --inkres N: the pens draw on their own sheet at N times the resolution and the output is N times as wide
 // (src/paint/methods/ink-res.mjs). Default 1, off. Cannot combine with --paperscan.
 // --inkresgain: the fine pen's ink strength; the default is a power-law fit in sheet width.
-const INKRES = num('inkres', 1) > 1 ? await (async () => { if (opt('paperscan', '')) throw new Error('--inkres: not with --paperscan'); const N=Math.round(num('inkres',1)),opts={...PAPER_OPTS,scale:(PAPER_OPTS.scale??1)*N};const finePaper=(await cachedStep({...RUN_CACHE,name:'fine-paper',code:codeHash(root,[],{dependencies:['src/media/paper.mjs']}),track:optTrack,inputs:{W2:W2*N,H2:H2*N,PAPER_OPTS:opts}},async()=>makePaper(W2*N,H2*N,opts))).value; return makeInkRes({paper:finePaper, N: num('inkres', 1), W2, H2, paperOpts: PAPER_OPTS, pigments: SHEET_PIGS, inkAt: PIGS.length, graphiteAt: GRAPHITE ? GRAPHITE_AT : null, main: ctx.sheet, pad: opt('inkrespad', '') === '' ? null : num('inkrespad', 0.25) * (Math.round(num('inkres', 1)) - 1), gain: num('inkresgain', 1.3 * Math.pow(540 / W2, 0.78)) }); })() : null;
+const INKRES = num('inkres', 1) > 1 ? await (async () => { if (opt('paperscan', '')) throw new Error('--inkres: not with --paperscan'); const N=Math.round(num('inkres',1)),opts={...PAPER_OPTS,scale:(PAPER_OPTS.scale??1)*N};const finePaper=(await cachedStep({...RUN_CACHE,name:'fine-paper',code:codeHash(root,[],{dependencies:['src/media/paper.mjs']}),track:optTrack,inputs:{W2:W2*N,H2:H2*N,PAPER_OPTS:opts}},async()=>AUX_GPU?makePaperGpu(AUX_GPU.device,W2*N,H2*N,opts):makePaper(W2*N,H2*N,opts))).value; return makeInkRes({paper:finePaper, N: num('inkres', 1), W2, H2, paperOpts: PAPER_OPTS, pigments: SHEET_PIGS, inkAt: PIGS.length, graphiteAt: GRAPHITE ? GRAPHITE_AT : null, main: ctx.sheet, pad: opt('inkrespad', '') === '' ? null : num('inkrespad', 0.25) * (Math.round(num('inkres', 1)) - 1), gain: num('inkresgain', 1.3 * Math.pow(540 / W2, 0.78)) }); })() : null;
 const PEN_STATE_GATE = true, PEN_STATE_AUDIT = [];
 
 const TARGET_EDGE_FILL=new Float32Array(N2);
@@ -427,8 +439,18 @@ if (opt('gpustrokes', '') === 'capdebug') process.env.GPU_STROKES = 'capdebug';
 if (opt('gpustrokes', '') === 'check') process.env.GPU_STROKES = 'check'; // compare eligible ordinary GPU strokes without within-stroke flow (src/media/gpu/stroke-check.mjs)
 const GPU_MODE = opt('gpu', 'auto');
 if (!['auto', 'on', 'off'].includes(GPU_MODE)) throw new Error(`--gpu takes auto, on or off, not ${GPU_MODE}`);
-const GPU_INFO = {...attachGpu(ctx.sheet, O, { mode: GPU_MODE, edgeThreads: ctx.gpuEdgeThreads }),nativePaintMode:NATIVE_PAINT_MODE};
+ctx.TWO_GRID = TWO_GRID_SETUP ? attachTwoGridBridge({
+  sheet: ctx.sheet, coarsePaper: TWO_GRID_SETUP.coarsePaper, finePaper: TWO_GRID_SETUP.finePaper,
+  pigments: SHEET_PIGS, opts: O, geom: TWO_GRID_SETUP.geom, gpuMode: GPU_MODE,
+}) : null;
+const GPU_INFO = ctx.TWO_GRID
+  ? { ...ctx.TWO_GRID.GPU_INFO, nativePaintMode: NATIVE_PAINT_MODE }
+  : { ...attachGpu(ctx.sheet, O, { mode: GPU_MODE, edgeThreads: ctx.gpuEdgeThreads }), nativePaintMode: NATIVE_PAINT_MODE };
 console.log(backendLine(GPU_INFO));
+if (ctx.TWO_GRID) {
+  const g = ctx.TWO_GRID.geom;
+  console.log(`two-grid: N=${g.N} (water ${g.cw}x${g.ch} @ ${g.coarseMm.toFixed(3)} mm, pigment ${g.FW}x${g.FH} @ ${g.fineMm.toFixed(3)} mm, backend ${GPU_INFO.backend})`);
+}
 const base = Buffer.alloc(N2 * 3);
 const SHADE = num('papershade', 0.04);
 const TONE_STAGE = TONE_MODE === '1' || (TONE_MODE === 'auto' && SHEET_TONE.toned);
@@ -652,7 +674,7 @@ ctx.lastPainted = null;
 ctx.FRAMER = null; let FRAMER_HANDED = false; let MARK_PENDING = new Map();
 const PENDING_IO = [];
 const framer = () => {
-  if (NATIVE_PAINT_MODE.mode==='fast' || ctx.FRAMER === false || !ctx.sheet._gpu || INKRES || LOOK || ctx.GOUACHE || opt('asyncframes', '1') === '0') return null;
+  if (NATIVE_PAINT_MODE.mode==='fast' || ctx.FRAMER === false || !ctx.sheet._gpu || ctx.TWO_GRID || INKRES || LOOK || ctx.GOUACHE || opt('asyncframes', '1') === '0') return null;
   if (!ctx.FRAMER) {
     if (FRAMER_HANDED) return null; // started once and stopped (a dried layer was rewritten): the painter's render from here on
     ctx.FRAMER = createFramer({ sheet: ctx.sheet, pigments: SHEET_PIGS, base, paperRGB, n: N2, w, h, W2, SC, out, quality: 88, outW: OUT_W, outH: OUT_H, wet: WETRENDER ? { cap: num('wetcap', 0.6), dark: num('wetdark', 0.14) } : null });

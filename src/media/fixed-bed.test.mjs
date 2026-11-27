@@ -14,7 +14,9 @@ function fixture(withBed=true) {
 const O={...DEFAULTS,flow:0,diffuse:0,evap:0,edgeEvap:0,absorb:0,settle:0,lift:0,scour:0,rewetLift:0,capRate:0,paperDry:0,dt:.1,slideFill:2,fillRef:0};
 test('fixed pigment fills the support hollows without changing bound pigment',()=>{
  const old=fixture(),next=fixture();const fixed=next.layers[0][0].slice();
- step(old,O);step(next,{...O,fixedBed:1});
+ // Stokes drag (grain-water.mjs) is 0.01308 for this pigment: observe ten
+ // seconds of rolling, keeping the original 0.1 s step and all support checks.
+ for(let i=0;i<100;i++){step(old,O);step(next,{...O,fixedBed:1});}
  assert.ok(old.D[0][12]<.02*.99,'unfilled support drains the exposed crest');
  assert.equal(next.D[0][12],Math.fround(.02),'filled support retains the newly deposited grains');
  assert.deepEqual(next.layers[0][0],fixed,'support never moves bound pigment');

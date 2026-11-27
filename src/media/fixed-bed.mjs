@@ -4,7 +4,9 @@ function sharedZeroLayer(sheet) {
   const zero = sheet._zeroLayer;
   if (!(zero instanceof Float32Array) || zero.length !== sheet.n) return null;
   const bits = new Uint32Array(zero.buffer, zero.byteOffset, zero.length);
-  for (let i = 0; i < bits.length; i++) if (bits[i] !== 0) return null;
+  let i = 0;
+  for (; i + 3 < bits.length; i += 4) if ((bits[i] | bits[i + 1] | bits[i + 2] | bits[i + 3]) !== 0) return null;
+  for (; i < bits.length; i++) if (bits[i] !== 0) return null;
   return zero;
 }
 

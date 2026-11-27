@@ -18,8 +18,8 @@ import {brushedWashPaths, sweepCover, containPaths, gradientSweepAngle, prewetAr
 import {pencilBatches, prepFade} from '../../src/paint/methods/pencil-stage.mjs';
 import {renderInkProof} from '../../src/paint/methods/ink-res.mjs';
 import {layVectors, inkForDarkness} from '../../src/paint/methods/ink-vectors.mjs';
+import {layVectorsOnSheet} from '../../src/paint/methods/lay-vectors-sheet.mjs';
 import {drawingBatches, drawingTimeMm, bigFormsFirst} from '../../src/paint/methods/drawing-film.mjs';
-import {coherent} from '../../src/media/sheet.mjs';
 import {components, removeSmall, dilate, erode} from '../../src/raster.js';
 import {gaussian} from '../../src/keyframes/density.mjs';
 import {applyResist} from '../../src/media/sheet.mjs';
@@ -280,12 +280,11 @@ function vectorHand(V, { closing = false } = {}) {
     if (layin.length) {
       const gp = ctx.sheet.pigments[GRAPHITE_AT], gDark = t => { const c = renderLayers([[Float32Array.of(t)]], [gp], white, 1, 1); return 1 - (c[0] + c[1] + c[2]) / 765; };
       if (!ctx.sheet.D[GRAPHITE_AT]) throw new Error('ink vectors: the pencil lay-in has no graphite layer on the sheet');
-      coherent(ctx.sheet);
       // on the fine sheet beside the ink when there is one, as the pencil drawing is
       const gFine = onFine(GRAPHITE_AT);
       const g = await inBatches(layin, sub => {
         if (gFine) { const q = layVectors({ ...doc, strokes: sub }, INKRES.fine.D[INKRES.channel(GRAPHITE_AT)], INKRES.width, INKRES.height, sheetMm / INKRES.width, inkForDarkness(gDark), { fill }); INKRES.changed(); INKRES.carry(); return q; }
-        coherent(ctx.sheet); const q = layVectors({ ...doc, strokes: sub }, ctx.sheet.D[GRAPHITE_AT], W2, H2, sheetMm / W2, inkForDarkness(gDark), { fill }); layersChanged(ctx.sheet); ctx.sheet._gpu?.cpuWroteAll?.(); return q;
+        return layVectorsOnSheet(ctx.sheet, GRAPHITE_AT, { ...doc, strokes: sub }, W2, H2, sheetMm / W2, inkForDarkness(gDark), { fill });
       }, phase ? `pencil lay-in, ${phase}` : 'pencil lay-in');
       ctx.drawnCount += g.strokes;
       console.log(`pencil lay-in${phase ? `, ${phase}` : ''}: ${g.strokes} graphite strokes laid ${pencilOver ? 'over the dry washes' : 'before the ink'}, ${g.cells} cells${gFine ? ` on the fine sheet (--inkres ${INKRES.N})` : ''}`);
@@ -298,10 +297,12 @@ function vectorHand(V, { closing = false } = {}) {
     // 0.0001 mm2), or wholly under a darker line laid with them; counted and told, never a stop
     let nothing = 0; const each = (_, n) => { if (!n) nothing++; };
     const r = await inBatches(rest, sub => {
-      if (!fineSheet) coherent(sheet);
-      const q = layVectors({ ...doc, strokes: sub }, sheet.D[at], w, h, sheetMm / w, inkForDarkness(darkOf), { fill, each });
-      if (fineSheet) { INKRES.changed(); INKRES.carry(); } else { layersChanged(sheet); sheet._gpu?.cpuWroteAll?.(); }
-      return q;
+      if (fineSheet) {
+        const q = layVectors({ ...doc, strokes: sub }, sheet.D[at], w, h, sheetMm / w, inkForDarkness(darkOf), { fill, each });
+        INKRES.changed(); INKRES.carry();
+        return q;
+      }
+      return layVectorsOnSheet(sheet, at, { ...doc, strokes: sub }, w, h, sheetMm / w, inkForDarkness(darkOf), { fill, each });
     }, phase ? `${pencil ? 'pencil' : 'pen'}, ${phase}` : pencil ? 'pencil' : 'pen');
     whole.strokes += r.strokes; whole.cells += r.cells;
     // a whole drawing (not one of its phases) that inked nothing is a sheet too coarse for its lines

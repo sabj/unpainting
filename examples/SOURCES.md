@@ -49,3 +49,5 @@ Made from the public-domain targets above by an image model, 2026-11-19 (records
 The painter's outputs from the public-domain targets, and from the synthetic stroke plan, are © 2026 Sam Jackson under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). Credit as "Painted by unpainting (Sam Jackson), CC BY 4.0". The output from the Trumbull photo is all rights reserved, like the photo. See [NOTICE](../NOTICE).
 
 The stroke plan `plans/graded-wash.json` is based on the graded-wash demonstration cited in its `source` field. It contains no material from the cited video.
+
+The fibre proof images in `work/lead-04/work/proof/fibre/` are procedural simulator outputs, with no external target image. The 40 mm landscape follows the project's grain-demo brush recipe; bloom cards use measured damp paper and clean-water drops. These outputs are © 2026 Sam Jackson, CC BY 4.0; see `ROUND3.md` beside the proof sheet for recipes and validation.

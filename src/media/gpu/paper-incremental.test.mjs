@@ -33,6 +33,21 @@ test('dry knowledge survives local changes; flow expands all wet regions, unknow
   assert.equal(g.paperWetRect,null);assert.notEqual(g.paperVersion,g.version);
 });
 
+test('flow retains distant paper gates and invalidates every expanded wet passage',()=>{
+  const g=Object.assign(Object.create(GpuLink.prototype),{
+    w:128,h:96,version:2,paperVersion:1,paperGateVersion:1,
+    paperWetRect:[8,8,2,2],paperFresh:new FreshMap(128,96),
+    paperGateCache:[{bounds:[5,5,5,5]},{bounds:[35,35,35,35]},{bounds:[90,80,95,85]}],
+  });
+  g.paperChanged([32,32,2,2],1,1);
+  assert.equal(g.paperGateVersion,2);
+  assert.deepEqual(g.paperGateCache,[{bounds:[90,80,95,85]}],
+    'both the older wet passage and the new stroke expand before invalidation');
+  g.version=4;g.paperChanged(null,1,3);
+  assert.equal(g.paperWetRect,null);
+  assert.notEqual(g.paperGateVersion,g.version,'unknown intervening write cannot preserve a gate');
+});
+
 test('GPU incremental observations equal full W/S/M after strokes, flow, dry, upload and queued dry',t=>{
   const keys=['GPU_PAPER_OBSERVE','GPU_ASYNC_DRY','GPU_RESIDENT'];const saved=keys.map(k=>process.env[k]);
   process.env.GPU_PAPER_OBSERVE='1';process.env.GPU_ASYNC_DRY='1';process.env.GPU_RESIDENT='1';

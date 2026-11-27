@@ -31,7 +31,10 @@ test('40 mm square in five successive sweeps has four rims within 15% and no sea
   const mm = .5, s = createSheet(paper(100, mm), pigments), o = { ...O, slope: 0, fibreFlow: 0 };
   // Isolate drying on a level, uniform sheet. Five adjacent eight-mm swaths
   // have the same loading: the brush calibration is tested separately.
-  for (const field of ['height', 'valley', 'tooth']) s.paper[field].fill(.5);
+  for (const field of ['height', 'grainH', 'valley', 'tooth']) s.paper[field].fill(.5);
+  // Grain geometry is derived separately from height on physical paper; flatten
+  // its rolling surface and settling bias too, rather than leaving hidden relief.
+  s.paper.hollow.fill(0);
   delete s.paper.surface;   // and no cockle (paper.mjs): a level sheet
   s.paper.capacity.fill(.3);
   for (let k = 0; k < 5; k++) {

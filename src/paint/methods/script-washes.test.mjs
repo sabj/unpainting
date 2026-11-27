@@ -188,3 +188,13 @@ test('a stroke written point by point may give the hand speed at each point (mm/
   assert.deepEqual(fast.map(q => q.slice(0, 3)), plain, 'the speed changes nothing else of the stroke');
   assert.deepEqual(fast.map(q => q[3]), [20, 60, 400], 'the speed is carried to the brush, held to 2 to 400 mm/s');
 });
+
+test('form sweeps handle polygons with 140k+ vertices without stack overflow', () => {
+  const N = 140000, big = new Array(N);
+  for (let i = 0; i < N; i++) {
+    const a = (2 * Math.PI * i) / N;
+    big[i] = [40 + 25 * Math.cos(a), 30 + 18 * Math.sin(a)];
+  }
+  const s = sweeps([big], { widthMm: 10, deg: 'form', rng: handOf('big') });
+  assert.ok(s.length > 0);
+});

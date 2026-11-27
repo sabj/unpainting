@@ -12,13 +12,15 @@ import { contactDistance, applyEdgeFlux } from '../contact-distance.mjs';
 
 const TILE = 32;
 /** sheet.mjs wetBoxes, scanning the whole sheet: boxes [x0, y0, x1, y1] round the wet or damp cells, grown by `margin`. */
-export function wetBoxes({ w, h, M, s, capacity }, margin = 2) {
+export function wetBoxes({ w, h, M, s, capacity }, margin = 2, bounds = null) {
   const tw = Math.ceil(w / TILE), th = Math.ceil(h / TILE), on = new Uint8Array(tw * th), seen = new Uint8Array(tw * th), stack = new Int32Array(tw * th);
   const wetAt = i => M[i] || s[i] > 0.02 * capacity[i];
-  for (let y = 0; y < h; y++) {
+  const sy0 = bounds ? Math.max(0, bounds[1]) : 0, sy1 = bounds ? Math.min(h - 1, bounds[3]) : h - 1;
+  const sx0 = bounds ? Math.max(0, bounds[0]) : 0, sx1 = bounds ? Math.min(w - 1, bounds[2]) : w - 1;
+  for (let y = sy0; y <= sy1; y++) {
     const r = y * w, tr = ((y / TILE) | 0) * tw;
-    for (let x = 0; x < w;) {
-      const tx = (x / TILE) | 0, xe = Math.min(w - 1, tx * TILE + TILE - 1);
+    for (let x = sx0; x <= sx1;) {
+      const tx = (x / TILE) | 0, xe = Math.min(sx1, tx * TILE + TILE - 1);
       if (!on[tr + tx]) for (let xx = x; xx <= xe; xx++) if (wetAt(r + xx)) { on[tr + tx] = 1; break; }
       x = xe + 1;
     }
@@ -70,16 +72,16 @@ export function edgeGeometry(sheet, o, box, mm, scratch) {
 export function prepareEdgeGeometry({ w, h, M, ever, resist }, o, box, mm, S) {
   const edgeEvap = o.edgeEvap ?? 0, E = o.edgeMm ?? 1;
   const n0 = w * h;
-  if (!S.lev || S.lev.length !== n0) Object.assign(S, { maskBox: null, lev: new Int32Array(n0), order: new Int32Array(n0), ex: new Float64Array(n0), geo: new Float32Array(n0), mask: new Uint8Array(n0), fx: new Float64Array(n0), fy: new Float64Array(n0), pressure: new Float64Array(n0), buckets: [] });
+  if (!S.lev || S.lev.length !== n0) Object.assign(S, { maskBox: null, lev: new Int32Array(n0), order: new Int32Array(n0), ex: new Float64Array(n0), geo: new Float32Array(n0), mask: new Uint8Array(n0), fx: new Float64Array(n0), fy: new Float64Array(n0), pressure: new Float64Array(n0), distance: new Int32Array(n0), next: new Int32Array(n0), previous: new Int32Array(n0) });
   const [x0, y0, x1, y1] = box, L = Math.min(32000, Math.max(1, Math.ceil(Math.hypot(w, h))));
-  const { lev, order, ex, geo, mask, fx, fy, pressure, buckets } = S;
+  const { lev, order, ex, geo, mask, fx, fy, pressure, distance, next, previous } = S;
   const reach = Math.max(1, Math.round((o.reachMm ?? 1.5) / mm));
   // the footprint is only ever set inside a box, so clearing the last box clears it (edge-feed.mjs)
   if (S.maskBox) { const [a0, b0, a1, b1] = S.maskBox; for (let y = b0; y <= b1; y++) mask.fill(0, y * w + a0, y * w + a1 + 1); }
   S.maskBox = box;
-  for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) { const i = y * w + x; mask[i] = M[i] || ever[i]; }
+  for (let y = y0; y <= y1; y++) { const end = y * w + x1; for (let i = y * w + x0; i <= end; i++) mask[i] = M[i] || ever[i]; }
   // the last call's cells, cleared (the whole sheet was cleared every call)
-  for (let q = 0; q < (S.used ?? 0); q++) { lev[order[q]] = 0; ex[order[q]] = 0; }
+  for (let q = 0; q < (S.used ?? 0); q++) { lev[order[q]] = 0; ex[order[q]] = 0; distance[order[q]] = 0; }
   S.used = 0;
   const dryAt = (x, y) => x < 0 || y < 0 || x >= w || y >= h || !mask[y * w + x];
   const hs = o.holeSpan ?? 0;
@@ -92,34 +94,56 @@ export function prepareEdgeGeometry({ w, h, M, ever, resist }, o, box, mm, S) {
     return true;
   };
   const pinnedAt = (x, y) => x >= 0 && y >= 0 && x < w && y < h && !mask[y * w + x] && !(hs > 0 && heldHole(x, y));
-  const inBox = (x, y) => x >= x0 && y >= y0 && x <= x1 && y <= y1;
-  for (const q of buckets) if (q) q.length = 0;
-  const push = (i, d) => { (buckets[d] ??= []).push(i); };
+  // Dial's queue keeps one live entry per cell, rather than allocating JS lists and up to eight duplicate entries.
+  // Keep the original 3/4 chamfer costs, neighbour order and equal-distance insertion order.
+  const DMAX = 3 * L;
+  if (S.head?.length !== DMAX + 1) { S.head = new Int32Array(DMAX + 1); S.tail = new Int32Array(DMAX + 1); }
+  const head = S.head, tail = S.tail; head.fill(-1); tail.fill(-1);
+  const push = (i, d) => {
+    const old = distance[i];
+    if (old && old <= d) return;
+    if (old) {
+      const a = previous[i], b = next[i];
+      if (a >= 0) next[a] = b; else head[old] = b;
+      if (b >= 0) previous[b] = a; else tail[old] = a;
+    }
+    distance[i] = d; previous[i] = tail[d]; next[i] = -1;
+    if (tail[d] >= 0) next[tail[d]] = i; else head[d] = i;
+    tail[d] = i;
+  };
   let seeds = 0;
   for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
     const i = y * w + x; if (!mask[i] || (resist && resist[i])) continue;
     if (pinnedAt(x + 1, y) || pinnedAt(x - 1, y) || pinnedAt(x, y + 1) || pinnedAt(x, y - 1)) { push(i, 3); seeds++; }
   }
   if (!seeds) return null;
-  const DMAX = 3 * L;
+  const visit = (j, d) => {
+    if (d <= DMAX && mask[j] && !lev[j] && !(resist && resist[j])) push(j, d);
+  };
   let n = 0;
-  for (let d = 3; d <= DMAX && d < buckets.length; d++) {
-    const list = buckets[d]; if (!list) continue;
-    for (let t = 0; t < list.length; t++) {
-      const i = list[t]; if (lev[i]) continue;
+  for (let d = 3; d <= DMAX; d++) {
+    while (head[d] >= 0) {
+      const i = head[d]; head[d] = next[i];
+      if (head[d] >= 0) previous[head[d]] = -1; else tail[d] = -1;
       lev[i] = d; order[n++] = i;
       const x = i % w, y = (i / w) | 0;
-      for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
-        if (!dx && !dy) continue;
-        const xx = x + dx, yy = y + dy; if (!inBox(xx, yy)) continue;
-        const j = yy * w + xx; if (!mask[j] || lev[j] || (resist && resist[j])) continue;
-        const dj = d + (dx && dy ? 4 : 3); if (dj <= DMAX) push(j, dj);
+      // Preserve the original eight-neighbour insertion order without
+      // recomputing coordinates and box bounds for every neighbour.
+      if (y > y0) {
+        if (x > x0) visit(i - w - 1, d + 4);
+        visit(i - w, d + 3);
+        if (x < x1) visit(i - w + 1, d + 4);
+      }
+      if (x > x0) visit(i - 1, d + 3);
+      if (x < x1) visit(i + 1, d + 3);
+      if (y < y1) {
+        if (x > x0) visit(i + w - 1, d + 4);
+        visit(i + w, d + 3);
+        if (x < x1) visit(i + w + 1, d + 4);
       }
     }
   }
   S.used = n;
-  const NX = [1, -1, 0, 0, 1, 1, -1, -1], NY = [0, 0, 1, -1, 1, -1, 1, -1];
-  const nb = (i, d) => { const xx = (i % w) + NX[d], yy = ((i / w) | 0) + NY[d]; return xx < x0 || yy < y0 || xx > x1 || yy > y1 ? -1 : yy * w + xx; };
   const ax0 = x0 - reach, ay0 = y0 - reach, aw = x1 - x0 + 2 * reach + 2, ah = y1 - y0 + 2 * reach + 2;
   if (!S.sat || S.sat.length < aw * ah) S.sat = new Float64Array(aw * ah);
   const sat = S.sat;
@@ -130,11 +154,16 @@ export function prepareEdgeGeometry({ w, h, M, ever, resist }, o, box, mm, S) {
   const dryShare = (x, y) => { const xa = x - reach - ax0, ya = y - reach - ay0, xb = xa + 2 * reach + 1, yb = ya + 2 * reach + 1; return (sat[yb * aw + xb] - sat[ya * aw + xb] - sat[yb * aw + xa] + sat[ya * aw + xa]) / ((2 * reach + 1) ** 2); };
 
   for (let q = 0; q < n; q++) {
-    const i = order[q], l = lev[i];
+    const i = order[q], l = lev[i], x = i % w, y = (i / w) | 0;
     let g = 0;
     if (l === 3) {
-      const u = Math.min(1, Math.max(0, (dryShare(i % w, (i / w) | 0) - 0.1) / 0.2)); g = u * u * (3 - 2 * u);
-    } else for (let e = 0; e < 4; e++) { const j = nb(i, e); if (j >= 0 && lev[j] && lev[j] < l && geo[j] > g) g = geo[j]; }
+      const u = Math.min(1, Math.max(0, (dryShare(x, y) - 0.1) / 0.2)); g = u * u * (3 - 2 * u);
+    } else {
+      if (x < x1 && lev[i + 1] && lev[i + 1] < l) g = Math.max(g, geo[i + 1]);
+      if (x > x0 && lev[i - 1] && lev[i - 1] < l) g = Math.max(g, geo[i - 1]);
+      if (y < y1 && lev[i + w] && lev[i + w] < l) g = Math.max(g, geo[i + w]);
+      if (y > y0 && lev[i - w] && lev[i - w] < l) g = Math.max(g, geo[i - w]);
+    }
     geo[i] = g;
     ex[i] = g > 0 ? edgeEvap * g : 0;
   }
@@ -150,4 +179,24 @@ export function finishEdgeGeometry(prepared, field) {
   const solve = dryingPressure(order, n, lev, w, ex, fx, fy, pressure);
   if (solve.relativeResidual > 1e-6) throw new Error(`drying pressure did not converge: ${solve.relativeResidual}`);
   return { order: order.slice(0, n), n, ex, fx, fy };
+}
+
+/** GPU cell quadrature and mixed-precision pressure, with the same footprint and Neumann equations. */
+export async function solveEdgeBoxGpu(sheet, o, box, mm, scratch, { contact, pressure: solver, packed, grid }) {
+  const pending = grid ? contact.edgeFlux(packed, sheet.w, sheet.h, grid, o.holeSpan ?? 0, mm, o.edgeMm ?? 1) : null;
+  const prepared = prepareEdgeGeometry(sheet, o, box, mm, scratch);
+  const flux = pending ? await pending : null;
+  if (!prepared) return null;
+  const { w, h, mask, pinnedAt, order, n, lev, ex, fx, fy, pressure, E } = prepared;
+  let total = 0;
+  if (flux) {
+    for (let q = 0; q < n; q++) {
+      const i = order[q]; ex[i] *= flux[(((i / w) | 0) - grid.y0) * grid.cols + i % w - grid.x0]; total += ex[i];
+    }
+  } else total = applyEdgeFlux(contactDistance(mask, w, h, pinnedAt, box), order, n, w, mm, E, ex);
+  if (!(total > 0)) return null;
+  for (let q = 0; q < n; q++) pressure[order[q]] = 0;
+  const solve = await solver.solve(order, n, lev, w, ex, fx, fy, pressure);
+  if (!(solve.relativeResidual <= 1e-6)) throw new Error(`drying pressure did not converge: ${solve.relativeResidual}`);
+  return { order: order.slice(0, n), n, ex, fx, fy, solve };
 }

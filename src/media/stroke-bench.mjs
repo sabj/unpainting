@@ -90,6 +90,7 @@ const DRY = { settle: 60, dt: 2 };
  *   attach(sheet)          the backend takes the new sheet
  *   instrument(points, reach, fn)  fn lays a mark through `points` (cells); the backend makes them current first
  *   step(n) -> wet         n flow steps; whether anything is still wet
+ *   standing?(sheet)       exact count of cells with W > 1e-3, without reading other planes
  *   read()                 the CPU copy current everywhere
  *   fix()                  dry the wet layer into a layer
  * Returns { sheet, pigments, steps }.
@@ -128,7 +129,16 @@ export async function layBenchStroke(s, { mmPerCell, wash, glaze, ops = cpuOps()
     },
     // Flow until no standing water is left: the paper damp, its pores still wet.
     async untilDamp() {
-      for (let k = 0; k < 400; k++) { await flow(4); await ops.read(sheet); let standing = 0; for (let i = 0; i < sheet.n; i++) if (sheet.W[i] > 1e-3) standing++; if (standing < sheet.n * 0.002) return; }
+      for (let k = 0; k < 400; k++) {
+        await flow(4);
+        let standing = 0;
+        if (ops.standing) standing = await ops.standing(sheet);
+        else {
+          await ops.read(sheet);
+          for (let i = 0; i < sheet.n; i++) if (sheet.W[i] > 1e-3) standing++;
+        }
+        if (standing < sheet.n * 0.002) return;
+      }
     },
     // The sheet dried as at the end of a stroke, so the next is laid on a dry layer.
     async dryAll() { await dryOut(); },

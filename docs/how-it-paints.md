@@ -14,13 +14,15 @@ This part walks through what the simulator does with a plan. The plan is either 
 
 The sheet is a grid of small squares called cells. Each cell keeps track of the water on its surface, the water inside the paper's pores, and the pigment. Pigment can be floating in the water, settled on the paper or soaked into the pores (`src/media/sheet.mjs`).
 
-The paper has a height map of curved fibres and fine grain, based on real cold-press paper (`src/media/paper.mjs`, `src/media/paper-relief.mjs`). It is also sized, which means dry paper resists water. So a stroke on dry paper stays where the brush went.
+The paper has a height map of curved fibres and fine grain, based on real cold-press paper (`src/media/paper.mjs`, `src/media/paper-relief.mjs`). The gaps between its fibres set the pressure needed for water to enter each cell (`src/media/fibre-throat.mjs`). It is also sized, which means dry paper resists water. So a stroke on dry paper stays where the brush went.
 
 ### The brush and its water
 
 A brush is a row of bristles with a reservoir of paint and water in its belly (`src/media/brush.mjs`). Bristles stick together in clumps. Water and pigment are tracked separately. More pressure puts more of the brush on the paper. Paint passes from a bristle to a cell only when the liquid on the bristle reaches down to the paper's grain there.
 
 A brush full of water lays a smooth film. A nearly dry brush catches only the high points of the grain and leaves broken colour. This is dry brush. Brush sizes are in `src/paint/brushes.json`.
+
+Pressure brings the bristles onto the crests; liquid bridges more hollows as the tuft fills (`src/media/tuft-section.mjs`). Dry paper can pull paint from damp bristles even below their free-water threshold. A dip restores a finite supply at the requested concentration, with a small, smooth gradient across the tips (`src/media/brush-load-variance.mjs`). The supply falls as paint leaves the brush and is restored only by a dip.
 
 ### How a wash is laid
 
@@ -42,7 +44,24 @@ For wet into wet, the painter first lays clean water over the area with a clean 
 
 Between passages the painter waits for the sheet to dry, unless the script says otherwise (`src/paint/methods/wetdry.mjs`). Drying is not a timer. The simulator measures the water on the surface and in the pores. It waits until the paper is dry enough, or wet enough, for the next passage.
 
-Water evaporates faster at the edge of a wash. More water flows out from behind to replace it and carries pigment with it. So the edge dries darker. Where water runs back into a drying wash, it pushes pigment aside and leaves a backrun, the pale cauliflower shape painters know well.
+A passage laid beside damp paint waits for its neighbour to lose its shine. The wait grows from the ordinary clock to steps of at most two seconds between measurements. As the measured surface water approaches the gloss limit, it slows again to preserve the original admission-time resolution.
+
+Water evaporates faster at the edge of a wash. More water flows out from behind to replace it and carries pigment with it. So the edge dries darker. Where water runs back into a drying wash, it pushes pigment aside and leaves a backrun, the pale cauliflower shape painters know well. Its advancing water must cross the same fibre throats as the outer wash edge: a fibre edge holds it until the puddle supplies enough water head, while a path along the fibre needs less head (`src/media/backrun.mjs`). Water and pigment still move together, and the pigment piles up where the front stops.
+
+Only the free water above the paper-held layer levels as a liquid film. A thin part of the film resists flow more than a deep part; the two sides of each cell face contribute their hydraulic resistances in series. As either side reaches shine-off, that connection closes continuously. A tiny rounding difference at shine-off therefore cannot open a channel carrying a finite amount of water and paint (`src/media/film-mobility.mjs`).
+
+Fast drying can finish the last pore evaporation in place once the whole sheet has no surface film or wet surface cells, and the pores are below the threshold for wicking. It keeps the pigment in the same cells and phases as ordinary drying. Until then, the remaining water continues through the transport steps, even when the film is very thin.
+
+An unwatched dry can accelerate its minimum wait after measuring a film below the connected-film floor, while preserving the full physical waiting time in steps of at most half a second. Only a measured sub-threshold trace permits fourteen-second chunks in the later kinetic tail; thicker films retain seven-second chunks. Both paths still subcycle water and pore transport and finish their implicit solves before applying flux. The GPU observes the first fast batch near the film's estimated evaporation time, then checks actual wetness and the whole-sheet pore gate before stopping.
+
+After an initial measurement, a film entirely below the connected-film floor can complete the minimum levelling wait with kinetic steps of at most half a second. The wait still covers the same physical time before entering the usual drying tail. CPU and GPU use the same rule. Watched drying keeps its requested checkpoint times.
+
+On the GPU, a previously quiet surface is checked again in each step before levelling. If water collects into a mobile film, that film levels in the same step. Fast drying uses the ordinary adaptive solver budget; it does not impose a shorter solve just because the wash is drying.
+
+The GPU's parallel iteration budget controls how the solve runs, not when it may stop. A box still above the residual tolerance continues in one workgroup before its water and pigment move. The continuation uses the same matrix, tile preconditioner and sums as the parallel solve. Only converged boxes produce flux. A numerical breakdown or the 8,192-iteration safety ceiling reports an error on the next solver status read; it cannot be accepted as convergence. The next steps increase their parallel budget from the completed solve's actual iteration count.
+
+Water and pigment transport follow the same rule: the parallel budget is a scheduling choice. A box finishes any remaining donor-limited rounds before backruns or drying. This lets quiet washes use fewer dispatches without changing their water, pigment or time step.
+
 
 ### Glazes
 
@@ -54,7 +73,7 @@ A wash laid on dry paper has a hard edge on every side. Painters soften an edge 
 
 ### Granulation
 
-Some pigments settle into the hollows of the paper as they dry. This makes a grainy texture. Ultramarine, cerulean and the earth colours do it. The staining paints such as phthalo blue dry smooth. A wetter or slower-drying wash granulates more.
+Some pigments settle into the hollows of the paper as they dry. This makes a grainy texture. Ultramarine, cerulean and the earth colours do it. The staining paints such as phthalo blue dry smooth. A wetter or slower-drying wash granulates more. Landing on fibres follows particle settling and diffusion; collection in hollows takes time in a connected surface film. As that film recedes, loose grains move down slopes at a rate limited by their particle drag. Water held among the fibres cannot keep sliding or scouring the grains (`src/media/grain-water.mjs`). Paint Lab’s WebGPU shader uses the same settling, scour mobility, particle drag and slope-convergence limit as the painter and the Lab CPU sheet.
 
 ### Pen and pencil
 
@@ -129,6 +148,10 @@ Brushes: `src/media/brush.mjs`, with physical sizes in `src/paint/brushes.json`.
 
 The sheet is a grid of cells. Each cell tracks the water on the surface, the water in the paper's pores, and the pigment that is floating, settled or in the pores ([pigments and paper](pigments-and-paper.md)). Code: `src/media/sheet.mjs` (`sheet-kernel.mjs` on the CPU, `src/media/gpu/stepfull.wgsl` on the GPU) and `src/paint/methods/wetdry.mjs`. `--strict 1` stops the run if the physics breaks a rule. Otherwise `continued-checks.json` records it.
 
+Before laying a stroke, contact prediction follows the same brush geometry and checks its footprint and neighboring paper. Row, tuft and section brushes reuse bounded observation buffers; a section's prediction evaluates each cell only until that cell has entered the footprint. The physical brush still evaluates every contact. When a CPU brush works against the GPU sheet, newly exposed window rectangles travel together in one readback, preserving cells already written on the CPU. Fast mode uploads disjoint row spans of actual writes while keeping the original logical stroke bounds and flow order (`src/media/gpu/cpu-demand-window.mjs`, `src/media/gpu/rect-transfer.mjs`, `src/media/cpu-stroke-dirty.mjs`). A tracked section stroke activates its brush pigments and the sheet's existing wet and top-layer pigments, including every pigment it can pick up; other CPU writers keep the all-pigment bound.
+
+The fine drawing carries new ink or graphite to the painting through only the changed coarse cells. On a GPU sheet it reads their wet-recipient mask and that pigment's floating and deposited amounts, performs the same CPU addition and clamp, and writes only those pigment amounts back (`src/media/gpu/pigment-cells.mjs`). Water, other pigments, resist and dried layers stay resident. This partial read never certifies whole tiles as fresh.
+
 ![A real wash by Winslow Homer beside a simulated flat wash and graded wash on the default cold-press paper](img/paper-texture.webp)
 
 ## 7. Looking at the picture
@@ -144,6 +167,14 @@ A pen drawing goes down first and dries before the washes. A pencil drawing goes
 ## 9. Finish
 
 After all the washes are dry, `tools/plate/finish.mjs` removes masking fluid, rubs out any pencil that is not kept, and draws the closing pen lines. It writes `painting.png`, `wash.jpg`, `ink.jpg`, `frames.json`, the stage frames, `run-card.json`, `target-guard.json`, `cheat-risk.json`, `marks.json` and `pipeline-plan.json`.
+
+A finer final render can show wash edges between cell centres and the same paper's grain below the cell size (`src/media/subcell-grain.mjs`). It reconstructs the deposited pigment, conserving each layer's total; interior cells keep their own pigment and boundary cells share theirs locally. It does not rerun water flow or recover subject features absent from the simulation. Resizing a finished image alone adds no such detail.
+
+The renderer sums contiguous pigment planes and records each pigment's support in the same read. Only that support and its interpolation ring are reconstructed. Layer contours are shared, and zero base sums skip neighbour calculations. The contour, grain weights and order of each cell's pigment additions are unchanged.
+
+A tiny deposited core can fall between every pixel centre at a 2× export. If point sampling misses an occupied cell completely, the renderer integrates that same contour over the finite pixels. Horizontal integration is exact and vertical integration is adaptive; the usual pigment balance then preserves each paint’s deposited total. No pigment, contour or grain is invented. Uniform full and empty spans use exact constant fills.
+
+The paper-field convolutions skip bounds checks for interior taps and share clamped row offsets (`src/media/gaussian-field.mjs`). Their kernel, tap order and precision are unchanged, so the sampled grain and final pigment bytes stay the same.
 
 ## 10. Judging
 

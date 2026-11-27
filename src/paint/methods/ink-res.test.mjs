@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { makePaper } from '../../media/paper.mjs';
-import { createSheet, thickness } from '../../media/sheet.mjs';
+import { createSheet, thickness, layersChanged, fix } from '../../media/sheet.mjs';
 import { makeInkRes, renderInkProof } from './ink-res.mjs';
 
 const ink = { K: [1.2, 1.3, 1.4], S: [0.02, 0.02, 0.02], rho: 0.02, omega: 5.5, gamma: 0.15 };
@@ -16,6 +16,24 @@ test('the ink drawn at 3x is carried down whole onto the painting\'s sheet', () 
   const hi = thickness(R.fine)[0].reduce((a, v) => a + v, 0) / 9;
   assert.ok(lo > 0);
   assert.ok(Math.abs(lo - hi) / hi < 1e-4, `${lo} against ${hi}`);
+});
+
+test('sparse carry includes removed marks at both ends of the fine sheet',()=>{
+  const {main,R}=setup(),last=R.fine.n-1;
+  R.fine.D[0][0]=.5625;R.fine.D[0][last]=1.125;R.changed();R.carry();
+  assert.equal(main.D[0][0],.0625);assert.equal(main.D[0].at(-1),.125);
+  R.fine.D[0].fill(0);R.changed();R.carry();
+  assert.ok(main.D[0].every(v=>v===0),'negative deltas include cells outside the current occupied spans');
+});
+
+test('restoring fine ink rebuilds cached fixed-layer totals',()=>{
+  const {R}=setup(),lo=Buffer.alloc(W*H*3,230);
+  R.fine.D[0][17]=1;R.changed();R.carry();R.settle();
+  const expected=R.compose(lo),saved=structuredClone(R.exportState());
+  R.fine.layers[0][0][17]=3;layersChanged(R.fine);R.changed();R.carry();
+  assert.notDeepEqual(R.compose(lo),expected);
+  R.importState(saved);
+  assert.deepEqual(R.compose(lo),expected);
 });
 
 test('a fine line drawn into a damp wash spreads wider than on dry paper', () => {
@@ -210,4 +228,39 @@ test('a composition kept and changed in place is the same bytes as one made whol
   }
   // a composition handed out is the caller's own: later frames did not write into it
   for (const [got, then] of kept) assert.ok(got.equals(then));
+});
+
+
+test('sparse fine totals and settling preserve full-scan arithmetic after edits, cancellation and layer changes',()=>{
+ const {R}=setup(),f=R.fine,n=f.n;
+ const snapshot=()=>{
+  const out=new Float32Array(n),lsum=new Float32Array(n);
+  for(const L of f.layers)for(let i=0;i<n;i++)if(L[0][i])lsum[i]+=L[0][i];
+  for(let i=0;i<n;i++)out[i]=f.layers.length?lsum[i]+(f.G[0][i]+f.D[0][i]+f.P[0][i]):f.G[0][i]+f.D[0][i]+f.P[0][i];
+  return renderLayers([[out]],[ink],Buffer.alloc(n*3,255),n,1);
+ };
+ for(let round=0;round<4;round++){
+  for(const i of [0,1,R.width-1,R.width+3,n-1,round*R.width+11]){
+   f.G[0][i]=.125;f.D[0][i]=-.125;f.P[0][i]=i%2?.0078125:0;
+  }
+  R.changed();assert.deepEqual(R.nativeInk().pixels,snapshot());
+  const expected=createSheet(f.paper,[ink]);
+  expected.layers=f.layers.map(L=>L.map(a=>a.slice()));
+  for(const name of ['G','D','P'])expected[name][0].set(f[name][0]);
+  for(let i=0;i<n;i++)if(expected.G[0][i]){expected.D[0][i]+=expected.G[0][i];expected.G[0][i]=0;}
+  fix(expected);R.settle();
+  for(const name of ['G','D','P'])assert.deepEqual(f[name],expected[name]);
+  assert.deepEqual(f.layers.map(L=>L.map(a=>a)),expected.layers.map(L=>L.map(a=>a)));
+  assert.deepEqual(R.nativeInk().pixels,snapshot());
+  if(f.layers.length){f.layers[0][0].fill(0);layersChanged(f);R.changed();assert.deepEqual(R.nativeInk().pixels,snapshot());}
+ }
+});
+
+
+test('settle includes direct fine-sheet edits outside previously cached totals',()=>{
+ const {R}=setup();R.nativeInk();
+ R.fine.G[0][R.fine.n-1]=.125;
+ R.settle();
+ assert.equal(R.fine.G[0].at(-1),0);
+ assert.equal(R.fine.layers.at(-1)[0].at(-1),.125);
 });

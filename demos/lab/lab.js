@@ -1,3 +1,4 @@
+import { BRUSH_PRESETS, studioShortcut, createChargeMeter, engineLabel } from './ui/studio.js';
 import {handStatus,recordedStatus} from './ui/status-log.js';
 import {addToolIcons} from './ui/tool-icons.js';
 import {createOperationsUI} from './ui/operations.js';
@@ -23,7 +24,7 @@ if (query.get('intro') === '0') document.getElementById('welcome').hidden = true
 // Measured on an M-series Mac at device scale 2 (median / 90th percentile ms from a move to its frame): WebGPU 0.25 mm 16/24,
 // 0.21 mm 16/35, 0.125 mm 20/45, 0.1 mm 30/328; CPU 0.42 mm 17/140, 0.25 mm 169/509.
 const PAPERS = { '6x4.5': [6, 4.5], '8x6': [8, 6], '12x9': [12, 9] }, DPIS = [60, 90, 101.6, 120, 150, 160, 200, 203.2, 240, 254, 300], MM = 25.4;
-const AUTO_STEPS = [60, 101.6, 120, 160, 203.2, 254], AUTO_MAX = { webgpu: 203.2, cpu: 60 };
+const AUTO_STEPS = [60, 101.6, 120, 160, 203.2, 254], AUTO_MAX = { webgpu: 120, cpu: 60 };
 function autoDpi(webgpu) {
   const r = canvas.parentElement.getBoundingClientRect(), devicePx = (r.width || 745) * (window.devicePixelRatio || 1);
   const want = devicePx / PAPERS[paperKey][0], cap = webgpu ? AUTO_MAX.webgpu : AUTO_MAX.cpu;
@@ -66,14 +67,21 @@ function begin() {
 }
 // the worker tells us the sheet it made: the canvas is that many pixels, and a 2D canvas is resized to match
 let introConsidered = false;
+const enginePill = document.getElementById('engine-pill');
+function showEngine() {
+  const lags = [...lab.lags].sort((a, b) => a - b);
+  enginePill.textContent = engineLabel(lab.physics, dpi, lags.length ? lags[Math.floor(lags.length / 2)] : undefined);
+}
 // What the sheet is: cells, their size on paper and on screen, and how long a brush move takes to reach the screen.
 function showResolution() {
   const r = canvas.getBoundingClientRect(), perCell = r.width ? r.width * (window.devicePixelRatio || 1) / W : 0, lags = [...lab.lags].sort((a, b) => a - b);
+  showEngine();
   const frame = lags.length ? ` · frame ${Math.round(lags[Math.floor(lags.length / 2)])} ms` : '';
   document.getElementById('resolution-choice').textContent = `${lab.dpiChoice ?? 'Selected'} · ${W} × ${H} cells · ${(MM / dpi).toFixed(3)} mm a cell · ${perCell.toFixed(2)} screen px a cell${frame}`;
 }
 setInterval(() => { if (lab.sheet) showResolution(); }, 2000);
 function onSheet(data) {
+  lab.physics = data.physics;
   if(data.dpi!==dpi)lab.dpiChoice='loaded sheet';
   operations.reset(data.width,data.height);
   W = data.width; H = data.height; PIXELS_PER_INCH = data.dpi; dpi = data.dpi; lab.dpi = dpi; lab.sheet = { width: W, height: H, dpi, paperIn: data.paperIn, surface: data.surface };
@@ -97,7 +105,9 @@ function useCpuCanvas() {
 const announce = text => { announcer.textContent = text; };
 const PIGMENT_TOOLS = ['round', 'flat']; // pen is walnut, pencil graphite, clean water none
 const pigmentSet = document.getElementById('pigment-set');
-const settings = { tool: 'round', pigment: 'rose', sizeMm: 10, water: 2.0, amount: 0.5, pressure: 0.8, model: 'row', reservoirMode: 'standard', autoRedip: true };
+const settings = { tool: 'round', pigment: 'rose', sizeMm: 10, water: 2.0, amount: 0.5, pressure: 0.8, model: 'section', reservoirMode: 'standard', autoRedip: true };
+const chargeMeter = createChargeMeter();
+function clearPreset() { press('[data-preset]', 'preset', ''); }
 let lastPaintTool = 'round';
 let temporaryWater=false, altHeld=false, barrelHeld=false;
 const manualPressure=document.getElementById('manual-pressure');
@@ -123,21 +133,29 @@ function updateActiveTool() {
     document.getElementById(id).closest('label').hidden = !useful;
   }
   document.getElementById('model-label').parentElement.hidden = !paintTool;
+  document.getElementById('focus-water').value = settings.water;
+  document.getElementById('focus-water').disabled = !paintTool;
+  const swatch = document.getElementById('focus-pigment');
+  swatch.querySelector('i').style.background = settings.mixture ? `rgb(${previewMix(settings.mixture,settings.amount,SURFACES[surface].colour).paint.join(' ')})` : BY_KEY[settings.pigment].swatch;
+  swatch.setAttribute('aria-label', `Choose pigment · ${settings.mixture ? 'mixed paint' : BY_KEY[settings.pigment].name}`);
 }
 
 // the palette: a round swatch per pigment, named by its label and tooltip, the selected one named above the swatches
 const pigBox = document.getElementById('pigments'), pigmentName = document.getElementById('pigment-name');
 const habit = p => (stains(p) ? 'staining' : 'lifts easily');
-for (const p of PIGMENTS) {
+for (const [index, p] of PIGMENTS.entries()) {
   const { key, name, swatch } = p, b = document.createElement('button'), dot = document.createElement('i');
-  b.dataset.pigment = key; b.setAttribute('aria-pressed', String(key === settings.pigment)); b.setAttribute('aria-label', `${name}, ${habit(p)}`); b.title = `${name}, ${habit(p)}`;
+  b.dataset.pigment = key; b.setAttribute('aria-pressed', String(key === settings.pigment)); b.setAttribute('aria-label', `${name}, ${habit(p)}`); b.title = `${name}, ${habit(p)}${index < 9 ? ` (${index + 1})` : ''}`;
   dot.style.background = swatch; b.append(dot); pigBox.append(b);
+  const quick = b.cloneNode(true); quick.addEventListener('click', () => { b.click(); document.getElementById('focus-palette').hidePopover(); });
+  document.getElementById('focus-palette').append(quick);
 }
 const showPigment = () => { const p = BY_KEY[settings.pigment]; pigmentName.textContent = `${p.name} · ${habit(p)}`; };
 showPigment();
 const press = (selector, attr, value) => document.querySelectorAll(selector).forEach(b => b.setAttribute('aria-pressed', String(b.dataset[attr] === value)));
-document.querySelectorAll('[data-tool]').forEach(b => b.addEventListener('click', () => { settings.tool = b.dataset.tool; if(PIGMENT_TOOLS.includes(settings.tool))lastPaintTool=settings.tool; press('[data-tool]', 'tool', settings.tool); updateActiveTool(); }));
-pigBox.addEventListener('click', e => { const b = e.target.closest('[data-pigment]'); if (!b || !BY_KEY[b.dataset.pigment]) return; settings.pigment = b.dataset.pigment; delete settings.mixture; press('[data-pigment]', 'pigment', settings.pigment); showPigment(); renderMixer(); updateActiveTool(); queueCursor(); });
+document.querySelectorAll('[data-tool]').forEach(b => b.addEventListener('click', () => { clearPreset(); chargeMeter.reset(); settings.tool = b.dataset.tool; if(PIGMENT_TOOLS.includes(settings.tool))lastPaintTool=settings.tool; press('[data-tool]', 'tool', settings.tool); updateActiveTool(); }));
+function selectPigment(e) { const b = e.target.closest('[data-pigment]'); if (!b || !BY_KEY[b.dataset.pigment]) return; settings.pigment = b.dataset.pigment; delete settings.mixture; press('[data-pigment]', 'pigment', settings.pigment); showPigment(); renderMixer(); updateActiveTool(); chargeMeter.reset(); queueCursor(); }
+pigBox.addEventListener('click', selectPigment);
 
 // The mixing well holds a recipe, and Load mix takes an independent snapshot for the next brush dip.
 const mixParts = document.getElementById('mix-parts'), mixStrength = document.getElementById('mix-strength');
@@ -179,12 +197,13 @@ mixLoad.addEventListener('click',()=>{ const mix=normalizeMix(parts); if(!mix)re
 mixClear.addEventListener('click',()=>{ parts={}; delete settings.mixture; changedMix(); updateActiveTool(); queueCursor(); announce('Mixing palette cleared. Single pigment selected.'); });
 mixStrength.addEventListener('input',()=>{ const amount=document.getElementById('amount'); amount.value=mixStrength.value; amount.dispatchEvent(new Event('input',{bubbles:true})); });
 renderMixer();
-document.querySelectorAll('[data-model]').forEach(b => b.addEventListener('click', () => { settings.model = b.dataset.model; press('[data-model]', 'model', settings.model); }));
+press('[data-model]', 'model', settings.model);
+document.querySelectorAll('[data-model]').forEach(b => b.addEventListener('click', () => { clearPreset(); settings.model = b.dataset.model; press('[data-model]', 'model', settings.model); }));
 const UNITS = { size: ' mm', speed: '×' };
 for (const id of ['size', 'water', 'amount', 'pressure', 'speed']) {
   const input = document.getElementById(id), out = document.getElementById(`${id}-out`);
   const apply = () => { out.textContent = `${input.value}${UNITS[id] ?? ''}`; if (id === 'speed') worker.postMessage({ type: 'speed', value: Number(input.value) }); else settings[id === 'size' ? 'sizeMm' : id] = Number(input.value); if (id === 'size' || id === 'water') updateActiveTool(); if(id==='amount')renderMixer(); };
-  input.addEventListener('input', apply); apply();
+  input.addEventListener('input', () => { if (id !== 'speed') { clearPreset(); chargeMeter.reset(); } apply(); }); apply();
 }
 const pauseButton = document.getElementById('pause');
 const quickDryButton=document.getElementById('dry-layer');
@@ -210,16 +229,44 @@ for (const action of ['undo', 'redo']) document.getElementById(action).addEventL
 document.addEventListener('keydown', e => {
   if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z' && !e.target.closest('input,select,textarea,[contenteditable]')) { e.preventDefault(); if (!playing) document.getElementById(e.shiftKey ? 'redo' : 'undo').click(); }
 });
+function applyPreset(key) {
+  const preset = BRUSH_PRESETS[key]; if (!preset || playing) return;
+  cancelStroke(); settings.tool = preset.tool; lastPaintTool = preset.tool;
+  press('[data-tool]', 'tool', preset.tool);
+  for (const [id, value] of Object.entries({ size: preset.sizeMm, water: preset.water, amount: preset.amount, pressure: preset.pressure })) {
+    const input = document.getElementById(id); input.value = value; input.dispatchEvent(new Event('input', { bubbles: true }));
+  }
+  manualPressure.checked = true; manualPressure.dispatchEvent(new Event('change'));
+  press('[data-preset]', 'preset', key); updateActiveTool(); queueCursor();
+  announce(`${preset.label} loaded${key === 'glaze' ? ' · glaze over a dry layer' : ''}`);
+}
+document.querySelectorAll('[data-preset]').forEach(b => b.addEventListener('click', () => applyPreset(b.dataset.preset)));
+document.getElementById('focus-water').addEventListener('input', e => {
+  const input = document.getElementById('water'); input.value = e.target.value; input.dispatchEvent(new Event('input', { bubbles: true })); queueCursor();
+});
+for (const b of document.querySelectorAll('[data-action]')) {
+  const original = document.getElementById(b.dataset.action);
+  b.addEventListener('click', () => original.click());
+  const sync = () => { b.disabled = original.disabled; if (original.id === 'dry-layer') b.textContent = original.textContent; };
+  new MutationObserver(sync).observe(original, { attributes: true, attributeFilter: ['disabled'], childList: true }); sync();
+}
+const studioToggle = document.getElementById('studio-toggle');
+studioToggle.addEventListener('click', () => {
+  const on = document.body.classList.toggle('studio-open'); studioToggle.setAttribute('aria-expanded', String(on)); cacheRect(); queueCursor();
+});
 document.addEventListener('keydown', e => {
-  if (e.repeat || e.metaKey || e.ctrlKey || e.altKey || e.target.closest('input,select,textarea,[contenteditable]')) return;
-  if(e.shiftKey&&e.key.toLowerCase()==='d'){e.preventDefault();quickDryButton.click();return;}
-  const tool = { r: 'round', f: 'flat', w: 'water', i: 'pen', p: 'pencil', d: 'dryer' }[e.key.toLowerCase()];
-  if (tool) { e.preventDefault(); document.querySelector(`[data-tool="${tool}"]`).click(); }
-  else if (e.key === '[' || e.key === ']') {
-    e.preventDefault(); const size = document.getElementById('size');
-    size.value = Math.max(Number(size.min), Math.min(Number(size.max), Number(size.value) + (e.key === '[' ? -0.5 : 0.5)));
+  if (document.querySelector(':popover-open')) return;
+  const shortcut = studioShortcut(e); if (!shortcut) return;
+  e.preventDefault();
+  if (shortcut.preset) applyPreset(shortcut.preset);
+  else if (shortcut.action) document.getElementById(shortcut.action).click();
+  else if (shortcut.tool) document.querySelector(`[data-tool="${shortcut.tool}"]`).click();
+  else if (shortcut.pigment != null) pigBox.children[shortcut.pigment]?.click();
+  else if (shortcut.resize) {
+    const size = document.getElementById('size');
+    size.value = Math.max(Number(size.min), Math.min(Number(size.max), Number(size.value) + shortcut.resize));
     size.dispatchEvent(new Event('input', { bubbles: true })); queueCursor();
-  } else if (e.code === 'Space' && !e.target.closest('button,summary')) { e.preventDefault(); pauseButton.click(); }
+  }
 });
 document.getElementById('keep-painting').addEventListener('click', () => { cancelStroke(); worker.postMessage({ type: 'resume' }); document.getElementById('return-sheet').hidden = true; });
 document.getElementById('dismiss-return').addEventListener('click', () => { document.getElementById('return-sheet').hidden = true; });
@@ -290,7 +337,7 @@ let exampleMode='replay';lab.mode=exampleMode;
 for(const el of [runMode,strokeLimit])el.addEventListener('change',()=>{exampleMode=runMode.value;lab.mode=runMode.value;document.getElementById('mode-note').textContent=lab.mode==='live'?'Live paints the recorded strokes here, with water and pigment physics.':'Recording · original saved frames, stepped without fades. Overlay: stroke path.';targets.replay();});
 replaySpeed.addEventListener('change',()=>worker.postMessage({type:'live-speed',value:Number(replaySpeed.value)}));
 document.querySelectorAll('[data-seek]').forEach(b=>b.addEventListener('click',()=>targets.replay(Number(b.dataset.seek))));
-document.getElementById('redip').addEventListener('click',()=>{worker.postMessage({type:'redip'});announce('Re-dipped. The next stroke starts with a fresh load.');});
+document.getElementById('redip').addEventListener('click',()=>{chargeMeter.reset();worker.postMessage({type:'redip'});announce('Re-dipped. The next stroke starts with a fresh load.');});
 document.getElementById('auto-redip').addEventListener('change',e=>{settings.autoRedip=e.target.checked;});
 async function playExampleFilm(example, carry=false, seek=0) {
   const run=++filmRun, alive=()=>run===filmRun;
@@ -367,6 +414,7 @@ function startTouch() {
   const start = touchStart;
   clearPendingTouch();
   if (!start || !started || playing || gesture || pointer !== null) return;
+  playbackUI.dismiss(); if (settings.autoRedip) chargeMeter.reset();
   cacheRect(); canvas.focus({preventScroll:true}); pointer = start.pointerId; lastPointerType='touch'; lastScreen=start; contactSampler.reset(); last = toSheet(start,true); recordContact(last,'down'); lastT = start.timeStamp; lastMove = performance.now();
   document.getElementById('paint-hint').hidden = true;
   if(['round','flat','pen','pencil'].includes(toolInHand().tool))operations.log.write(handStatus(toolInHand(),strokeCount+1,BY_KEY));
@@ -374,7 +422,7 @@ function startTouch() {
 }
 const applyView = () => {
   for (const el of [canvas, filmCanvas, operations.canvas, document.getElementById('seek-preview'), document.getElementById('cursor')]) { el.style.transformOrigin = '0 0'; el.style.transform = `translate(${panX}px, ${panY}px) scale(${zoom})`; }
-  cacheRect(); queueCursor();
+  lab.view = { zoom, panX, panY }; cacheRect(); queueCursor();
 };
 let focusScroll=0;
 function fitFocus(){
@@ -386,6 +434,8 @@ function setFocus(on){
   lab.focus=on;document.body.classList.toggle('canvas-focus',on);
   const button=document.getElementById('focus-view');button.setAttribute('aria-pressed',String(on));button.setAttribute('aria-label',on?'Exit fullscreen':'Fullscreen');
   document.getElementById('exit-focus').hidden=!on;
+  document.getElementById('focus-dock').hidden=!on;
+  if (!on && document.getElementById('focus-palette').matches(':popover-open')) document.getElementById('focus-palette').hidePopover();
   zoom=1;panX=panY=0;applyView();fitFocus();
   if(on)document.getElementById('exit-focus').focus({preventScroll:true});else{scrollTo(0,focusScroll);button.focus({preventScroll:true});}
 }
@@ -393,6 +443,46 @@ document.getElementById('focus-view').addEventListener('click',()=>setFocus(!lab
 document.getElementById('exit-focus').addEventListener('click',()=>setFocus(false));
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&lab.focus){e.preventDefault();setFocus(false);}});
 window.addEventListener('resize',fitFocus);
+let spaceHeld = false, spaceDragged = false, mousePan = null;
+const spaceTarget = e => !e.target.closest('input,select,textarea,[contenteditable],button,summary') && !document.querySelector(':popover-open');
+document.addEventListener('keydown', e => {
+  if (e.code !== 'Space' || e.repeat || e.metaKey || e.ctrlKey || e.altKey || !spaceTarget(e)) return;
+  e.preventDefault(); spaceHeld = true; spaceDragged = false; sheetEl.classList.add('pan-ready');
+});
+document.addEventListener('keyup', e => {
+  if (e.code !== 'Space' || !spaceHeld) return;
+  e.preventDefault(); spaceHeld = false; sheetEl.classList.remove('pan-ready');
+  if (!spaceDragged && !mousePan) pauseButton.click();
+});
+window.addEventListener('blur', () => { spaceHeld = false; mousePan = null; sheetEl.classList.remove('pan-ready', 'is-panning'); });
+sheetEl.addEventListener('pointerdown', e => {
+  if (e.target.closest('button')) return;
+  document.getElementById('welcome').hidden = true;
+  if (e.pointerType === 'touch' || !(e.button === 1 || spaceHeld)) return;
+  e.preventDefault(); e.stopImmediatePropagation();
+  if (zoom <= 1) return;
+  cancelStroke(); spaceDragged = true;
+  mousePan = { pointerId: e.pointerId, x: e.clientX, y: e.clientY, panX, panY };
+  sheetEl.setPointerCapture(e.pointerId); sheetEl.classList.add('is-panning');
+}, true);
+sheetEl.addEventListener('pointermove', e => {
+  if (mousePan?.pointerId !== e.pointerId) return;
+  e.preventDefault(); e.stopImmediatePropagation();
+  panX = mousePan.panX + e.clientX - mousePan.x; panY = mousePan.panY + e.clientY - mousePan.y; applyView();
+}, true);
+for (const type of ['pointerup', 'pointercancel', 'lostpointercapture']) sheetEl.addEventListener(type, e => {
+  if (mousePan?.pointerId !== e.pointerId) return;
+  e.stopImmediatePropagation(); mousePan = null; sheetEl.classList.remove('is-panning');
+}, true);
+sheetEl.addEventListener('wheel', e => {
+  if (!started || playing) return;
+  e.preventDefault(); cancelStroke();
+  const r = sheetEl.getBoundingClientRect(), next = Math.max(1, Math.min(4, zoom * Math.exp(-e.deltaY * .002)));
+  const x = e.clientX - r.left, y = e.clientY - r.top, ratio = next / zoom;
+  panX = x - (x - panX) * ratio; panY = y - (y - panY) * ratio; zoom = next;
+  if (zoom === 1) panX = panY = 0;
+  applyView();
+}, { passive: false });
 const touchPair = () => { const [a, b] = [...touches.values()]; return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2, distance: Math.max(1, Math.hypot(a.x - b.x, a.y - b.y)) }; };
 sheetEl.addEventListener('pointerdown', e => {
   if (e.pointerType !== 'touch' || e.target.closest('button')) return;
@@ -427,9 +517,9 @@ for (const type of ['pointerup', 'pointercancel', 'lostpointercapture']) sheetEl
 }, true);
 document.getElementById('reset-view').addEventListener('click', () => { zoom = 1; panX = panY = 0; applyView(); });
 sheetEl.addEventListener('pointerdown', e => {
-  if (e.target.closest('button'))return;
+  if (e.target.closest('button') || (e.pointerType === 'mouse' && e.button !== 0))return;
   if (!started || playing || pointer !== null) return;
-  playbackUI.dismiss();
+  playbackUI.dismiss(); if (settings.autoRedip) chargeMeter.reset();
   cacheRect(); // A control can move the sheet without resizing it.
   lastPointerType=e.pointerType;barrelHeld=e.pointerType==='pen'&&Boolean(e.buttons&2);setTemporaryWater();
   canvas.focus({preventScroll:true});canvas.setPointerCapture(e.pointerId); pointer = e.pointerId; lastScreen=e; contactSampler.reset(); last = toSheet(e,true);recordContact(last,'down');lastT = e.timeStamp; lastMove = e.timeStamp;
@@ -503,6 +593,7 @@ worker.addEventListener('message', ({ data }) => {
   if(data.liveRun!=null&&data.liveRun!==filmRun)return;
   if (data.type === 'caps') {
     lab.physics = data.physics; lab.physicsReason = data.physicsReason; lab.physicsName = data.physicsName;
+    showEngine();
     lab.dpiChoice=dpiAsked!==null?'URL':quality==='full'?'Full physics':'Fitted to screen';
     const autoChoice=autoDpi(Boolean(data.webgpu));lab.viewportResolution={width:innerWidth,height:innerHeight,defaultDpi:quality==='full'?200:autoChoice};
     if (dpiAsked === null) { dpi = quality==='full'?200:autoChoice; lab.dpi = dpi; dpiSelect.value = String(dpi); }
@@ -556,7 +647,9 @@ worker.addEventListener('message', ({ data }) => {
     dryingLabel.title = 'Share of the peak wet area that has dried';
     lab.gpuSteps = data.gpuSteps; lab.gpuFrameMs = data.gpuFrameMs; lab.wet = Boolean(data.wet);
     lab.lastTool = data.lastTool;lab.load=data.load;lab.replayPoint=data.replayPoint;
-    document.getElementById('load-state').textContent=data.load?`Water ${data.load.water.toFixed(1)} · paint ${data.load.pigment.toFixed(1)} · ${settings.autoRedip?'auto re-dip each wet stroke':'manual re-dip'}`:'';
+    const charge = chargeMeter.update(data.load);
+    for (const el of document.querySelectorAll('.charge')) { el.style.setProperty('--water-charge', charge.water); el.style.setProperty('--paint-charge', charge.pigment); }
+    for (const el of document.querySelectorAll('#redip,[data-action="redip"]')) el.title = `Re-dip (X) · ${charge.text}`;
     if(lab.mode==='live'&&playing)filmCanvas.hidden=true;
 
     lab.frames++; if (data.gpuDrawn) lab.gpuDrawnEpoch = data.gpuDrawn; lab.workerRenderMs = data.renderMs; lab.workerRenders = data.renderCount;
@@ -570,6 +663,7 @@ worker.addEventListener('message', ({ data }) => {
     strokeCount = data.strokes;
     pauseButton.setAttribute('aria-pressed', String(data.paused));pauseButton.textContent = data.paused ? 'Resume drying' : 'Pause drying';
     showMarks(data);
+    showEngine();
     // Frames update live brush load, not the selected controls. Setting handlers update those controls.
     canvas.dataset.ticks=data.ticks;canvas.dataset.strokes=data.strokes;
     dryer.setAttribute('aria-pressed', String(data.dryer));

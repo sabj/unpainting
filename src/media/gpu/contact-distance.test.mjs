@@ -1,5 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { contactDistanceWgsl } from './contact-distance-wgsl.mjs';
 import { contactDistance, cellEdgeFlux } from '../contact-distance.mjs';
 import { GpuContactDistance, contactGrid } from './contact-distance.mjs';
 import { openGpu } from './stepfull.mjs';
@@ -20,6 +22,7 @@ test('WebGPU half-cell distances give exactly the CPU evaporation at corners, ho
   let device;
   try { ({ device } = await openGpu(impl.create([]))); }
   catch (error) {
+    if (process.env.GPU_REQUIRED === '1') throw error;
     if (error.message !== 'no WebGPU adapter') throw error;
     t.skip(error.message); return;
   }
@@ -55,7 +58,10 @@ test('WebGPU half-cell distances give exactly the CPU evaporation at corners, ho
         });
       device.queue.writeBuffer(gpuMask, 0, packed);
       const grid = contactGrid(box, mm, E, device.limits);
+      device.pushErrorScope('validation');
       const actual = await runner.field(gpuMask, w, h, grid, span);
+      const flux = await runner.edgeFlux(gpuMask, w, h, grid, span, mm, E);
+      assert.equal(await device.popErrorScope(), null);
       const expected = contactDistance(mask, w, h, pinned, box);
       assert.equal(actual.width, expected.width);
       for (let i = 0; i < expected.distance.length; i++) {
@@ -63,7 +69,13 @@ test('WebGPU half-cell distances give exactly the CPU evaporation at corners, ho
       }
       for (let y = top; y <= bottom; y++) for (let x = left; x <= right; x++) {
         assert.equal(cellEdgeFlux(actual, x, y, mm, E), cellEdgeFlux(expected, x, y, mm, E));
+        if (mask[y*w+x]) assert.ok(Math.abs(flux[(y-top)*grid.cols+x-left] - cellEdgeFlux(expected, x, y, mm, E)) < 1e-5, `cell flux at ${x},${y}`);
+        else assert.equal(flux[(y-top)*grid.cols+x-left], 0);
       }
     }
   } finally { gpuMask.destroy(); runner.destroy(); device.destroy(); }
+});
+
+test('browser contact-distance WGSL matches the standalone shader', () => {
+  assert.equal(contactDistanceWgsl.trim(), readFileSync(new URL('./contact-distance.wgsl', import.meta.url), 'utf8').trim());
 });

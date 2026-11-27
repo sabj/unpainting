@@ -1,15 +1,15 @@
-import { invalidatePaperCertificate, beginWetOperation } from './paper-certificate.mjs';
+import { invalidatePaperCertificate, beginWetOperation, recordWetBox } from './paper-certificate.mjs';
 import { censusMark } from './census.mjs';
-import { laneFactors, loadFactor } from './brush-load-variance.mjs';
+import { laneFactors } from './brush-load-variance.mjs';
 // A brush as a row of bristles across the stroke, based on "Hairy Brushes", with a belly
 // reservoir as in DAB. Water and pigment move as separate masses. One contact model covers every load:
 // paint reaches a cell when the hair's liquid spans the depth from the hair to the paper's tooth there.
 import { deposit, soak, collectFlows } from './sheet.mjs';
-import { toothRange } from './paper.mjs';
+import { toothRange, SURFACE_MM } from './paper.mjs';
 import { localRowPlanBound } from './gpu/local-row-plan.mjs';
 import { checkedStroke } from './gpu/stroke-check.mjs';
 import { markCpuStrokeCell } from './cpu-stroke-dirty.mjs';
-import { brushContactLookahead,sectionContactLookahead,lookaheadCount } from './cpu-contact-lookahead.mjs';
+import { brushContactLookahead, sectionContactLookahead, sectionContactLookaheadStrip, lookaheadCount } from './cpu-contact-lookahead.mjs';
 import { TUFT, REF_MM, tuftShape, contactShare, roundProfile, kappaOf, headOf, feedRate, moveChain, footprint, exchangeCell, toothReach } from './tuft-section.mjs';
 
 export function createBrush(opts = {}) {
@@ -45,17 +45,17 @@ export function dip(brush, { water = 1, conc }) {
   brush.K = conc.length; brush.load = water; brush.carry = 0; brush.travel = 0;
   brush.dips = (brush.dips ?? 0) + 1; brush.sinceDip = 0; brush._onPaper = false;
   if (varietyOf(brush)) reclump(brush);
-  // Uneven load: one seeded factor for this load, and a smooth seeded factor per bristle lane (see brush-load-variance.mjs).
-  const lf = loadFactor(brush.seed, brush.dips - 1), lane = laneFactors(brush.seed, brush.dips - 1, brush.hairs.map(hr => hr.len));
-  brush.resW = water * brush.capacity * brush.hairs.length * brush.belly; brush.resP = conc.map(v => v * lf * brush.resW);
-  brush.hairs.forEach((hr, j) => { hr.water = water * brush.capacity * hr.len; hr.pig = conc.map(v => v * lf * lane[j] * hr.water); });
+  // Reload the finite supply at the requested concentration, with a small gradient across the tips.
+  const lane = laneFactors(brush.seed, brush.dips - 1, brush.hairs.map(hr => hr.len));
+  brush.resW = water * brush.capacity * brush.hairs.length * brush.belly; brush.resP = conc.map(v => v * brush.resW);
+  brush.hairs.forEach((hr, j) => { hr.water = water * brush.capacity * hr.len; hr.pig = conc.map(v => v * lane[j] * hr.water); });
   if (brush.loadWater > 0) {
     const total = water * brush.loadWater;
     const tipCap = brush.capacity * brush.hairs.reduce((a, hr) => a + hr.len, 0);
     // A blotted brush remains dry; a loaded belly keeps the tips saturated.
     const tip = Math.min(total, tipCap * (water < brush.free ? water : 1));
-    brush.hairs.forEach((hr, j) => { hr.water = tip * hr.len * brush.capacity / tipCap; hr.pig = conc.map(v => v * lf * lane[j] * hr.water); });
-    brush.resW = total - tip; brush.resP = conc.map(v => v * lf * brush.resW);
+    brush.hairs.forEach((hr, j) => { hr.water = tip * hr.len * brush.capacity / tipCap; hr.pig = conc.map(v => v * lane[j] * hr.water); });
+    brush.resW = total - tip; brush.resP = conc.map(v => v * brush.resW);
   }
   // the belly's capacity, for the section brush's capillary feed: what a dip at 1 puts there, or what this metered load did
   brush._capB = Math.max(brush.capacity * brush.hairs.length * brush.belly, brush.resW);
@@ -108,6 +108,26 @@ const field2 = (c, x, y) => {
   const a = hash2(c, i, j), b = hash2(c, i + 1, j), d = hash2(c, i, j + 1), e = hash2(c, i + 1, j + 1);
   return a + (b - a) * u + (d - a) * w + (a - b - d + e) * u * w;
 };
+// A section step samples many cells between the same few lattice knots. Keep
+// those exact double-precision hashes once per footprint, without changing the
+// interpolation or Math.sin argument order used by field2.
+function sectionField(c) {
+  let values = new Float64Array(64), x0 = 0, y0 = 0, width = 0;
+  return {
+    prepare(xa, ya, xb, yb, inv) {
+      x0 = Math.floor(xa * inv); y0 = Math.floor(ya * inv);
+      width = Math.floor(xb * inv) - x0 + 2;
+      const height = Math.floor(yb * inv) - y0 + 2, n = width * height;
+      if (values.length < n) values = new Float64Array(n + 64);
+      for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) values[y * width + x] = hash2(c, x0 + x, y0 + y);
+    },
+    at(x, y) {
+      const i = Math.floor(x), j = Math.floor(y), fx = x - i, fy = y - j, u = fx * fx * (3 - 2 * fx), w = fy * fy * (3 - 2 * fy);
+      const q = (j - y0) * width + i - x0, a = values[q], b = values[q + 1], d = values[q + width], e = values[q + width + 1];
+      return a + (b - a) * u + (d - a) * w + (a - b - d + e) * u * w;
+    },
+  };
+}
 
 // Stroke variety, all deterministic: the hand lands and lifts, pressure, width and line wander (varyPath), hairs
 // re-clump per dip, the wet edge breathes and follows the tooth (sidesAt, edgeShift), a stroke films a cell once,
@@ -451,37 +471,48 @@ export function stroke(brush, sheet, path, options = {}) {
   // A stroke goes to the GPU when its `between` only flows the sheet; gpuBetween: false keeps it on the CPU copy.
   // The link throws if a `between` reads the sheet during planning.
   const betweenOk = !options.between || options.gpuBetween === true || (options.gpuBetween !== false && link?.anyBetween);
-  // The GPU contact kernel is row-only: tufts use CPU contact; metered tips require GPU_RESIDENT=1.
+  // The GPU contact kernel handles row and section models; tufts use CPU contact; metered row tips require GPU_RESIDENT=1.
   const planLimit=link?.strokePlanCapacity??3900000;
-  let fits=planFits(brush,varyPath(brush,path,sheet.paper,options.lift),options.spacing??.7,planLimit);
-  if(!fits&&link&&!link.paused&&link.brushGpu&&betweenOk&&brush.model!=='tuft'&&brush.model!=='section'&&(!brush.depositDepth||ENV.GPU_RESIDENT==='1')&&ENV.GPU_LOCAL_ROW_PLAN==='1'&&onGpu(brush,sheet)){
+  const isSection = brush.model === 'section';
+  const variedForFit = varyPath(brush, path, sheet.paper, options.lift);
+  let fits = isSection
+    ? sectionPlanFits(brush, sheet, variedForFit, options.spacing ?? 0.7, planLimit)
+    : planFits(brush, variedForFit, options.spacing ?? 0.7, planLimit);
+  if(!fits&&link&&!link.paused&&link.brushGpu&&betweenOk&&brush.model!=='tuft'&&!isSection&&(!brush.depositDepth||ENV.GPU_RESIDENT==='1')&&ENV.GPU_LOCAL_ROW_PLAN==='1'&&onGpu(brush,sheet)){
     const bound=localRowPlanBound(brush,sheet,path,options,planLimit);fits=bound.eligible;
     const stats=link.stats??(link.stats={});stats.localRowPlanChecks=(stats.localRowPlanChecks??0)+1;
     if(fits){stats.localRowPlanAdmitted=(stats.localRowPlanAdmitted??0)+1;stats.localRowPlanWords=(stats.localRowPlanWords??0)+bound.words;stats.localRowPlanEmptySteps=(stats.localRowPlanEmptySteps??0)+bound.emptySteps;}
   }
-  // The section brush has no GPU contact kernel yet (BRUSH-PHYSICS.md S4): its contact runs on the CPU against the GPU sheet.
-  const gpuOk = brush.model !== 'tuft' && brush.model !== 'section' && (!brush.depositDepth || ENV.GPU_RESIDENT === '1') && !!link && !link.paused && path.length > 0 && link.brushGpu && betweenOk && onGpu(brush, sheet) && fits;
+  const gpuOk = brush.model !== 'tuft' && (isSection || !brush.depositDepth || ENV.GPU_RESIDENT === '1') && !!link && !link.paused && path.length > 0 && link.brushGpu && betweenOk && onGpu(brush, sheet) && fits;
   const p = brush._pend;
   if (p) {
     // A pending GPU stroke: continue on the GPU when possible (_cont 2 when hairs and belly are still there, 1 for the
     // generator only), otherwise settle the brush's state back first.
-    if (gpuOk && !link.check && link.resident && !p.splat && p.link === link) {
+    if (gpuOk && !link.check && link.resident && !p.splat && p.link === link && !!p.section === isSection) {
       brush._cont = p.hairs ? 2 : 1; brush._restore = p.state;
-    } else if (gpuOk && !link.check && !p.splat && link.lastPend === p && p.link === link) brush._cont = p.hairs ? 2 : 1;
+    } else if (gpuOk && !link.check && !p.splat && link.lastPend === p && p.link === link && !!p.section === isSection) brush._cont = p.hairs ? 2 : 1;
     else p.link.settleBrush(brush);
   }
   if (CPU_TRACE && link && !gpuOk) { const k = JSON.stringify({ tuft: brush.model === 'tuft', depth: !!brush.depositDepth, paused: !!link.paused, empty: !path.length, brushGpu: !!link.brushGpu, betweenOk, onGpu: onGpu(brush, sheet), fits, model: brush.model, pathLen: path.length > 2000 ? '>2000' : path.length > 200 ? '>200' : 'small' }); CPU_TRACE.set(k, (CPU_TRACE.get(k) ?? 0) + 1); }
   if (!link || link.paused || !path.length) return strokeImpl(brush, sheet, path, options);
   if (gpuOk) {
-    if (link.check) { invalidatePaperCertificate(sheet); return checkedStroke(brush, sheet, path, options, { cpuStroke: strokeImpl, gpuStroke: strokeGpu, rect: link.validRect(strokeRect(brush, sheet, path)) }); }
-    return strokeGpu(brush, sheet, path, options);
+    const gpuFn = isSection ? sectionStrokeGpu : strokeGpu;
+    if (link.check) { invalidatePaperCertificate(sheet); return checkedStroke(brush, sheet, path, options, { cpuStroke: strokeImpl, gpuStroke: gpuFn, rect: link.validRect(strokeRect(brush, sheet, path)) }); }
+    return gpuFn(brush, sheet, path, options);
   }
   const transport = {
     tracked: !options.between || options.gpuBetween === true, instrument: 'brush',
     planOverflow: !!link.brushGpu && onGpu(brush, sheet) && !fits,
     periodic: options.gpuBetween === true && typeof options.between === 'function', flowEvery: options.flowEvery ?? 0,
   };
-  if (brush.model === 'section' && brush.radius > 0 && sectionPrefetchMargin > 0) transport.prefetch = Math.ceil(brush.radius) + sectionPrefetchMargin;
+  if(brush.model==='section'&&transport.tracked){
+    let mask=0;
+    for(let k=0;k<sheet.K;k++)if(brush.resP?.[k]!==0||brush.hairs.some(hr=>hr.pig?.[k]!==0))mask|=1<<k;
+    transport.pigmentMask=mask;
+  }
+  if (brush.model === 'section' && brush.radius > 0 && sectionPrefetchMargin > 0) {
+    transport.prefetch = Math.ceil(brush.radius) + sectionPrefetchMargin;
+  }
   link.beginStroke(sheet, strokeRect(brush, sheet, path), transport);
   try { return strokeImpl(brush, sheet, path, options); } finally { link.endStroke(sheet); }
 }
@@ -534,20 +565,52 @@ function endLine(path, atEnd) {
   const n = path.length, a = path[atEnd ? n - 1 : 0];
   for (let k = 1; k < n; k++) {
     const b = path[atEnd ? n - 1 - k : k], dx = b.x - a.x, dy = b.y - a.y, m = Math.hypot(dx, dy);
-    if (m >= 0.5) return { x: a.x, y: a.y, tx: dx / m, ty: dy / m };
+    if (m >= 0.5) return { x: a.x, y: a.y, tx: dx / m, ty: dy / m, atEnd };
   }
   return null;
 }
+function countSectionSteps(path, carry, spacing) {
+  let t = carry, n = 0;
+  for (let k = 1; k < path.length; k++) {
+    const a = path[k - 1], b = path[k], seg = Math.hypot(b.x - a.x, b.y - a.y) || 1e-6;
+    while (t <= seg) { n++; t += spacing; }
+    t -= seg;
+  }
+  return n;
+}
+function setEndGuards(ends, path, brush, paper, spacing) {
+  if (!ends.length) return;
+  const near = 1.2 * path.reduce((m, q) => Math.max(m, q.r ?? brush.radius), 0) + 2 * edgeTooth(brush, paper) + 3;
+  const totalSteps = countSectionSteps(path, brush.carry, spacing);
+  const guardSteps = Math.ceil(near / spacing);
+  for (const e of ends) {
+    e.r2 = near * near;
+    if (e.atEnd) { e.s0 = Math.max(0, totalSteps - 1 - guardSteps); e.s1 = Math.max(0, totalSteps - 1); }
+    else { e.s0 = 0; e.s1 = Math.max(0, totalSteps - 1); }
+  }
+}
+// Latch the landing endLine off as soon as either the towed tuft has fully cleared the landing line
+// or the stroke reverses onto a return lane (so short-lane zigzags never self-clip while straight starts never leak a nub).
+function startGuardCleared(e, pts, S, rad, margin, tx, ty, hold, steps) {
+  if (steps >= 1 && tx * e.tx + ty * e.ty < -0.25) return true;
+  if (hold) return false;
+  for (let j = 0; j < S; j++) {
+    if ((pts[2 * j] - e.x) * e.tx + (pts[2 * j + 1] - e.y) * e.ty <= rad[j] + margin) return false;
+  }
+  return true;
+}
 // The section brush's stroke (tuft-section.mjs): a towed tuft on the CPU, one film law between it and the paper.
 // `speed` (mm/s) sets how long each cell is in contact; a point's own `v` overrides it.
-function sectionStroke(brush, sheet, path, { spacing = 0.7, between, lift = true, upright = false, speed, candidateMask = null, flowEvery = 0 } = {}) {
+function sectionStroke(brush, sheet, path, { spacing = 0.7, between, lift = true, upright = false, speed, candidateMask = null, candidateMark = null, flowEvery = 0 } = {}) {
   const countContact = candidateMask ? null : strokeContacts(sheet);
   const rec = candidateMask ? null : tapeStroke(brush, sheet, path, { spacing, lift, upright, speed });
   land(brush, path); path = varyPath(brush, path, sheet.paper, lift);
   // The stroke lays inside its planned ends: nothing behind the line across it where the brush lands, nothing past the
   // one where it lifts. Only near those ends, so a ring that comes back round past its start is not cut.
   const ends = [!brush._onPaper ? endLine(path, false) : null, lift !== false ? endLine(path, true) : null].filter(Boolean);
-  if (ends.length) { const near = 1.2 * path.reduce((m, q) => Math.max(m, q.r ?? brush.radius), 0) + 2 * edgeTooth(brush, sheet.paper) + 3; for (const e of ends) e.r2 = near * near; }
+  setEndGuards(ends, path, brush, sheet.paper, spacing);
+  let startEnd = ends[0] && !ends[0].atEnd ? ends[0] : null;
+  const liftEnd = ends.find(e => e.atEnd) ?? null;
   const { w, h, paper } = sheet, K = sheet.K, mmc = paper.mmPerCell > 0 ? paper.mmPerCell : REF_MM, S = TUFT.sections;
   const shape = tuftShape(brush.flat), lanes = brush.hairs.length, hairs = brush.hairs, v0 = speed ?? brush.speed ?? TUFT.speed;
   const g = mmc * mmc / kappaOf(brush, mmc), kF = feedRate(brush.feed), Hb = brush.depositDepth || TUFT.head * brush.wetness;
@@ -572,17 +635,37 @@ function sectionStroke(brush, sheet, path, { spacing = 0.7, between, lift = true
   if (rec) collectFlows(rec, () => steps);
   sheet.clock = sheet.clock ?? 0;
   sheet._contactBrush = brush;
-  const rad = new Float64Array(S), geom = { pts: null, S, rad, flat: brush.flat, bx: 1, by: 0, thick: 0, onBox: null };
+  const rad = new Float64Array(S), geom = { pts: null, S, rad, flat: brush.flat, bx: 1, by: 0, thick: 0, onBox: null, observedMask: candidateMask };
   // A footprint outside the fresh window reads, with it, where the hand goes next (flowEvery steps, the most a stroke lays
-  // before the sheet flows and the window goes stale; 48 when the stroke does not say), so a stroke reads about once a
-  // flow rather than at every step its tuft moves out of the window.
-  const ahead = lookaheadCount(flowEvery) || 48;
+  // before the sheet flows and the window goes stale; 256 when the stroke does not flow mid-stroke), so a stroke reads once
+  // per flow epoch rather than splitting into many sequential GPU waits.
+  const ahead = lookaheadCount(flowEvery) || 256;
+  const laReach = brush.flat ? 1.5 : Math.max(1.8, shape.length + 0.5);
+  const stripReach = brush.flat ? 1.5 : 2.1;
+  const stripFirst = brush.flat ? 1.5 : 3.2;
+  const laPad = Math.ceil(2 * ET + 4);
   if (sheet._cpuDemandWindow) geom.onBox = (x0, y0, x1, y1) => {
     const r = [x0, y0, x1 - x0 + 1, y1 - y0 + 1];
     if (sheet._cpuDemandWindow.covers(r)) return;
-    const la = ahead ? sectionContactLookahead(brush, path, { k, t, spacing, count: ahead, w, h }) : null;
+    if (sheet._cpuDemandWindow.sparse) {
+      const strip = ahead ? sectionContactLookaheadStrip(brush, path, { k, t, spacing, count: ahead, w, h, reach: stripReach, firstReach: stripFirst, pad: laPad }) : [];
+      strip.unshift(r);
+      sheet._cpuDemandWindow.preloadRects(strip);
+      return;
+    }
+    const la = ahead ? sectionContactLookahead(brush, path, { k, t, spacing, count: ahead, w, h, reach: laReach, pad: laPad }) : null;
     sheet._cpuDemandWindow.require(la ? unionRect(la, r) : r);
   };
+  const noise1 = vr ? sectionField(1046) : null, noise2 = vr ? sectionField(1058) : null;
+  let noiseInv1 = 0, noiseInv2 = 0;
+  if (vr) {
+    const demandBox = geom.onBox;
+    geom.onBox = (x0, y0, x1, y1) => {
+      demandBox?.(x0, y0, x1, y1);
+      noise1.prepare(x0, y0, x1, y1, noiseInv1);
+      noise2.prepare(x0, y0, x1, y1, noiseInv2);
+    };
+  }
   while (k < path.length) {
     const a = path[k - 1], b = path[k], seg = Math.hypot(b.x - a.x, b.y - a.y) || 1e-6;
     if (t > seg) { t -= seg; k++; continue; }
@@ -628,28 +711,46 @@ function sectionStroke(brush, sheet, path, { spacing = 0.7, between, lift = true
           else if (q < 0 && hr.water > 0) { const f = Math.min(1, -q / hr.water); for (let kk = 0; kk < K; kk++) { const m = hr.pig[kk] * f; hr.pig[kk] -= m; brush.resP[kk] += m; } brush.resW += hr.water * f; hr.water -= hr.water * f; }
           sat[j] = hr.water / (capL[j] || 1); hb[j] = headOf(sat[j], keep, Hb);
           const cl = brush.clumps[hr.clump], wander = cl && brush.streak ? 1 + brush.streak * (2 * along1(hr.clump + cl.lift * 7, brush.travel * mmc / (brush.streakLength * REF_MM)) - 1) : 1;
-          reach[j] = toothReach(hb[j], Hb, p, brush.bridge, wander) * relief;
+          reach[j] = toothReach(sat[j], p, brush.bridge, wander) * relief;
         }
       }
       const ka = TUFT.rate * brush.give / 0.9, half = brush.flat ? rad[0] : R, band = vr ? 0.1 * half + 2 * ET + 1 : 2 * ET + 1;
-      const l1 = Math.max(3, 0.8 * half), l2 = Math.max(8, 3 * half);
+      const l1 = Math.max(3, 0.8 * half), l2 = Math.max(8, 3 * half), invL1 = 1 / l1, invL2 = 1 / l2, invSoft = 1 / soft;
+      noiseInv1 = invL1; noiseInv2 = invL2;
+      const kadt = -ka * dt, flatAa = brush.flat ? 1 - Math.exp(kadt * (0.35 + 0.65 * Math.min(1, p))) : 0;
+      if (startEnd && startGuardCleared(startEnd, brush._chain, S, rad, band + 0.5, tx, ty, brush._hold, steps)) startEnd = null;
+      const e0 = startEnd;
+      const e1 = liftEnd && steps >= liftEnd.s0 && steps <= liftEnd.s1 ? liftEnd : null;
+      const nEnds = e0 || e1 ? 1 : 0;
+      const pHeight = paper.height, pTooth = paper.tooth, sheetW = sheet.W, lanesM1 = lanes - 1, halfVr = half * vr;
       footprint(geom, w, h, band, (i, d, across, x, y) => {
+        if (candidateMask && candidateMask[i]) return;
         if (d > band + 0.5) return;
         // the wet edge breathes at two scales, as fields over the paper, and follows the tooth
         if (d > -band - 0.5) {
-          if (vr) d -= half * vr * (0.05 * (2 * field2(1046, x / l1, y / l1) - 1) + 0.05 * (2 * field2(1058, x / l2, y / l2) - 1));
-          if (ET) d -= ET * Math.max(-2, Math.min(2, (paper.height[i] - 0.54) / 0.16));
+          if (vr) d -= halfVr * (0.05 * (2 * noise1.at(x * invL1, y * invL1) - 1) + 0.05 * (2 * noise2.at(x * invL2, y * invL2) - 1));
+          if (ET) { const hNorm = (pHeight[i] - 0.54) / 0.16; d -= ET * (hNorm < -2 ? -2 : hNorm > 2 ? 2 : hNorm); }
         }
-        let cov = Math.min(1, 0.5 - d);
-        for (const e of ends) { const ex = x + 0.5 - e.x, ey = y + 0.5 - e.y; if (ex * ex + ey * ey <= e.r2) cov = Math.min(cov, 0.5 + ex * e.tx + ey * e.ty); }
+        let cov = 0.5 - d; if (cov > 1) cov = 1;
+        if (nEnds) {
+          const px = x + 0.5, py = y + 0.5;
+          if (e0) { const ex = px - e0.x, ey = py - e0.y; if (ex * ex + ey * ey <= e0.r2) { const c0 = 0.5 + ex * e0.tx + ey * e0.ty; if (c0 < cov) cov = c0; } }
+          if (e1) { const ex = px - e1.x, ey = py - e1.y; if (ex * ex + ey * ey <= e1.r2) { const c1 = 0.5 + ex * e1.tx + ey * e1.ty; if (c1 < cov) cov = c1; } }
+        }
         if (cov <= 0) return;
         if (clip && !clip[i]) return;
-        if (candidateMask) { candidateMask[i] = 1; return; }
-        const j = Math.max(0, Math.min(lanes - 1, Math.round((across + 1) / 2 * (lanes - 1)))), hr = hairs[j];
-        const rel = tspan ? paper.height[i] - (tlo + tspan * paper.tooth[i]) : 0, tooth = smooth((rel + reach[j]) / soft + 0.5);
+        if (candidateMask) { if (candidateMark) candidateMark(i); else candidateMask[i] = 1; return; }
+        let j = Math.round((across + 1) * 0.5 * lanesM1); if (j < 0) j = 0; else if (j > lanesM1) j = lanesM1;
+        const hr = hairs[j];
+        // A free film on the paper can meet the tuft above a hollow that its bristles cannot reach. The first
+        // poreFilm is held in the tooth; only the liquid standing above it bridges the gap (mm to height units).
+        const wi = sheetW[i], filmReach = wi > TUFT.poreFilm ? (wi - TUFT.poreFilm) / SURFACE_MM : 0;
+        const rel = tspan ? pHeight[i] - (tlo + tspan * pTooth[i]) : 0, tooth = smooth((rel + reach[j] + filmReach) * invSoft + 0.5);
         const contact = cov * tooth; if (contact <= 0) return;
         // a round presses hardest along its spine, a flat evenly along its blade
-        const pl = brush.flat ? p : p * (0.6 + 0.4 * (1 - across * across)), aa = 1 - Math.exp(-ka * (0.35 + 0.65 * Math.min(1, pl)) * dt);
+        let aa;
+        if (brush.flat) aa = flatAa;
+        else { const pl = p * (0.6 + 0.4 * (1 - across * across)); aa = 1 - Math.exp(kadt * (0.35 + 0.65 * (pl < 1 ? pl : 1))); }
         countContact(i); markCpuStrokeCell(sheet, i);
         exchangeCell(sheet, i, hr, capL[j], keep * capL[j], aa, contact, hb[j], g, buf);
         // the lane's head follows what it gave or took
@@ -667,7 +768,7 @@ function sectionStroke(brush, sheet, path, { spacing = 0.7, between, lift = true
   sheet._contactBrush = null; sheet._lastPoint = path[path.length - 1];
   return brush.hairs.reduce((s2, hr) => s2 + hr.water, 0) + brush.resW;
 }
-function strokeImpl(brush, sheet, path, { spacing = 0.7, between, lift = true, upright = false, flowEvery = 0, candidateMask = null } = {}) {
+function strokeImpl(brush, sheet, path, { spacing = 0.7, between, lift = true, upright = false, flowEvery = 0, candidateMask = null, candidateMark = null } = {}) {
   if (brush.model === 'section') return sectionStroke(brush, sheet, path, arguments[3] ?? {});
   const countContact = candidateMask ? null : strokeContacts(sheet);
   const rec = candidateMask ? null : tapeStroke(brush, sheet, path, { spacing, lift, upright });
@@ -792,7 +893,7 @@ function strokeImpl(brush, sheet, path, { spacing = 0.7, between, lift = true, u
         if (tuft && Math.abs(along-offset)>alongLimit) continue;
         if (tuft && liquidShare<=0) stamp[yy*w+xx]=clk;
         if (candidateMask) {
-          if (q.p>0 && (brush.flat || q.p*(.6+.4*hr.len)>=.18+.5*(1-hr.len))) candidateMask[yy*w+xx]=1;
+          if (q.p>0 && (brush.flat || q.p*(.6+.4*hr.len)>=.18+.5*(1-hr.len))) { if (candidateMark) candidateMark(yy*w+xx); else candidateMask[yy*w+xx]=1; }
           continue;
         }
         // metered tips refill from the belly's finite mass at contact
@@ -914,6 +1015,138 @@ function strokeImpl(brush, sheet, path, { spacing = 0.7, between, lift = true, u
   return brush.hairs.reduce((s2, hr) => s2 + hr.water, 0) + brush.resW;
 }
 
+// The section brush's GPU stroke: plans compact per-step tuft geometry on CPU (zero per-cell CPU work)
+// and executes capillary feed, SDF footprint, edge breathing/tooth and per-lane exchange on Metal WebGPU.
+function sectionStrokeGpu(brush, sheet, path, { spacing = 0.7, between, lift = true, upright = false, speed, _wetCells = null } = {}) {
+  const link = sheet._gpu;
+  const rec = tapeStroke(brush, sheet, path, { spacing, lift, upright, speed });
+  land(brush, path); path = varyPath(brush, path, sheet.paper, lift);
+  const ends = [!brush._onPaper ? endLine(path, false) : null, lift !== false ? endLine(path, true) : null].filter(Boolean);
+  setEndGuards(ends, path, brush, sheet.paper, spacing);
+  let startEnd = ends[0] && !ends[0].atEnd ? ends[0] : null, startLast = -1;
+  const { w, h, paper } = sheet, K = sheet.K, mmc = paper.mmPerCell > 0 ? paper.mmPerCell : REF_MM, S = TUFT.sections;
+  const shape = tuftShape(brush.flat), lanes = brush.hairs.length, nClumps = brush.clumps.length;
+  const v0 = speed ?? brush.speed ?? TUFT.speed;
+  const g = mmc * mmc / kappaOf(brush, mmc), kF = feedRate(brush.feed), Hb = brush.depositDepth || TUFT.head * brush.wetness;
+  const keep = TUFT.keep * brush.free;
+  const [tlo, tspan] = paper.toothSpan > 0 ? [paper.toothLo, paper.toothSpan] : [0, 0];
+  const relief = paper.relief ?? 0.2, soft = Math.hypot(Math.max(0.05, brush.bridgeSoft) * relief, 2.5 * (paper.subRelief ?? 0));
+  const ET = edgeTooth(brush, paper), vr = varietyOf(brush);
+  const capB = brush._capB ?? brush.capacity * lanes * brush.belly;
+  const ka = TUFT.rate * brush.give / 0.9;
+  let hx = 0, hy = 1;
+  if (upright === 'sweep' && path.length > 1) {
+    const ex = path[path.length - 1].x - path[0].x, ey = path[path.length - 1].y - path[0].y, em = Math.hypot(ex, ey);
+    if (em > 1e-6) { hx = ex / em; hy = ey / em; }
+  }
+  if (!brush._onPaper) { brush._chain = null; brush._blade = null; brush._seg = 0; brush._hold = true; }
+  let t = brush.carry, k = 1, steps = 0;
+  if (rec) collectFlows(rec, () => steps);
+  sheet.clock = sheet.clock ?? 0;
+  sheet._contactBrush = brush;
+  const plan = link.beginSectionPlan(sheet, brush, { K, lanes, nClumps, capB, keep, Hb, g, kF, ka, relief, soft, tlo, tspan, ET, vr, ends, wetCells: _wetCells });
+  const rad = new Float64Array(S);
+  const travelScale = mmc / (brush.streakLength * REF_MM);
+  while (k < path.length) {
+    const a = path[k - 1], b = path[k], seg = Math.hypot(b.x - a.x, b.y - a.y) || 1e-6;
+    if (t > seg) { t -= seg; k++; continue; }
+    const u = t / seg, p = (a.p ?? 1) + ((b.p ?? 1) - (a.p ?? 1)) * u, qx = a.x + (b.x - a.x) * u, qy = a.y + (b.y - a.y) * u;
+    const tx = (b.x - a.x) / seg, ty = (b.y - a.y) / seg, R = a.r === undefined ? brush.radius : a.r + ((b.r ?? a.r) - a.r) * u;
+    const vel = (a.v ?? v0) + ((b.v ?? a.v ?? v0) - (a.v ?? v0)) * u, dt = spacing * mmc / Math.max(1e-3, vel);
+    const o = plan.step(), F = plan.F, U = plan.U;
+    F[o + 18] = p; F[o + 19] = dt; U[o + 27] = 0;
+    if (p < 0.02 || !(R > 0)) {
+      brush._chain = null; brush._seg = 0; brush._hold = true;
+      U[o + 28] = 0xFFFFFFFF;
+    } else {
+      const c = contactShare(shape, p), segLen = c * shape.length * R / (S - 1);
+      const tipX = brush._chain?.[2 * S - 2], tipY = brush._chain?.[2 * S - 1];
+      brush._chain = moveChain(brush._chain, S, qx, qy, segLen, brush._seg ?? 0, -tx, -ty, brush._hold); brush._seg = segLen;
+      if (brush._hold && tipX !== undefined && (brush._chain[2 * S - 2] !== tipX || brush._chain[2 * S - 1] !== tipY)) brush._hold = false;
+      let bx = 1, by = 0, thick = 0;
+      if (brush.flat) {
+        const a0 = R * (0.9 + 0.1 * p) * Math.sqrt(Math.min(1, p / 0.05));
+        rad.fill(a0); thick = Math.max(0.5, shape.thick * R);
+        const bladeDeg = a.blade === undefined ? brush.bladeAngle : a.blade + ((b.blade ?? a.blade) - a.blade) * u;
+        const [fx, fy] = upright ? [hx, hy] : [tx, ty], ang = bladeDeg * Math.PI / 180;
+        let gx = fx * Math.cos(ang) - fy * Math.sin(ang), gy = fx * Math.sin(ang) + fy * Math.cos(ang);
+        const bl = brush._blade;
+        if (bl && gx * bl[0] + gy * bl[1] < 0) { gx = -gx; gy = -gy; }
+        if (!bl || upright) brush._blade = [gx, gy];
+        else { const e = 1 - Math.exp(-spacing / Math.max(spacing, R)); let nx = bl[0] + (gx - bl[0]) * e, ny = bl[1] + (gy - bl[1]) * e; const m = Math.hypot(nx, ny) || 1; brush._blade = [nx / m, ny / m]; }
+        [bx, by] = brush._blade;
+      } else {
+        let cr = c;
+        if (brush._hold) { let lying = 0; for (let j = 1; j < S; j++) lying += brush._chain[2 * S + j - 1]; cr = Math.min(c, lying / Math.max(1e-9, shape.length * R)); }
+        for (let j = 0; j < S; j++) rad[j] = R * roundProfile(1 - cr + cr * j / (S - 1), shape.belly) * (1 + 0.15 * Math.max(0, p - 1));
+      }
+      const pts = brush._chain, half = brush.flat ? rad[0] : R, band = vr ? 0.1 * half + 2 * ET + 1 : 2 * ET + 1;
+      if (startEnd) {
+        if (startGuardCleared(startEnd, pts, S, rad, band + 0.5, tx, ty, brush._hold, steps)) startEnd = null;
+        else startLast = steps;
+      }
+      const l1 = Math.max(3, 0.8 * half), l2 = Math.max(8, 3 * half);
+      const edgeLim = 0.5 + 0.1 * half * vr + 2 * ET + 0.5;
+      let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+      if (brush.flat) {
+        const ax = Math.abs(bx) * rad[0] + Math.abs(by) * thick + edgeLim;
+        const ay = Math.abs(by) * rad[0] + Math.abs(bx) * thick + edgeLim;
+        for (let j = 0; j < S; j++) {
+          const px = pts[2 * j], py = pts[2 * j + 1];
+          F[o + 2 * j] = px; F[o + 2 * j + 1] = py; F[o + 12 + j] = rad[j];
+          if (px - ax < x0) x0 = px - ax; if (px + ax > x1) x1 = px + ax;
+          if (py - ay < y0) y0 = py - ay; if (py + ay > y1) y1 = py + ay;
+        }
+      } else {
+        for (let j = 0; j < S; j++) {
+          const px = pts[2 * j], py = pts[2 * j + 1], rj = rad[j] + edgeLim;
+          F[o + 2 * j] = px; F[o + 2 * j + 1] = py; F[o + 12 + j] = rad[j];
+          if (px - rj < x0) x0 = px - rj; if (px + rj > x1) x1 = px + rj;
+          if (py - rj < y0) y0 = py - rj; if (py + rj > y1) y1 = py + rj;
+        }
+      }
+      F[o + 20] = half; F[o + 21] = band; F[o + 22] = l1; F[o + 23] = l2;
+      F[o + 24] = bx; F[o + 25] = by; F[o + 26] = thick;
+      const X0 = Math.max(0, Math.floor(x0)), X1 = Math.min(w - 1, Math.ceil(x1));
+      const Y0 = Math.max(0, Math.floor(y0)), Y1 = Math.min(h - 1, Math.ceil(y1));
+      if (X1 < X0 || Y1 < Y0) {
+        U[o + 28] = 0xFFFFFFFE;
+      } else {
+        U[o + 28] = X0; U[o + 29] = Y0; U[o + 30] = X1; U[o + 31] = Y1;
+        if (X0 < plan.x0) plan.x0 = X0; if (Y0 < plan.y0) plan.y0 = Y0;
+        if (X1 > plan.x1) plan.x1 = X1; if (Y1 > plan.y1) plan.y1 = Y1;
+      }
+      const tv = brush.travel * travelScale;
+      for (let ci = 0; ci < nClumps; ci++) {
+        const cl = brush.clumps[ci];
+        F[o + 32 + ci] = cl && brush.streak ? 1 + brush.streak * (2 * along1(ci + cl.lift * 7, tv) - 1) : 1;
+      }
+    }
+    steps++;
+    if (between) {
+      if (!plan.wetRecorded && plan.x1 >= plan.x0) recordWetBox(sheet, plan.x0, plan.y0, plan.x1, plan.y1, 0);
+      link.planning = plan; try { between(steps); } finally { link.planning = null; }
+    }
+    t += spacing; brush.travel += spacing; sheet.clock++;
+  }
+  brush.carry = t;
+  if (ends[0] && !ends[0].atEnd) plan.F[47] = startLast;
+  if (rec) collectFlows(null, null);
+  if (!lift) { brush._onPaper = true; link.endSectionPlan(sheet, brush, plan, strokeRect(brush, sheet, path)); return undefined; }
+  brush.carry = 0; nextStroke(brush); brush._chain = null; brush._blade = null; brush._seg = 0;
+  sheet._contactBrush = null; sheet._lastPoint = path[path.length - 1];
+  link.endSectionPlan(sheet, brush, plan, strokeRect(brush, sheet, path));
+  return undefined;
+}
+function sectionPlanFits(brush, sheet, path, spacing, limit = 3900000) {
+  let len = 0;
+  for (let i = 1; i < path.length; i++) len += Math.hypot(path[i].x - path[i - 1].x, path[i].y - path[i - 1].y);
+  const s0 = 64 + (brush.hairs.length + 1) * (4 + sheet.K);
+  const sp = 32 + brush.clumps.length;
+  const estSteps = Math.ceil(len / Math.max(1e-6, spacing)) + path.length + 4;
+  const clipWords = sheet.clip ? Math.ceil(sheet.n / 32) : 0;
+  return s0 + estSteps * sp + clipWords < limit;
+}
 // The strokeImpl stroke with cell work on the GPU (gpu/stepfull.wgsl, stroke_run). Geometry and cell selection are
 // planned here in the same double arithmetic as strokeImpl, so edge cells go the same way as on the CPU.
 function strokeGpu(brush, sheet, path, { spacing = 0.7, between, lift = true, upright = false } = {}, observational = false) {
@@ -1037,7 +1270,7 @@ function planFits(brush, path, spacing,limit=3900000) {
   return (len / spacing + 2) * perStep + 400 + (brush.hairs.length + 2) * (4 + (brush.K || 16)) + 3 * (4 * rmax + 20) ** 2 < limit;
 }
 
-/** Reusable ROW observation buffers. A result using this workspace is valid until
+/** Reusable observation buffers. A result using this workspace is valid until
  * the next prediction using it. Live sheet arrays are never used as scratch. */
 export class ContactWorkspace {
   prepare(n, w = 0, h = 0) {
@@ -1092,29 +1325,38 @@ export function candidateContact(brush, sheet, path, { spacing = 0.7, lift = tru
   if (![brush.radius, brush.splay, brush.carry, brush.travel].every(Number.isFinite) || brush.radius < 0 || brush.carry < 0) throw new Error('candidate contact instrument geometry must be finite and valid');
   for (let k = 1; k < path.length; k++) if (!Number.isFinite(Math.hypot(path[k].x - path[k - 1].x, path[k].y - path[k - 1].y))) throw new Error('candidate contact path segment must be finite');
   const tuft = brush.model === 'tuft' || brush.model === 'section', sw = sheet.w, sh = sheet.h;
-  const n = sw * sh, work = !tuft && workspace instanceof ContactWorkspace ? workspace.prepare(n, sw, sh) : null;
+  const n = sw * sh, work = workspace instanceof ContactWorkspace ? workspace.prepare(n, sw, sh) : null;
   const mask = work?.mask ?? new Uint8Array(n), copy = tuft ? { ...brush, tip:brush.tip?{...brush.tip}:null, _chain:brush._chain?.slice()??null, _blade:brush._blade?.slice()??null, hairs:brush.hairs.map(hr=>({...hr,pig:hr.pig?.slice()})), resP:brush.resP?.slice() } : { ...brush, tip:null };
   const sparse = sparseRow === true && !tuft, emitted = sparse ? [] : null;
   const rLo = work?.rowLo ?? null, rHi = work?.rowHi ?? null, nrLo = work?.nrowLo ?? null, nrHi = work?.nrowHi ?? null;
   // row-major index range of the set cells, so dense passes scan only that range
   let lo = n, hi = -1, primaryCount = 0, neighborCount = 0;
+  const markPrimary = i => {
+    if (!mask[i]) {
+      if (sparse) emitted.push(i);
+      primaryCount++;
+      if (i < lo) lo = i; if (i > hi) hi = i;
+      if (rLo) { const y = (i / sw) | 0, x = i - y * sw; if (x < rLo[y]) rLo[y] = x; if (x > rHi[y]) rHi[y] = x; }
+      mask[i] = 1;
+    }
+  };
   const link = {
-    beginPlan() { return { emit(indices, lanes, across, count) { for (let j = 0; j < count; j++) { const i=indices[j]; if(!mask[i]){if(sparse)emitted.push(i);primaryCount++;if(i<lo)lo=i;if(i>hi)hi=i;if(rLo){const y=(i/sw)|0,x=i-y*sw;if(x<rLo[y])rLo[y]=x;if(x>rHi[y])rHi[y]=x;}} mask[i]=1; } return 0; } }; },
+    beginPlan() { return { emit(indices, lanes, across, count) { for (let j = 0; j < count; j++) markPrimary(indices[j]); return 0; } }; },
     endPlan() {},
   };
   const scratch = { w: sw, h: sh, K: sheet.K, paper: sheet.paper, clip, _gpu: link, clock: sheet.clock,
-    touched: sheet.touched ? work?.touched ?? sheet.touched.slice() : undefined,
+    touched: sheet.touched ? (tuft ? (brush.model === 'section' && !includeTouched ? undefined : sheet.touched.slice()) : work?.touched ?? sheet.touched.slice()) : undefined,
     _observedMask: !includeTouched && !tuft ? mask : null,
-    _contactSnapshot: work && sheet.touched ? { work, source: sheet.touched, recordReads: includeTouched } : null,
-    contactStrength:tuft ? sheet.contactStrength?.slice() : undefined,
+    _contactSnapshot: work && !tuft && sheet.touched ? { work, source: sheet.touched, recordReads: includeTouched } : null,
+    contactStrength:brush.model === 'tuft' ? sheet.contactStrength?.slice() : undefined,
     _contactBrush: sheet._contactBrush === brush ? copy : null };
   // an undipped tuft is treated as full, the widest footprint
   if (tuft && !brush.K) for (const hr of copy.hairs) hr.water=brush.capacity*hr.len;
   if (path.length > 1) {
-    if (tuft) strokeImpl(copy,scratch,path,{spacing,lift,upright,candidateMask:mask});
+    if (tuft) strokeImpl(copy,scratch,path,{spacing,lift,upright,candidateMask:mask,candidateMark:work ? markPrimary : null});
     else strokeGpu(copy,scratch,path,{spacing,lift,upright},true);
   }
-  if (tuft) { lo = 0; hi = n - 1; } // strokeImpl writes the mask directly
+  if (tuft && !work) { lo = 0; hi = n - 1; } // the independent prediction writes the mask directly
   const primaryMask = work?.primaryMask ?? mask.slice(), liftMask = work?.liftMask ?? new Uint8Array(n), sparseCells = sparse ? emitted.slice() : null, sparseNeighbors = sparse ? [] : null;
   if (work && hi >= lo) {
     for (let y = (lo / sw) | 0, yEnd = (hi / sw) | 0; y <= yEnd; y++) {
@@ -1208,6 +1450,6 @@ export function candidateContact(brush, sheet, path, { spacing = 0.7, lift = tru
   const source = 'brush-primary-contact-v1:' + JSON.stringify({ model:brush.model??'row', lag:brush.lag??.6, flat: !!brush.flat, radius: brush.radius, splay: brush.splay, spacing, upright, lift, neighborRadius, ...(varietyOf(brush) ? { variety: varietyOf(brush) } : {}) });
   return { kind: 'instrument-candidate-contact', source, cells: indices, mask, primaryMask, liftMask, neighbors, neighborIndices,
     contact: { kind: 'instrument-candidate-contact', source, cells: indices },
-    cellCount: indices.length, primaryCellCount: sparse ? emitted.length : tuft ? primaryMask.reduce((sum, value) => sum + value, 0) : primaryCount, liftCellCount: liftCount, neighborCells: sparse ? sparseNeighbors.length : neighborCount,
+    cellCount: indices.length, primaryCellCount: sparse ? emitted.length : tuft && !work ? primaryMask.reduce((sum, value) => sum + value, 0) : primaryCount, liftCellCount: liftCount, neighborCells: sparse ? sparseNeighbors.length : neighborCount,
     continuation: { carry: copy.carry, travel: copy.travel, clock: scratch.clock, touched } };
 }

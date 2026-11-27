@@ -1,4 +1,5 @@
 // Generated from src/media/sheet.mjs by tools/lab/sync-site-media.mjs. Edit the source.
+import { grainSlide, grainMobility, grainDrag } from './grain-water.js';
 import { slideRate, reposeStep } from './grain-field.js';
 import { certifyDryFixed, validDryFixedCertificate, invalidatePaperCertificate, recordWetCell, recordWetCells, recordWetStep, syncWetReachVersion } from './paper-certificate.js';
 import { censusDry } from './census.js';
@@ -8,7 +9,7 @@ import { levelFilm } from './film-level.js';
 import { backRun } from './backrun.js';
 export { setTilt } from './film-level.js';
 import { flowTime, poreTime } from './flow-time.js';
-import { timeChunks, DRY_TAIL_CHUNK_DT, levelEvery } from './time-chunks.js';
+import { timeChunks, DRY_TAIL_CHUNK_DT, levelEvery, thinDryWarmup, fastLevelPlan, planStepAt } from './time-chunks.js';
 import { settleSpeed, settleDiffusion, settleShare } from './settling.js';
 // Pipeline: painting, stage 4 (the sheet physics).
 // A sheet of paper with water and pigment on it and in it. The model's structure is based on Computer-Generated Watercolor,
@@ -45,8 +46,9 @@ export const DEFAULTS = {
   // levelFloor (mm): a film no deeper than this has lost its sheen; it is damp paint held in the tooth and does not level.
   // At 0.03 (the film the pores leave) half of a just-damp wash still levelled, and a puddle dropped on it spread out
   // through that half before it could run
-  // (film-level.mjs). Water standing deeper than `puddle` beside damp paint invades it at about `invade` mm/s and pushes
-  // `push` of the loose paint it meets on to its front: a back-run (backrun.mjs). At levelFloor 0 every film levelled, a
+  // (film-level.mjs). Water standing deeper than `puddle` invades the exposed tooth beside it at about `invade` mm/s,
+  // scaled by its unfilled fraction up to that puddle depth, and pushes `push` of the loose paint it meets on to its
+  // front: a back-run (backrun.mjs). Shine-off is not a binary wetting switch. At levelFloor 0 every film levelled, a
   // puddle of clean water spread through the whole damp wash in moments and no back-run ever formed (physics check, 24
   // Nov). With the puddle at the floor, a flat phthalo wash on flat paper dried mottled as it thinned (grain 0.058 where
   // it was 0.008): a film a hair above the floor is not a puddle.
@@ -256,7 +258,16 @@ export function liftResist(sheet, { byPlane = false } = {}) {
     }
     // Plane order preserves repeated writes through identical plane views.
     // Cache the layers getter once and walk adjacent masked cells per plane.
+    const zero = sheet._zeroLayer;
+    let skipZero = zero instanceof Float32Array && planes.includes(zero);
+    if (skipZero) {
+      const bits = new Uint32Array(zero.buffer, zero.byteOffset, zero.length);
+      for (let i = 0; i < bits.length; i++) if (bits[i]) { skipZero = false; break; }
+      // Zero times an infinite multiplier is NaN and must still be evaluated.
+      for (let j = 0; skipZero && j < keep.length; j++) if (!Number.isFinite(keep[j])) skipZero = false;
+    }
     for (const plane of planes) {
+      if (skipZero && plane === zero) continue;
       for (let j = 0; j < hard.length; j++) plane[hard[j]] = 0;
       for (let j = 0; j < partial.length; j++) plane[partial[j]] *= keep[j];
     }
@@ -275,17 +286,24 @@ export function liftResist(sheet, { byPlane = false } = {}) {
 /** Blot the surface film through a binary mask. Pore water and settled pigment remain.
  * Dry cells and cells with only pore moisture release nothing.
  * Returns removed {water, pigment} for inventory accounting. */
-export function blot(sheet, mask, { strength = 0.85, pigmentShare = 0.9 } = {}) {
-  if (!mask || mask.length !== sheet.n) throw new RangeError(`blot needs a mask of the sheet's ${sheet.n} cells`);
+export function blot(sheet, mask, { strength = 0.85, pigmentShare = 0.9, rect = null } = {}) {
+  if (rect && (rect.length !== 4 || !rect.every(Number.isInteger) || rect[0] < 0 || rect[1] < 0 || rect[2] < 0 || rect[3] < 0 || rect[0]+rect[2] > sheet.w || rect[1]+rect[3] > sheet.h)) throw new RangeError('blot rect must lie inside the sheet');
+  if (!mask || mask.length !== (rect ? rect[2] * rect[3] : sheet.n)) throw new RangeError(`blot needs a mask of the sheet's ${sheet.n} cells`);
   if (!Number.isFinite(strength) || strength < 0 || strength > 1) throw new RangeError('blot strength must be between 0 and 1');
   if (!Number.isFinite(pigmentShare) || pigmentShare < 0 || pigmentShare > 1) throw new RangeError('blot pigmentShare must be between 0 and 1');
   // a blot is a call, like a resist: a replay without it keeps the water and the pigment the tissue took away
-  if (TAPE && sheet._tape) TAPE.push({ k: 'b', m: Array.from(mask), s: strength, p: pigmentShare });
+  if (TAPE && sheet._tape) {
+    const full = rect ? new Uint8Array(sheet.n) : mask;
+    if (rect) for (let y=0;y<rect[3];y++) full.set(mask.slice(y*rect[2],(y+1)*rect[2]),(rect[1]+y)*sheet.w+rect[0]);
+    TAPE.push({ k: 'b', m: Array.from(full), s: strength, p: pigmentShare });
+  }
   coherent(sheet);
   const { W, M, G, K, n } = sheet, film = DEFAULTS.film, pigment = new Array(K).fill(0);
   let water = 0;
-  for (let i = 0; i < n; i++) {
-    if (!mask[i] || !M[i] || W[i] < film) continue;   // no film under the tissue
+  const count = rect ? rect[2] * rect[3] : n;
+  for (let j = 0; j < count; j++) {
+    const i = rect ? (rect[1] + Math.floor(j / rect[2])) * sheet.w + rect[0] + j % rect[2] : j;
+    if (!mask[j] || !M[i] || W[i] < film) continue;   // no film under the tissue
     const dw = W[i] * strength; W[i] -= dw; water += dw;
     for (let k = 0; k < K; k++) { const Gk = G[k], q = Gk[i] * pigmentShare; Gk[i] -= q; pigment[k] += q; }
   }
@@ -491,13 +509,10 @@ function scratch(sheet) {
   sheet.scratch = { n, K, fx: f(), fy: f(), out: f(), C: f(), wsc: f(), dW: f(), went: f(), qx: per(), qy: per(), pout: per(), dG: per(), sNext: f(), PNext: per(), dDep: per(), dSlide: per(), dep: f(), ex: new Float32Array(4), mobility: new Float32Array(K), fl: new Float32Array(K), rhoOf: new Float64Array(K), vOf: new Float64Array(K), dfOf: new Float64Array(K), omegaOf: new Float64Array(K), gammaOf: new Float64Array(K), dra: new Int32Array((n >> 1) + h + 8), drb: new Int32Array((n >> 1) + h + 8), drow: new Int32Array(h + 2), pxa: new Int32Array((n >> 1) + h + 8), pxb: new Int32Array((n >> 1) + h + 8), prow: new Int32Array(h + 2), tmA: new Int32Array(3 * (sheet.w >> 1) + 16), tmB: new Int32Array(3 * (sheet.w >> 1) + 16), dlo: I32(h), dhi: I32(h), plo: I32(h), phi: I32(h), rlo: I32(h), rhi: I32(h), wlo: I32(h), whi: I32(h), wl: I32(n), wrow: I32(h + 1), wf: U8(n), act: new Int32Array(K), act3: new Int32Array(K), ggOf: new Float64Array(K), liftOf: new Float64Array(K), scourOf: new Float64Array(K), repOf: new Float64Array(K), surf: [], surfOf: new Int32Array(2 * K), pact: new Int32Array(K), moved: new Uint8Array(K), newly: [], drying: [] };
   return sheet.scratch;
 }
-const hashCell = (i, k) => { const v = Math.sin(i * 12.9898 + k * 78.233) * 43758.5453; return v - Math.floor(v); };
-// The pinning throat of each cell, hashCell(j, 0) - 0.5, depends on the cell's index alone, so it is worked out once
-// for the largest sheet seen and looked up.
-let THROATS = new Float64Array(0);
-function throatTable(n) {
-  if (THROATS.length < n) { const t = new Float64Array(n); for (let j = 0; j < n; j++) t[j] = hashCell(j, 0) - 0.5; THROATS = t; }
-  return THROATS;
+// The pinning throat of each cell comes from the paper: the fibre and relief a wet front meets there (fibre-throat.mjs).
+function throatsOf(paper) {
+  if (!paper.throat || paper.throat.length !== paper.w * paper.h) throw new Error('sheet: the paper has no throat (make it with makePaper or scanPaper)');
+  return paper.throat;
 }
 
 // Permeability of each face between cells, towards +x and +y: water on damp paper runs along the fibres and is held up
@@ -632,6 +647,9 @@ function stepCpu(sheet, o, reduction) {
   const pores = poreTime(sheet, o);
   const boxes = wetBoxes(sheet, Math.max(2, pores.iters)); if (!boxes.length) return false;
   if (o.dt === 0) return true;
+  // Start a ledger only for a step that executes: dry() does not call its observer after an empty final step.
+  if (sheet._flux) sheet._flux.begin(o.dt);
+  if (sheet._flux?.film) sheet._flux.film.recorded = true;
   if (reduction) { reduction.maxW = 0; reduction.surfaceLevel = 0; }
   // the pinned edges dry faster, fed by the flow from behind them (edge-feed.mjs); the box steps then dry evenly
   const mm = sheetMm(sheet, o);
@@ -649,7 +667,7 @@ function stepCpu(sheet, o, reduction) {
   const oOf = box => { const f = slideFillFor(sheet, o, box); return f === undefined ? oBox0 : { ...oBox0, slideFillNow: f }; };
   const merge = value => { if (reduction) { reduction.maxW = Math.max(reduction.maxW, value.maxW); reduction.surfaceLevel = Math.max(reduction.surfaceLevel, value.surfaceLevel); } };
   if (PAR) {
-    const H = { scratch: scratch(sheet), perm: permeability(sheet.paper), throats: throatTable(sheet.n) };
+    const H = { scratch: scratch(sheet), perm: permeability(sheet.paper), throats: throatsOf(sheet.paper) };
     for (const box of boxes) {
       const before = boxWater(sheet, box), oBox = oOf(box);
       if (PAR.stepBox(sheet, oBox, box, H)) { sheet.evaporated = (sheet.evaporated ?? 0) + before - boxWater(sheet, box); if (reduction) merge(boxDryStats(sheet, box, oBox.slope ?? 0)); }
@@ -683,7 +701,7 @@ function boxWater(sheet, [x0, y0, x1, y1]) {
 function stepBox(sheet, o, box, reduce = false) {
   const [x0, y0, x1, y1] = box, { w, h, W, s, M, G, D, P, K, paper, pigments, edge, resist, ever } = sheet, { capacity, fdx, fdy, grain } = paper, height = paper.surface || paper.valley || paper.height, dt = o.dt ?? 1;
   // fine pigment (dyes, small particles) travels with water into and through the fibres; coarse, granulating pigment stays on top
-  const sc = scratch(sheet), { mobility } = sc;
+  const sc = scratch(sheet), { mobility } = sc, FL = sheet._flux ?? null;
   for (let k = 0; k < K; k++) mobility[k] = pigments[k].wick ?? Math.max(0.05, Math.min(0.9, 1 - pigments[k].gamma));
 
   // distance to the pinned boundary, in cells, capped at edgeWidth + 1. The wash is pinned where it met dry paper; a gap
@@ -769,15 +787,18 @@ function stepBox(sheet, o, box, reduce = false) {
   // 1. drying, faster at the pinned boundary; absorption into the pores without tearing the film
   const evap = o.evap, absorb = o.absorb, oFilm = o.film;
 
+  FL?.film?.begin(box, true);
   for (let q = 0; q < nw; q++) {
     const i = wl[q];
     const evaporation = Math.min(W[i], dt * evap);
     const beforeEvap = W[i]; W[i] -= evaporation;
     sheet.evaporated = (sheet.evaporated ?? 0) + beforeEvap - W[i];
     const a = Math.min(dt * absorb, Math.max(0, capacity[i] - s[i]), Math.max(0, W[i] - oFilm));
+    if (a > 0 && FL) FL.aw[i] = a / W[i];
     if (a > 0) { const aw = a / W[i]; for (let n = 0; n < nA; n++) { const k = act[n], Gk = G[k], g = Gk[i] * aw * mobility[k]; Gk[i] -= g; P[k][i] += g; } }
     s[i] += a; W[i] -= a; sheet.absorbed = (sheet.absorbed ?? 0) + a;
   }
+  FL?.film?.end();
 
   // 2. water levels out and carries pigment; pigment also diffuses; all outflows share each cell's budget. A thin film
   //    barely flows (its conductance falls with the square of its depth), so a wash that has thinned dries where it is
@@ -804,6 +825,7 @@ function stepBox(sheet, o, box, reduce = false) {
   if (!(iters > 0)) for (let q = 0; q < nw; q++) went[wl[q]] = 0;
   const waterBefore = sc.waterBefore ??= new Float32Array(sheet.n);
   for (let it = 0; it < iters; it++) {
+    FL?.film?.begin(box);
     // both sides of every face: a face's far cell may be dry paper outside the wet list, and an unwritten entry there
     // held the water of some earlier step (so a painting taken over by a fresh process did not end the same)
     for (let q = 0; q < nw; q++) { const i = wl[q], fl = wf[q]; waterBefore[i] = W[i]; if (fl & 1) waterBefore[i + 1] = W[i + 1]; if (fl & 2) waterBefore[i + w] = W[i + w]; }
@@ -842,6 +864,7 @@ function stepBox(sheet, o, box, reduce = false) {
         const f = dir === 0 ? fx[i] : fy[i], Q = dir === 0 ? QX : QY;
         const sgn = f > 0 ? 1 : f < 0 ? -1 : 0, amt = f === 0 ? 0 : (f > 0 ? f : -f) * wsc[f > 0 ? i : j];
         dw = Math.fround(dw - sgn * amt); dW[j] += sgn * amt;
+        if (FL && amt) { (dir === 0 ? FL.fx : FL.fy)[i] += sgn * amt; FL.film?.face(i, dir, sgn * amt); }
         const wi = waterBefore[i], wj = waterBefore[j], mw = wi < wj ? wi : wj;
         const mi = wi / cd, mj = wj / cd, carryI = mi >= 1 ? 1 : mi * mi, carryJ = mj >= 1 ? 1 : mj * mj, carryM = carryI < carryJ ? carryI : carryJ;
         for (let n = 0; n < nA; n++) {
@@ -855,6 +878,7 @@ function stepBox(sheet, o, box, reduce = false) {
       const v = .5 * ((right ? Math.abs(right) * wsc[right > 0 ? i : i + 1] : 0) + (down ? Math.abs(down) * wsc[down > 0 ? i : i + w] : 0) + (left ? Math.abs(left) * wsc[left > 0 ? i - 1 : i] : 0) + (up ? Math.abs(up) * wsc[up > 0 ? i - w : i] : 0));
       went[i] = it === 0 ? v : went[i] + v;
     }
+    FL?.film?.end();
     for (let n = 0; n < nA; n++) {
       const k = act[n], Gk = G[k], po = POUT[k], qx = QX[k], qy = QY[k], dG = DG[k];
       // The donor's share of its own budget is worked out at the face that spends it, since only the wet faces ever
@@ -881,7 +905,7 @@ function stepBox(sheet, o, box, reduce = false) {
   for (let k = 0; k < K; k++) { rhoOf[k] = pigments[k].rho; omegaOf[k] = pigments[k].omega; gammaOf[k] = pigments[k].gamma; vOf[k] = settleSpeed(pigments[k]); dfOf[k] = settleDiffusion(pigments[k]); }
   const hollow = paper.hollow;
   if (!hollow) throw new Error('sheet: the paper has no hollow field (make it with makePaper or scanPaper)');
-  const gran = o.gran ?? 1, liftDepth = o.liftDepth ?? 0.15, scour = o.scour ?? 0, holdCap = o.hold ?? Infinity, holdDepth = o.holdDepth ?? oFilm, coSettle = o.coSettle ?? 0;
+  const gran = o.gran ?? 1, liftDepth = o.liftDepth ?? 0.15, scour = o.scour ?? 0, holdCap = o.hold ?? Infinity, holdDepth = Math.fround(o.holdDepth ?? oFilm), coSettle = o.coSettle ?? 0;
   const settle = o.settle, lift = o.lift, looseLift = o.looseLift, rewetLift = o.rewetLift;
   // how much deposit fills a hollow: 0 keeps a fixed bias towards hollows
   const granFill = o.granFill ?? 0;
@@ -913,6 +937,7 @@ function stepBox(sheet, o, box, reduce = false) {
     if (resist !== null && resist[i]) continue;
     const Wi = W[i], hh = height[i], ld = Wi / liftDepth, wetting = ld >= 1 ? 1 : ld * ld; // settled pigment lifts only into water deep enough to hold it
     const rewet = topLayer !== null && Wi > oFilm, turnover = Wi > 1e-6 ? Math.min(1, went[i] / Wi * (sheetMm(sheet, o) / .25)) : 0;
+    if (FL) FL.turn[i] = turnover;
     // the suspension's mean Stokes speed, by mass: a mix flocculates, its fine particles riding on the coarse ones
     let vMix = 0; if (coSettle > 0) { let gm = 0; for (let n = 0; n < n3; n++) { const k = act3[n], g = G[k][i]; vMix += g * vOf[k]; gm += g; } vMix = gm > 0 ? vMix / gm : 0; }
     for (let n = 0; n < n3; n++) {
@@ -924,7 +949,7 @@ function stepBox(sheet, o, box, reduce = false) {
       // every wash into the same cells and the pattern would compound. The slide two blocks below already rolls grains
       // over the filled surface (dep). This does the same for the settling: granFill of deposit fills the hollow.
       const hol = granFill > 0 ? hollow[i] * Math.max(0, 1 - settled[i] * granFill) : hollow[i];
-      // Stokes settling and Brownian deposition through the film's depth Wi mm, B = 1 + gamma hollow (settling.mjs); `settle` scales both (1 physical)
+      // Stokes landing, residence-dependent hollow capture and Brownian deposition (settling.mjs).
       const gg = ggOf[k], down = Gk[i] * settleShare((coSettle > 0 ? (1 - coSettle) * vOf[k] + coSettle * vMix : vOf[k]) * settle, dfOf[k] * settle, gg, hol, dt, Wi);
       // Still water lifts a deposit slowly, over time. A current scours it: the water crossing the cell this
       // step takes loose grains with it and drops them again where it slows. Clean water run into a wash that
@@ -933,7 +958,8 @@ function stepBox(sheet, o, box, reduce = false) {
       // goes by how much of the cell's water was replaced, not by how long the water sat there, and a
       // staining pigment holds on (omega) while a loose one goes.
       const shape = Math.max(0, 1 + (hh - 1) * gg);
-      const up = Dk[i] * shape * (liftOf[k] * wetting * dt + scourOf[k] * turnover);
+      // A disconnected film cannot scour the bed merely by turning over its tiny water volume.
+      const up = Dk[i] * shape * (liftOf[k] * wetting * dt + scourOf[k] * turnover * grainMobility(Wi));
       const dn = Math.min(Gk[i], Math.max(0, down)), u = Math.min(Dk[i], Math.max(0, up));
       Dk[i] += dn - u; Gk[i] += u - dn;
       if (rewet) { const top = topLayer[k], r = Math.min(top[i], (top[i] * rewetLift * dt) / omega); top[i] -= r; Gk[i] += r; }
@@ -952,7 +978,8 @@ function stepBox(sheet, o, box, reduce = false) {
   // Settled particles do not stay where they land. Heavy grains on wet paper roll off the crests of the fibres, and a
   // thinning film, pulled down between the fibres by its meniscus, pushes them into the hollows: granulating pigment
   // leaves the hills bare and collects in the hollows. Loose pigment moves to lower neighbours, most while the film is
-  // thin but still wet, down any slope steeper than its grains can rest on: fine grains cling to the fibres, coarse
+  // receding but connected, at a speed limited by particle drag, down slopes steeper than the grains can rest on:
+  // fine grains cling to the fibres, coarse
   // ones (high granulation) roll down gentle slopes. The grains fill the hollow they collect in (the surface they roll
   // over is the paper plus the pigment already on it), so a hollow fills until it is no steeper than they rest on. A
   // next-state buffer keeps it unbiased. Flocculating pigment (floc) settles as clumps too big for the hollows between
@@ -992,7 +1019,7 @@ function stepBox(sheet, o, box, reduce = false) {
     for (let q = 0; q < nw; q++) {
       const i = wl[q], Wi = W[i]; if (Wi <= 0) continue;
       const fg = wf[q];
-      const film = Math.min(3, 0.12 / Math.max(0.04, Wi)) * (Wi > oFilm ? 1 : Wi / oFilm);
+      const film = grainSlide(Wi);
       for (let n = 0; n < n3; n++) {
         const k = act3[n], gg = ggOf[k]; const Dk = D[k]; if (gg <= 0 || Dk[i] <= 0) continue;
         const S = surf[surfOf[K + n]], rep = repOf[k];
@@ -1002,7 +1029,7 @@ function stepBox(sheet, o, box, reduce = false) {
         ex[2] = fg & 2 ? Math.max(0, here - S[i + nOff2] - rep) : 0; sum += ex[2];
         ex[3] = fg & 8 ? Math.max(0, here - S[i + nOff3] - rep) : 0; sum += ex[3];
         if (sum <= 0) continue;
-        let moved = Dk[i] * Math.min(0.2, slide * gg * film * sum * dt); const dd = dD[k];
+        let moved = Dk[i] * Math.min(0.2, slide * grainDrag(vOf[k]) * gg * film * sum * dt); const dd = dD[k];
         // slideCap c: grains stop rolling when the slope is gone, so no move may reverse
         // the slope it rolled down. The surface falls by fill x moved here and rises by fill x moved x ex/sum at each
         // lower neighbour, closing that difference by fill x moved x (1 + ex/sum); the move is held to c of it. Without
@@ -1041,6 +1068,7 @@ function stepBox(sheet, o, box, reduce = false) {
     prow[y1 + 1] = y1 - y0 + 1;
   }
   for (let pass = 0; pass < pores.iters; pass++) {
+    FL?.pores?.begin(box, s);
     // one pigment at a time, so a row's arrays are found once instead of once a cell, and the copy is a memmove
     for (let y = y0; y <= y1; y++) for (let r = prow[y], re = prow[y + 1]; r < re; r++) { const a = y * w + pxa[r], b = y * w + pxb[r] + 1; sNext.set(s.subarray(a, b), a); }
     for (let n = 0; n < nP; n++) { const k = pact[n], Pk = P[k], PN = PNext[k], dd = dDep[k]; for (let y = y0; y <= y1; y++) for (let r = prow[y], re = prow[y + 1]; r < re; r++) { const a = y * w + pxa[r], b = y * w + pxb[r] + 1; PN.set(Pk.subarray(a, b), a); dd.fill(0, a, b); } }
@@ -1062,15 +1090,18 @@ function stepBox(sheet, o, box, reduce = false) {
         const ds = (Math.max(0, Math.min(si - sj, capacity[j] - sj)) / 4) * capStep * rate * open; if (ds <= 0) continue;
         const f = Math.min(1, ds / si);
         sNext[i] -= ds; sNext[j] += ds;
+        if (FL) { if (d === 0) FL.px[i] += ds; else if (d === 1) FL.px[j] -= ds; else if (d === 2) FL.py[i] += ds; else FL.py[j] -= ds; FL.catch[j] = ever[j] && sj > capDelta * capacity[j] ? 0 : filter; }
         // fibres catch the pigment where pore water enters paper the wash never covered (ever), however damp the wicking
         // has made it, and where it enters dry paper; between damp pores under the wash it moves freely. Caught only at a
         // dry cell, the first trickle went in clean and the rest carried its pigment out past the edge as a pale halo.
         const catchF = ever[j] && sj > capDelta * capacity[j] ? 0 : filter;
+        FL?.pores?.face(i, j, ds, catchF);
         // what the fibres catch at a dry front stays on the wet side of it, where the water left it
         for (let n = 0; n < nP; n++) { const k = pact[n], q = P[k][i] * f; if (!q) continue; PNext[k][i] -= q; PNext[k][j] += q * (1 - catchF); dDep[k][i] += q * catchF; }
       }
     }
 
+    FL?.pores?.end(sNext);
     if (pass + 1 < pores.iters) {
       for (let n = 0; n < nP; n++) { const k = pact[n], Pk = P[k], PN = PNext[k], Dk = D[k], dd = dDep[k]; for (let y = y0; y <= y1; y++) for (let r = prow[y], re = prow[y + 1]; r < re; r++) for (let i = y * w + pxa[r], e = y * w + pxb[r]; i <= e; i++) { Pk[i] = Math.max(0, PN[i]); Dk[i] += dd[i]; } }
       for (let y = y0; y <= y1; y++) for (let r = prow[y], re = prow[y + 1]; r < re; r++) for (let i = y * w + pxa[r], e = y * w + pxb[r]; i <= e; i++) s[i] = Math.max(0, sNext[i]);
@@ -1083,7 +1114,7 @@ function stepBox(sheet, o, box, reduce = false) {
   // does not have to be interleaved with it.
   for (let n = 0; n < nP; n++) { const k = pact[n], Pk = P[k], PN = PNext[k], Dk = D[k], dd = dDep[k]; for (let y = y0; y <= y1; y++) for (let r = prow[y], re = prow[y + 1]; r < re; r++) for (let i = y * w + pxa[r], e = y * w + pxb[r]; i <= e; i++) { Pk[i] = Math.max(0, PN[i]); Dk[i] += dd[i]; } }
   const wetEps = o.wetEps, paperDry = o.paperDry, capSigma = o.capSigma, spill = o.spill, spillHeight = o.spillHeight, dampEase = o.dampEase, pinning = o.pinning ?? 0, pinFibre = o.pinFibre ?? 0, enclose = o.encloseEase ?? 0, holeFill = o.holeFill ?? 0;
-  const throats = throatTable(sheet.n);
+  const throats = throatsOf(paper);
   let maxW = 0;
   for (let y = y0; y <= y1; y++) for (let r = prow[y], re = prow[y + 1]; r < re; r++) for (let x = pxa[r], xe = pxb[r]; x <= xe; x++) {
     const i = y * w + x;
@@ -1092,6 +1123,7 @@ function stepBox(sheet, o, box, reduce = false) {
     if (W[i] <= wetEps && s[i] > 0) { // damp paper dries; the pigment in its pores stays on the fibres
       let d = Math.min(s[i], dt * paperDry); if (d > 0 && s[i] - d <= 0.02 * capacity[i]) d = s[i]; // the last trace goes at once, so the cell leaves the worked area
       const f = d / s[i]; s[i] -= d; sheet.evaporated = (sheet.evaporated ?? 0) + d;
+      if (FL && f > 0) FL.pd[i] = f;
       for (let n = 0; n < nP; n++) { const k = pact[n], q = P[k][i] * f; P[k][i] -= q; D[k][i] += q; }
     }
     if (!M[i]) {
@@ -1138,7 +1170,7 @@ function stepBox(sheet, o, box, reduce = false) {
       let thinAround = true;
       for (let d = 0; d < 4; d++) { const xx = x + DX[d], yy = y + DY[d]; if (xx < 0 || yy < 0 || xx >= w || yy >= h) continue; const j = yy * w + xx; if (M[j] && W[j] > 3 * wetEps) { thinAround = false; break; } }
       // Even a sub-threshold film is water: let evaporation remove it before clearing the cell.
-      if (thinAround && W[i] === 0) { for (let k = 0; k < K; k++) { D[k][i] += G[k][i]; G[k][i] = 0; } drying.push(i); }
+      if (thinAround && W[i] === 0) { for (let k = 0; k < K; k++) { D[k][i] += G[k][i]; G[k][i] = 0; } drying.push(i); if (FL) FL.dried[i] = 1; }
     }
   }
   for (const j of drying) M[j] = 0;
@@ -1211,26 +1243,47 @@ function evaporateInPlace(sheet) {
   }
   sheet.wetDirty = 1;
 }
-// Only a pore-only sheet can take this shortcut. A previous surface wash may
-// still have unresolved contact-line demand; subcycle its entire drying tail.
+// Once the surface is gone and no pore can donate capillary water, only local
+// pore evaporation remains. Past wetting does not make that water mobile again.
+// Keep every positive film and every wet mask cell on the normal transport path.
 export function quietDryTail(sheet, o = DEFAULTS) {
-  for (let i = 0; i < sheet.n; i++) if (sheet.ever[i] || sheet.M[i] || sheet.W[i] !== 0 || sheet.s[i] > (o.capEps ?? DEFAULTS.capEps) * sheet.paper.capacity[i]) return false;
-  evaporateInPlace(sheet);
+  const capEps = o.capEps ?? DEFAULTS.capEps, paperDry = o.paperDry ?? DEFAULTS.paperDry;
+  for (let i = 0; i < sheet.n; i++) if (sheet.M[i] || sheet.W[i] !== 0 || sheet.s[i] > capEps * sheet.paper.capacity[i] || (!(paperDry > 0) && sheet.s[i] > 0)) return false;
+  // The normal pore-only steps transfer P into D. Any inert G left outside the
+  // wet mask stays in its own plane, preserving fixation and later lifting.
+  for (let i = 0; i < sheet.n; i++) {
+    sheet.evaporated = (sheet.evaporated ?? 0) + sheet.s[i]; sheet.s[i] = 0;
+    for (let k = 0; k < sheet.K; k++) { sheet.D[k][i] += sheet.P[k][i]; sheet.P[k][i] = 0; }
+  }
+  sheet.wetDirty = 1;
   return true;
 }
 function dryCpu(sheet, max, o, { level, levelMax, levelTol, dt, onStep, analyticTail }) {
   // water levels in moments and dries in minutes: keep real time while the surface is still moving, then run faster
-  let t = 0, fast = false; const every = levelEvery(analyticTail && !onStep);
+  let t = 0, fast = false, warmup = null; const every = levelEvery(analyticTail && !onStep);
+  const plan = analyticTail && !onStep ? fastLevelPlan(o.dt, level, levelMax) : null;
+  const levelAt = plan ? plan.levelStep : level, levelMaxAt = plan ? plan.levelMaxStep : levelMax;
   // the two settings a step runs with, made once rather than once a step (step reads them and never changes them)
   const oLevel = { ...o, dt: o.dt }, oFast = { ...o, dt };
   for (; t < max; t++) {
-    if (!fast && t >= level && (t >= levelMax || (t % every === 0 && surfaceLevel(sheet, o.slope ?? 0) < levelTol))) fast = true;
+    if (!fast && analyticTail && !onStep && t === every) {
+      let maxWater = 0; for (let i = 0; i < sheet.n; i++) maxWater = Math.max(maxWater, sheet.W[i]);
+      warmup = thinDryWarmup(maxWater, o.levelFloor, o.dt, level - t, o.wetEps);
+    }
+    if (warmup?.steps === 0) fast = true;
+    const onCheck = plan && !warmup
+      ? (t >= levelAt && (t >= levelMaxAt || (t - levelAt) % plan.postCheckEvery === 0))
+      : (t >= levelAt && (t >= levelMaxAt || t % every === 0));
+    if (!fast && onCheck && (t >= levelMaxAt || surfaceLevel(sheet, o.slope ?? 0) < levelTol)) fast = true;
     if (analyticTail && !onStep) {
       if (quietDryTail(sheet, o)) {
         break;
       }
     }
-    if (!step(sheet, fast ? oFast : oLevel, null, fast && analyticTail ? DRY_TAIL_CHUNK_DT : undefined)) break;
+    const seg = !fast && !warmup && plan ? planStepAt(plan, t) : null;
+    const stepOpts = fast ? oFast : warmup ? { ...o, dt: warmup.dt } : seg && seg.dt !== o.dt ? { ...o, dt: seg.dt } : oLevel;
+    if (!step(sheet, stepOpts, null, fast && analyticTail ? warmup?.tailChunkDt ?? DRY_TAIL_CHUNK_DT : undefined)) break;
+    if (warmup && !fast) warmup.steps--;
     // a caller watching the sheet dry (frames of a wash spreading and settling)
     if (onStep) onStep(t);
   }
@@ -1269,7 +1322,11 @@ function fixCpu(sheet) {
   // ever written into a dried layer (a lifted
   // resist, the rewet of the top layer, the prep fade all scale or subtract what is there), so sharing changes nothing.
   const zero = sheet._zeroLayer || (sheet._zeroLayer = F32(sheet.n));
-  sheet.layers.push(sheet.D.map(Dk => { if (!Dk.some(v => v !== 0)) return zero; const L = F32(Dk.length); L.set(Dk); return L; }));
+  sheet.layers.push(sheet.D.map(Dk => {
+    let i = 0; while (i < Dk.length && Dk[i] === 0) i++;
+    if (i === Dk.length) return zero;
+    const L = F32(Dk.length); L.set(Dk); return L;
+  }));
   sheet.ever.fill(0);
   for (const Dk of sheet.D) Dk.fill(0);
 }
@@ -1284,12 +1341,56 @@ export function layersOf(sheet) {
 /** Total pigment across layers. With held:true, return an additive cell reader
  * (pigment, cell, initial=0) preserving the finishing readers' double-precision order. */
 const ENV = typeof process !== 'undefined' ? process.env : {};
-export function thickness(sheet, { held = false } = {}) {
+export function thickness(sheet, { held = false, channels = null } = {}) {
   if (held) return heldThickness(sheet);
+  if (channels) return thicknessChannels(sheet, channels);
   if (PAR) { const t = PAR.thickness(sheet); if (t) return t; }
   if (ENV.LAYER_CACHE === '0') return thicknessPlain(sheet);
   const out = thicknessCached(sheet);
   if (ENV.LAYER_CACHE_CHECK) { const ref = thicknessPlain(sheet), tol = sheet._gpu ? 1e-5 : 0; /* the GPU's sums are rounded twice */ for (let k = 0; k < ref.length; k++) for (let i = 0; i < ref[k].length; i++) if (tol ? Math.abs(ref[k][i] - out[k][i]) > tol * Math.max(1, Math.abs(ref[k][i])) : !Object.is(ref[k][i], out[k][i])) throw new Error(`thickness cache differs at pigment ${k} cell ${i}`); }
+  return out;
+}
+function thicknessChannels(sheet, channels) {
+  const valid = [...new Set(channels.filter(k => Number.isInteger(k) && k >= 0 && k < sheet.K))];
+  const out = new Array(sheet.K);
+  if (!valid.length) return out;
+  let mask = 0;
+  for (const k of valid) mask |= 1 << k;
+  const link = sheet._gpu;
+  let sums = null;
+  if (link && !link.paused && !link.stroke) {
+    link.syncTop(sheet, false, mask);
+    sums = link.wetSums(sheet, mask);
+    if (!sums && link.stale) coherent(sheet);
+  }
+  const n = sheet.n, layers = sheet.layers, m = layers.length - 1, top = m >= 0 ? layers[m] : null, zero = sheet._zeroLayer;
+  const lower = ENV.LAYER_CACHE === '0' ? null : lowerThickness(sheet, valid, layers);
+  for (const k of valid) {
+    const plane = lower ? lower[k].slice() : new Float32Array(n);
+    for (let l = 0; !lower && l < m; l++) {
+      const a = layers[l][k];
+      if (a === zero) continue;
+      for (let i = 0; i < n; i++) plane[i] += a[i];
+    }
+    if (top && top[k] !== zero) {
+      const a = top[k];
+      for (let i = 0; i < n; i++) plane[i] += a[i];
+    }
+    const sk = sums?.[k];
+    if (sk) {
+      if (sk !== zero) for (let i = 0; i < n; i++) plane[i] += sk[i];
+    } else {
+      const G = sheet.G[k], D = sheet.D[k], P = sheet.P[k];
+      for (let i = 0; i < n; i++) plane[i] += Math.fround(G[i] + D[i] + P[i]);
+    }
+    out[k] = plane;
+  }
+  if (ENV.LAYER_CACHE_CHECK) {
+    const ref = thicknessPlain(sheet), tol = sheet._gpu ? 1e-5 : 0;
+    for (const k of valid) for (let i = 0; i < n; i++)
+      if (tol ? Math.abs(ref[k][i] - out[k][i]) > tol * Math.max(1, Math.abs(ref[k][i])) : !Object.is(ref[k][i], out[k][i]))
+        throw new Error(`thickness channel cache differs at pigment ${k} cell ${i}`);
+  }
   return out;
 }
 // Finishing readers historically add wet mass first, then each fixed layer in double
@@ -1359,12 +1460,28 @@ function thicknessParts(sheet, materializeWet = true) {
   syncTopLayer(sheet);
   const sums = materializeWet ? wetSums(sheet) : sheet._gpu?.wetSums(sheet) ?? null;
   if (!sums) coherent(sheet);
-  const n = sheet.n, layers = sheet.layers, m = layers.length - 1, K = sheet.K;
+  const layers = sheet.layers;
+  return { lower: lowerThickness(sheet, null, layers), top: layers.at(-1) ?? null, sums };
+}
+// Channels advance independently: a selective GPU read must never cache an
+// unsynchronized pigment placeholder. Each plane retains the original sequence
+// of Float32 additions; the mutable newest layer is always read afresh.
+function lowerThickness(sheet, channels = null, layers = sheet.layers) {
+  const n = sheet.n, m = Math.max(0, layers.length - 1), K = sheet.K, zero = sheet._zeroLayer;
   let c = sheet._thickLower;
-  if (c && (c.ver !== (sheet._layerVer || 0) || c.m > Math.max(0, m) || !c.refs.every((r, q) => layers[q] === r))) c = null;
-  if (!c) c = sheet._thickLower = { ver: sheet._layerVer || 0, m: 0, refs: [], sum: sheet.G.map(() => new Float32Array(n)) };
-  for (; c.m < m; c.m++) { const layer = layers[c.m]; c.refs.push(layer); for (let k = 0; k < K; k++) { const a = layer[k], o = c.sum[k]; for (let i = 0; i < n; i++) o[i] += a[i]; } }
-  return { lower: c.sum, top: m >= 0 ? layers[m] : null, sums };
+  if (c && (c.n !== n || c.layers !== layers || c.ver !== (sheet._layerVer || 0) || c.refs.length > m ||
+      !c.refs.every((r, q) => layers[q] === r && c.versions[q] === (r._cacheVersion ?? 0)))) c = null;
+  if (!c) c = sheet._thickLower = { n, layers, ver: sheet._layerVer || 0, refs: [], versions: [], count: new Int32Array(K), sum: new Array(K) };
+  for (let l = c.refs.length; l < m; l++) { c.refs.push(layers[l]); c.versions.push(layers[l]._cacheVersion ?? 0); }
+  for (let q = 0, end = channels ? channels.length : K; q < end; q++) {
+    const k = channels ? channels[q] : q, o = c.sum[k] ?? (c.sum[k] = new Float32Array(n));
+    for (let l = c.count[k]; l < m; l++) {
+      const a = layers[l][k]; if (a === zero) continue;
+      for (let i = 0; i < n; i++) o[i] += a[i];
+    }
+    c.count[k] = m;
+  }
+  return c.sum;
 }
 function thicknessCached(sheet) {
   const { lower, top, sums } = thicknessParts(sheet), n = sheet.n;

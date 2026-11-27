@@ -1,4 +1,8 @@
 // Generated from src/media/gpu/film-level-wgsl.mjs by tools/lab/sync-site-media.mjs. Edit the source.
+import { filmLevelCgWgsl } from './film-level-cg-wgsl.js';
+import { filmLevelTransportWgsl } from './film-level-transport-wgsl.js';
+import { FILM_RESIDUAL_SQUARED } from '../film-accuracy.js';
+
 // The CPU step's boxes, each box's hollow fill and the film's levelling, on the GPU (sheet.mjs wetBoxes and slideFillFor,
 // film-level.mjs levelFilm).
 //
@@ -9,39 +13,47 @@
 // (fillRef / mean deposit)^2 where its mean deposit is above fillRef.
 //
 // Levelling. In each box the wet cells (M and W > 0) level by (I + L) d = -L H, with L the Laplacian of the faces'
-// conductances k0 p h^3 and H the surface (W + slope height, lowered by the meniscus near a dry side, falling with the
-// board's tilt). The CPU solves it by IC(0) conjugate gradients to a residual a millionth of the first; here each box
+// conductances k0 p h^3 (free depth above lvFloor, half-cell resistances in series: film-mobility.mjs) and H the surface (W + slope height, lowered by the meniscus near a dry side, falling with the
+// board's tilt). The CPU solves it by IC(0) conjugate gradients to the shared relative residual; here each box
 // runs its own conjugate gradients (preconditioned by Gauss-Seidel within each tile, lvPrecond) to the same residual (alpha and beta per box, from the tiles'
-// partial sums), so the solutions agree to that residual. The CPU stops at 2000 iterations; the host encodes u.lvIt
-// a step, and a box that runs out is counted (LVS[4]) and the host gives the next steps more. The water each face
+// partial sums), so the solutions agree to that residual. The host encodes a parallel iteration budget; a box that
+// needs more continues in one workgroup before transport (LVS[10]). A numerical failure or the safety ceiling is
+// counted in LVS[4] and fails the next status read. Only converged boxes produce flux. The water each face
 // carries over the step then moves with its pigment in the box's substeps (no donor gives more than half its water, at
-// most 64), each under the 95% donor budgets. The host encodes u.lvSubs rounds; a box needing more takes u.lvSubs
-// (counted in LVS[6]). The surface enters only as differences between neighbours, taken part by part (depth, relief,
+// most 64), each under the 95% donor budgets. The host encodes an adaptive parallel budget; lv_subs writes this step's
+// indirect arguments so unused rounds dispatch no workgroups. One group per box finishes any remaining rounds
+// before backrun, using the same donor helpers and storage barriers between rounds. An older budget never shortens
+// the transport. The surface enters only as differences between neighbours, taken part by part (depth, relief,
 // the meniscus's lowering, which LVA holds, and the tilt), so a board's fall over a large sheet or a film's depth near
 // its relief does not lose the digits its slope has in float32.
+import { filmMobilityWgsl } from '../film-mobility.js';
+
 export const LV_BMAX = 1024;
 /** Words of the LVX buffer for a w x h sheet with `ntiles` 16x16 tiles. */
 export function lvxWords(w, h, ntiles) {
   const nt32 = Math.ceil(w / 32) * Math.ceil(h / 32);
-  return 16 + 11 * nt32 + 17 * LV_BMAX + ntiles;
+  return 16 + 11 * nt32 + 17 * LV_BMAX + 2 * ntiles;
 }
 // LVX (u32): [0] boxes, [1] tiles in LT, [2] more boxes than LV_BMAX; then per 32-cell tile 10 words (wet, x0, y0, x1,
 // y1, deposit sum, wet count, label, mask of 16-cell children with a level cell, -), the cluster stack, per box 16
 // words (x0, y0, x1, y1, deposit sum, wet count, fill, LT offset, LT tiles, alpha, beta, rz, tol, iterations, state,
 // substeps), the cluster-to-box map, then LT: the tiles holding level cells, grouped by box.
-// LVS (atomic u32): [8] steps with a level tile, [9] those the host encoded without levelling; [3] most CG iterations a solve took, [4] solves stopped at u.lvIt, [5] most substeps a box asked
-// for, [6] boxes that got fewer than they asked for, [7] solves, [11] the most boxes; per box at 16 + 2 b, the largest explicit face flux
+// LVS (atomic u32): [2] sticky box overflow (fails the next status read); [8] steps with a level tile, [9] those found during a light step (solved in that same step), [10] boxes
+// continued beyond the parallel budget; [3] most CG iterations a solve took, [4] failed solves, [5] most substeps a box asked
+// for, [6] reserved (formerly truncated transport boxes), [7] solves, [11] the most boxes; per box at 16 + 2 b, the largest explicit face flux
 // (most) and the largest outflow over water (worst), as f32 bits.
-// State bits: 1 the box levels, 2 its CG is done.
+// State: 0 inactive, 1 running CG, 3 converged, 4 failed (never transported).
 export const filmLevelWgsl = ({ channel = 'klAt', count = 'u.nAct' } = {}) => `
+${filmMobilityWgsl()}
 @group(0) @binding(51) var<storage, read_write> LVT: array<u32>;
 @group(0) @binding(52) var<storage, read_write> LVX: array<u32>;
 @group(0) @binding(53) var<storage, read_write> LVS: array<atomic<u32>>;
 @group(0) @binding(54) var<storage, read_write> LVA: array<vec4<f32>>;   // H, conductance of the west face, of the north face, diagonal
 @group(0) @binding(55) var<storage, read_write> LVB: array<vec4<f32>>;   // d, r, z, q
-@group(0) @binding(56) var<storage, read_write> LVP: array<f32>;         // p, two planes in turn
-@group(0) @binding(57) var<storage, read_write> LVF: array<vec4<f32>>;   // west face flux (+x), north face flux (+y), water scale, meniscus distance
+@group(0) @binding(56) var<storage, read_write> LVP: array<f32>;         // two distance planes before rhs, then p in turn
+@group(0) @binding(57) var<storage, read_write> LVF: array<vec4<f32>>;   // west face flux (+x), north face flux (+y), water scale, transport mark
 @group(0) @binding(58) var<storage, read_write> LVR: array<f32>;         // per LT tile 8: pq, then rr and rz for even and odd iterations
+@group(0) @binding(59) var<storage, read_write> LVI: array<u32, 198>;    // tile/box args (lv_boxes), then 64 transport args (lv_subs)
 override LVPAR: u32 = 0u;
 override LVROUND: u32 = 0u;
 override LVK0: bool = false;
@@ -56,6 +68,7 @@ fn lvCL() -> u32 { return 16u + 10u * lvNt32(); }
 fn lvBX(b: u32) -> u32 { return 16u + 11u * lvNt32() + 16u * b; }
 fn lvRM() -> u32 { return 16u + 11u * lvNt32() + 16u * LV_BMAX; }
 fn lvLT() -> u32 { return lvRM() + LV_BMAX; }
+fn lvTM() -> u32 { return lvLT() + u.ntiles; }
 fn lvT32(i: u32) -> u32 { return ((i / u.w) / 32u) * lvTw32() + (i % u.w) / 32u; }
 fn lvBoxOf(i: u32) -> u32 { return LVX[lvTR(lvT32(i)) + 7u]; }
 fn lvLevel(i: u32) -> bool { return M[i] == 1u && W[i] > u.lvFloor; }   // film-level.mjs levelFloor: damp paint does not level
@@ -65,13 +78,14 @@ fn lvLevel(i: u32) -> bool { return M[i] == 1u && W[i] > u.lvFloor; }   // film-
 fn lvRound(i: u32) -> bool { return M[i] == 1u && LVF[i].w < 0.0; }
 // the hollow fill of a wet cell's box (sheet.mjs slideFillFor)
 fn fillAt(i: u32) -> f32 {
-  if (u.fillRef <= 0.0) { return u.slideFill; }
+  if (u.fillRef <= 0.0 || LVX[2] != 0u) { return u.slideFill; }
   return bitcast<f32>(LVX[lvBX(lvBoxOf(i)) + 6u]);
 }
 fn lvState(b: u32) -> u32 { return LVX[lvBX(b) + 14u]; }
 
 var<workgroup> lvSum: array<f32, 256>;
 var<workgroup> lvSum2: array<f32, 256>;
+var<workgroup> lvSum3: array<f32, 256>;
 var<workgroup> lvAt: array<atomic<u32>, 8>;
 var<workgroup> lvCount: u32;
 var<workgroup> lvBox: u32;
@@ -79,6 +93,12 @@ var<workgroup> lvBox: u32;
 fn lvReduce2(li: u32) {
   for (var k = 128u; k > 0u; k = k >> 1u) {
     if (li < k) { lvSum[li] += lvSum[li + k]; lvSum2[li] += lvSum2[li + k]; }
+    workgroupBarrier();
+  }
+}
+fn lvReduce3(li: u32) {
+  for (var k = 128u; k > 0u; k = k >> 1u) {
+    if (li < k) { lvSum[li] += lvSum[li + k]; lvSum2[li] += lvSum2[li + k]; lvSum3[li] += lvSum3[li + k]; }
     workgroupBarrier();
   }
 }
@@ -157,7 +177,10 @@ fn lv_boxes(@builtin(local_invocation_index) li: u32) {
   workgroupBarrier();
   var wo = lvWl[li]; for (var t = ra; t < re; t++) { if (LVX[lvTR(t)] != 0u) { LVX[lvTR(wo) + 9u] = t; wo += 1u; } }
   storageBarrier(); workgroupBarrier();
+  for (var t = li; t < u.ntiles; t += 256u) { LVX[lvTM() + t] = LV_NONE; }
+  storageBarrier(); workgroupBarrier();
   if (li == 0u) {
+    atomicStore(&LVS[12], 0u); atomicStore(&LVS[13], 0u); atomicStore(&LVS[14], 0u);
     let nw = lvWn;
     // clusters of wet tiles touching on a side or corner, found in tile order (sheet.mjs wetBoxes)
     let st = lvCL(); var nb = 0u; let m = u32(u.poreReach); let th32 = (u.h + 31u) / 32u;
@@ -187,47 +210,60 @@ fn lv_boxes(@builtin(local_invocation_index) li: u32) {
       LVX[lvRM() + nb] = nb;
       nb += 1u;
     }
-    let nc = nb;
-    // boxes that overlap once grown are merged, in the CPU's order
-    var i = 0u;
-    loop {
-      if (i >= nb) { break; }
-      var merged = false;
-      for (var j = i + 1u; j < nb; j++) {
-        if (!lvOverlap(i, j)) { continue; }
-        let A = lvBX(i); let Bj = lvBX(j);
-        LVX[A] = min(LVX[A], LVX[Bj]); LVX[A + 1u] = min(LVX[A + 1u], LVX[Bj + 1u]);
-        LVX[A + 2u] = max(LVX[A + 2u], LVX[Bj + 2u]); LVX[A + 3u] = max(LVX[A + 3u], LVX[Bj + 3u]);
-        LVX[A + 4u] = bitcast<u32>(bitcast<f32>(LVX[A + 4u]) + bitcast<f32>(LVX[Bj + 4u])); LVX[A + 5u] += LVX[Bj + 5u];
-        for (var k = j; k + 1u < nb; k++) { for (var e = 0u; e < 6u; e++) { LVX[lvBX(k) + e] = LVX[lvBX(k + 1u) + e]; } }
-        for (var c = 0u; c < nc; c++) { let v = LVX[lvRM() + c]; if (v == j) { LVX[lvRM() + c] = i; } else if (v > j) { LVX[lvRM() + c] = v - 1u; } }
-        nb -= 1u; merged = true; break;
+    // An incomplete discovery cannot be remapped: later wet tiles still carry LV_NONE. Disable all solver work
+    // and report a sticky failure; never publish a partial set of boxes as a successful physical step.
+    if (LVX[2] != 0u) {
+      LVX[0] = 0u; LVX[1] = 0u; atomicStore(&LVS[2], 1u);
+      LVI[0] = 0u; LVI[1] = 1u; LVI[2] = 1u; LVI[3] = 0u; LVI[4] = 1u; LVI[5] = 1u;
+    } else {
+      let nc = nb;
+      // boxes that overlap once grown are merged, in the CPU's order
+      var i = 0u;
+      loop {
+        if (i >= nb) { break; }
+        var merged = false;
+        for (var j = i + 1u; j < nb; j++) {
+          if (!lvOverlap(i, j)) { continue; }
+          let A = lvBX(i); let Bj = lvBX(j);
+          LVX[A] = min(LVX[A], LVX[Bj]); LVX[A + 1u] = min(LVX[A + 1u], LVX[Bj + 1u]);
+          LVX[A + 2u] = max(LVX[A + 2u], LVX[Bj + 2u]); LVX[A + 3u] = max(LVX[A + 3u], LVX[Bj + 3u]);
+          LVX[A + 4u] = bitcast<u32>(bitcast<f32>(LVX[A + 4u]) + bitcast<f32>(LVX[Bj + 4u])); LVX[A + 5u] += LVX[Bj + 5u];
+          for (var k = j; k + 1u < nb; k++) { for (var e = 0u; e < 6u; e++) { LVX[lvBX(k) + e] = LVX[lvBX(k + 1u) + e]; } }
+          for (var c = 0u; c < nc; c++) { let v = LVX[lvRM() + c]; if (v == j) { LVX[lvRM() + c] = i; } else if (v > j) { LVX[lvRM() + c] = v - 1u; } }
+          nb -= 1u; merged = true; break;
+        }
+        if (merged) { if (i > 0u) { i -= 1u; } continue; }
+        i += 1u;
       }
-      if (merged) { if (i > 0u) { i -= 1u; } continue; }
-      i += 1u;
-    }
-    // each box's fill (slideFillFor), and its level tiles, grouped by box in tile order
-    for (var b = 0u; b < nb; b++) {
-      let B = lvBX(b); let cnt = LVX[B + 5u]; let mean = select(0.0, bitcast<f32>(LVX[B + 4u]) / f32(cnt), cnt > 0u);
-      let fr = u.fillRef;
-      LVX[B + 6u] = bitcast<u32>(select(u.slideFill, u.slideFill * (fr / mean) * (fr / mean), fr > 0.0 && u.slide > 0.0 && mean > fr));
-      LVX[B + 8u] = 0u; LVX[B + 14u] = 0u;
-    }
-    for (var w = 0u; w < nw; w++) { let r = lvTR(LVX[lvTR(w) + 9u]); let b = LVX[lvRM() + LVX[r + 7u]]; LVX[r + 7u] = b; LVX[lvBX(b) + 8u] += countOneBits(LVX[r + 8u]); }
-    var off = 0u;
-    for (var b = 0u; b < nb; b++) { let B = lvBX(b); LVX[B + 7u] = off; off += LVX[B + 8u]; LVX[B + 8u] = 0u; }
-    for (var w = 0u; w < nw; w++) {
-      let t = LVX[lvTR(w) + 9u]; let r = lvTR(t); let lm = LVX[r + 8u]; if (lm == 0u) { continue; }
-      let B = lvBX(LVX[r + 7u]); let tx = t % tw32; let ty = t / tw32;
-      for (var c = 0u; c < 4u; c++) {
-        if ((lm & (1u << c)) == 0u) { continue; }
-        LVX[lvLT() + LVX[B + 7u] + LVX[B + 8u]] = (2u * ty + (c >> 1u)) * u.tw + 2u * tx + (c & 1u); LVX[B + 8u] += 1u;
+      // each box's fill (slideFillFor), and its level tiles, grouped by box in tile order
+      for (var b = 0u; b < nb; b++) {
+        let B = lvBX(b); let cnt = LVX[B + 5u]; let mean = select(0.0, bitcast<f32>(LVX[B + 4u]) / f32(cnt), cnt > 0u);
+        let fr = u.fillRef;
+        LVX[B + 6u] = bitcast<u32>(select(u.slideFill, u.slideFill * (fr / mean) * (fr / mean), fr > 0.0 && u.slide > 0.0 && mean > fr));
+        LVX[B + 8u] = 0u; LVX[B + 14u] = 0u;
       }
+      for (var w = 0u; w < nw; w++) { let r = lvTR(LVX[lvTR(w) + 9u]); let b = LVX[lvRM() + LVX[r + 7u]]; LVX[r + 7u] = b; LVX[lvBX(b) + 8u] += countOneBits(LVX[r + 8u]); }
+      var off = 0u;
+      for (var b = 0u; b < nb; b++) { let B = lvBX(b); LVX[B + 7u] = off; off += LVX[B + 8u]; LVX[B + 8u] = 0u; }
+      for (var w = 0u; w < nw; w++) {
+        let t = LVX[lvTR(w) + 9u]; let r = lvTR(t); let lm = LVX[r + 8u]; if (lm == 0u) { continue; }
+        let B = lvBX(LVX[r + 7u]); let tx = t % tw32; let ty = t / tw32;
+        for (var c = 0u; c < 4u; c++) {
+          if ((lm & (1u << c)) == 0u) { continue; }
+          let t16 = (2u * ty + (c >> 1u)) * u.tw + 2u * tx + (c & 1u);
+          let ltIdx = LVX[B + 7u] + LVX[B + 8u];
+          LVX[lvLT() + ltIdx] = t16; LVX[lvTM() + t16] = ltIdx; LVX[B + 8u] += 1u;
+        }
+      }
+      LVX[0] = nb; LVX[1] = off;
+      atomicMax(&LVS[11], nb);
+      // The light path dispatches no levelling work only when THIS step has no level tiles. Redistribution may bring
+      // mobile film back without a host write; it must solve now, before the rest of the step transports or dries it.
+      LVI[0] = min(off, 256u); LVI[1] = 1u; LVI[2] = 1u;
+      LVI[3] = select(0u, min(nb, u32(u.lvBoxes)), off > 0u); LVI[4] = 1u; LVI[5] = 1u;
+      // steps with a level tile; LVLIGHT counts same-step recoveries for the host's light-mode observation
+      if (off > 0u) { atomicAdd(&LVS[8], 1u); if (LVLIGHT) { atomicAdd(&LVS[9], 1u); } }
     }
-    LVX[0] = nb; LVX[1] = off;
-    atomicMax(&LVS[11], nb);
-    // steps with a level tile; LVLIGHT: the host encoded no levelling for this step (film-level-host.mjs), so it went without
-    if (off > 0u) { atomicAdd(&LVS[8], 1u); if (LVLIGHT) { atomicAdd(&LVS[9], 1u); } }
   }
   storageBarrier(); workgroupBarrier();
   for (var b = li; b < LV_BMAX; b += 256u) { atomicStore(&LVS[16u + 2u * b], 0u); atomicStore(&LVS[17u + 2u * b], 0u); }
@@ -251,34 +287,36 @@ fn lv_init(@builtin(workgroup_id) wid: vec3<u32>, @builtin(num_workgroups) nw: v
     let b = lvBoxOf(i);
     var cw = 0.0; var cn = 0.0; var most = 0.0;
     if (c.x > 0u && lvLevel(i - 1u)) {
-      let h = 0.5 * (W[i] + W[i - 1u]); let p = 1.0 - u.ff + u.ff * (0.25 + 1.75 * PAPER2[i - 1u].x);
-      cw = u.lvK0 * p * h * h * h; most = max(most, cw * abs(lvDh(i, i - 1u) - u.lvTx));
+      let p = 1.0 - u.ff + u.ff * (0.25 + 1.75 * PAPER2[i - 1u].x);
+      cw = u.lvK0 * p * filmMobility(W[i], W[i - 1u], u.lvFloor); most = max(most, cw * abs(lvDh(i, i - 1u) - u.lvTx));
     }
     if (c.y > 0u && lvLevel(i - u.w)) {
-      let h = 0.5 * (W[i] + W[i - u.w]); let p = 1.0 - u.ff + u.ff * (0.25 + 1.75 * PAPER2[i - u.w].y);
-      cn = u.lvK0 * p * h * h * h; most = max(most, cn * abs(lvDh(i, i - u.w) - u.lvTy));
+      let p = 1.0 - u.ff + u.ff * (0.25 + 1.75 * PAPER2[i - u.w].y);
+      cn = u.lvK0 * p * filmMobility(W[i], W[i - u.w], u.lvFloor); most = max(most, cn * abs(lvDh(i, i - u.w) - u.lvTy));
     }
     atomicMax(&LVS[16u + 2u * b], bitcast<u32>(most));
     // the line's cells: a side not on a wet cell of the box
     let edge = !(c.x > 0u && lvLevel(i - 1u)) || !(c.y > 0u && lvLevel(i - u.w)) || !(c.x + 1u < u.w && lvLevel(i + 1u)) || !(c.y + 1u < u.h && lvLevel(i + u.w));
     LVA[i] = vec4<f32>(0.0, cw, cn, 0.0);   // x: the meniscus's lowering of H (lv_dist)
-    LVF[i] = vec4<f32>(0.0, 0.0, 1.0, select(1e9, 0.0, edge)); LVB[i] = vec4<f32>(0.0);
+    LVF[i] = vec4<f32>(0.0, 0.0, 1.0, 0.0); LVB[i] = vec4<f32>(0.0);
+    LVP[i] = select(1e9, 0.0, edge);
   }
 }
-// the meniscus: the distance in cells through the wet cells from the line (relaxed in place, u.lvR - 1 times; a value
-// is always a path's length, so in place it is exact below the reach), then the surface lowered within meniscusMm
+// The meniscus: each pass reads only the previous distance plane and writes the other. After R - 1 passes every
+// distance below the reach is exact, including across workgroup boundaries. rhs then reuses both planes for CG.
 @compute @workgroup_size(16, 16)
 fn lv_dist(@builtin(workgroup_id) wid: vec3<u32>, @builtin(num_workgroups) nw: vec3<u32>, @builtin(local_invocation_id) lid: vec3<u32>) {
   let count = LVX[1];
   for (var j = wid.x; j < count; j += nw.x) {
     let c = lvCellOf(LVX[lvLT() + j], lid); if (c.z == 0u) { continue; }
     let i = c.y * u.w + c.x; if (!lvLevel(i)) { continue; }
-    var d = LVF[i].w;
-    if (c.x > 0u && lvLevel(i - 1u)) { d = min(d, LVF[i - 1u].w + 1.0); }
-    if (c.y > 0u && lvLevel(i - u.w)) { d = min(d, LVF[i - u.w].w + 1.0); }
-    if (c.x + 1u < u.w && lvLevel(i + 1u)) { d = min(d, LVF[i + 1u].w + 1.0); }
-    if (c.y + 1u < u.h && lvLevel(i + u.w)) { d = min(d, LVF[i + u.w].w + 1.0); }
-    LVF[i].w = d;
+    let src = LVPAR * u.n; let dst = (1u - LVPAR) * u.n;
+    var d = LVP[src + i];
+    if (c.x > 0u && lvLevel(i - 1u)) { d = min(d, LVP[src + i - 1u] + 1.0); }
+    if (c.y > 0u && lvLevel(i - u.w)) { d = min(d, LVP[src + i - u.w] + 1.0); }
+    if (c.x + 1u < u.w && lvLevel(i + 1u)) { d = min(d, LVP[src + i + 1u] + 1.0); }
+    if (c.y + 1u < u.h && lvLevel(i + u.w)) { d = min(d, LVP[src + i + u.w] + 1.0); }
+    LVP[dst + i] = d;
     if (LVMEN && u.lvTan > 0.0 && d < u.lvR) {
       let dmm = (d + 0.5) * u.mmPerCell;
       if (dmm < u.lvDm) { LVA[i].x = LVA[i].x + u.lvTan * (u.lvDm - dmm); }
@@ -338,6 +376,7 @@ fn lv_rhs(@builtin(workgroup_id) wid: vec3<u32>, @builtin(num_workgroups) nw: ve
   for (var j = wid.x; j < count; j += nw.x) {
     let t = LVX[lvLT() + j];
     var bb = 0.0; var rz = 0.0; var has = false; var r = 0.0; var diag = 1.0; var cp = vec4<f32>(0.0); var i = 0u;
+    var cdCell = 0.0; var cwE = 0.0; var cnE = 0.0; var ceE = 0.0; var csE = 0.0;
     let c = lvCellOf(t, lid);
     if (c.z != 0u) {
       i = c.y * u.w + c.x;
@@ -352,14 +391,37 @@ fn lv_rhs(@builtin(workgroup_id) wid: vec3<u32>, @builtin(num_workgroups) nw: ve
         diag = 1.0 + f[0].y + f[1].y + f[2].y + f[3].y;
         r = -(f[0].y * (dh.x + dd.x) + f[1].y * (dh.y + dd.y) + f[2].y * (dh.z + dd.z) + f[3].y * (dh.w + dd.w)) - d;
         cp = lvInTile(f, lid); has = true;
+        cdCell = 1.0;
+        if (lid.x == 0u) { cwE = f[0].y; cdCell += cwE; }
+        if (lid.y == 0u) { cnE = f[1].y; cdCell += cnE; }
+        if (lid.x == 15u) { ceE = f[2].y; cdCell += ceE; }
+        if (lid.y == 15u) { csE = f[3].y; cdCell += csE; }
       }
     }
     let z = lvPrecond(li, lid, r, diag, cp, has);
     if (has) { LVA[i].w = diag; LVB[i] = vec4<f32>(LVB[i].x, r, z, 0.0); LVP[i] = 0.0; LVP[u.n + i] = 0.0; bb = r * r; rz = r * z; }
-    lvSum[li] = bb; lvSum2[li] = rz;
+    lvSum[li] = bb; lvSum2[li] = rz; lvSum3[li] = select(0.0, r, has);
+    workgroupBarrier();
+    lvReduce3(li);
+    let bb0 = lvSum[0]; let rz0 = lvSum2[0]; let rTile = lvSum3[0];
+    workgroupBarrier();
+    lvSum[li] = cdCell; lvSum2[li] = 0.0;
     workgroupBarrier();
     lvReduce2(li);
-    if (li == 0u) { LVR[8u * j + 3u] = lvSum[0]; LVR[8u * j + 4u] = lvSum2[0]; }
+    let cd0 = lvSum[0];
+    workgroupBarrier();
+    if (lid.x == 0u) { lvSum[lid.y] = cwE; }
+    if (lid.y == 0u) { lvSum[16u + lid.x] = cnE; }
+    if (lid.x == 15u) { lvSum[32u + lid.y] = ceE; }
+    if (lid.y == 15u) { lvSum[48u + lid.x] = csE; }
+    workgroupBarrier();
+    if (li == 0u) {
+      var sw = 0.0; var sn = 0.0; var se = 0.0; var ss = 0.0;
+      for (var k = 0u; k < 16u; k++) { sw += lvSum[k]; sn += lvSum[16u + k]; se += lvSum[32u + k]; ss += lvSum[48u + k]; }
+      let base = 16u * j;
+      LVR[base + 3u] = bb0; LVR[base + 4u] = rz0; LVR[base + 5u] = rTile; LVR[base + 6u] = 0.0;
+      LVR[base + 8u] = cd0; LVR[base + 9u] = sw; LVR[base + 10u] = sn; LVR[base + 11u] = se; LVR[base + 12u] = ss;
+    }
     workgroupBarrier();
   }
 }
@@ -368,10 +430,52 @@ fn lv_rhs(@builtin(workgroup_id) wid: vec3<u32>, @builtin(num_workgroups) nw: ve
 fn lvBoxSums(b: u32, li: u32, sa: u32, sc: u32) {
   let B = lvBX(b); let off = LVX[B + 7u]; let n = LVX[B + 8u];
   var a = 0.0; var c = 0.0;
-  for (var q = li; q < n; q += 256u) { a += LVR[8u * (off + q) + sa]; c += LVR[8u * (off + q) + sc]; }
+  for (var q = li; q < n; q += 256u) { a += LVR[16u * (off + q) + sa]; c += LVR[16u * (off + q) + sc]; }
   lvSum[li] = a; lvSum2[li] = c;
   workgroupBarrier();
   lvReduce2(li);
+}
+// Coarse-tile symmetric red-black Gauss-Seidel (2-level additive Schwarz: M^-1 = M_tile^-1 + P A_c^-1 P^T).
+// Guaranteed SPD on any mask; returns r_tile . z_coarse in lvSum[0].
+var<workgroup> lvCOff: u32;
+var<workgroup> lvCN: u32;
+var<workgroup> lvRun: u32;
+var<workgroup> lvCw: array<f32, 256>;
+var<workgroup> lvCn: array<f32, 256>;
+fn lvCoarseSolve(b: u32, li: u32) -> f32 {
+  let B = lvBX(b);
+  if (li == 0u) { lvCOff = LVX[B + 7u]; lvCN = LVX[B + 8u]; }
+  let off = workgroupUniformLoad(&lvCOff); let n = workgroupUniformLoad(&lvCN);
+  if (n <= 1u) {
+    if (li == 0u && n == 1u) { LVR[16u * off + 6u] = 0.0; }
+    workgroupBarrier();
+    return 0.0;
+  }
+  for (var q = li; q < n; q += 256u) { LVR[16u * (off + q) + 6u] = 0.0; }
+  storageBarrier(); workgroupBarrier();
+  let halfSweeps = select(13u, 9u, n <= 64u);
+  for (var s = 0u; s < halfSweeps; s++) {
+    let par = s & 1u;
+    for (var q = li; q < n; q += 256u) {
+      let j = off + q; let t = LVX[lvLT() + j]; let tx = t % u.tw; let ty = t / u.tw;
+      if (((tx + ty) & 1u) != par) { continue; }
+      let base = 16u * j; let d = LVR[base + 8u];
+      if (d <= 0.0) { continue; }
+      var v = LVR[base + 5u];
+      if (tx > 0u) { let cw = LVR[base + 9u]; if (cw != 0.0) { let nj = LVX[lvTM() + t - 1u]; if (nj >= off && nj < off + n) { v += cw * LVR[16u * nj + 6u]; } } }
+      if (ty > 0u) { let cn = LVR[base + 10u]; if (cn != 0.0) { let nj = LVX[lvTM() + t - u.tw]; if (nj >= off && nj < off + n) { v += cn * LVR[16u * nj + 6u]; } } }
+      if (tx + 1u < u.tw) { let ce = LVR[base + 11u]; if (ce != 0.0) { let nj = LVX[lvTM() + t + 1u]; if (nj >= off && nj < off + n) { v += ce * LVR[16u * nj + 6u]; } } }
+      if (ty + 1u < u.th) { let cs = LVR[base + 12u]; if (cs != 0.0) { let nj = LVX[lvTM() + t + u.tw]; if (nj >= off && nj < off + n) { v += cs * LVR[16u * nj + 6u]; } } }
+      LVR[base + 6u] = v / d;
+    }
+    storageBarrier(); workgroupBarrier();
+  }
+  var rzc = 0.0;
+  for (var q = li; q < n; q += 256u) { let base = 16u * (off + q); rzc += LVR[base + 5u] * LVR[base + 6u]; }
+  lvSum[li] = rzc; lvSum2[li] = 0.0;
+  workgroupBarrier();
+  lvReduce2(li);
+  return lvSum[0];
 }
 // The per-box kernels: each workgroup takes boxes wid.x, wid.x + workgroups, ... (any number of workgroups covers them)
 var<workgroup> lvBoxN: u32;
@@ -384,134 +488,34 @@ fn lv_cg0(@builtin(workgroup_id) wid: vec3<u32>, @builtin(num_workgroups) nw: ve
     if (li == 0u) { lvBox = select(0u, 1u, lvActive(b) && LVX[B + 8u] > 0u); }
     if (workgroupUniformLoad(&lvBox) == 0u) { if (li == 0u) { LVX[B + 14u] = 0u; } continue; }
     lvBoxSums(b, li, 3u, 4u);
-    if (li == 0u) {
-      let bb = lvSum[0]; let tol = max(1e-24, 1e-12 * bb);
-      LVX[B + 9u] = 0u; LVX[B + 10u] = 0u; LVX[B + 11u] = bitcast<u32>(lvSum2[0]); LVX[B + 12u] = bitcast<u32>(tol); LVX[B + 13u] = 0u;
-      LVX[B + 14u] = select(1u, 3u, bb <= tol);
-      atomicAdd(&LVS[7], 1u);
-    }
-    workgroupBarrier();
-  }
-}
-fn lvRunning(b: u32) -> bool { return lvState(b) == 1u; }
-// Each CG iteration k is two dispatches, lv_cg_a and lv_cg_c (LVPAR = k & 1); lv_cg_d closes the last one. A box's
-// alpha and beta come from the sums of its tiles' partials, which every workgroup holding one of the box's tiles takes
-// itself (lvBoxSums, in one order, so the same floats) instead of a per-box dispatch between them. Iteration k's rr and rz
-// partials are in LVR slots 1 + 2 LVPAR and 2 + 2 LVPAR, so the next iteration reads them while it writes its own; the
-// workgroup holding the box's first tile writes the box's words (LVX), which no other workgroup reads in the same dispatch.
-var<workgroup> lvGo: u32;
-var<workgroup> lvCoef: f32;
-@compute @workgroup_size(16, 16)
-fn lv_cg_a(@builtin(workgroup_id) wid: vec3<u32>, @builtin(num_workgroups) nw: vec3<u32>, @builtin(local_invocation_id) lid: vec3<u32>, @builtin(local_invocation_index) li: u32) {
-  if (li == 0u) { lvCount = LVX[1]; }
-  let count = workgroupUniformLoad(&lvCount);
-  let po = LVPAR * u.n; let pn = (1u - LVPAR) * u.n; let prev = 1u - LVPAR;
-  for (var j = wid.x; j < count; j += nw.x) {
-    let t = LVX[lvLT() + j];
-    if (li == 0u) { let bx = LVX[lvTR(((t / u.tw) / 2u) * lvTw32() + (t % u.tw) / 2u) + 7u]; lvBox = select(LV_NONE, bx, lvRunning(bx)); }
-    let b = workgroupUniformLoad(&lvBox);
-    if (b == LV_NONE) { continue; }
-    var beta = bitcast<f32>(LVX[lvBX(b) + 10u]);
-    if (!LVK0) {
-      // the close of iteration k - 1 (as lv_cg_d): beta, and whether the box is done
-      lvBoxSums(b, li, 1u + 2u * prev, 2u + 2u * prev);
+    let bb = lvSum[0]; let rzLoc = lvSum2[0];
+    let tol = max(1e-24, 0.1 * ${FILM_RESIDUAL_SQUARED} * bb);
+    if (li == 0u) { lvRun = select(1u, 0u, bb <= tol); }
+    if (workgroupUniformLoad(&lvRun) == 0u) {
       if (li == 0u) {
-        let B = lvBX(b); let rr = lvSum[0]; let next = lvSum2[0];
-        let it = LVX[B + 13u] + 1u; let met = rr <= bitcast<f32>(LVX[B + 12u]); let done = met || f32(it) >= u.lvIt;
-        lvCoef = next / bitcast<f32>(LVX[B + 11u]); lvGo = select(1u, 0u, done);
-        if (j == LVX[B + 7u]) {
-          LVX[B + 10u] = bitcast<u32>(lvCoef); atomicMax(&LVS[3], it);
-          if (done) { LVX[B + 14u] = 3u; if (!met) { atomicAdd(&LVS[4], 1u); } }
-        }
+        LVX[B + 9u] = 0u; LVX[B + 10u] = 0u; LVX[B + 11u] = bitcast<u32>(rzLoc); LVX[B + 12u] = bitcast<u32>(tol); LVX[B + 13u] = 0u;
+        LVX[B + 14u] = 3u; atomicAdd(&LVS[7], 1u);
       }
-      if (workgroupUniformLoad(&lvGo) == 0u) { continue; }
-      beta = lvCoef;
+      workgroupBarrier();
+      continue;
     }
-    var pq = 0.0;
-    let c = lvCellOf(t, lid);
-    if (c.z != 0u) {
-      let i = c.y * u.w + c.x;
-      if (lvLevel(i)) {
-        let f = lvFaces(i, c.x, c.y);
-        let p = LVB[i].z + beta * LVP[po + i];
-        var q = LVA[i].w * p;
-        for (var e = 0u; e < 4u; e++) { if (f[e].y != 0.0) { let k = lvNb(i, e); q -= f[e].y * (LVB[k].z + beta * LVP[po + k]); } }
-        LVP[pn + i] = p; LVB[i].w = q; pq = p * q;
-      }
-    }
-    lvSum[li] = pq; lvSum2[li] = 0.0;
-    workgroupBarrier();
-    lvReduce2(li);
-    if (li == 0u) { LVR[8u * j] = lvSum[0]; }
-    workgroupBarrier();
-  }
-}
-@compute @workgroup_size(16, 16)
-fn lv_cg_c(@builtin(workgroup_id) wid: vec3<u32>, @builtin(num_workgroups) nw: vec3<u32>, @builtin(local_invocation_id) lid: vec3<u32>, @builtin(local_invocation_index) li: u32) {
-  if (li == 0u) { lvCount = LVX[1]; }
-  let count = workgroupUniformLoad(&lvCount);
-  let pn = (1u - LVPAR) * u.n; let prev = 1u - LVPAR;
-  for (var j = wid.x; j < count; j += nw.x) {
-    let t = LVX[lvLT() + j];
-    if (li == 0u) { let bx = LVX[lvTR(((t / u.tw) / 2u) * lvTw32() + (t % u.tw) / 2u) + 7u]; lvBox = select(LV_NONE, bx, lvRunning(bx)); }
-    let b = workgroupUniformLoad(&lvBox);
-    if (b == LV_NONE) { continue; }
-    // alpha (as lv_cg_b did): this iteration's pq over the box's last rz
-    lvBoxSums(b, li, 0u, 2u + 2u * prev);
+    let rzCoarse = lvCoarseSolve(b, li);
     if (li == 0u) {
-      let B = lvBX(b); let pq = lvSum[0]; let rz = lvSum2[0];
-      lvCoef = rz / pq; lvGo = select(0u, 1u, pq > 0.0);
-      if (j == LVX[B + 7u]) {
-        if (!(pq > 0.0)) { LVX[B + 14u] = 3u; }
-        else { LVX[B + 9u] = bitcast<u32>(lvCoef); LVX[B + 11u] = bitcast<u32>(rz); LVX[B + 13u] = LVX[B + 13u] + select(1u, 0u, LVK0); }
-      }
-    }
-    if (workgroupUniformLoad(&lvGo) == 0u) { continue; }
-    let alpha = lvCoef;
-    var rr = 0.0; var rz = 0.0; var has = false; var v = vec4<f32>(0.0); var diag = 1.0; var cp = vec4<f32>(0.0); var i = 0u;
-    let c = lvCellOf(t, lid);
-    if (c.z != 0u) {
-      i = c.y * u.w + c.x;
-      if (lvLevel(i)) {
-        v = LVB[i]; diag = LVA[i].w; cp = lvInTile(lvFaces(i, c.x, c.y), lid); has = true;
-        v.x = v.x + alpha * LVP[pn + i]; v.y = v.y - alpha * v.w;
-      }
-    }
-    let z = lvPrecond(li, lid, v.y, diag, cp, has);
-    if (has) { v.z = z; LVB[i] = v; rr = v.y * v.y; rz = v.y * z; }
-    lvSum[li] = rr; lvSum2[li] = rz;
-    workgroupBarrier();
-    lvReduce2(li);
-    if (li == 0u) { LVR[8u * j + 1u + 2u * LVPAR] = lvSum[0]; LVR[8u * j + 2u + 2u * LVPAR] = lvSum2[0]; }
-    workgroupBarrier();
-  }
-}
-// the close of the last iteration (LVPAR its parity)
-@compute @workgroup_size(256)
-fn lv_cg_d(@builtin(workgroup_id) wid: vec3<u32>, @builtin(num_workgroups) nw: vec3<u32>, @builtin(local_invocation_index) li: u32) {
-  let nb = lvBoxCount(li);
-  for (var b = wid.x; b < nb; b += nw.x) {
-    if (li == 0u) { lvBox = select(0u, 1u, lvRunning(b)); }
-    if (workgroupUniformLoad(&lvBox) == 0u) { continue; }
-    lvBoxSums(b, li, 1u + 2u * LVPAR, 2u + 2u * LVPAR);
-    if (li == 0u) {
-      let B = lvBX(b); let rr = lvSum[0]; let next = lvSum2[0];
-      LVX[B + 10u] = bitcast<u32>(next / bitcast<f32>(LVX[B + 11u])); LVX[B + 11u] = bitcast<u32>(next);
-      let it = LVX[B + 13u] + 1u; LVX[B + 13u] = it;
-      atomicMax(&LVS[3], it);
-      if (rr <= bitcast<f32>(LVX[B + 12u])) { LVX[B + 14u] = 3u; }
-      else if (f32(it) >= u.lvIt) { LVX[B + 14u] = 3u; atomicAdd(&LVS[4], 1u); }
+      let rz0 = rzLoc + rzCoarse;
+      LVX[B + 9u] = 0u; LVX[B + 10u] = 0u; LVX[B + 11u] = bitcast<u32>(rz0); LVX[B + 15u] = bitcast<u32>(rz0); LVX[B + 12u] = bitcast<u32>(tol); LVX[B + 13u] = 0u;
+      LVX[B + 14u] = 1u; atomicAdd(&LVS[7], 1u); atomicAdd(&LVS[12], 1u);
     }
     workgroupBarrier();
   }
 }
+${filmLevelCgWgsl}
 // the water each face carries over the step, from the new surface: stored at the face's +x / +y cell, towards +x / +y
 @compute @workgroup_size(16, 16)
 fn lv_flux(@builtin(workgroup_id) wid: vec3<u32>, @builtin(num_workgroups) nw: vec3<u32>, @builtin(local_invocation_id) lid: vec3<u32>) {
   let count = LVX[1];
   for (var j = wid.x; j < count; j += nw.x) {
     let c = lvCellOf(LVX[lvLT() + j], lid); if (c.z == 0u) { continue; }
-    let i = c.y * u.w + c.x; if (!lvLevel(i) || lvState(lvBoxOf(i)) == 0u) { continue; }   // (W as at the step's start)
+    let i = c.y * u.w + c.x; if (!lvLevel(i) || lvState(lvBoxOf(i)) != 3u) { continue; }   // (W as at the step's start)
     let a = LVA[i]; let di = LVB[i].x;
     var fw = 0.0; var fn_ = 0.0;
     if (a.y != 0.0) { fw = a.y * (lvDh(i - 1u, i) + (LVA[i - 1u].x - a.x) + u.lvTx + (LVB[i - 1u].x - di)); }
@@ -540,64 +544,35 @@ fn lv_out(@builtin(workgroup_id) wid: vec3<u32>, @builtin(num_workgroups) nw: ve
     if (out > 0.0 && wk > u.wetEps) { atomicMax(&LVS[17u + 2u * b], bitcast<u32>(out / wk)); }
   }
 }
+var<workgroup> lvRounds: atomic<u32>;
 @compute @workgroup_size(64)
-fn lv_subs(@builtin(global_invocation_id) gid: vec3<u32>, @builtin(num_workgroups) nw: vec3<u32>) {
-  for (var b = gid.x; b < LVX[0]; b += 64u * nw.x) {
-    let B = lvBX(b); if (LVX[B + 14u] == 0u) { continue; }
+fn lv_subs(@builtin(local_invocation_index) li: u32) {
+  // One group covers every box and replaces all arguments, including the empty-film case. No previous step's
+  // active transport dispatch can survive. Each box retains its own denominator, as on the CPU.
+  if (li == 0u) { atomicStore(&lvRounds, 0u); }
+  workgroupBarrier();
+  for (var b = li; b < LVX[0]; b += 64u) {
+    let B = lvBX(b); if (LVX[B + 14u] != 3u) { continue; }
     let worst = bitcast<f32>(atomicLoad(&LVS[17u + 2u * b]));
     let want = u32(min(64.0, max(1.0, ceil(worst / 0.5))));
     atomicMax(&LVS[5], want);
-    if (f32(want) > u.lvSubs) { atomicAdd(&LVS[6], 1u); }
-    LVX[B + 15u] = min(want, u32(u.lvSubs));
+    LVX[B + 15u] = want;
+    atomicMax(&lvRounds, want);
   }
-}
-// one substep (round LVROUND of the box's): the donors' water scale, each pigment's concentration and pigment scale
-@compute @workgroup_size(16, 16)
-fn lv_s1(@builtin(workgroup_id) wid: vec3<u32>, @builtin(num_workgroups) nw: vec3<u32>, @builtin(local_invocation_id) lid: vec3<u32>) {
-  let count = LVX[1];
-  for (var j = wid.x; j < count; j += nw.x) {
-    let c = lvCellOf(LVX[lvLT() + j], lid); if (c.z == 0u) { continue; }
-    let i = c.y * u.w + c.x; if (!lvRound(i)) { continue; }
-    let B = lvBX(lvBoxOf(i)); let subs = LVX[B + 15u];
-    if (LVX[B + 14u] == 0u || LVROUND >= subs) { continue; }
-    let wk = W[i]; let out = lvPos(lvOut(i, c.x, c.y)) / f32(subs);
-    let scale = select(1.0, (0.95 * wk) / out, out > 0.95 * wk);
-    LVF[i].z = scale;
-    for (var ka = 0u; ka < ${count}; ka++) {
-      let q = ${channel}(ka) * u.n + i; let g = G[q];
-      let conc = select(0.0, g / wk, wk > 1e-12); let pout = out * scale * conc;
-      o4set(q, vec4<f32>(conc, select(1.0, (0.95 * g) / pout, pout > 0.95 * g), 0.0, 0.0));
+  workgroupBarrier();
+  if (li == 0u) {
+    let rounds = atomicLoad(&lvRounds);
+    atomicStore(&LVS[13], rounds);
+    for (var r = 0u; r < 64u; r++) {
+      LVI[6u + 3u * r] = select(0u, min(LVX[1], 256u), r < rounds);
+      LVI[7u + 3u * r] = 1u; LVI[8u + 3u * r] = 1u;
     }
   }
 }
-@compute @workgroup_size(16, 16)
-fn lv_s2(@builtin(workgroup_id) wid: vec3<u32>, @builtin(num_workgroups) nw: vec3<u32>, @builtin(local_invocation_id) lid: vec3<u32>) {
-  let count = LVX[1];
-  for (var j = wid.x; j < count; j += nw.x) {
-    let c = lvCellOf(LVX[lvLT() + j], lid); if (c.z == 0u) { continue; }
-    let i = c.y * u.w + c.x; if (!lvRound(i)) { continue; }
-    let B = lvBX(lvBoxOf(i)); let subs = LVX[B + 15u];
-    if (LVX[B + 14u] == 0u || LVROUND >= subs) { continue; }
-    // each face's water out of the cell this substep (signed), from its donor's scale
-    let o = lvOut(i, c.x, c.y) / f32(subs);
-    var a = vec4<f32>(0.0); var donor = vec4<u32>(i);
-    var dW = 0.0;
-    for (var e = 0u; e < 4u; e++) {
-      let f = o[e]; if (f == 0.0) { continue; }
-      let k = lvNb(i, e); donor[e] = select(k, i, f > 0.0);
-      a[e] = f * LVF[donor[e]].z; dW -= a[e];
-    }
-    for (var ka = 0u; ka < ${count}; ka++) {
-      let base = ${channel}(ka) * u.n; var dG = 0.0;
-      for (var e = 0u; e < 4u; e++) { if (a[e] != 0.0) { let s = o4get(base + donor[e]); dG -= a[e] * s.x * s.y; } }
-      if (dG != 0.0) { G[base + i] = max(0.0, G[base + i] + dG); }
-    }
-    if (dW != 0.0) { W[i] = max(0.0, W[i] + dW); }
-  }
-}
+${filmLevelTransportWgsl({ channel, count })}
 // ---- back-runs (backrun.mjs), on the wet tiles after the levelling: lv_br_a each damp cell's intake from the puddles
 // beside it (LVB, by direction: 0 +x, 1 -x, 2 +y, 3 -y, as backrun.mjs DX, DY) and its push (LVF: x the push share s,
-// y the share of its loose paint that leaves it, z 1 for a damp cell); lv_br_b each pigment's push per unit of intake
+// y the share of its loose paint that leaves it, z the fraction of exposed tooth); lv_br_b each pigment's push per unit of intake
 // (OUT4 x) and a puddle's concentration (OUT4 y); lv_br_c applies the water and the paint. Every read of a neighbour is of state written in an earlier
 // kernel, so the cells' order does not matter, as on the CPU. A neighbour is read only where M is set: a cell without
 // water lies in no wet tile, and its LVB and LVF are stale.
@@ -606,26 +581,34 @@ fn brIn(x: u32, y: u32, e: u32) -> bool {
 }
 fn brNb(i: u32, e: u32) -> u32 { if (e == 0u) { return i + 1u; } if (e == 1u) { return i - 1u; } if (e == 2u) { return i + u.w; } return i - u.w; }
 fn brOpp(e: u32) -> u32 { return e ^ 1u; }
-fn brDamp(i: u32) -> bool { return M[i] == 1u && W[i] > 0.0 && W[i] <= u.lvFloor && (RESIST[i] & 1u) == 0u; }
+fn brExposed(i: u32) -> f32 {
+  if (M[i] != 1u || W[i] <= 0.0 || W[i] >= u.brHead || (RESIST[i] & 1u) != 0u) { return 0.0; }
+  return (u.brHead - W[i]) / u.brHead;
+}
 @compute @workgroup_size(16, 16)
 fn lv_br_a(@builtin(workgroup_id) wid: vec3<u32>, @builtin(num_workgroups) nw: vec3<u32>, @builtin(local_invocation_id) lid: vec3<u32>) {
   let count = TL[u.ntiles];
   for (var j = wid.x; j < count; j += nw.x) {
     let c = lvCellOf(TL[j], lid); if (c.z == 0u) { continue; }
     let i = c.y * u.w + c.x;
-    var q = vec4<f32>(0.0); var s = 0.0; var go = 0.0; var damp = 0.0;
-    if (brDamp(i)) {
-      damp = 1.0;
-      let share = 0.25 * min(1.0, u.brC * clamp(1.5 - PAPER3[i].z, 0.5, 1.5));
+    var q = vec4<f32>(0.0); var s = 0.0; var go = 0.0; let damp = brExposed(i);
+    if (damp > 0.0) {
+      let share = damp * 0.25 * min(1.0, u.brC * clamp(1.5 - PAPER3[i].z, 0.5, 1.5));
       for (var e = 0u; e < 4u; e++) {
         if (!brIn(c.x, c.y, e)) { continue; }
-        let k = brNb(i, e); if (M[k] == 1u && W[k] > u.brHead) { q[e] = share * (W[k] - u.brHead); }
+        let k = brNb(i, e);
+        if (M[k] == 1u && W[k] > u.brHead) {
+          let aligned = abs(select(PAPER[i].w, PAPER[i].z, e < 2u)) * PAPER[i].y;
+          let entry = u.brHead * exp(max(0.0, 2.0 * u.pinning * PAPER3[i].y - u.pinFibre * aligned));
+          q[e] = share * max(0.0, W[k] - entry);
+        }
       }
       let Q = q.x + q.y + q.z + q.w;
       if (Q > 0.0) {
+        atomicStore(&LVS[14], 1u);
         s = u.brPush * Q / (Q + W[i]);
         var moved = 0.0;
-        for (var e = 0u; e < 4u; e++) { let o = brOpp(e); if (q[e] > 0.0 && brIn(c.x, c.y, o) && brDamp(brNb(i, o))) { moved += q[e] / Q; } }
+        for (var e = 0u; e < 4u; e++) { let o = brOpp(e); if (q[e] > 0.0 && brIn(c.x, c.y, o)) { moved += (q[e] / Q) * brExposed(brNb(i, o)); } }
         go = s * moved;
       }
     }
@@ -634,6 +617,7 @@ fn lv_br_a(@builtin(workgroup_id) wid: vec3<u32>, @builtin(num_workgroups) nw: v
 }
 @compute @workgroup_size(16, 16)
 fn lv_br_b(@builtin(workgroup_id) wid: vec3<u32>, @builtin(num_workgroups) nw: vec3<u32>, @builtin(local_invocation_id) lid: vec3<u32>) {
+  if (atomicLoad(&LVS[14]) == 0u) { return; }
   let count = TL[u.ntiles];
   for (var j = wid.x; j < count; j += nw.x) {
     let c = lvCellOf(TL[j], lid); if (c.z == 0u) { continue; }
@@ -648,6 +632,7 @@ fn lv_br_b(@builtin(workgroup_id) wid: vec3<u32>, @builtin(num_workgroups) nw: v
 }
 @compute @workgroup_size(16, 16)
 fn lv_br_c(@builtin(workgroup_id) wid: vec3<u32>, @builtin(num_workgroups) nw: vec3<u32>, @builtin(local_invocation_id) lid: vec3<u32>) {
+  if (atomicLoad(&LVS[14]) == 0u) { return; }
   let count = TL[u.ntiles];
   for (var j = wid.x; j < count; j += nw.x) {
     let c = lvCellOf(TL[j], lid); if (c.z == 0u) { continue; }
@@ -668,7 +653,7 @@ fn lv_br_c(@builtin(workgroup_id) wid: vec3<u32>, @builtin(num_workgroups) nw: v
           let k = brNb(i, e); if (M[k] != 1u) { continue; }
           let ok = o4get(base + k);
           if (q[e] > 0.0) { inc += q[e] * ok.y; }   // the puddle's paint, carried in with its water
-          let v = LVB[k][e]; if (v > 0.0) { inc += v * ok.x; }
+          let v = LVB[k][e]; if (v > 0.0) { inc += f.z * v * ok.x; }
         }
       }
       if (dw < 0.0) { let fr = dw / W[i]; G[base + i] = max(0.0, G[base + i] * (1.0 + fr)); D[base + i] = max(0.0, D[base + i] * (1.0 + u.brPush * fr)); }   // a puddle: its water left with its paint

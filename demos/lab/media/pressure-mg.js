@@ -57,12 +57,15 @@ export function pressureMultigrid({ count, cell, edges, anchor, degree, width, c
     let W = 0, H = 0; for (let k = 0; k < F.n; k++) { if (F.X[k] > W) W = F.X[k]; if (F.Y[k] > H) H = F.Y[k]; }
     // a node never joins cells of two puddles (a 2 x 2 block can hold two that touch only at a corner)
     let K = 1; for (let k = 0; k < F.n; k++) if (F.comp[k] >= K) K = F.comp[k] + 1; // keys stay below 2^53: slots x puddles
-    const CW = (W >> 1) + 1, key = new Map(), agg = new Int32Array(F.n).fill(-1);
+    const CW = (W >> 1) + 1, CH = (H >> 1) + 1, slots = CW * CH * K;
+    const flat = slots <= 2_000_000 ? new Int32Array(slots).fill(-1) : null;
+    const key = flat ? null : new Map(), agg = new Int32Array(F.n).fill(-1);
     let n = 0; const Xs = [], Ys = [], Cs = [];
     for (let k = 0; k < F.n; k++) {
       if (F.skip && F.skip[k]) continue;
       const kk = ((F.Y[k] >> 1) * CW + (F.X[k] >> 1)) * K + F.comp[k];
-      let I = key.get(kk); if (I === undefined) { I = n++; key.set(kk, I); Xs.push(F.X[k] >> 1); Ys.push(F.Y[k] >> 1); Cs.push(F.comp[k]); }
+      let I = flat ? flat[kk] : key.get(kk);
+      if (flat ? I < 0 : I === undefined) { I = n++; if (flat) flat[kk] = I; else key.set(kk, I); Xs.push(F.X[k] >> 1); Ys.push(F.Y[k] >> 1); Cs.push(F.comp[k]); }
       agg[k] = I;
     }
     if (n >= F.n) break;
@@ -81,7 +84,8 @@ export function pressureMultigrid({ count, cell, edges, anchor, degree, width, c
       diag[I] = st[9 * I + 4];
       for (let s = 0; s < 9; s++) {
         if (s === 4 || st[9 * I + s] === 0) continue;
-        const dx = s % 3 - 1, dy = ((s / 3) | 0) - 1, J = key.get(((Y[I] + dy) * CW + (X[I] + dx)) * K + comp[I]);
+        const dx = s % 3 - 1, dy = ((s / 3) | 0) - 1, kk = ((Y[I] + dy) * CW + (X[I] + dx)) * K + comp[I];
+        const J = flat ? flat[kk] : key.get(kk);
         nb[9 * I + s] = J; off[9 * I + s] = st[9 * I + s];
       }
     }
@@ -136,14 +140,24 @@ export function pressureMultigrid({ count, cell, edges, anchor, degree, width, c
       }
     }
   };
-  const residual = (L, b, x, r) => {
-    const n = L.n, nb = L.nb, d = L.diag;
+  const restrict = (L, b, x, out) => {
+    const n = L.n, nb = L.nb, d = L.diag, agg = L.agg;
+    out.fill(0);
     if (L.five) {
-      for (let k = 0; k < n; k++) { const e = 4 * k; let s = b[k] - d[k] * x[k], j;
-        if ((j = nb[e]) >= 0) s += x[j]; if ((j = nb[e + 1]) >= 0) s += x[j]; if ((j = nb[e + 2]) >= 0) s += x[j]; if ((j = nb[e + 3]) >= 0) s += x[j]; r[k] = s; }
+      for (let k = 0; k < n; k++) {
+        const a = agg[k]; if (a < 0) continue;
+        const e = 4 * k; let s = b[k] - d[k] * x[k], j;
+        if ((j = nb[e]) >= 0) s += x[j]; if ((j = nb[e + 1]) >= 0) s += x[j]; if ((j = nb[e + 2]) >= 0) s += x[j]; if ((j = nb[e + 3]) >= 0) s += x[j];
+        out[a] += s;
+      }
     } else {
       const off = L.off;
-      for (let k = 0; k < n; k++) { const e = 9 * k; let s = b[k] - d[k] * x[k]; for (let u = e; u < e + 9; u++) { const j = nb[u]; if (j >= 0) s -= off[u] * x[j]; } r[k] = s; }
+      for (let k = 0; k < n; k++) {
+        const a = agg[k]; if (a < 0) continue;
+        const e = 9 * k; let s = b[k] - d[k] * x[k];
+        for (let u = e; u < e + 9; u++) { const j = nb[u]; if (j >= 0) s -= off[u] * x[j]; }
+        out[a] += s;
+      }
     }
   };
   const solveCoarsest = (L, b, x) => {
@@ -154,7 +168,7 @@ export function pressureMultigrid({ count, cell, edges, anchor, degree, width, c
     }
   };
   const cycle = l => {
-    const L = levels[l], { b, x, r } = L;
+    const L = levels[l], { b, x } = L;
     if (l === levels.length - 1) { solveCoarsest(L, b, x); return; }
     x.fill(0); for (let s = 0; s < SWEEPS; s++) sweep(L, b, x, true);
     const N = levels[l + 1];
@@ -162,12 +176,11 @@ export function pressureMultigrid({ count, cell, edges, anchor, degree, width, c
       if (L.children && pressureThreads) {
         pressureThreads.restrict({ b, x, nb: L.nb, diag: L.diag, off: L.off, children: L.children, out: N.b, n: N.n });
       } else {
-        residual(L, b, x, r);
-        N.b.fill(0);
-        for (let k = 0; k < L.n; k++) if (L.agg[k] >= 0) N.b[L.agg[k]] += r[k];
+        restrict(L, b, x, N.b);
       }
       cycle(l + 1);
-      for (let k = 0; k < L.n; k++) if (L.agg[k] >= 0) x[k] += OMEGA * N.x[L.agg[k]];
+      const agg = L.agg, nx = N.x;
+      for (let k = 0; k < L.n; k++) { const a = agg[k]; if (a >= 0) x[k] += OMEGA * nx[a]; }
     }
     for (let s = 0; s < SWEEPS; s++) sweep(L, b, x, false);
   };

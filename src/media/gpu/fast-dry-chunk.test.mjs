@@ -18,6 +18,29 @@ test('adaptive chunks amortize early/wet Fast reads and return to 50 near dry',(
  assert.equal(adaptiveFastDryChunk({analyticTail:true,lastWetCounter:1,fastChunks:3},1000),50);
 });
 
+test('the first fast observation probes before the measured evaporation horizon, without claiming a dry state', async () => {
+ const counters=new Uint32Array(8);new Float32Array(counters.buffer)[7]=.025;
+ const state={analyticTail:true,fastChunks:0,lastCounters:counters,dt:14};
+ assert.equal(adaptiveFastDryChunk(state,1000,{evap:.0003}),6);
+ for(const evap of [0,-1,undefined])assert.equal(adaptiveFastDryChunk(state,1000,{evap}),50);
+ assert.equal(adaptiveFastDryChunk({...state,analyticTail:false},1000,{evap:.0003}),50);
+ assert.equal(adaptiveFastDryChunk({...state,fastChunks:1,lastWetCounter:1000},1000,{evap:.0003}),6);
+ assert.equal(adaptiveFastDryChunk({...state,fastChunks:1,lastWetCounter:1000},1000),200);
+ const run=async(forceWet=false)=>{
+  const h=Object.assign(Object.create(GpuSheet.prototype),{
+   resident:true,ntiles:64,epoch:0,o:{...DEFAULTS,levelFloor:.01},elapsed:0,chunks:[],
+   setOptions(o){Object.assign(this.o,o);},step(n){this.chunks.push(n);this.elapsed+=n;},noteCount(){},
+   async surfaceLevel(){return 0;},
+   async counters(){const c=new Uint32Array(8);c[0]=1;c[1]=forceWet||this.elapsed<16?1:0;c[6]=1;new Float32Array(c.buffer)[7]=.025;return c;},
+  });
+  h.dryBegin(30,DEFAULTS,{level:10,levelMax:10,analyticTail:true,dt:14});
+  await h.dryAdvance();return h;
+ };
+ const dry=await run();assert.deepEqual(dry.chunks,[5,5,4,6]);assert.equal(await dry.dryEnd(),20);
+ const stillWet=await run(true);assert.equal(stillWet.elapsed,30);assert.equal(stillWet.dryS.done,false);
+ await assert.rejects(stillWet.dryEnd(),/still wet/);
+});
+
 test('adaptive long wet chunks cut maps over 3x while retaining measured termination and limits',async()=>{
  const run=async({override=null,max=1000,until=Infinity}={})=>{
   const h=Object.assign(Object.create(GpuSheet.prototype),{

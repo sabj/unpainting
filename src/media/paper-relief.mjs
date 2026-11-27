@@ -22,7 +22,7 @@
 //
 // Strength varies across the sheet. A real sheet is not equally toothy everywhere: the felt, the sizing and the
 // pressing leave patches a centimetre or a few across that granulate more or less. So the relief's local amplitude is
-// scaled by a slow seeded field (wavelengths about 10 to 40 mm, factor about 0.5 to 1.5, mean square 1, so the sheet's
+// scaled by a slow seeded field (wavelengths about 10 to 40 mm, factor about 0.65 to 1.35, mean square 1, so the sheet's
 // RMS is unchanged). It scales the relief's height only, not its spectrum: the pepper stays 0.2 to 0.5 mm, some
 // patches show more of it. Every grid, CPU and GPU, reads the same field (paperRelief).
 // DOM free.
@@ -43,7 +43,7 @@ const HOLLOW_MM = 1;
 
 const TILES = [{ n: 1024, dx: 0.025 }, { n: 1024, dx: 0.02 }];
 // the strength field: one 128 mm periodic tile at 1 mm, wavelengths STRENGTH_MM, factor 1 + STRENGTH_SWING tanh(g)
-const STRENGTH = { n: 128, dx: 1 }, STRENGTH_MM = [10, 40], STRENGTH_SWING = 0.5;
+const STRENGTH = { n: 128, dx: 1 }, STRENGTH_MM = [10, 40], STRENGTH_SWING = 0.35;
 
 function fft1(re, im, inv) {
   const n = re.length;
@@ -97,7 +97,7 @@ function makeTile({ n, dx }, p, seed) {
   return out;
 }
 
-// the strength field for one seed: a factor about 0.5 to 1.5 with mean square 1, smooth below a centimetre
+// the strength field for one seed: a factor about 0.65 to 1.35 with mean square 1, smooth below a centimetre
 const STRENGTH_CACHE = new Map();
 function strengthOf(seed) {
   if (STRENGTH_CACHE.has(seed)) return STRENGTH_CACHE.get(seed);
@@ -178,6 +178,13 @@ function boxPeriodic(f, n, r) {
   for (let y = 0; y < n; y++) { let s = 0; for (let d = -r; d <= r; d++) s += f[y * n + ((d % n) + n) % n]; for (let x = 0; x < n; x++) { tmp[y * n + x] = s / k; s += f[y * n + (x + r + 1) % n] - f[y * n + ((x - r) % n + n) % n]; } }
   for (let x = 0; x < n; x++) { let s = 0; for (let d = -r; d <= r; d++) s += tmp[(((d % n) + n) % n) * n + x]; for (let y = 0; y < n; y++) { out[y * n + x] = s / k; s += tmp[((y + r + 1) % n) * n + x] - tmp[(((y - r) % n + n) % n) * n + x]; } }
   return out;
+}
+
+/** Internal tile/strength data for one relief preset and seed (shared with paper-gpu.mjs). */
+export function reliefFieldData(relief = 'cold', seed = 1) {
+  const F = fieldOf(relief, seed);
+  const S = F.p.scanId ? null : strengthOf(seed);
+  return { tiles: F.tiles, off: F.off, rmsUm: F.p.rmsUm, hollowRmsUm: F.hollowRms * F.p.rmsUm, preset: F.p, strength: S };
 }
 
 /**

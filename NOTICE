@@ -485,3 +485,7 @@ credits: THIRD_PARTY_NOTICES.md.
 
 Paper001 (ambientCG, https://ambientcg.com/a/Paper001), CC0 1.0 Universal: a scanned paper height map, read by
 src/media/paper-relief.mjs scanRelief when a caller loads it. The scan itself is not in this repository.
+
+The fibre proof cards, procedural 40 mm landscape, playback frames and comparison sheet in
+work/lead-04/work/proof/fibre/round3/ and SHEET.jpg use no external target image. They are simulator outputs,
+© 2026 Sam Jackson, CC BY 4.0, under the same credit as the other synthetic-plan outputs above.

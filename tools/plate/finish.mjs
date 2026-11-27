@@ -23,18 +23,22 @@ import {step, layersOf, thickness, layersChanged, coherent} from '../../src/medi
 import {gpuStats} from '../../src/media/gpu/link.mjs';
 import {assertDeviceHealthy} from '../../src/media/gpu/device-health.mjs';
 import {backendLine} from '../../src/media/gpu/backend-record.mjs';
-import {renderLayers, renderCells} from '../../src/media/km.mjs';
+import {renderLayers} from '../../src/media/km.mjs';
 import {measureLine} from '../../src/paint/methods/pencil-line.mjs';
 import {penEndPosition, eraseFactor} from '../../src/paint/methods/pencil-stage.mjs';
 import {followErase} from '../../src/paint/methods/fine-erase.mjs';
 import {retimeRun, codeForImage, concatList, phaseAt, phaseShares, PHASES, labelFrames} from '../../src/paint/film-timeline.mjs';
 import {dilate} from '../../src/raster.js';
 import {intermediates} from '../../src/eval/composite.mjs';
-import {planDensityOver} from '../../src/eval/plan-optics.mjs';
+import {densityOf} from '../../src/eval/plan-optics.mjs';
 import {gaussian} from '../../src/keyframes/density.mjs';
 import {gouacheCover, dryCover} from '../../src/media/gouache.mjs';
 import {writeGuardReport} from '../guard/no-target.mjs';
 import {cheatRisk} from '../guard/cheat-risk.mjs';
+import {createImageWriteQueue} from './image-write-queue.mjs';
+import {renderSubgridLayers} from './subcell-finish.mjs';
+import {finishReliefAndGrainGpu} from '../../src/media/gpu/paper-gpu.mjs';
+import {renderSubgridLayersGpu} from '../../src/media/gpu/finish-gpu.mjs';
 
 export async function finish(ctx) {
 const { JSONL, argv0, argv, OPTS_READ, optIdx, NAN_GIVEN, TEXT_READ, WORD_GIVEN, WORD_OK, opt, num, 
@@ -47,7 +51,7 @@ const { JSONL, argv0, argv, OPTS_READ, optIdx, NAN_GIVEN, TEXT_READ, WORD_GIVEN,
   base, SHADE, render, LOOK_RES, view, renderFine, colourTrace, traceBox, colourMass, UPRIGHT, 
   expected, sheetDensity, marks, drainFrames, mark, CAL, FRAMES, FULL_TAPE, MARKTAPE, RESUME_AT, shoot, 
   FILM_BY_PAINT, up, SEED, t0, spent, clock, PROF, used, TECHS, LAST, DRAWING, 
-  PEN_FIRST, DRAW_LAST, drawPass, PREPF, fadePrep, awareProvenance, awareBoundary } = ctx;
+  PEN_FIRST, DRAW_LAST, drawPass, PREPF, fadePrep, awareProvenance, awareBoundary, AUX_GPU } = ctx;
 // a painting taken over at the closing boundary has had everything up to the closing drawing (AWARE_SKIP_POST)
 const removeFilm=()=>{const value=liftResist(ctx.sheet);ctx.NATIVE_CAPTURE?.('film-remove');return value;};
 const AWARE_SKIP_POST = RESUME_AT?.kind === 'closing';
@@ -114,15 +118,42 @@ if (judged.steps.length) console.log(`carried the plan: forms ${(100 * judged.en
 for (const f of judged.flags) console.log(`  ! ${f}`);
 {
   // What each pigment was planned against what the sheet holds of it, so a wrong hue can be traced to one pigment.
-  const th = thickness(ctx.sheet), rows = [];
-  for (let j = 0; j < PIGS.length; j++) { let planned = 0, got = 0; for (let i = 0; i < n; i++) planned += expected[i * PIGS.length + j]; for (let i = 0; i < N2; i++) got += th[j][i]; rows.push(`${j} ${(got / Math.max(1e-6, planned * SC * SC)).toFixed(2)}`); }
+  const th = thickness(ctx.sheet), rows = [], exploded = [];
+  for (let j = 0; j < PIGS.length; j++) {
+    let planned = 0, got = 0;
+    for (let i = 0; i < n; i++) planned += expected[i * PIGS.length + j];
+    for (let i = 0; i < N2; i++) got += th[j][i];
+    const plannedScaled = planned * SC * SC;
+    const ratio = got / Math.max(1e-6, plannedScaled);
+    rows.push(`${j} ${ratio.toFixed(2)}`);
+    if (!Number.isFinite(got) || !Number.isFinite(ratio) || (plannedScaled > 1e-4 && ratio > 5.0) || (plannedScaled <= 1e-4 && got > 1e6)) {
+      exploded.push(`ch ${j} (${PIGS[j]?.name ?? j}): delivered=${got.toExponential(2)} planned=${plannedScaled.toExponential(2)} ratio=${Number.isFinite(ratio) ? ratio.toFixed(2) : String(ratio)}`);
+    }
+  }
   console.log(`pigment delivered over planned: ${rows.join(', ')}`);
+  if (exploded.length && process.env.PAINTER_ALLOW_PIGMENT_EXPLOSION !== '1') {
+    throw new Error(`Pigment mass explosion detected (GPU/physics corruption): ${exploded.join('; ')}`);
+  }
 }
+const imageQueue = createImageWriteQueue({ concurrency: 4 });
+// Render the plan once through the sheet's optics: used for both plan.jpg (encoded concurrently) and the covered check.
+const planRGB = (() => {
+  const layer = PIGS.map(() => new Float32Array(n));
+  for (let j = 0; j < PIGS.length; j++) {
+    const plane = layer[j], stride = PIGS.length;
+    for (let i = 0, at = j; i < n; i++, at += stride) plane[i] = expected[at];
+  }
+  const flat = new Uint8ClampedArray(n * 3);
+  for (let i = 0; i < n; i++) { const o = i * 3; flat[o] = paperRGB[0]; flat[o + 1] = paperRGB[1]; flat[o + 2] = paperRGB[2]; }
+  return renderLayers([layer], PIGS, flat, n, 1);
+})();
+imageQueue.enqueue(() => sharp(Buffer.from(planRGB.buffer, planRGB.byteOffset, planRGB.byteLength), { raw: { width: w, height: h, channels: 3 } })
+  .jpeg({ quality: 92 }).toFile(path.join(out, 'plan.jpg')));
 if (marks.length) {
   // covered: of the cells the plan washes, the share holding at least half of it by tone. Both sides through the same
   // optics: the plan is rendered on flat paper as plan.jpg is.
   const paintedD = ctx.lastPainted;
-  const planD = planDensityOver(expected, PIGS, paperRGB, n);
+  const planD = densityOf(planRGB, paperRGB, n);
   let asked = 0, arrived = 0;
   for (let i = 0; i < n; i++) if (planD[i] > 0.1) { asked++; if (paintedD[i] >= 0.5 * planD[i]) arrived++; }
   const cov = asked ? arrived / asked : 1;
@@ -133,11 +164,18 @@ if (marks.length) {
 }
 phaseMark('painting');
 if (TARGET_GUARD.mode !== 'off') { TARGET_GUARD.endPaint(); ctx.px = TARGET_GUARD.opened(PX_RAW); const g = TARGET_GUARD.summary(); console.log(`target guard: ${g.violations} paint-time target reads${g.violations ? ' (' + Object.keys(g.byName).join(', ') + ')' : ''}`); }
+imageQueue.enqueue(() => sharp(ctx.px, { raw: { width: w, height: h, channels: 3 } }).jpeg({ quality: 92 }).toFile(path.join(out, 'source.jpg')));
+// the picture the painter aimed at, so a photo plate is compared with a watercolour, not a photograph
+if (STYLE > 0) {
+  const aim = new Uint8ClampedArray(n * 3);
+  for (let i = 0; i < n; i++) for (let c = 0; c < 3; c++) aim[i * 3 + c] = paperRGB[c] * Math.exp(-D_AIM[i * 3 + c]);
+  imageQueue.enqueue(() => sharp(aim, { raw: { width: w, height: h, channels: 3 } }).jpeg({ quality: 92 }).toFile(path.join(out, 'target.jpg')));
+}
 console.log(`time: ${Object.entries(spent).map(([k, v]) => `${k} ${(v / 1000).toFixed(0)}s`).join(', ')}`);
 console.log(`profile: ${Object.entries(PROF).map(([k, v]) => `${k} ${(v / 1000).toFixed(1)}s`).join(', ')}`);
 console.log(`${ctx.laid} brush sweeps, ${ctx.frame} frames, ${((Date.now() - t0) / 1000).toFixed(0)} s`);
 
-if(COLOUR_TRACE) await sharp(INKRES ? INKRES.compose(render()) : render(), {raw:{width:OUT_W,height:OUT_H,channels:3}}).png().toFile(path.join(out,'colour-final.png'));
+if(COLOUR_TRACE) imageQueue.enqueue(() => sharp(INKRES ? INKRES.compose(render()) : render(), {raw:{width:OUT_W,height:OUT_H,channels:3}}).png().toFile(path.join(out,'colour-final.png')));
 // --subgrid N: spread settled pigment over N x N sub-cells by the cold-press relief, each cell keeping its pigment. Default 0.
 // Water stays at the sheet's grid. Written as painting-fine.jpg and averaged back as reflectance. Cold-press paper only.
 // With the pens on a sheet N times finer (--inkres N) the painting is already N times the sheet: the sub-cell render is
@@ -145,41 +183,57 @@ if(COLOUR_TRACE) await sharp(INKRES ? INKRES.compose(render()) : render(), {raw:
 const SUBGRID = Math.round(num('subgrid', 0)) >= 2 && INKRES ? INKRES.N : Math.round(num('subgrid', 0));
 if (INKRES && SUBGRID >= 2 && SUBGRID !== Math.round(num('subgrid', 0))) console.log(`subgrid: ${SUBGRID}, the pen sheet's (--inkres ${INKRES.N}), not ${num('subgrid', 0)}: the painting is written at the pen's grid`);
 if (SUBGRID >= 2 && !CP_MM) throw new Error('--subgrid: the sub-cell grain needs the cold-press relief in micrometres (--paper coldpress)');
-const renderSub = () => {
-  const coarse = view();
-  if (SUBGRID < 2) return { coarse, fine: null };
+const renderSub = async () => {
+  if (ctx.TWO_GRID && ctx.TWO_GRID.pigmentScale > 1) {
+    const res = await ctx.TWO_GRID.renderFinal({ auxDevice: AUX_GPU?.device ?? null, paperRGB, shade: SHADE, gouache: ctx.GOUACHE });
+    console.log(`two-grid finish: native fine pigment ${res.fineW}x${res.fineH} at ${ctx.TWO_GRID.geom.fineMm.toFixed(3)} mm (${res.usedGpuFinish ? 'GPU' : 'CPU'})`);
+    return res;
+  }
+  if (SUBGRID < 2) return { coarse: view(), fine: null };
   // the sheet's settled pigment spread over the same paper evaluated N times finer (src/media/subcell-grain.mjs): each
   // cell keeps its pigment, granulating paint gathers in the fine pits, staining paint only interpolates
   const N = SUBGRID, FW = W2 * N, FH = H2 * N, FN = FW * FH;
-  const hF = paperRelief(FW, FH, CP_MM / N, { seed: PAPER_OPTS.seed, relief: PAPER_OPTS.relief ?? 'cold' }).height;
-  const spread = subcellSpread(SHEET_PIGS, ctx.sheet.paper, N, { gain: SUBCELL_GAIN * num('subgridgain', 1) });
-  const fbase = new Uint8Array(FN * 3);
-  for (let i = 0; i < FN; i++) { const shade = 1 - SHADE + SHADE * hF[i]; for (let ch = 0; ch < 3; ch++) fbase[i * 3 + ch] = Math.round(Math.min(255, paperRGB[ch] * shade)); }
-  // each layer is spread and composited over the ones below as it is made (the composite kept in doubles between
-  // layers, km.mjs renderCells init and keep): the same arithmetic a cell as all the layers at once, with one
-  // layer's fine planes in memory, not every layer's
-  const Kp = SHEET_PIGS.map(p => p.K), Sp = SHEET_PIGS.map(p => p.S), under = new Float64Array(FN * 3), fineOut = new Uint8ClampedArray(FN * 3);
-  for (let i = 0; i < FN * 3; i++) under[i] = fbase[i] / 255;
   const sheetLayers = layersOf(ctx.sheet);
-  sheetLayers.forEach((layer, q) => renderCells([spread(layer)], Kp, Sp, fbase, 0, FN, 1, null, q === sheetLayers.length - 1 ? fineOut : null, under, under));
-  if (!sheetLayers.length) fineOut.set(fbase);
-  const fine = Buffer.from(fineOut.buffer), avg = Buffer.alloc(N2 * 3), acc = new Float64Array(N2 * 3);
-  for (let y = 0; y < FH; y++) for (let x = 0; x < FW; x++) { const c = ((y / N) | 0) * W2 + ((x / N) | 0); for (let ch = 0; ch < 3; ch++) acc[c * 3 + ch] += fine[(y * FW + x) * 3 + ch]; }
-  for (let i = 0; i < N2 * 3; i++) avg[i] = Math.round(acc[i] / (N * N));
-  console.log(`subgrid: settled pigment over ${N}x${N} sub-cells of the paper's relief at ${(CP_MM / N).toFixed(3)} mm, ${INKRES ? 'the painting with the pen over it' : 'painting-fine.jpg'} ${FW}x${FH}`);
-  return { coarse: avg, fine };
+  const gain = SUBCELL_GAIN * num('subgridgain', 1);
+  const res = AUX_GPU
+    ? await (async () => {
+      const fg = await finishReliefAndGrainGpu(AUX_GPU.device, FW, FH, CP_MM / N, N, { seed: PAPER_OPTS.seed, relief: PAPER_OPTS.relief ?? 'cold' });
+      return renderSubgridLayersGpu({
+        device: AUX_GPU.device, sheetLayers, pigments: SHEET_PIGS, paper: ctx.sheet.paper,
+        heightFine: fg.height, deltaZFine: fg.deltaZ, paperRGB, shade: SHADE,
+        W2, H2, N, gain, wantCoarse: !INKRES, zeroLayer: ctx.sheet._zeroLayer,
+      });
+    })()
+    : (() => {
+      const hF = paperRelief(FW, FH, CP_MM / N, { seed: PAPER_OPTS.seed, relief: PAPER_OPTS.relief ?? 'cold' }).height;
+      const spread = subcellSpread(SHEET_PIGS, ctx.sheet.paper, N, { gain });
+      const fbase = new Uint8Array(FN * 3);
+      const p0 = paperRGB[0], p1 = paperRGB[1], p2 = paperRGB[2], s0 = 1 - SHADE;
+      for (let i = 0; i < FN; i++) {
+        const shade = s0 + SHADE * hF[i], o = i * 3;
+        const r = p0 * shade, g = p1 * shade, b = p2 * shade;
+        fbase[o] = Math.round(r > 255 ? 255 : r);
+        fbase[o + 1] = Math.round(g > 255 ? 255 : g);
+        fbase[o + 2] = Math.round(b > 255 ? 255 : b);
+      }
+      return renderSubgridLayers({ sheetLayers, spread, pigments: SHEET_PIGS, fbase, W2, H2, N, wantCoarse: !INKRES, zeroLayer: ctx.sheet._zeroLayer });
+    })();
+  console.log(`subgrid: settled pigment over ${N}x${N} sub-cells of the paper's relief at ${(CP_MM / N).toFixed(3)} mm, ${INKRES ? 'the painting with the pen over it' : 'painting-fine.jpg'} ${FW}x${FH}${AUX_GPU ? ' (GPU)' : ''}`);
+  return res;
 };
-const FINAL = renderSub();
-if (FINAL.fine && !INKRES) await sharp(FINAL.fine, { raw: { width: W2 * SUBGRID, height: H2 * SUBGRID, channels: 3 } }).jpeg({ quality: 92 }).toFile(path.join(out, 'painting-fine.jpg'));
-if (LOOK_RES > 1 && !INKRES) { const F = renderFine(); await sharp(F.buf, { raw: { width: F.FW, height: F.FH, channels: 3 } }).jpeg({ quality: 92 }).toFile(path.join(out, 'painting-fine.jpg')); }
-const FINAL_PIXELS=INKRES ? (FINAL.fine ? INKRES.composeFine(FINAL.fine) : INKRES.compose(view())) : FINAL.coarse;
+const FINAL = await renderSub();
+if (FINAL.fine && !INKRES) imageQueue.enqueue(() => sharp(FINAL.fine, { raw: { width: FINAL.fineW ?? W2 * SUBGRID, height: FINAL.fineH ?? H2 * SUBGRID, channels: 3 } }).jpeg({ quality: 92 }).toFile(path.join(out, 'painting-fine.jpg')));
+if (LOOK_RES > 1 && !INKRES) { const F = renderFine(); imageQueue.enqueue(() => sharp(F.buf, { raw: { width: F.FW, height: F.FH, channels: 3 } }).jpeg({ quality: 92 }).toFile(path.join(out, 'painting-fine.jpg'))); }
+const FINAL_PIXELS=INKRES ? (FINAL.fine && (!ctx.TWO_GRID || ctx.TWO_GRID.pigmentScale === 1 || INKRES.N === ctx.TWO_GRID.pigmentScale) ? INKRES.composeFine(FINAL.fine) : INKRES.compose(FINAL.coarse ?? view())) : FINAL.coarse;
 assertDeviceHealthy(ctx.sheet); // a broken GPU device never writes a painting (src/media/gpu/device-health.mjs)
-await sharp(FINAL_PIXELS,{raw:{width:OUT_W,height:OUT_H,channels:3}}).png().toFile(path.join(out,'painting.png'));
+const paintingPngP = imageQueue.enqueue(() => sharp(FINAL_PIXELS,{raw:{width:OUT_W,height:OUT_H,channels:3}}).png().toFile(path.join(out,'painting.png')));
+imageQueue.enqueue(() => sharp(FINAL_PIXELS,{raw:{width:OUT_W,height:OUT_H,channels:3}}).jpeg({quality:92}).toFile(path.join(out,'painting.jpg')));
 if(ctx.NATIVE_RECORDER){
  try{
   if(ctx.NATIVE_RECORDING_FAILURE)throw Error(ctx.NATIVE_RECORDING_FAILURE);
   if(ctx.NATIVE_UNOBSERVED_ROUTES?.length)throw Error('Incomplete native recording: direct marks in '+ctx.NATIVE_UNOBSERVED_ROUTES.join(', '));
   verifyNativeMarkCoverage(MARKTAPE,ctx.NATIVE_MARK_COUNTS);
+  await paintingPngP;
   const decoded=await sharp(path.join(out,'painting.png')).removeAlpha().raw().toBuffer();
   if(!decoded.equals(Buffer.from(FINAL_PIXELS)))throw Error('Native recording final PNG pixel mismatch');
   ctx.NATIVE_RECORDER.finish(decoded,{stage:ctx.STAGE});
@@ -190,7 +244,6 @@ if(ctx.NATIVE_RECORDER){
   process.exitCode=4;
  }
 }
-await sharp(FINAL_PIXELS,{raw:{width:OUT_W,height:OUT_H,channels:3}}).jpeg({quality:92}).toFile(path.join(out,'painting.jpg'));
 let exportedMarkTape = null;
 if (MARKTAPE) {
   const file = path.join(out, 'marks.json');
@@ -206,34 +259,53 @@ if (MARKTAPE) {
     opts: O,
     pigments: SHEET_PIGS.map(asTape), brushOpts: BRUSHOPTS, brushes: BRUSHES, penOpts: PENOPTS, pens: PENS, marks: MARKTAPE,
   };
-  if (FULL_TAPE) { const fd = fs.openSync(file, 'w');
-  try { for (const chunk of markTapeJSON(exportedMarkTape)) fs.writeFileSync(fd, chunk); } finally { fs.closeSync(fd); }
-  const strokes = MARKTAPE.filter(m => m.k === 's'), lines = MARKTAPE.filter(m => m.k === 'P');
-  const pts = strokes.reduce((a, m) => a + m.d.length, 0), lpts = lines.reduce((a, m) => a + m.d.length, 0);
-  console.log(`marks: ${strokes.length} strokes over ${pts} points, ${lines.length} pen lines over ${lpts} points, ${MARKTAPE.length - strokes.length - lines.length} other, ${BRUSHES.length} brushes over ${BRUSHOPTS.length} shapes, ${PENS.length} pens over ${PENOPTS.length} nibs, ${(fs.statSync(file).size / 1048576).toFixed(2)} MB`); }
+  if (FULL_TAPE) {
+    const fd = fs.openSync(file, 'w');
+    try {
+      const buf = []; let bufLen = 0;
+      for (const chunk of markTapeJSON(exportedMarkTape)) {
+        buf.push(chunk); bufLen += chunk.length;
+        if (bufLen >= 1048576) { fs.writeFileSync(fd, buf.join('')); buf.length = 0; bufLen = 0; }
+      }
+      if (buf.length) fs.writeFileSync(fd, buf.join(''));
+    } finally { fs.closeSync(fd); }
+    const strokes = MARKTAPE.filter(m => m.k === 's'), lines = MARKTAPE.filter(m => m.k === 'P');
+    const pts = strokes.reduce((a, m) => a + m.d.length, 0), lpts = lines.reduce((a, m) => a + m.d.length, 0);
+    console.log(`marks: ${strokes.length} strokes over ${pts} points, ${lines.length} pen lines over ${lpts} points, ${MARKTAPE.length - strokes.length - lines.length} other, ${BRUSHES.length} brushes over ${BRUSHOPTS.length} shapes, ${PENS.length} pens over ${PENOPTS.length} nibs, ${(fs.statSync(file).size / 1048576).toFixed(2)} MB`);
+  }
 }
+const subLayer = (a, b) => {
+  const len = a.length, out = new Float32Array(len);
+  if (!b) { for (let i = 0; i < len; i++) { const v = a[i]; out[i] = v > 0 ? v : 0; } return out; }
+  for (let i = 0; i < len; i++) { const v = a[i] - b[i]; out[i] = v > 0 ? v : 0; }
+  return out;
+};
+let inkJpgP = null;
 {
   // Pen last: the ink is what the sheet gained while drawing. Pen first: the ink is what the drawing laid, and the washes
   // are what the sheet holds beyond it (the washes moved some of that ink, so this is the layer as laid, not as left).
   const after = thickness(ctx.sheet);
   // with --drawing none no pen ran at all, so there is no wash snapshot to subtract and the ink layer is empty
   const empty = () => after.map(a => new Float32Array(a.length));
-  const inkLayer = PEN_FIRST ? (ctx.INK_THK ?? empty()) : ctx.WASH_THK ? after.map((a, j) => Float32Array.from(a, (v, i) => Math.max(0, v - ctx.WASH_THK[j][i]))) : empty();
-  await sharp(Buffer.from(renderLayers([inkLayer], SHEET_PIGS, base, N2, 1).buffer), { raw: { width: W2, height: H2, channels: 3 } }).jpeg({ quality: 92 }).toFile(path.join(out, 'ink.jpg'));
+  const inkLayer = PEN_FIRST ? (ctx.INK_THK ?? empty()) : ctx.WASH_THK ? after.map((a, j) => subLayer(a, ctx.WASH_THK[j])) : empty();
+  const inkBuf = Buffer.from(renderLayers([inkLayer], SHEET_PIGS, base, N2, 1).buffer);
+  inkJpgP = imageQueue.enqueue(() => sharp(inkBuf, { raw: { width: W2, height: H2, channels: 3 } }).jpeg({ quality: 92 }).toFile(path.join(out, 'ink.jpg')));
   // Proof export at the actual pen-sheet resolution; the legacy ink.jpg remains the coarse layer.
   // Unlike legacy opening-only ink.jpg, the coarse proof includes the closing pen
   // and the ink remaining after wash transport, excluding paint and graphite.
   const nativeInk = INKRES ? INKRES.nativeInk() : renderInkProof({ thickness: after, pigments: SHEET_PIGS, inkAt: PIGS.length, width: W2, height: H2 });
-  await sharp(nativeInk.pixels, { raw: { width: nativeInk.width, height: nativeInk.height, channels: 3 } }).png().toFile(path.join(out, 'ink-native.png'));
+  imageQueue.enqueue(() => sharp(nativeInk.pixels, { raw: { width: nativeInk.width, height: nativeInk.height, channels: 3 } }).png().toFile(path.join(out, 'ink-native.png')));
   fs.writeFileSync(path.join(out, 'ink-native.json'), JSON.stringify({ width: nativeInk.width, height: nativeInk.height, sheetWidthMm: PB?.mm ?? num('sheetmm', DEFAULT_SHEET_MM), kind: INKRES ? 'deposited ink on native pen sheet, before wash redistribution' : 'final deposited coarse ink, including wash redistribution', resized: false }) + '\n');
   if (PEN_FIRST) {
-    const washLayer = after.map((a, j) => Float32Array.from(a, (v, i) => Math.max(0, v - (ctx.INK_THK ? ctx.INK_THK[j][i] : 0))));
-    await sharp(Buffer.from(renderLayers([washLayer], SHEET_PIGS, base, N2, 1).buffer), { raw: { width: W2, height: H2, channels: 3 } }).jpeg({ quality: 92 }).toFile(path.join(out, 'wash.jpg'));
+    const washLayer = after.map((a, j) => subLayer(a, ctx.INK_THK ? ctx.INK_THK[j] : null));
+    const washBuf = Buffer.from(renderLayers([washLayer], SHEET_PIGS, base, N2, 1).buffer);
+    imageQueue.enqueue(() => sharp(washBuf, { raw: { width: W2, height: H2, channels: 3 } }).jpeg({ quality: 92 }).toFile(path.join(out, 'wash.jpg')));
   }
 }
 // Final contribution stats need both the finished painting and the exported ink layer.
 if (MARKTAPE) {
   JSONL.flush();
+  await Promise.all([paintingPngP, inkJpgP]);
   const strokeStats = await tapeStats(exportedMarkTape, out);
   const strokeGate = evaluateGate(strokeStats, { mode: opt('strokegate', 'warn'),
     config: opt('strokegateconfig', '') ? JSON.parse(fs.readFileSync(opt('strokegateconfig'), 'utf8')) : {} });
@@ -242,13 +314,6 @@ if (MARKTAPE) {
   fs.writeFileSync(path.join(out, 'stroke-gate.json'), JSON.stringify(strokeGate, null, 2));
   printGate(strokeGate);
   if (strokeGate.blocks) process.exitCode = 4;
-}
-await sharp(ctx.px, { raw: { width: w, height: h, channels: 3 } }).jpeg({ quality: 92 }).toFile(path.join(out, 'source.jpg'));
-// the picture the painter aimed at, so a photo plate is compared with a watercolour, not a photograph
-if (STYLE > 0) {
-  const aim = new Uint8ClampedArray(n * 3);
-  for (let i = 0; i < n; i++) for (let c = 0; c < 3; c++) aim[i * 3 + c] = paperRGB[c] * Math.exp(-D_AIM[i * 3 + c]);
-  await sharp(aim, { raw: { width: w, height: h, channels: 3 } }).jpeg({ quality: 92 }).toFile(path.join(out, 'target.jpg'));
 }
 // --timeline target|<code>: retime the frames so each phase takes the share the target build gives it (src/paint/film-timeline.mjs).
 // Milestones come from work/references/manifest.json; a piece with none takes the median. Nothing here paints.
@@ -283,16 +348,7 @@ if(ctx.sheet._layerStoragePolicy)compactLowerLayers(ctx.sheet,ctx.sheet._layerSt
 fs.writeFileSync(path.join(out, 'backend.json'), JSON.stringify({ ...PAINTER, ...GPU_INFO, layerStorage:{main:layerStorageStats(ctx.sheet),...(INKRES?{fine:layerStorageStats(INKRES.fine)}:{})}, gpuStats: gpuStats(ctx.sheet), performanceOptions: { opticalThreads: ctx.opticalThreads, trackedTransfers: SPEED_TRANSFERS, edgePingPong: process.env.GPU_EDGE_PINGPONG === '1', fusedWetScanRequested: process.env.GPU_FUSE_WETSCAN === '1', pressureSolver: PRESSURE_SOLVER } }, null, 1));
 console.log(backendLine(GPU_INFO)); // the backend this painting was made on, again at the end (details in backend.json)
 fs.writeFileSync(path.join(out, 'frames.json'), JSON.stringify({ ...PAINTER, width: OUT_W, height: OUT_H, presentation: { framePolicy: FRAME_POLICY.all ? 'all' : 'checkpoints', checkpoints: [10,25,50,75,100], video: Boolean(OUTPUT_VIDEO), frameFormat: ctx.FRAME_FORMAT === 'jpg' ? 'jpeg (quality 88)' : `${ctx.FRAME_FORMAT} (lossless)`, requestedTimeline: TIMELINE, retimed: Boolean(RETIMED) }, ...(RETIMED ? { timeline: { target: RETIMED.target.code, fallback: RETIMED.target.fallback, milestones: RETIMED.target.milestones } } : {}), frames: num('phaselabels', 0) > 0 ? labelFrames(placed, RETIMED?.target.milestones ?? null) : placed }, null, 1));
-// The plan as a picture, through the sheet's optics, to tell a bad plan from one the brushes failed to carry out.
-{
-  const layer = PIGS.map(() => new Float32Array(n));
-  for (let i = 0; i < n; i++) for (let j = 0; j < PIGS.length; j++) layer[j][i] = expected[i * PIGS.length + j];
-  const flat = new Uint8ClampedArray(n * 3);
-  for (let i = 0; i < n; i++) for (let c = 0; c < 3; c++) flat[i * 3 + c] = paperRGB[c];
-  await sharp(Buffer.from(renderLayers([layer], PIGS, flat, n, 1).buffer), { raw: { width: w, height: h, channels: 3 } })
-    .jpeg({ quality: 92 }).toFile(path.join(out, 'plan.jpg'));
-}
-await drainFrames(); if (ctx.FRAMER) ctx.FRAMER.close();
+await Promise.all([drainFrames(), imageQueue.flush()]); if (ctx.FRAMER) ctx.FRAMER.close();
 phaseMark('finish');
 if (OUTPUT_VIDEO) {
   // re-timed, each frame is held for its share of the same running time, and the film is resampled to the frame rate

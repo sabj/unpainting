@@ -12,6 +12,7 @@ import path from 'node:path';
 import sharp from 'sharp';
 import {pickPalette, paletteOptions} from '../../src/crop/palettepick.mjs';
 import {widePalette} from '../../src/crop/palettewide.mjs';
+import {pickPaletteGpu, widePaletteGpu} from '../../src/media/gpu/palette-gpu.mjs';
 import {paintGuardOptions} from '../../src/crop/paint-guard.mjs';
 import {channelDensity} from '../../src/crop/pigments.mjs';
 import {measureLine} from '../../src/paint/methods/pencil-line.mjs';
@@ -36,7 +37,7 @@ export async function plan(ctx) {
 const { JSONL, argv0, argv, PIPELINE, opt, num, DRAWING_STAGE_INTENT, optTrack, SPEED_PROFILE, 
   root, out, INK_RECIPE, DRAWING_REGISTRATION, RUN_CACHE, holdInk, VALUE_CONFIG, 
   phaseMark, PX_SOURCE, PX_RAW, TARGET_GUARD, w, h, n, lum, paperRGB, CODE_HASH, 
-  PALETTE_FROM_FILE, paletteFitStarted } = ctx;
+  PALETTE_FROM_FILE, paletteFitStarted, AUX_GPU } = ctx;
 const PALETTE = (await cachedStep({ ...RUN_CACHE, name: 'palette', code: codeHash(root,[],{dependencies:['src/crop/palettepick.mjs','src/crop/palettewide.mjs','src/crop/paint-guard.mjs']}), track: optTrack, inputs: { px: ctx.px, w, h, paperRGB, from: PALETTE_FROM_FILE } }, async () => {
   const from = opt('palettefrom', '');
   let source = ctx.px, sw = w, sh_ = h;
@@ -56,14 +57,19 @@ const PALETTE = (await cachedStep({ ...RUN_CACHE, name: 'palette', code: codeHas
     source = await sharp(Buffer.from(source.buffer, source.byteOffset, source.byteLength), { raw: { width: sw, height: sh_, channels: 3 } }).resize(rw, rh, { fit: 'fill', kernel: 'lanczos3' }).raw().toBuffer();
     console.log(`palette: fitted on the picture at ${rw}x${rh} (--palettecells ${PALETTE_CELLS})`); sw = rw; sh_ = rh;
   }
-  const { palette, note } = pickPalette(source, sw, sh_, paperRGB, paletteOptions(opt, num));
+  const { palette, note } = AUX_GPU
+    ? await pickPaletteGpu(AUX_GPU.device, source, sw, sh_, paperRGB, paletteOptions(opt, num))
+    : pickPalette(source, sw, sh_, paperRGB, paletteOptions(opt, num));
   if (note) console.log(note);
   // --paintguard dE: check a forced box (--paints) against the painter's own pick (src/crop/paint-guard.mjs). Default 0, off.
   // --paintguardmode add|replace (default add); --paintguardmax: most paints after adding (default 8).
   // --paintsextend 0: keep a named --paints box as it is. Default 1: it gains pans only for a large hue cluster it cannot reach.
   // --palettewide 1: box paints chosen to reach the picture's local colours (src/crop/palettewide.mjs)
   if (num('palettewide', 0) > 0) {
-    const wide = widePalette(source, sw, sh_, paperRGB, palette, { weight: num('pwweight', 1), gain: num('pwgain', 0.5), min: num('pwmin', 3), max: num('pwmax', 6), K: num('pwcolours', 8), keys: opt('paints', '') ? opt('paints', '').split(',') : null, add: opt('paintsadd', '') ? opt('paintsadd', '').split(',') : null, extend: num('paintsextend', 1) > 0, guard: paintGuardOptions(opt, num) });
+    const wideOpts = { weight: num('pwweight', 1), gain: num('pwgain', 0.5), min: num('pwmin', 3), max: num('pwmax', 6), K: num('pwcolours', 8), keys: opt('paints', '') ? opt('paints', '').split(',') : null, add: opt('paintsadd', '') ? opt('paintsadd', '').split(',') : null, extend: num('paintsextend', 1) > 0, guard: paintGuardOptions(opt, num) };
+    const wide = AUX_GPU
+      ? await widePaletteGpu(AUX_GPU.device, source, sw, sh_, paperRGB, palette, wideOpts)
+      : widePalette(source, sw, sh_, paperRGB, palette, wideOpts);
     console.log(wide.note);
     return wide.palette;
   }
@@ -208,7 +214,6 @@ const COLOUR_TRACE = num('colourtrace', 0) > 0;
 const pl = 0.2126 * paperRGB[0] + 0.7152 * paperRGB[1] + 0.0722 * paperRGB[2];
 ctx.SRC = TARGET_GUARD.register('SRC', new Float32Array(n));
 for (let i = 0; i < n; i++) ctx.SRC[i] = Math.max(0, -Math.log(Math.max(0.02, Math.min(1, lum(i) / pl))));
-const peakD = [...ctx.SRC].sort((a, b) => b - a)[Math.floor(n * 0.03)] || 1;
 
 // The rows and columns a passage's cells lie in, found once: the loops that walk its mask walk only these, in the same order
 // (a cell outside the box is not in the mask, so it is skipped either way). Empty mask: y1 < y0.

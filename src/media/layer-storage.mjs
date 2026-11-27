@@ -34,6 +34,18 @@ function install(layer,k,record) {
   });
 }
 
+// Read four words at a time, including signed zero and every NaN payload.
+function firstWord(bits, a, end) {
+  while(a+3<end && !(bits[a]|bits[a+1]|bits[a+2]|bits[a+3]))a+=4;
+  while(a<end && !bits[a])a++;
+  return a;
+}
+function lastWord(bits, a, start) {
+  while(a-3>=start && !(bits[a]|bits[a-1]|bits[a-2]|bits[a-3]))a-=4;
+  while(a>=start && !bits[a])a--;
+  return a;
+}
+
 /**
  * Keep the mutable top, underlay, pending GPU archives, removable-resist layers,
  * pending prep-fade prefix and retained pigments dense. Crops must save >=25%.
@@ -49,37 +61,48 @@ export function compactLowerLayers(sheet,{from=1,before=Infinity,retainPigments=
   if(sheet._lastCompactKey===compactKey)return {packed:0,savedBytes:0};
   const pending=new Set(pendingList.map(p=>p.index));
   const keep=new Set(retainPigments);
-  const references=new Map();
-  for(const layer of [sheet.G,sheet.D,sheet.P,...sheet.layers])for(let k=0;k<sheet.K;k++){
-    const plane=Object.getOwnPropertyDescriptor(layer,k)?.value;
-    if(plane?.buffer)references.set(plane.buffer,(references.get(plane.buffer)??0)+1);
-  }
-  let packed=0,savedBytes=0;
+  // Most calls have no new dense planes. Do not census every retained layer
+  // (or trigger a cropped getter) until there is actual storage work to do.
+  const candidates=[];
   for(let l=start;l<end;l++){
     if(pending.has(l))continue;
     const layer=sheet.layers[l],version=layer._cacheVersion??0;
     for(let k=0;k<sheet.K;k++){
       if(keep.has(k)||slots.get(layer)?.has(k))continue;
       const plane=layer[k];
-      if(!(plane instanceof Float32Array)||plane.length!==sheet.n||plane===sheet._zeroLayer)continue;
-      if(references.get(plane.buffer)>1)continue; // preserve aliases into retained or mutable reservoirs
-      const prior=examined.get(plane);
-      if(prior===version)continue;
-      const bits=new Uint32Array(plane.buffer,plane.byteOffset,plane.length);
-      let x0=sheet.w,y0=sheet.h,x1=-1,y1=-1;
-      // Include negative zero and NaN payloads: storage is bit-preserving.
-      for(let i=0;i<bits.length;i++)if(bits[i]){
-        const x=i%sheet.w,y=Math.floor(i/sheet.w);
-        x0=Math.min(x0,x);x1=Math.max(x1,x);y0=Math.min(y0,y);y1=Math.max(y1,y);
-      }
-      const cw=x1-x0+1,ch=y1-y0+1;
-      if(x1<0||cw*ch>=sheet.n*.75){examined.set(plane,version);continue;}
-      const crop=new Uint32Array(cw*ch);
-      for(let row=0;row<ch;row++)crop.set(bits.subarray((y0+row)*sheet.w+x0,(y0+row)*sheet.w+x0+cw),row*cw);
-      const record={n:sheet.n,w:sheet.w,x:x0,y:y0,cw,ch,bits:crop,dense:null,
-        shared:typeof SharedArrayBuffer!=='undefined'&&plane.buffer instanceof SharedArrayBuffer};
-      install(layer,k,record);packed++;savedBytes+=plane.byteLength-crop.byteLength;
+      if(!(plane instanceof Float32Array)||plane.length!==sheet.n||plane===sheet._zeroLayer||examined.get(plane)===version)continue;
+      candidates.push({layer,k,plane,version});
     }
+  }
+  if(!candidates.length){sheet._lastCompactKey=compactKey;return {packed:0,savedBytes:0};}
+  const references=new Map();
+  for(const layer of [sheet.G,sheet.D,sheet.P,...sheet.layers])for(let k=0;k<sheet.K;k++){
+    const plane=Object.getOwnPropertyDescriptor(layer,k)?.value;
+    if(plane?.buffer)references.set(plane.buffer,(references.get(plane.buffer)??0)+1);
+  }
+  let packed=0,savedBytes=0;
+  for(const {layer,k,plane,version} of candidates){
+    if(references.get(plane.buffer)>1)continue; // preserve aliases into retained or mutable reservoirs
+    const bits=new Uint32Array(plane.buffer,plane.byteOffset,plane.length);
+    const w=sheet.w,first=firstWord(bits,0,bits.length);
+    if(first===bits.length){examined.set(plane,version);continue;}
+    const last=lastWord(bits,bits.length-1,first),y0=Math.floor(first/w),y1=Math.floor(last/w);
+    let x0=first-y0*w,x1=-1;
+    // Only the outermost occupied rows and the portions outside the current
+    // horizontal bounds matter. Never rescan the growing dense interior.
+    for(let y=y0;y<=y1;y++){
+      const row=y*w,a=firstWord(bits,row,row+x0)-row;
+      if(a<x0)x0=a;
+      const b=lastWord(bits,row+w-1,row+x1+1)-row;
+      if(b>x1)x1=b;
+    }
+    const cw=x1-x0+1,ch=y1-y0+1;
+    if(x1<0||cw*ch>=sheet.n*.75){examined.set(plane,version);continue;}
+    const crop=new Uint32Array(cw*ch);
+    for(let row=0;row<ch;row++)crop.set(bits.subarray((y0+row)*sheet.w+x0,(y0+row)*sheet.w+x0+cw),row*cw);
+    const record={n:sheet.n,w:sheet.w,x:x0,y:y0,cw,ch,bits:crop,dense:null,
+      shared:typeof SharedArrayBuffer!=='undefined'&&plane.buffer instanceof SharedArrayBuffer};
+    install(layer,k,record);packed++;savedBytes+=plane.byteLength-crop.byteLength;
   }
   sheet._lastCompactKey=compactKey;
   return {packed,savedBytes};

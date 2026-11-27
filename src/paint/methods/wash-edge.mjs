@@ -49,10 +49,11 @@ export function edgeWanderMm(P, wetness = 'plain') {
  */
 export function organicOutline(P, { seed = 0, wetness = 'plain' } = {}) {
   if (!P || P.length < 3) return P;
-  const H = EDGE_HAND, amp = edgeWanderMm(P, wetness), size = Math.sqrt(Math.max(1e-6, areaOf([P])));
+  const H = EDGE_HAND, size = Math.sqrt(Math.max(1e-6, areaOf([P]))), amp = Math.min(edgeWanderMm(P, wetness), 0.08 * size);
   // corners rounded over a share of the wash's size (at least a couple of mm), then resampled fine
   let per = 0; for (let k = 0; k < P.length; k++) { const a = P[k], b = P[(k + 1) % P.length]; per += Math.hypot(b[0] - a[0], b[1] - a[1]); }
-  const round = Math.max(1.5, Math.min(8, size * H.corner)), coarse = resample(P, round);
+  // a small part is rounded and wanders by its own size: never more than a fifth of it, so it is never rounded away
+  const round = Math.min(Math.max(1.5, Math.min(8, size * H.corner)), 0.2 * size), coarse = resample(P, round);
   const Q = resample(chaikin(coarse, 3), Math.max(0.25, Math.min(1, amp / 2)));
   const rng = handOf(`${seed}/edge`), sign = areaSign(Q);
   // three scales of wander: long swells, a bead's length, and a ragged fine edge (knots by perimeter in mm)
@@ -65,7 +66,8 @@ export function organicOutline(P, { seed = 0, wetness = 'plain' } = {}) {
     let d = 0; for (const [f, w] of octaves) d += f(t) * w;
     out[k] = [Q[k][0] + nx * d * amp, Q[k][1] + ny * d * amp];
   }
-  return out;
+  // the outline keeps the part: one that would lose most of its area is laid by its own outline
+  return areaOf([out]) >= 0.6 * areaOf([P]) ? out : P;
 }
 
 function areaSign(P) { let s = 0; for (let k = 0; k < P.length; k++) { const a = P[k], b = P[(k + 1) % P.length]; s += a[0] * b[1] - b[0] * a[1]; } return s >= 0 ? 1 : -1; }

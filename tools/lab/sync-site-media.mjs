@@ -11,7 +11,7 @@ import path from 'node:path';
 
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
 const SRC = path.join(ROOT, 'src', 'media');
-export const ROOTS = ['paper', 'sheet', 'brush', 'pen', 'pencil', 'graphite', 'km', 'pigment-physical', 'stroke-bench', 'gpu/edge-geometry', 'gpu/edge-feed-wgsl', 'gpu/film-level-wgsl', 'gpu/film-level-host'];
+export const ROOTS = ['paper', 'sheet', 'brush', 'pen', 'pencil', 'graphite', 'km', 'pigment-physical', 'stroke-bench', 'gpu/edge-geometry', 'gpu/contact-distance-wgsl', 'gpu/contact-distance', 'gpu/drying-pressure-wgsl', 'gpu/drying-pressure-gpu', 'gpu/edge-feed-wgsl', 'gpu/film-level-wgsl', 'gpu/film-level-host', 'gpu/paper-gpu', 'gpu/finish-gpu', 'gpu/section-brush-gpu'];
 const HEADER = from => `// Generated from src/media/${from} by tools/lab/sync-site-media.mjs. Edit the source.\n`;
 
 const relImports = code => [...code.matchAll(/^\s*(?:import|export)\s[^'"]*?from\s+'([^']+)'|^\s*import\s+'([^']+)'/gm)].map(m => m[1] ?? m[2]);
@@ -23,7 +23,14 @@ export function generate() {
     const rel = todo.pop(); if (out.has(rel.replace(/\.mjs$/, '.js'))) continue;
     const file = path.join(SRC, rel);
     if (!file.startsWith(SRC + path.sep)) throw new Error(`${rel} lies outside src/media; the lab copies only src/media`);
-    const code = fs.readFileSync(file, 'utf8');
+    let code = fs.readFileSync(file, 'utf8');
+    // The browser's async physics adapter captures only section plans. Other tools keep
+    // the existing CPU contact path; the painter source needs no browser lifecycle hook.
+    if (rel === 'brush.mjs') code = code.replace('export function stroke(brush, sheet, path, options = {}) {',
+      `export function stroke(brush, sheet, path, options = {}) {
+  if (brush.model === 'section' && sheet._sectionStroke && !sheet._gpu && !options.between) {
+    return sheet._sectionStroke(brush, path, options);
+  }`);
     for (const spec of relImports(code)) {
       if (!spec.startsWith('.')) throw new Error(`src/media/${rel} imports ${spec}, which the browser cannot load`);
       todo.push(path.posix.normalize(path.posix.join(path.posix.dirname(rel), spec)));

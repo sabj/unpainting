@@ -16,6 +16,19 @@ test('a wet-into-wet bed is wetted by a clean brush made like the painting brush
   assert.equal(out.paper.waterP50, 0.1);
 });
 
+test('repeated prewet passes increase clean-water load so deep cold-press pits bridge', () => {
+  const dips = []; let passes = 0;
+  const out = prepareWetBed({
+    settings: { radius: 9 }, bristles: 18, seed: 911, pigments: 1, target: 'sheet', points: ['p'], prepOpts: { lift: false },
+    observe: () => ({ moistShare: passes >= 3 ? 0.85 : 0.6, waterP50: 0.08, waterMax: 0.12, saturationMax: 0.1 }),
+    gate: () => ({ saturationMax: 0.1 }), advance: () => {},
+    createBrush: o => ({ o }), dip: (_b, d) => dips.push(+d.water.toFixed(2)), thirsty: () => {},
+    stroke: () => { passes++; },
+  });
+  assert.deepEqual(dips, [0.55, 0.7, 0.85]);
+  assert.equal(out.paper.moistShare, 0.85);
+});
+
 // The numeric sheet callback is exercised directly, as the recorder tests exercise renderRaw.
 // This is a synthetic observed-state/contact-domain regression, not replay of a saved physical sheet.
 const callerSource = (await import('node:fs')).readFileSync(new URL('../plate/sheet.mjs', import.meta.url), 'utf8');

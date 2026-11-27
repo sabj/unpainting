@@ -18,7 +18,9 @@ test('a film standing deeper in one half levels across 20 mm in seconds, keeping
   const mm = 0.25, w = 60, s = createSheet(flatPaper(w, 40, mm), [ultramarine]);
   for (let y = 10; y < 30; y++) for (let x = 10; x < 50; x++) deposit(s, y * w + x, x < 30 ? 0.25 : 0.15, [x < 30 ? 0.1 : 0.03]);
   const water = () => { let t = 0; for (const v of s.W) t += v; return t; }, pig = () => { let t = 0; for (const v of s.G[0]) t += v; return t; };
-  const w0 = water(), g0 = pig(), o = { ...O, slope: 0, fibreFlow: 0, dt: 0.1 };
+  // Isolate the free-film calibration here. The paper-held layer is covered by
+  // film-mobility.test.mjs and the ordinary floor stays on in every wash below.
+  const w0 = water(), g0 = pig(), o = { ...O, levelFloor: 0, slope: 0, fibreFlow: 0, dt: 0.1 };
   for (let t = 0; t < 30; t++) levelFilm(s, o, [0, 0, w - 1, 39], mm);
   const a = s.W[20 * w + 15], b = s.W[20 * w + 45];
   assert.ok(Math.abs(a - b) < 0.01, `three seconds over 20 mm: ${a} against ${b}`);

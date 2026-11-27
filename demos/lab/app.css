@@ -19,7 +19,7 @@ button,select,summary{touch-action:manipulation}button,select{min-height:44px}bu
 @media(max-width:860px){main{padding:8px 16px 24px}.lab{grid-template-columns:minmax(0,1fr)}.paint-nav{display:none}.paint-head{margin-bottom:8px}.paint-head h1{font-size:27px}.sheet{width:min(100%,calc((100svh - 195px)*var(--sheet-ratio,1.33333)))}.panel{margin-top:8px}#panel-tabs{gap:8px}#panel-tabs button{display:flex;justify-content:center;gap:8px;min-height:44px}.panel .seg.tools{display:grid;grid-template-columns:repeat(6,minmax(0,1fr))}.panel .seg.tools button{font-size:14px;padding:4px}.sheetbar .toolbar button{padding:4px 10px}#painting-picker{grid-template-columns:repeat(auto-fill,minmax(145px,1fr))}}
 @media(max-width:480px){#run-settings{gap:6px;justify-content:flex-start}#run-settings label{font-size:13px;gap:4px}#run-settings select{font-size:14px;max-width:166px}#run-settings label:first-child{font-size:0}#run-settings label:first-child select{max-width:145px}#run-settings label:nth-child(2){font-size:0}#run-settings label:nth-child(2) select{max-width:178px}.sheet{width:100%}#welcome{gap:4px;padding:8px}#welcome p{display:none}#welcome h2{margin:0 0 5px;font-size:23px}#welcome small{font-size:12px}#current-materials{min-height:76px}.sequence-row{grid-template-columns:1fr 3fr;gap:8px}#sequence-thumbs{grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}#sequence-thumbs img{aspect-ratio:1.55}.sequence-row figure{padding-top:4px}#replay-controls{gap:6px}#replay-controls label{font-size:13px}#replay-controls button{padding:4px 9px}.panel .seg.tools{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(orientation:landscape) and (max-height:540px){.paint-head{display:none}.lab{grid-template-columns:minmax(0,1fr) 240px}.stage-heading{font-size:15px}#run-settings{gap:6px}.sheet{width:min(100%,calc((100svh - 120px)*var(--sheet-ratio,1.33333)))}#welcome{gap:3px}#welcome p,#welcome small{display:none}#welcome h2{font-size:20px;margin-bottom:4px}#welcome>div{gap:4px}#welcome button{padding:4px 12px}}
-@media(min-width:861px){.paint-nav{display:none}.sheet{width:min(100%,calc((100svh - 340px)*var(--sheet-ratio,1.33333)))}}
+@media(min-width:861px){.paint-nav{display:none}.sheet{width:min(100%,calc((100svh - 210px)*var(--sheet-ratio,1.33333)))}}
 .panel .seg.papers{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px}.panel .seg.papers button{border-radius:3px;margin:0}
 body:not(.has-example) #replay-controls{display:none}
 body.replaying .stage>.status{display:none}
@@ -47,27 +47,27 @@ body.replaying .stage>.status{display:none}
 
 
 
-/* Fullscreen has fixed slots; changing status or seeking cannot move the paper. */
-body.canvas-focus main{padding:60px 12px 12px}
-body.canvas-focus .stage{display:grid!important;grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr) 80px 44px;align-items:center;justify-items:center;gap:6px}
-body.canvas-focus .sheet{grid-area:1/1;align-self:center;width:min(100%,calc((100dvh - 220px)*var(--sheet-ratio,1.33333)));max-width:100%;margin:0}
-body.canvas-focus :where(.stage-heading,#run-settings,#mode-note,#sequence,#replay-controls,.sheetbar,#step-caption,.drying,.stage>.status){display:none!important}
-body.canvas-focus #current-materials{grid-area:2/1;position:static;width:min(800px,100%);height:80px;min-height:80px;overflow:auto;margin:0}
-body.canvas-focus #playbar{grid-area:3/1;width:min(760px,100%);min-height:44px;margin:0;flex:none}
-body.canvas-focus:not(.replaying) .sheetbar{display:flex!important;grid-area:3/1;width:min(760px,100%);margin:0}
-body.canvas-focus:not(.replaying) .sheetbar .state,body.canvas-focus:not(.replaying) #load-state{display:none}
-body.canvas-focus:not(.replaying) .sheetbar .toolbar{justify-content:center}
-body.canvas-focus:not(.replaying) .sheetbar :is(#clear,#redo,#dry-layer){display:none}
-body.canvas-focus #exit-focus{top:max(8px,env(safe-area-inset-top));right:12px}
-@media(orientation:landscape) and (max-height:540px){
- body.canvas-focus .stage{grid-template-rows:minmax(0,1fr) 44px}
- body.canvas-focus .sheet{width:min(100%,calc((100dvh - 120px)*var(--sheet-ratio,1.33333)))}
- body.canvas-focus #current-materials{position:absolute;top:5px;left:12px;width:calc(100% - 165px);height:48px;min-height:48px;max-height:48px}
- body.canvas-focus #playbar,body.canvas-focus:not(.replaying) .sheetbar{grid-area:2/1}
- body.canvas-focus #playbar{flex-wrap:nowrap}
- body.canvas-focus #playbar progress{order:0;flex-basis:auto}
-}
-.sheetbar label:has(#auto-redip){display:flex;align-items:center;gap:8px;min-height:44px;white-space:nowrap;font-size:14px}.sheetbar #auto-redip{width:20px;height:20px;margin:0}.replaying label:has(#auto-redip),body.canvas-focus .sheetbar label:has(#auto-redip){display:none}
+/* A floating dock never participates in paper layout. */
+body.canvas-focus main{padding:16px 12px 116px}
+body.canvas-focus .stage{display:flex!important;align-items:center;justify-content:center;gap:0}
+body.canvas-focus .sheet{width:min(100%,calc((100dvh - 132px)*var(--sheet-ratio,1.33333)));max-width:100%;margin:0}
+body.canvas-focus :where(.stage-heading,#run-settings,#mode-note,#sequence,#replay-controls,.sheetbar,#step-caption,.drying,.stage>.status,#current-materials){display:none!important}
+body.canvas-focus #playbar{position:fixed;top:12px;left:16px;width:min(650px,calc(100% - 200px));margin:0;padding:4px 8px;background:var(--paper);border:1px solid var(--line);border-radius:5px;z-index:12}
+body.canvas-focus #exit-focus{top:max(10px,env(safe-area-inset-top));right:12px}
+#focus-dock{position:fixed;z-index:20;bottom:max(12px,env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);display:flex;align-items:center;justify-content:center;gap:8px;max-width:calc(100% - 24px);width:max-content;padding:6px 10px;border:1px solid var(--line);border-radius:28px;background:color-mix(in srgb,var(--paper) 92%,transparent);backdrop-filter:blur(14px);box-shadow:0 5px 24px #0002}
+#focus-dock button{display:flex;align-items:center;justify-content:center;gap:6px;min-width:40px;min-height:44px;padding:4px 8px;border-radius:20px}
+.focus-tools,.focus-actions{display:flex;gap:2px;align-items:center}
+.focus-tools button span{display:none}.focus-tools svg{width:20px;height:20px;flex:none}
+#focus-pigment i{width:23px;height:23px;border:1px solid #0003;border-radius:50%}
+.focus-water{display:flex;align-items:center;gap:6px;font-size:14px!important}.focus-water input{width:72px;min-height:44px;accent-color:var(--accent)}
+#focus-palette{position:fixed;inset:auto;bottom:96px;left:50%;transform:translateX(-50%);width:min(340px,calc(100vw - 24px));padding:10px;background:var(--paper);color:var(--ink);border:1px solid var(--line);border-radius:14px;box-shadow:0 5px 24px #0002}
+#focus-palette:popover-open{display:flex;flex-wrap:wrap;justify-content:center}
+#focus-palette button{width:44px;height:44px;padding:8px;display:grid;place-items:center;border:0;border-radius:50%;background:transparent}
+#focus-palette i{display:block;width:26px;height:26px;border-radius:50%;border:1px solid #0003}
+#focus-palette button[aria-pressed=true] i{outline:2px solid var(--ink);outline-offset:3px}
+@media(max-width:1000px){#focus-dock{gap:4px;padding:5px 8px}#focus-dock button{padding:4px 6px}.focus-water{font-size:0!important}.focus-water input{width:60px}}
+@media(max-width:860px){#focus-dock{flex-wrap:wrap;gap:2px 8px;border-radius:20px;width:max-content;max-width:calc(100% - 16px)}.focus-actions{justify-content:center}#focus-palette{bottom:126px}}
+@media(max-width:580px){#focus-dock{width:360px}.focus-actions{flex-basis:100%}body.canvas-focus main{padding-bottom:132px}body.canvas-focus .sheet{width:min(100%,calc((100dvh - 156px)*var(--sheet-ratio,1.33333)))}#focus-dock button{font-size:14px}.focus-water input{width:48px}}
 
 /* Scratch paint stays above the page background and below every UI region. */
 body{isolation:isolate}
@@ -97,3 +97,164 @@ body.canvas-focus #operation-controls,body.canvas-focus #operation-timeline{disp
  #welcome{background:#24231fd9}#welcome button{background:var(--paper)}.mix-preview small{background:#24231fdd}
  :root{color-scheme:dark;--paper:#24231f;--ink:#eee8dc;--muted:#bbb2a3;--line:#eee8dc38;--accent:#dfab87;--paint-paper:var(--paper);--paint-ink:var(--ink);--paint-muted:var(--muted);--paint-line:var(--line);--paint-accent:var(--accent)}
 }
+
+/* Freehand needs only the paper, brush and one compact row of sheet actions. */
+body:not(.studio-open):not(.replaying):not(.has-example) :is(#run-settings,#mode-note,#operation-controls,#operation-timeline){display:none}
+.stage-heading{min-height:44px;gap:8px}
+#sheet-title{min-width:0;margin-right:auto}
+.stage-heading button{min-height:36px;padding:4px 10px;border:1px solid var(--line);border-radius:4px;background:transparent;color:var(--ink);font:15px var(--paint-face);cursor:pointer}
+#studio-toggle[aria-expanded=true]{border-color:var(--accent);color:var(--accent)}
+#focus-view{font-size:15px}
+#engine-pill{flex:none;max-width:220px;border:1px solid var(--line);border-radius:20px;padding:3px 9px;color:var(--muted);font:12px/1.3 var(--paint-face);font-variant-numeric:tabular-nums}
+.studio-version{font-size:12px;color:var(--muted);padding:2px 6px;border:1px solid var(--line);border-radius:4px}
+#welcome{background:transparent;justify-content:center;gap:6px}
+#welcome>div{flex-direction:row;flex-wrap:wrap;justify-content:center;gap:4px 12px;margin-top:5px}
+#welcome button{min-width:0;padding:4px 8px;border:0;background:transparent;font-size:15px;text-decoration:underline;text-underline-offset:.2em}
+#welcome button:first-child{background:transparent;color:var(--muted)}
+#welcome h2{margin:0;font-size:clamp(23px,3vw,34px)}
+#welcome p{display:block}
+.sheetbar{flex-direction:column;gap:2px}
+.lab .sheetbar .toolbar{flex-wrap:nowrap;gap:0;width:100%;justify-content:center;overflow-x:auto;scrollbar-width:thin}
+.toolbar-group{position:relative;display:flex;align-items:center;flex:none;gap:2px;padding:0 9px;border-right:0}
+.toolbar-group::after{content:'';position:absolute;right:0;top:50%;transform:translateY(-50%);width:1px;height:16px;background:var(--line)}
+.toolbar-group:first-child{padding-left:0}.toolbar-group:last-child{padding-right:0}.toolbar-group:last-child::after{display:none}
+.lab .sheetbar .toolbar button,#reset-view{padding:4px 8px;border-color:transparent;font-size:15px}
+.lab .sheetbar .toolbar button:hover,#reset-view:hover{border-color:var(--line)}
+#redip,[data-action=redip]{display:flex;align-items:center;gap:7px}
+.charge{display:inline-grid;gap:3px;width:26px;flex:none;vertical-align:middle;--water-charge:0;--paint-charge:0}
+.charge i{display:block;height:3px;border-radius:2px;background:color-mix(in srgb,var(--ink) 16%,transparent);overflow:hidden}
+.charge i::before{content:'';display:block;height:100%;width:calc(100% * var(--water-charge));background:#7094a8}
+.charge i:last-child::before{width:calc(100% * var(--paint-charge));background:var(--accent)}
+#load-state{display:inline-grid;min-height:0;flex-basis:auto;order:0}
+.sheetbar .state{text-align:center;font-size:13px}
+.panel .seg.presets button{font-size:14px;padding:4px 3px;min-height:38px}
+.panel .seg.presets button[aria-pressed=true]{background:color-mix(in srgb,var(--accent) 12%,var(--paper));border-color:var(--accent);color:var(--accent)}
+.panel .auto-redip{font-size:13px;min-height:32px;gap:7px}.auto-redip input{width:16px!important;height:16px!important}
+.sheet.is-panning{cursor:grabbing}.sheet.pan-ready{cursor:grab}
+.sheet.is-panning .cursor,.sheet.pan-ready .cursor{visibility:hidden}
+@media(max-width:860px){.stage-heading{flex-wrap:wrap}#engine-pill{margin-left:auto}.stage-heading #sheet-title{margin-right:0}.lab .sheetbar .toolbar{justify-content:flex-start}.sheetbar .state{font-size:13px}.panel .seg.presets{display:flex}}
+@media(max-width:480px){main{padding-inline:12px}.stage-heading{gap:4px}#engine-pill{font-size:11px;padding:3px 6px}.stage-heading button{padding:4px 7px}#focus-view>span{display:none}.sheetbar .toolbar-group{padding-inline:4px}.lab .sheetbar .toolbar button{font-size:14px;padding-inline:6px}.charge{width:18px}#welcome button{font-size:14px}#welcome h2{font-size:24px}}
+@media(prefers-color-scheme:dark){#welcome{background:transparent}#welcome button{background:transparent}.sheet{box-shadow:0 6px 28px #0004}}
+
+.sheet canvas:focus-visible{outline:1px solid var(--accent);outline-offset:-1px}
+
+/* Studio shell: one topbar, a flexible desk and a bounded inspector.
+   Intrinsic content must never determine either workspace column's width. */
+:root{--desk-bg:#efeae0;--panel-bg:#f7f4ec}
+body{background:var(--desk-bg)}
+main{width:100%;max-width:none;min-width:0}
+.paint-head{display:flex;align-items:center;gap:10px;background:var(--panel-bg)}
+.paint-title{min-width:0;gap:10px;align-items:center}
+.paint-head h1{font-size:22px;line-height:1;white-space:nowrap}
+.help-toggle{display:inline-flex;align-items:center;justify-content:center;line-height:1;white-space:nowrap}
+.studio-version{display:inline-flex;align-items:center;line-height:1;height:24px;white-space:nowrap}
+.stage-heading{margin-left:auto;min-width:0;justify-content:flex-end}
+#sheet-title{font-size:14px;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+body:not(.has-example):not(.replaying) #sheet-title{display:none}
+#engine-pill{white-space:nowrap;font-variant-numeric:tabular-nums}
+.stage,.lab{min-width:0;min-height:0}
+.sheet{box-shadow:0 3px 6px #483e3014,0 12px 32px #483e3020}
+.sheet-status{display:flex;align-items:center;gap:8px;min-width:0}
+.sheetbar .state{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:left}
+.sheetbar .state::before{content:'';display:inline-block;width:5px;height:5px;margin-right:6px;border-radius:50%;background:var(--accent);vertical-align:middle}
+#drying{flex:none;order:0;min-height:0;margin:0;gap:6px;font-size:12px}
+#drying progress{width:40px}
+#painting-controls{background:var(--panel-bg);align-content:start;gap:8px}
+.panel section{gap:6px;padding-top:8px}
+.panel section:first-of-type{border-top:0;padding-top:0}
+.panel .seg.tools,.panel .seg.papers{gap:4px}
+.panel .seg.tools button{min-width:0}
+.panel .row{grid-template-columns:56px minmax(0,1fr) 44px;gap:6px}
+.panel .label{min-width:0;line-height:1.2}
+.panel .label .current{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:right}
+.panel .swatches{grid-template-columns:repeat(6,minmax(0,1fr));gap:6px;justify-items:center}
+.panel .mix-disclosure{margin-top:8px}
+.panel .pair{grid-template-columns:repeat(2,minmax(0,1fr));gap:4px}
+.panel .pair button{min-width:0;padding-inline:4px}
+.panel .seg.presets{display:grid;grid-template-columns:repeat(4,minmax(0,1fr))}
+.panel .seg.presets button{font-size:13px}
+.panel .more,.mixing{min-width:0}
+.mix-part{grid-template-columns:minmax(0,1fr) minmax(40px,1fr) 2em 32px}
+.mix-part>span{overflow:hidden;text-overflow:ellipsis}
+@media(prefers-color-scheme:dark){
+ :root{--desk-bg:#1b1a17;--panel-bg:#23211d}
+ .sheet{box-shadow:0 3px 8px #0005,0 16px 40px #0006}
+}
+@media(min-width:900px){
+ body:not(.canvas-focus) main{display:grid;grid-template-rows:48px minmax(0,1fr);height:100dvh;padding:0;margin:0}
+ .paint-head{height:48px;margin:0;padding:0 16px;border-bottom:1px solid var(--line)}
+ .paint-title{flex-wrap:nowrap;flex:none}
+ .paint-head .help-toggle{height:32px;min-height:32px;padding:0 8px}
+ .stage-heading{flex-wrap:nowrap;gap:8px}
+ .stage-heading button{display:inline-flex;align-items:center;justify-content:center;height:32px;min-height:32px}
+ body:not(.canvas-focus) .lab{grid-template-columns:minmax(0,1fr) 292px;gap:0;align-items:stretch;overflow:hidden}
+ body:not(.canvas-focus) .stage{display:flex;flex-direction:column;align-items:center;gap:8px;padding:12px 16px 10px;overflow-y:auto;overscroll-behavior:contain}
+ .stage>*{max-width:100%;flex-shrink:0}
+ body:not(.canvas-focus) .sheet{width:min(100%,calc((100dvh - 156px)*var(--sheet-ratio,1.33333) + 2px));max-height:calc(100dvh - 154px);margin:0 auto}
+ .stage>:not(.sheet){width:100%}
+ .sheetbar{flex-direction:row;flex-wrap:nowrap;align-items:center;justify-content:space-between;gap:10px;padding:4px 8px;margin:0;border-top:1px solid var(--line)}
+ .sheet-status{flex:1 1 0}
+ .lab .sheetbar .toolbar{width:auto;flex:none;overflow:visible;justify-content:flex-end}
+ .lab .sheetbar .toolbar button{height:32px;min-height:32px}
+ .sheetbar:has(#drying:not([hidden])) .state{display:none}
+ #painting-controls{width:292px;min-height:0;height:100%;margin:0;padding:12px 14px;border-left:1px solid var(--line);overflow-y:auto;overscroll-behavior:contain}
+ #quick-catalogue{order:12;margin:0;padding:0;border-top:0}
+ #quick-catalogue>summary{min-height:24px;margin:0;padding:0;font-size:14px;line-height:24px}
+ #quick-catalogue .notes{margin:12px 0 0;padding-top:8px}
+ .stage>.status{display:none}
+ #run-settings{order:9}
+ #mode-note{order:10}
+ #operation-controls{order:10}
+ #operation-timeline{order:11}
+}
+@media(pointer:fine) and (min-width:900px){
+ #painting-controls{--tap:32px}
+ /* The section heading already names paper; keep its group label accessible. */
+ #surface-label{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+ #reset-view{min-height:32px}
+ .panel :is(button,select),.panel .seg.presets button{min-height:32px}
+ .panel .row{min-height:28px;height:28px;font-size:14px}
+ .panel input[type=range]{height:28px;min-width:0}
+ .panel .check{min-height:28px}
+ .panel summary{min-height:32px}
+ .panel .swatches button{width:32px;height:32px}
+ .panel .label{font-size:14px}
+ .panel .seg.tools button{font-size:14px}
+ .panel .seg.tools svg{width:17px;height:17px}
+}
+/* The stacked layout keeps full touch targets and allows normal page scrolling. */
+@media(max-width:899px){
+ body:not(.canvas-focus) main{padding:0 12px 16px}
+ .paint-head{margin:0 -12px 10px;padding:8px 12px;flex-wrap:wrap;gap:4px 8px;border-bottom:1px solid var(--line)}
+ .paint-title{width:100%;justify-content:space-between;gap:4px;flex-wrap:nowrap}
+ .paint-head h1{font-size:22px}
+ .paint-head .help-toggle{min-height:44px;padding:4px;font-size:14px}
+ .studio-version{font-size:11px;padding:2px 4px}
+ .stage-heading{width:100%;gap:6px;flex-wrap:nowrap;min-height:44px}
+ .stage-heading button{min-height:44px}
+ #engine-pill{margin-left:0;margin-right:auto;font-size:11px;padding:3px 6px}
+ #sheet-title{display:none}
+ body:not(.canvas-focus) .lab{display:flex;flex-direction:column;gap:8px}
+ body:not(.canvas-focus) .stage{display:flex;flex-direction:column;gap:8px;width:100%;height:auto}
+ body:not(.canvas-focus) .sheet{width:100%;max-width:100%;margin:auto}
+ #painting-controls{width:100%;padding:12px;border:1px solid var(--line);border-radius:4px}
+ .sheetbar{flex-direction:column;align-items:stretch;gap:4px}
+ .sheet-status{justify-content:space-between}
+ .lab .sheetbar .toolbar{width:100%;justify-content:space-between;overflow:visible}
+ .sheetbar .toolbar-group{padding-inline:1px;gap:0;min-width:0}
+ .lab .sheetbar .toolbar button{min-height:44px;padding-inline:4px;font-size:13px}
+ .panel .swatches button{width:44px;height:44px}
+ .panel :is(button,select),.panel .seg.presets button,.panel summary{min-height:44px}
+ .panel .row,.panel input[type=range],.panel .check{min-height:44px}
+ #run-settings select{min-width:0;max-width:100%}
+ #run-settings label{max-width:100%}
+ #playbar{flex-wrap:wrap}
+ #operation-controls{overflow-wrap:anywhere}
+ #operation-controls label{min-width:0}
+ .notes{margin-top:12px}
+}
+
+/* Welcome lettering sits on the light sheet in both interface themes. */
+#welcome{color:#39362f}
+#welcome p,#welcome button:first-child{color:#7b7166}
+#welcome button{color:#39362f}

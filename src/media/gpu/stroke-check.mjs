@@ -4,12 +4,16 @@
 // Lines are printed for strokes that differ.
 const snap = (brush, sheet) => ({
   hairs: brush.hairs.map(h => ({ water: h.water, pig: h.pig && h.pig.slice() })), resW: brush.resW, resP: brush.resP && brush.resP.slice(), rs: brush.rs.s,
-  carry: brush.carry, heading: brush.heading, travel: brush.travel, sinceDip: brush.sinceDip, onPaper: brush._onPaper, t0: brush._strokeT0, clock: sheet.clock, contact: sheet._contactBrush, touched: sheet.touched ? sheet.touched.slice() : null,
+  carry: brush.carry, heading: brush.heading, travel: brush.travel, sinceDip: brush.sinceDip, onPaper: brush._onPaper, t0: brush._strokeT0,
+  chain: brush._chain ? brush._chain.slice() : null, blade: brush._blade ? brush._blade.slice() : null, seg: brush._seg, hold: brush._hold,
+  clock: sheet.clock, contact: sheet._contactBrush, touched: sheet.touched ? sheet.touched.slice() : null,
 });
 const restore = (brush, sheet, s) => {
   brush.hairs.forEach((h, j) => { h.water = s.hairs[j].water; if (s.hairs[j].pig) for (let k = 0; k < s.hairs[j].pig.length; k++) h.pig[k] = s.hairs[j].pig[k]; });
   brush.resW = s.resW; if (s.resP) for (let k = 0; k < s.resP.length; k++) brush.resP[k] = s.resP[k];
-  brush.rs.s = s.rs; brush.carry = s.carry; brush.heading = s.heading; brush.travel = s.travel; brush.sinceDip = s.sinceDip; brush._onPaper = s.onPaper; brush._strokeT0 = s.t0; sheet.clock = s.clock; sheet._contactBrush = s.contact;
+  brush.rs.s = s.rs; brush.carry = s.carry; brush.heading = s.heading; brush.travel = s.travel; brush.sinceDip = s.sinceDip; brush._onPaper = s.onPaper; brush._strokeT0 = s.t0;
+  brush._chain = s.chain ? s.chain.slice() : null; brush._blade = s.blade ? s.blade.slice() : null; brush._seg = s.seg; brush._hold = s.hold;
+  sheet.clock = s.clock; sheet._contactBrush = s.contact;
   if (s.touched) sheet.touched.set(s.touched); else sheet.touched = null;
 };
 const CHECK = { strokes: 0, bad: 0, worst: 0, sum: 0, shown: 0 };

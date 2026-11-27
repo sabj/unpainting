@@ -55,6 +55,7 @@ import {runMethods, describeMethods} from '../../src/paint/run-methods.mjs';
 import {createTargetGuard, writeGuardReport, DEFAULT_MODE, HARD_LOOK_BUDGET} from '../guard/no-target.mjs';
 import {detectSheetTone} from '../../src/paint/methods/sheet-tone.mjs';
 import {checkSourceScale, sourceReadable} from './source-scale.mjs';
+import {getAuxGpuDevice} from '../../src/media/gpu/aux-device.mjs';
 
 export async function setup(ctx) {
 const { ENTRY_FILE } = ctx;
@@ -152,6 +153,9 @@ const FRAME_POLICY = framePolicy({ video: OUTPUT_VIDEO, keepAll: num('keepallfra
 const RECORDING = recordingPolicy(opt('recording', 'medium'));
 const SPEED_PROFILE = startSpeedProfile(num('speedprofile', 0) > 0);
 const CPU_PROFILE = num('speedcpu', 0) > 0 ? await import('../speed/cpu-profile.mjs').then(m => m.startCpuProfile()) : null;
+const GPU_MODE = opt('gpu', 'auto');
+if (!['auto', 'on', 'off'].includes(GPU_MODE)) throw new Error(`--gpu takes auto, on or off, not ${GPU_MODE}`);
+const AUX_GPU = await getAuxGpuDevice(GPU_MODE);
 void opt('downtrace', '0'); // tracing is selected from argv while GPU modules load
 
 if (RECIPE_NOTE) console.log(RECIPE_NOTE);
@@ -235,7 +239,7 @@ const FAST_PAPER_OBSERVE=num('fastpaperobserve',NATIVE_PAINT_MODE.mode==='fast'?
 if(![0,1].includes(FAST_PAPER_OBSERVE))throw Error('--fastpaperobserve takes 0 or 1');
 const PAPER_OBSERVE_POLICY={requested:FAST_PAPER_OBSERVE,enabled:NATIVE_PAINT_MODE.mode==='fast'&&FAST_PAPER_OBSERVE===1&&process.env.GPU_PAPER_OBSERVE!=='0',scope:'fresh regional W/s plus wet-recipient M observation only; pigment/layer freshness independent; CPU stroke/demand windows use original full observation'};
 process.env.GPU_PAPER_OBSERVE=PAPER_OBSERVE_POLICY.enabled?'1':'0';NATIVE_PAINT_MODE.paperObservation=PAPER_OBSERVE_POLICY;
-NATIVE_PAINT_MODE.syncPolicy={demand:process.env.GPU_DEMAND_READBACK,paperObservation:PAPER_OBSERVE_POLICY.enabled,frames:!FRAME_POLICY.all?'completed passage checkpoints at 10/25/50/75/100 percent and every completed value band; first wash and other stages retained':NATIVE_PAINT_MODE.mode==='fast'?'completed paint boundary every fourth pass and every completed value band; other stages retained; no within-stroke snapshots':'full existing cadence',optical:NATIVE_PAINT_MODE.mode==='fast'||SPEED_GPU_OPTICS?'GPU optical RGB for frame and density feedback':'CPU composite',mask:NATIVE_PAINT_MODE.mode==='fast'?'demand CPU uploads conservatively retain all pigment lanes and signed zero':'original'};
+NATIVE_PAINT_MODE.syncPolicy={demand:process.env.GPU_DEMAND_READBACK,paperObservation:PAPER_OBSERVE_POLICY.enabled,frames:!FRAME_POLICY.all?'completed passage checkpoints at 10/25/50/75/100 percent and every completed value band; first wash and other stages retained':NATIVE_PAINT_MODE.mode==='fast'?'completed paint boundary every fourth pass and every completed value band; other stages retained; no within-stroke snapshots':'full existing cadence',optical:NATIVE_PAINT_MODE.mode==='fast'||SPEED_GPU_OPTICS?'GPU optical RGB for frame and density feedback':'CPU composite',mask:NATIVE_PAINT_MODE.mode==='fast'?'tracked section CPU uploads retain brush/wet/top pigment lanes; other demand uploads retain all lanes; signed zero conservative':'original'};
 fs.writeFileSync(path.join(out,'native-paper-observation.json'),JSON.stringify(PAPER_OBSERVE_POLICY,null,2));
 fs.writeFileSync(path.join(out,'native-mode.json'),JSON.stringify(NATIVE_PAINT_MODE,null,2));
 const FAST_BODY_ENABLED=num('fastbodycadence',NATIVE_PAINT_MODE.mode==='fast'?1:0);
@@ -308,7 +312,7 @@ if (FINAL_W !== w) console.log(`look: this sheet of ${w} cells is a look at a pa
 const MM_SPACING_ON = () => { try { return num('mmspacing', mmSpacingDefault(FINAL_W) ? 1 : 0) > 0; } catch { return false; } };
 // (a target of fewer cells than the sheet is scrap: a swatch)
 const dabSpacing = (o, t) => { if (!MM_SPACING_ON()) return o; const f = dabSpacingFactor({ width: w, finalWidth: FINAL_W, onSheet: !t || t.w >= w }); return { ...(o ?? {}), spacing: (o?.spacing ?? 0.7) * f }; };
-const physicalStroke = (b, t, p, o) => physicalStrokeRaw(b, t, p, dabSpacing(o, t));
+const physicalStroke = (b, t, p, o) => (t._twoGridStroke ? t._twoGridStroke(b, p, dabSpacing(o, t)) : physicalStrokeRaw(b, t, p, dabSpacing(o, t)));
 const candidateContact = (b, t, p, o) => candidateContactRaw(b, t, p, dabSpacing(o, t));
 function gpuHairCap(o) {
   let K; try { K = ctx.SHEET_PIGS.length; } catch { K = 16; }
@@ -379,5 +383,5 @@ Object.assign(ctx, { LINE_SOURCE, RUN_METHODS, MEDIUM_DECISION, SUBJECT_MEDIUM, 
   SOFT_WET_MM, WASH_SESSION, WALL_PHASES, 
   phaseMark, srcMeta, PX_SOURCE, PX_RAW, TARGET_GUARD, paintingLook, STEP_BACKS, w, h, n, FINAL_W, SEGMENTS_RECORD, createBrush, 
   physicalStroke, candidateContact, ANCHORS, lum, TONE_MODE, SHEET_TONE, CALIBRATED_PLAN, PAPER_RULE, paperRGB, 
-  WASH_SPLAT_SETTINGS, planContentHashes, CODE_HASH, PALETTE_FROM_FILE, paletteFitStarted, SOURCE_SCALE });
+  WASH_SPLAT_SETTINGS, planContentHashes, CODE_HASH, PALETTE_FROM_FILE, paletteFitStarted, SOURCE_SCALE, AUX_GPU });
 }

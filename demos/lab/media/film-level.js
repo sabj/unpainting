@@ -9,7 +9,8 @@
 // Here the film levels by thin-film (lubrication) flow: the flux per unit width is (rho g / 3 mu) h^3 times the slope of
 // the water's surface, scaled by `o.level` (1: the free film; a 0.2 mm film levels a 4 mm overlap in a twentieth of a
 // second and a 40 mm square in six seconds, a 0.05 mm damp film 64 times slower). The paper's roughness is in the h^3:
-// a film no deeper than its tooth hardly moves. The surface is the depth plus the paper's relief (o.slope times its height, as the explicit flow reads it)
+// a film no deeper than its tooth hardly moves. h is the free depth above levelFloor; water held in the tooth adds no
+// conductance. A face joins two half-cell resistances in series (film-mobility.mjs). The surface is the total depth plus the paper's relief (o.slope times its height, as the explicit flow reads it)
 // plus the board's tilt (sheet.tilt, the sine of the angle along x and y), so on a tilted board the film runs down
 // and stands as a bead at the lower pinned edge. Because h^3 falls fast, a thin film hardly moves and a damp wash
 // keeps its blooms and fronts to the explicit flow.
@@ -20,6 +21,9 @@
 // as many substeps as keep every donor above half its water, under the same 95% donor budget as the explicit flow. It
 // only moves water between wet cells: fronts onto dry paper are still the sheet's own rule.
 import { permeability } from './sheet.js';
+import { FILM_RESIDUAL_SQUARED } from './film-accuracy.js';
+import { filmMobility } from './film-mobility.js';
+import { levelMultigrid } from './level-mg.js';
 
 const KAPPA = 1000 * 9.81 / (3 * 1e-3) / 1e3;   // rho g / (3 mu), 3.27e6 1/(m s), in 1/(mm s): 3270
 const scratch = new WeakMap();
@@ -61,7 +65,9 @@ export function levelFilm(sheet, o, box, mm) {
   // Water run onto it does not level across the whole wash in a moment: it stands where it lands and invades the damp
   // paint by the explicit flow and the wet fronts, slowly, scouring as it goes: a back-run (Computer-Generated
   // Watercolor, section 4.7), where a levelled film spread a puddle of clean water through the whole damp wash.
-  const floor = o.levelFloor ?? 0;
+  // W and the GPU uniforms are float32. Classify their shared boundary in that
+  // same format, including a cell stored exactly at the shine-off depth.
+  const floor = Math.fround(o.levelFloor ?? 0);
   for (let y = y0; y <= y1; y++) for (let x = x0, i = y * w + x0; x <= x1; x++, i++) if (M[i] && W[i] > floor) { at[i] = n; cells[n] = i; H[n] = W[i] + slope * height[i] - tx * x - ty * y; n++; }
   if (n < 2) { for (let k = 0; k < n; k++) at[cells[k]] = -1; return null; }
   // faces to the west and north neighbours, conductance from the mean depth cubed (lubrication) and the fibres
@@ -70,8 +76,8 @@ export function levelFilm(sheet, o, box, mm) {
     const i = cells[k], x = i % w, y = (i - x) / w;
     const kw = x > x0 ? at[i - 1] : -1, kn = y > y0 ? at[i - w] : -1;
     west[k] = kw; north[k] = kn; east[k] = -1; south[k] = -1;
-    if (kw >= 0) { const h = 0.5 * (W[i] + W[i - 1]), p = perm ? 1 - ff + ff * (0.25 + 1.75 * perm.px[i - 1]) : 1; cw[k] = k0 * p * h * h * h; east[kw] = k; most = Math.max(most, cw[k] * Math.abs(H[k] - H[kw])); } else cw[k] = 0;
-    if (kn >= 0) { const h = 0.5 * (W[i] + W[i - w]), p = perm ? 1 - ff + ff * (0.25 + 1.75 * perm.py[i - w]) : 1; cn[k] = k0 * p * h * h * h; south[kn] = k; most = Math.max(most, cn[k] * Math.abs(H[k] - H[kn])); } else cn[k] = 0;
+    if (kw >= 0) { const p = perm ? 1 - ff + ff * (0.25 + 1.75 * perm.px[i - 1]) : 1; cw[k] = k0 * p * filmMobility(W[i], W[i - 1], floor); east[kw] = k; most = Math.max(most, cw[k] * Math.abs(H[k] - H[kw])); } else cw[k] = 0;
+    if (kn >= 0) { const p = perm ? 1 - ff + ff * (0.25 + 1.75 * perm.py[i - w]) : 1; cn[k] = k0 * p * filmMobility(W[i], W[i - w], floor); south[kn] = k; most = Math.max(most, cn[k] * Math.abs(H[k] - H[kn])); } else cn[k] = 0;
   }
   // The meniscus at a contact line: the film meets the paper at an angle, so its depth rises from the line over
   // o.meniscusMm instead of standing as a wall: the surface the film levels to is lowered by o.meniscus (the slope) x
@@ -103,19 +109,26 @@ export function levelFilm(sheet, o, box, mm) {
     if (csk) lap += csk * (H[k] - H[s]);
     r[k] = -lap; d[k] = 0; bb += lap * lap;
   }
-  // incomplete Cholesky, IC(0), on the five-point stencil in raster order (the west and north faces are below the diagonal)
-  for (let k = 0; k < n; k++) {
-    const kw = west[k], kn = north[k];
-    lw[k] = kw >= 0 ? -cw[k] / ld[kw] : 0; ln[k] = kn >= 0 ? -cn[k] / ld[kn] : 0;
-    ld[k] = Math.sqrt(Math.max(1e-12, diag[k] - lw[k] * lw[k] - ln[k] * ln[k]));
+  // Preconditioner: weighted Galerkin multigrid V-cycle on large washes (converges in ~8-12 iterations instead of
+  // hundreds on high-k0 large washes), IC(0) on small washes where setup dominates. Same SPD system and residual rule.
+  let precondition;
+  if (n >= 2048) {
+    const mg = levelMultigrid({ n, w, cells, west, north, east, south, cw, cn, diag });
+    precondition = () => mg(r, z);
+  } else {
+    for (let k = 0; k < n; k++) {
+      const kw = west[k], kn = north[k];
+      lw[k] = kw >= 0 ? -cw[k] / ld[kw] : 0; ln[k] = kn >= 0 ? -cn[k] / ld[kn] : 0;
+      ld[k] = Math.sqrt(Math.max(1e-12, diag[k] - lw[k] * lw[k] - ln[k] * ln[k]));
+    }
+    precondition = () => {
+      for (let k = 0; k < n; k++) { const kw = west[k], kn = north[k]; t[k] = (r[k] - (kw >= 0 ? lw[k] * t[kw] : 0) - (kn >= 0 ? ln[k] * t[kn] : 0)) / ld[k]; }
+      for (let k = n - 1; k >= 0; k--) { const e = east[k], s = south[k]; z[k] = (t[k] - (e >= 0 ? lw[e] * z[e] : 0) - (s >= 0 ? ln[s] * z[s] : 0)) / ld[k]; }
+    };
   }
-  const precondition = () => {
-    for (let k = 0; k < n; k++) { const kw = west[k], kn = north[k]; t[k] = (r[k] - (kw >= 0 ? lw[k] * t[kw] : 0) - (kn >= 0 ? ln[k] * t[kn] : 0)) / ld[k]; }
-    for (let k = n - 1; k >= 0; k--) { const e = east[k], s = south[k]; z[k] = (t[k] - (e >= 0 ? lw[e] * z[e] : 0) - (s >= 0 ? ln[s] * z[s] : 0)) / ld[k]; }
-  };
   precondition();
   let rz = 0; for (let k = 0; k < n; k++) { p[k] = z[k]; rz += r[k] * z[k]; }
-  const tol = Math.max(1e-24, 1e-12 * bb);   // the residual a millionth of the first
+  const tol = Math.max(1e-24, FILM_RESIDUAL_SQUARED * bb);
   let rr = bb, iterations = 0;
   for (; rr > tol && iterations < 2000; iterations++) {
     let pq = 0;
@@ -155,15 +168,18 @@ export function levelFilm(sheet, o, box, mm) {
   // donor concentrations, g each cell's pigment
   const ae = p, as = q, c = z, g = t;
   let moved = 0;
+  // the water each face carried, for a pigment grid finer than this one (two-grids/flux-ledger.mjs); null when there is none
+  const FL = sheet._flux ?? null;
   for (let sub = 0; sub < subs; sub++) {
-    // water: each donor's outflow is held to 95% of what it has (the explicit flow's budget)
+    FL?.film?.begin(box);
+    // water: each donor keeps the paper-held layer and 5% of its free film.
     for (let k = 0; k < n; k++) out[k] = 0;
     for (let k = 0; k < n; k++) {
       const f = fe[k] / subs, h = fs[k] / subs;
       if (f > 0) out[k] += f; else if (f < 0) out[east[k]] -= f;
       if (h > 0) out[k] += h; else if (h < 0) out[south[k]] -= h;
     }
-    for (let k = 0; k < n; k++) { const wk = W[cells[k]]; out[k] = out[k] > 0.95 * wk ? (0.95 * wk) / out[k] : 1; }   // now the donor's scale
+    for (let k = 0; k < n; k++) { const free = Math.max(0, W[cells[k]] - floor), budget = 0.95 * free; out[k] = out[k] > budget ? budget / out[k] : 1; }   // now the donor's scale
     for (let k = 0; k < n; k++) {
       const f = fe[k] / subs, h = fs[k] / subs;
       ae[k] = f > 0 ? f * out[k] : f < 0 ? f * out[east[k]] : 0;
@@ -187,12 +203,18 @@ export function levelFilm(sheet, o, box, mm) {
       for (let k = 0; k < n; k++) if (dG[k]) { const i = cells[k]; Gg[i] = Math.max(0, g[k] + dG[k]); }
     }
     for (let k = 0; k < n; k++) dW[k] = 0;
+    if (FL) for (let k = 0; k < n; k++) {
+      const i = cells[k];
+      if (ae[k]) { FL.fx[i] += ae[k]; FL.film?.face(i, false, ae[k]); }
+      if (as[k]) { FL.fy[i] += as[k]; FL.film?.face(i, true, as[k]); }
+    }
     for (let k = 0; k < n; k++) {
       const f = ae[k], h = as[k];
       if (f) { dW[k] -= f; dW[east[k]] += f; moved += Math.abs(f); }
       if (h) { dW[k] -= h; dW[south[k]] += h; moved += Math.abs(h); }
     }
     for (let k = 0; k < n; k++) if (dW[k]) { const i = cells[k]; W[i] = Math.max(0, W[i] + dW[k]); }
+    FL?.film?.end();
   }
   done();
   return { cells: n, iterations, moved };

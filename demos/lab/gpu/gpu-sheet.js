@@ -2,17 +2,23 @@
 // the GPU. Adapted from src/media/gpu/stepfull.mjs: the WGSL is a module, the
 // device comes from navigator.gpu, and nothing blocks (every read is a promise). sheet.js stays the reference and the
 // CPU fallback.
+import { SectionBrushGpu } from '../media/gpu/section-brush-gpu.js';
 import { slideRate, reposeStep } from '../media/grain-field.js';
+import { grainDrag } from '../media/grain-water.js';
 import { permeability } from '../media/sheet.js';
 import { settleSpeed, settleDiffusion } from '../media/settling.js';
 import { WGSL } from './gpu-wgsl.js';
 import { flowTime, poreTime } from '../media/flow-time.js';
-import { EF_RMAX, EF_BMAX } from '../media/gpu/edge-feed-wgsl.js';
-import { wetBoxes, edgeGeometry } from '../media/gpu/edge-geometry.js';
+import { EF_RMAX, EF_BMAX, EF_TAIL } from '../media/gpu/edge-feed-wgsl.js';
+import { wetBoxes, solveEdgeBoxGpu } from '../media/gpu/edge-geometry.js';
+import { GpuContactDistance, contactGrid } from '../media/gpu/contact-distance.js';
+import { GpuDryingPressure } from '../media/gpu/drying-pressure-gpu.js';
 import { levelOn, levelBudget, levelBuffers, levelUniforms, encodeLevel, adaptLevel } from '../media/gpu/film-level-host.js';
 import { channelList, observeSheetChannels, observePackedChannels } from './gpu-active-channels.js';
 
 const TILE = 16;
+const onesCache = new Map();
+const ONES = n => onesCache.get(n) ?? (onesCache.set(n, new Float32Array(n).fill(1)), onesCache.get(n));
 
 /** A device with the limits the kernels need. Throws when there is no WebGPU or no adapter. */
 export async function openDevice(gpu = globalThis.navigator?.gpu) {
@@ -25,6 +31,7 @@ export async function openDevice(gpu = globalThis.navigator?.gpu) {
   const device = await adapter.requestDevice({ requiredFeatures: adapter.features.has('timestamp-query') ? ['timestamp-query'] : [], requiredLimits: {
     maxStorageBuffersPerShaderStage: Math.min(12, L.maxStorageBuffersPerShaderStage),
     maxStorageBufferBindingSize: L.maxStorageBufferBindingSize, maxBufferSize: L.maxBufferSize,
+    maxComputeWorkgroupStorageSize: Math.min(32768, L.maxComputeWorkgroupStorageSize),
   } });
   const info = adapter.info ?? {};
   return { adapter, device, name: [info.vendor, info.architecture, info.description].filter(Boolean).join(' ') || 'webgpu' };
@@ -37,6 +44,7 @@ const UF = [['w', 'u'], ['h', 'u'], ['n', 'u'], ['tw', 'u'], ['th', 'u'], ['ntil
   // the painter's film sheet (media/gpu/film-level-host.js levelUniforms)
   'holdDepth', 'coSettle', 'fillRef', 'lvK0', 'lvTx', 'lvTy', 'lvTan', 'lvDm', 'lvR', 'lvIt', 'lvSubs', 'lvBoxes', 'brC', 'brPush', 'brHead', 'brPad2'].map(k => [k, 'f'])];
 const UOFF = Object.fromEntries(UF.map(([k], i) => [k, i * 4]));
+const UTYPE = Object.fromEntries(UF);
 const UBYTES = UF.length * 4 + 512 + 64 + 256;
 const PRELUDE = `struct U {\n${UF.map(([k, t]) => `  ${k}: ${t === 'u' ? 'u32' : 'f32'},`).join('\n')}\n  pa: array<vec4<f32>, 16>,\n  pb: array<vec4<f32>, 16>,\n  act: array<vec4<u32>, 4>,\n  pc: array<vec4<f32>, 16>,\n}\n@group(0) @binding(0) var<uniform> u: U;\nfn pigA(k: u32) -> vec4<f32> { return u.pa[k]; }\nfn pigB(k: u32) -> vec4<f32> { return u.pb[k]; }\nfn pigC(k: u32) -> vec4<f32> { return u.pc[k]; }\nfn physicalChannel(a: u32) -> u32 { return u.act[a / 4u][a % 4u]; }\n`;
 const SRC = PRELUDE + WGSL;
@@ -57,7 +65,6 @@ function analyse(src) {
   const entries = [...src.matchAll(/@compute[^\n]*\nfn (\w+)\(/g)].map(m => m[1]);
   return { decl, entries, uses };
 }
-const HASH = j => { const v = Math.sin(j * 12.9898) * 43758.5453; return v - Math.floor(v) - 0.5; };
 
 // A rectangle buffer with room to grow: half again what is needed, at least a megabyte, and a whole number of 256-byte
 // blocks. Half again an odd number of planes (an odd pigment count) is not a multiple of four bytes, and a storage binding
@@ -71,7 +78,6 @@ export class GpuSheet {
   }
 
   async build(device, pigments, o) {
-    if ((o.marangoni ?? 0) !== 0 || (o.slope ?? 0) !== 0) throw new Error('GpuSheet: marangoni and slope must be 0');
     if (pigments.length > 16) throw new Error('GpuSheet: at most 16 pigments');
     const d = device; this.device = d; this.pigments = pigments; this.K = pigments.length; this.o = { ...o };
     const info = analyse(SRC);
@@ -79,7 +85,7 @@ export class GpuSheet {
     this.names = Object.fromEntries(info.decl.map(x => [x.binding, x.name]));
     d.pushErrorScope('validation');
     const module = d.createShaderModule({ code: SRC }); this.module = module;
-    this.p = {}; this.bgl = {}; this.uses = {};
+    this.p = {}; this.bgl = {}; this.uses = {}; this.lvPipes = null;
     for (const name of info.entries) {
       const use = [0, ...info.uses(name).filter(b => b !== 0)]; this.uses[name] = use;
       this.bgl[name] = d.createBindGroupLayout({ entries: use.map(binding => ({ binding, visibility: GPUShaderStage.COMPUTE, buffer: { type: this.kind[binding] === 'uniform' ? 'uniform' : this.kind[binding] === 'storage, read' ? 'read-only-storage' : 'storage' } })) });
@@ -98,7 +104,7 @@ export class GpuSheet {
   attach(sheet) {
     this.detach();
     const { w, h, n, paper } = sheet, K = this.K, d = this.device;
-    this.w = w; this.h = h; this.n = n;
+    this.w = w; this.h = h; this.n = n; this.cpuPaper = paper;
     this.channelMask = 0; // Only fresh buffer allocations may forget historical TOP channels.
     this.tw = Math.ceil(w / TILE); this.th = Math.ceil(h / TILE); this.ntiles = this.tw * this.th;
     const mk = (bytes, usage = 0) => d.createBuffer({ size: Math.max(16, bytes), usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST | usage });
@@ -112,12 +118,14 @@ export class GpuSheet {
     B.RC = d.createBuffer({ size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST }); B.CTR = mk(48); B.ARGS = mk(36, GPUBufferUsage.INDIRECT);
     B.U = d.createBuffer({ size: UBYTES, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
     B.PACK = d.createBuffer({ size: 16, usage: GPUBufferUsage.STORAGE });
+    this.statusRb = d.createBuffer({ size: 128, usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST });
     const put = (buf, arr, off = 0) => d.queue.writeBuffer(buf, off, arr);
     // paper: constant for a sheet
     const { px, py } = permeability(paper), P4 = new Float32Array(n * 4), P2 = new Float32Array(n * 4), P3 = new Float32Array(n * 4), hv = paper.surface || paper.valley || paper.height;
+    if (!paper.throat || paper.throat.length !== n) throw new Error('GPU sheet: the paper has no throat (make it with makePaper)');
     for (let i = 0; i < n; i++) {
       P4.set([paper.capacity[i], paper.grain[i], paper.fdx[i], paper.fdy[i]], i * 4); P2.set([px[i], py[i], 0, 0], i * 4);
-      P3.set([paper.tooth[i], HASH(i), hv[i], paper.grainH[i]], i * 4);
+      P3.set([paper.tooth[i], paper.throat[i], hv[i], paper.grainH[i]], i * 4);
     }
     put(B.PAPER, P4); put(B.PAPER2, P2); put(B.PAPER3, P3);
     // settling's hollows are worked out from the tooth and the grain field with these (paper.js toothHollow; the
@@ -126,19 +134,56 @@ export class GpuSheet {
     this.paperMm = paper.mmPerCell ?? 0;
     if (!(paper.hollowUnit > 0)) throw new Error('GPU sheet: the paper has no hollowUnit (make it with makePaper)');
     this.paperHollow = { toothLo: paper.toothLo, toothSpan: paper.toothSpan, hollowUnit: paper.hollowUnit, physical: !!paper.zUm };
-    this.cap = this.ntiles; this.hold = 0; this.epoch = 0; this.knownDry = false; this.hasTop = false;
+    this.cap = this.ntiles; this.hold = 0; this.epoch = 0; this.knownDry = false; this.hasTop = false; this.statusSynced = false;
     this.efAlloc(B);
     // the CPU step's boxes and the film's levelling (media/gpu/film-level-wgsl.js)
-    const lvSize = levelBuffers(w, h, n, this.ntiles, true); for (const k of Object.keys(lvSize)) B[k] = mk(lvSize[k]);
-    this.lv = levelBudget(); this.tilt = sheet.tilt ?? null;
+    const lvSize = levelBuffers(w, h, n, this.ntiles, true); for (const k of Object.keys(lvSize)) B[k] = mk(lvSize[k], k === 'LVI' ? GPUBufferUsage.INDIRECT : 0);
+    this.lv = levelBudget(this.ntiles); this.lv.tracksWrites = true; this.tilt = sheet.tilt ?? null;
     this.setOptions({});
     this.bg = {};
     this.bindAll();
     this.upload(sheet);
   }
+  /** Run the painter's section kernel on these same water/pigment buffers. */
+  async runSectionStroke(data, info) {
+    const d = this.device;
+    if (!this.sectionHost) {
+      const mk = size => d.createBuffer({ size, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST | GPUBufferUsage.COPY_SRC });
+      this.SB = 4194304;
+      this.b.BSTR = mk(this.SB * 4 + this.n * 4);
+      this.b.BPAP = mk(this.n * 16);
+      this.b.SECTION_U = d.createBuffer({ size: UBYTES, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+      const paper = this.cpuPaper, pp = new Float32Array(this.n * 4);
+      for (let i = 0; i < this.n; i++) pp.set([paper.height[i], paper.tooth[i], (paper.valley || paper.height)[i], paper.proud?.[i] ?? paper.height[i] - (paper.valley || paper.height)[i]], i * 4);
+      d.queue.writeBuffer(this.b.BPAP, 0, pp);
+      d.queue.writeBuffer(this.b.BSTR, this.SB * 4, paper.capacity);
+      this.sectionHost = {
+        device: d, SB: this.SB, b: { ...this.b, U: this.b.SECTION_U }, sectionConstants: { LAB_FLAGS: 1 },
+        timestamps: { begin: enc => enc.beginComputePass() },
+        bumpFor: rect => { this.bumpFor(rect); this.statusSynced = false; this.ef.stale = true; },
+        readCountLater() {},
+      };
+      // Identical uniform ABI: the lab calls its active count p3 and channel list act.
+      const prelude = PRELUDE.replace('p2: u32', 'nAct: u32').replaceAll('act:', 'kl:').replaceAll('u.act', 'u.kl');
+      this.sectionBrush = new SectionBrushGpu(this.sectionHost, prelude);
+    }
+    this.channelMask |= info.mask ?? 0; this.setOptions({});
+    const uniforms = this.uniformData.slice(0), u32 = new Uint32Array(uniforms);
+    u32[UOFF.p2 / 4] = this.act.length;
+    d.queue.writeBuffer(this.b.SECTION_U, 0, uniforms);
+    this.lv.light = false;
+    return this.sectionBrush.run(data, info);
+  }
+
   detach() {
-    this.channelMask = 0; this.act = [];
+    this.channelMask = 0; this.act = []; this.statusSynced = false;
     this.snapshotRb?.destroy(); this.snapshotRb = null;
+    this.statusRb?.destroy(); this.statusRb = null;
+    this.efPackRb?.destroy(); this.efPackRb = null;
+    this.sectionBrush?.bSwork.destroy(); this.sectionBrush = null;
+    this.sectionHost = null;
+    this.contactDistance?.destroy(); this.contactDistance = null;
+    this.dryingPressure?.destroy(); this.dryingPressure = null;
     if (!this.b) return;
     for (const k of Object.keys(this.b)) this.b[k].destroy();
     this.b = null; this.rb?.destroy(); this.rb = null;
@@ -149,45 +194,118 @@ export class GpuSheet {
   // ---- the pinned-edge feed: geometry on the host (media/gpu/edge-geometry.js), transport in the kernels -----------
   efAlloc(B) {
     const d = this.device, n = this.n, mk = bytes => d.createBuffer({ size: Math.max(16, bytes), usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST });
-    B.EFL = mk((1 + 2 * n) * 4); B.EFG = mk(n * 16); B.EFS = mk(n * 16); B.EFC = mk(n * 4 * this.K); B.EFB = mk((16 + EF_BMAX * (EF_RMAX + 1)) * 4); B.EFP = mk(Math.ceil(n / 8) * 4);
-    this.ef = { count: 0, rounds: 16, key: null, scratch: {}, stale: true };
+    B.EFL = mk((1 + 2 * n) * 4); B.EFG = mk(n * 16); B.EFS = mk(n * 16); B.EFC = mk(n * 4 * this.K);
+    B.EFB = mk(Math.max(16 + EF_BMAX * (EF_RMAX + 1), EF_TAIL + 3) * 4);
+    B.EFP = mk(Math.ceil(n / 8) * 4);
+    this.ef = { count: 0, boxes: 0, rounds: 4, recent: [], key: null, scratch: {}, stale: true, G: null, span: null, unpacked: null };
   }
   get efOn() { return (this.o.edgeEvap ?? 0) > 0 && !!this.b; }
   efPipe(kind, r) {
     const key = `${kind}#${r}`;
     return this.p[key] ??= this.device.createComputePipeline({ layout: this.device.createPipelineLayout({ bindGroupLayouts: [this.bgl[kind]] }), compute: { module: this.module, entryPoint: kind, constants: { ROUND: Number(r) } } });
   }
-  /** Before queuing steps: whether the footprint moved since the geometry was made (ef_watch), more rounds if a step used them all, and the geometry again where needed. */
-  async efReady() {
-    if (!this.efOn) return;
-    const st = new Uint32Array(await this.readWords('EFB', 20)), ef = this.ef;
-    if (st[4]) ef.stale = true;
-    if (st[3] > 0.75 * ef.rounds && ef.rounds < EF_RMAX) { ef.rounds = Math.min(EF_RMAX, 2 * ef.rounds); this.device.queue.writeBuffer(this.b.EFB, 4, new Uint32Array([ef.rounds])); }
-    if (!ef.stale) return;
-    const { n, w, h, o } = this, cap = this.capacity;
-    const [Mw, Ew, Sw, Ww] = await Promise.all([this.readWords('M', n * 4), this.readWords('EVER', n * 4), this.readWords('S', n * 4), this.readWords('W', n * 4)]);
-    const M = new Uint32Array(Mw), ever = new Uint32Array(Ew), s = new Float32Array(Sw), W = new Float32Array(Ww), mm = o.mmPerCell ?? 0.3;
-    const boxes = wetBoxes({ w, h, M, s, capacity: cap }, Math.max(2, this.poreTime.iters));
-    if (boxes.length > EF_BMAX) throw new Error(`GPU edge feed: ${boxes.length} wet boxes, more than ${EF_BMAX}`);
-    let foot = 0, bx0 = 0xffffffff, by0 = 0xffffffff, bx1 = 0, by1 = 0;
-    for (let i = 0; i < n; i++) {
-      if (M[i] || ever[i]) foot++;
-      if (M[i] || s[i] > 0.02 * cap[i]) { const x = i % w, y = (i / w) | 0; if (x < bx0) bx0 = x; if (y < by0) by0 = y; if (x > bx1) bx1 = x; if (y > by1) by1 = y; }
+  /** Read packed 4-bit wet/footprint/damp/water words from GPU via ef_pack (32x smaller than 4 full-sheet buffers). */
+  async readPackedBits() {
+    const d = this.device, n = this.n, bytes = Math.ceil(n / 8) * 4;
+    if (!this.efPackRb || this.efPackRb.size < bytes) {
+      this.efPackRb?.destroy();
+      this.efPackRb = d.createBuffer({ size: Math.max(16, bytes), usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST });
     }
+    const enc = d.createCommandEncoder(), pass = enc.beginComputePass();
+    pass.setPipeline(this.p.ef_pack); pass.setBindGroup(0, this.bg.ef_pack); pass.dispatchWorkgroups(Math.ceil(n / 2048)); pass.end();
+    enc.copyBufferToBuffer(this.b.EFP, 0, this.efPackRb, 0, bytes);
+    d.queue.submit([enc.finish()]);
+    await this.efPackRb.mapAsync(GPUMapMode.READ, 0, bytes);
+    const out = new Uint32Array(this.efPackRb.getMappedRange(0, bytes).slice(0));
+    this.efPackRb.unmap();
+    return out;
+  }
+  /** Fast 1-bit wet/damp overlay mask on GPU without downloading pigment buffers (32x smaller than syncAll). */
+  async wetMask() {
+    const bits = await this.readPackedBits(), n = this.n, mask = new Uint8Array(n);
+    for (let q = 0, len = bits.length; q < len; q++) {
+      let word = bits[q];
+      if (!word) continue;
+      const base = q << 3, end = Math.min(n, base + 8);
+      for (let i = base; i < end && word; i++, word >>>= 4) if (word & 13) mask[i] = 1; // bit 1 M, bit 4 damp, bit 8 W>0
+    }
+    return mask;
+  }
+  applyEfStatus(st) {
+    if (!this.efOn || this.o.realtime) return;
+    const ef = this.ef;
+    if (st[4]) ef.stale = true;
+    const used = st[3];
+    if (used > 0) {
+      if (used > ef.rounds && ef.rounds < EF_RMAX) {
+        ef.rounds = Math.min(EF_RMAX, Math.max(ef.rounds + 2, Math.ceil(1.25 * used) + 1));
+      } else {
+        ef.recent.push(used);
+        if (ef.recent.length > 4) ef.recent.shift();
+        if (ef.recent.length >= 4) {
+          const want = Math.max(2, Math.max(...ef.recent) + 1);
+          if (want < ef.rounds) ef.rounds = want;
+        }
+      }
+      this.device.queue.writeBuffer(this.b.EFB, 12, new Uint32Array([0]));
+    }
+  }
+  /** Refresh pinned-edge feed geometry from packed GPU bits whenever ef.stale is set. */
+  async efRefresh() {
+    if (this.o.realtime || !this.efOn || !this.ef.stale) return;
+    const { n, w, h, o } = this, ef = this.ef;
+    const bits = await this.readPackedBits();
+    const U = ef.unpacked?.M.length === n ? ef.unpacked : (ef.unpacked = { M: new Uint8Array(n), ever: new Uint8Array(n), damp: new Uint8Array(n), water: new Uint8Array(n), span: null });
+    const { M, ever, damp, water } = U;
+    if (U.span) {
+      const [s0, s1] = U.span;
+      M.fill(0, s0, s1); ever.fill(0, s0, s1); damp.fill(0, s0, s1); water.fill(0, s0, s1);
+    }
+    let foot = 0, footDamp = 0, bx0 = 0xffffffff, by0 = 0xffffffff, bx1 = 0, by1 = 0, loI = n, hiI = -1;
+    for (let q = 0, len = bits.length; q < len; q++) {
+      let word = bits[q];
+      if (!word) continue;
+      const base = q << 3, end = Math.min(n, base + 8);
+      if (base < loI) loI = base;
+      if (end > hiI) hiI = end;
+      for (let i = base; i < end && word; i++, word >>>= 4) {
+        const b = word & 15;
+        if (!b) continue;
+        const mi = b & 1, ei = (b >> 1) & 1, di = (b >> 2) & 1;
+        M[i] = mi; ever[i] = ei; damp[i] = di; water[i] = b >> 3;
+        if (mi || ei) { foot++; if (di) footDamp++; }
+        if (di) { const y = (i / w) | 0, x = i - y * w; if (x < bx0) bx0 = x; if (y < by0) by0 = y; if (x > bx1) bx1 = x; if (y > by1) by1 = y; }
+      }
+    }
+    U.span = hiI > loI ? [loI, hiI] : null;
+    const boxes = bx0 <= bx1 ? wetBoxes({ w, h, M: damp, s: damp, capacity: ONES(n) }, Math.max(2, this.poreTime.iters), [bx0, by0, bx1, by1]) : [];
+    if (boxes.length > EF_BMAX) throw new Error(`GPU edge feed: ${boxes.length} wet boxes, more than ${EF_BMAX}`);
+    const mm = o.mmPerCell ?? 0.3;
     const q = this.device.queue;
     q.writeBuffer(this.b.EFB, 16, new Uint32Array([0, 0, 0xffffffff, 0xffffffff, 0, 0, foot, bx0, by0, bx1, by1]));
+    const feeding = boxes.filter(([x0, y0, x1, y1]) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) if (water[y * w + x]) return true; return false; });
+    const fastWatch = boxes.length === 1 && feeding.length === 1 && foot > 0 && footDamp === foot ? 1 : 0;
+    q.writeBuffer(this.b.EFB, EF_TAIL * 4, new Uint32Array([fastWatch, 0, footDamp]));
     ef.stale = false;
-    // a box with no surface water has no feed (edgeFeed returns before its geometry); the rest keep their geometry while
-    // the footprint in them is the same (edgeFeed's cache)
-    const feeding = boxes.filter(([x0, y0, x1, y1]) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) if (W[y * w + x] > 0) return true; return false; });
     const res = this.resist; let hash = 0x811c9dc5; const mix = v => { hash = Math.imul(hash ^ v, 16777619) >>> 0; };
     for (const [x0, y0, x1, y1] of feeding) { mix(0xb0c5); for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) { const i = y * w + x; if (M[i] || ever[i]) mix(res?.[i] ? ~i : i); } }
     const key = `${[mm, o.edgeMm, o.edgeEvap, o.reachMm, o.holeSpan].join(',')}:${feeding.length}:${hash}`;
     if (key === ef.key) return;
     ef.key = key;
-    const list = [], G = new Float32Array(4 * n); let b = 0;
+    if (ef.G?.length !== 4 * n) { ef.G = new Float32Array(4 * n); ef.span = null; }
+    const list = [], G = ef.G, was = ef.span;
+    if (was) G.fill(0, 4 * was[0], 4 * (was[1] + 1));
+    let b = 0, lo = Infinity, hi = -1;
     for (const box of feeding) {
-      const geo = edgeGeometry({ w, h, M, ever, resist: this.resist }, o, box, mm, ef.scratch);
+      // The edgeGeometry() footprint and equations, with GPU distance quadrature and pressure.
+      const grid = contactGrid(box, mm, o.edgeMm ?? 1, this.device.limits);
+      if (grid) this.contactDistance ??= new GpuContactDistance(this.device);
+      this.dryingPressure ??= new GpuDryingPressure(this.device);
+      const geo = await solveEdgeBoxGpu({ w, h, M, ever, resist: this.resist }, o, box, mm, ef.scratch, {
+        contact: this.contactDistance, pressure: this.dryingPressure, packed: this.b.EFP, grid,
+      });
+      if (grid) this.gpuDistanceBoxes = (this.gpuDistanceBoxes ?? 0) + 1;
+      if (geo?.solve) ef.pressureSolve = geo.solve;
       if (!geo) continue;
       const { order, ex, fx, fy } = geo;
       for (const i of order) { G[4 * i] = ex[i]; G[4 * i + 1] = fx[i]; G[4 * i + 2] = fy[i]; }
@@ -195,27 +313,79 @@ export class GpuSheet {
         if (fx[i] > 0) G[4 * i + 3] += fx[i]; else if (fx[i] < 0) G[4 * (i + 1) + 3] -= fx[i];
         if (fy[i] > 0) G[4 * i + 3] += fy[i]; else if (fy[i] < 0) G[4 * (i + w) + 3] -= fy[i];
       }
-      for (const i of order) list.push(i, b);
+      for (const i of order) { list.push(i, b); if (i < lo) lo = i; if (i + w > hi) hi = Math.min(n - 1, i + w); }
       b++;
     }
     const L = new Uint32Array(1 + list.length); L[0] = list.length / 2; L.set(list, 1);
-    q.writeBuffer(this.b.EFL, 0, L); q.writeBuffer(this.b.EFG, 0, G); q.writeBuffer(this.b.EFB, 0, new Uint32Array([b, ef.rounds]));
-    ef.count = L[0];
+    q.writeBuffer(this.b.EFL, 0, L);
+    const now = hi >= lo ? [lo, hi] : null, from = Math.min(now?.[0] ?? Infinity, was?.[0] ?? Infinity), to = Math.max(now?.[1] ?? -1, was?.[1] ?? -1);
+    if (to >= from) q.writeBuffer(this.b.EFG, 16 * from, G, 4 * from, 4 * (to - from + 1));
+    ef.span = now;
+    q.writeBuffer(this.b.EFB, 0, new Uint32Array([b, EF_RMAX]));
+    ef.count = L[0]; ef.boxes = b;
   }
-  /** Before queuing steps: the levelling's budgets brought up to what the last steps needed (film-level-host.js adaptLevel). */
+  /** Read CTR (48B), EFB (20B), and LVS (48B) in ONE single command buffer and persistent staging mapAsync. */
+  async readStepStatus(clearLvs = true) {
+    const d = this.device, rb = this.statusRb;
+    const enc = d.createCommandEncoder();
+    enc.copyBufferToBuffer(this.b.CTR, 0, rb, 0, 48);
+    enc.copyBufferToBuffer(this.b.EFB, 0, rb, 48, 20);
+    enc.copyBufferToBuffer(this.b.LVS, 0, rb, 68, 48);
+    d.queue.submit([enc.finish()]);
+    await rb.mapAsync(GPUMapMode.READ, 0, 116);
+    const mapped = rb.getMappedRange(0, 116);
+    const ctr = new Uint32Array(mapped.slice(0, 48));
+    const efb = new Uint32Array(mapped.slice(48, 68));
+    const lvs = new Uint32Array(mapped.slice(68, 116));
+    rb.unmap();
+    if (clearLvs) d.queue.writeBuffer(this.b.LVS, 12, new Uint32Array(9));
+    return { ctr, efb, lvs };
+  }
+  applyLevelStatus(v) {
+    if (this.o.realtime) return;
+    if (adaptLevel(this.lv, v, this.lv.epoch !== this.epoch)) this.setOptions({});
+  }
+  /** Bring edge-feed geometry and levelling budgets up to date before queuing steps (0 extra round-trips in steady state). */
+  async prepareStep() {
+    if (this.o.realtime) return;
+    if (!this.statusSynced) {
+      const { efb, lvs } = await this.readStepStatus(true);
+      this.applyEfStatus(efb);
+      this.applyLevelStatus(lvs);
+      this.statusSynced = true;
+    }
+    if (this.efOn && this.ef.stale) await this.efRefresh();
+  }
+  async efReady() {
+    if (!this.efOn || this.o.realtime) return;
+    if (!this.statusSynced) {
+      const st = new Uint32Array(await this.readWords('EFB', 20));
+      this.applyEfStatus(st);
+    }
+    if (this.ef.stale) await this.efRefresh();
+  }
   async levelReady() {
-    if (!levelOn(this.o)) return;
+    if (this.o.realtime || this.statusSynced) return;
     const v = new Uint32Array(await this.readWords('LVS', 48));
     this.device.queue.writeBuffer(this.b.LVS, 12, new Uint32Array(9));
-    if (adaptLevel(this.lv, v)) this.setOptions({});
+    this.applyLevelStatus(v);
   }
   bufFor(name) { return name === 'u' ? this.b.U : name === 'rc' ? this.b.RC : this.b[name]; }
 
-  /** Uniform values for the options and pigments. dt changes between dry()'s phases: call again with { dt }. */
+  /** Uniform values for the options and pigments. dt changes between dry()'s phases: call again with { dt }.
+   * realtime opts into GPU-only edge evaporation and bounded progressive levelling;
+   * omitted/false retains the converged reference solver and geometric edge feed.
+   */
   setOptions(o) {
     const d = this.device, u = new ArrayBuffer(UBYTES), U32 = new Uint32Array(u), F32 = new Float32Array(u);
-    this.o = { ...this.o, ...o }; o = this.o;
-    const set = (k, v) => { const i = UOFF[k] / 4; if (UF.find(x => x[0] === k)[1] === 'u') U32[i] = v; else F32[i] = v; };
+    const wasRealtime = this.o.realtime;
+    this.o = { ...this.o, ...o };
+    // Non-physical paper records zero cell size. Match flowTime/poreTime's
+    // fallback before levelling divides by the physical cell size.
+    if (!(this.o.mmPerCell > 0)) this.o.mmPerCell = 0.3;
+    o = this.o;
+    if (wasRealtime && !o.realtime && this.ef) { this.ef.stale = true; this.statusSynced = false; }
+    const set = (k, v) => { const i = UOFF[k] / 4; if (UTYPE[k] === 'u') U32[i] = v; else F32[i] = v; };
     set('w', this.w ?? 0); set('h', this.h ?? 0); set('n', this.n ?? 0); set('tw', this.tw ?? 0); set('th', this.th ?? 0); set('ntiles', this.ntiles ?? 0); set('K', this.K);
     set('p2', o.optimized === false ? 0 : 1); set('cap', this.cap ?? 0); set('hasTop', this.hasTop ? 1 : 0); set('holdOn', Number.isFinite(o.hold ?? Infinity) ? 1 : 0);
     // physical time (flow-time.js): a step's time in chunks of at most 2, flow and pore passes from dt and the cell size
@@ -223,9 +393,23 @@ export class GpuSheet {
     if (!Number.isFinite(requestedDt) || requestedDt < 0) throw new RangeError('dt must be finite and nonnegative');
     this.timeChunks = Math.max(1, Math.ceil(requestedDt / 2));
     const dt = requestedDt / this.timeChunks, sub = { ...o, dt }, at = { paper: { mmPerCell: o.mmPerCell ?? 0.3 } };
+    const prevDt = this._lastStepDt;
+    if (this.lv && prevDt > 0 && dt > 0 && dt !== prevDt && (dt > 2 * prevDt || prevDt > 2 * dt)) {
+      if (dt > prevDt) {
+        const scaled = Math.ceil(this.lv.iters * Math.pow(dt / prevDt, 0.25)) + 4;
+        this.lv.iters = Math.min(64, Math.max(this.lv.iters, scaled));
+      } else {
+        this.lv.iters = Math.min(this.lv.iters, this.ntiles >= 1024 ? 48 : 32);
+      }
+      this.lv.recent = [];
+    }
+    this._lastStepDt = dt;
     this.flowTime = flowTime(at, sub); this.poreTime = poreTime(at, sub);
     const fraction = this.flowTime.fraction;
-    if (this.ef) this.ef.stale = true;   // the edge feed's geometry depends on the options and dt
+    if (this.ef) {
+      const efKey = `${o.mmPerCell ?? 0.3}:${o.edgeMm}:${o.edgeEvap}:${o.reachMm}:${o.holeSpan}:${this.poreTime.iters}`;
+      if (efKey !== this._efOptKey) { this._efOptKey = efKey; this.ef.stale = true; }
+    }
     Object.entries({
       dt, evap: o.evap, edgeEvap: o.edgeEvap, edgeWidth: o.edgeWidth, capE: o.edgeWidth + 1, absorb: o.absorb, film: o.film, flow: o.flow * fraction, ff: o.fibreFlow ?? 0.6,
       flowDepth: o.flowDepth ?? 0.12, diffuse: Math.min(0.25, Math.max(0, o.diffuse * fraction)), cd: o.carryDepth ?? 0.08, settle: o.settle, liftDepth: o.liftDepth ?? 0.15,
@@ -233,7 +417,7 @@ export class GpuSheet {
       capStep: this.poreTime.fraction, capEps: o.capEps, capDelta: o.capDelta, sizing: o.sizing ?? 0.85, wickFilter: o.wickFilter ?? 0.2,
       wetEps: o.wetEps, paperDry: o.paperDry, capSigma: o.capSigma, spill: o.spill, spillHeight: o.spillHeight, dampEase: o.dampEase, pinning: o.pinning ?? 0, pinFibre: o.pinFibre ?? 0,
       enclose: o.encloseEase ?? 0, slideCap: o.slideCap ?? 0, holeFill: o.holeFill ?? 0, padB: 0,
-      filmDiff: Math.max(0, (o.filmDiffuse ?? 0) * fraction), filmDepth: o.filmDepth ?? 0.03, holeSpan: o.holeSpan ?? 0, mar: o.marangoni ?? 0, slope: o.slope ?? 0,
+      filmDiff: Math.max(0, (o.filmDiffuse ?? 0) * fraction), filmDepth: o.filmDepth ?? 0.03, holeSpan: o.holeSpan ?? 0, mar: (o.marangoni ?? 0) * fraction, slope: o.slope ?? 0,
       padC: 0, mmPerCell: o.mmPerCell ?? 0.3, edgeFlowDepth: o.edgeFlowDepth ?? 0.06,
       poreHalo: Math.max(1, Math.ceil(this.poreTime.iters / TILE)), poreReach: Math.max(2, this.poreTime.iters),
       toothLo: this.paperHollow?.toothLo ?? 0, toothSpan: this.paperHollow?.toothSpan ?? 0, hollowUnit: this.paperHollow?.hollowUnit ?? 1, groundPhys: this.paperHollow?.physical ? 1 : 0,
@@ -245,16 +429,19 @@ export class GpuSheet {
       F32.set([gg, (p.rho / p.omega) * o.lift * o.looseLift, scour / p.omega, gg > 0 ? reposeStep(o.repose ?? 0, this.paperMm ?? 0) / gg : 0], base + k * 4);
       // pb.x, pc.x: the Stokes speed and the Brownian diffusion of the paint's particles, times settle (settling.js)
       F32.set([settleSpeed(p) * (o.settle ?? 1), p.omega, p.floc ?? 0, mob], base + 64 + k * 4);
-      F32.set([settleDiffusion(p) * (o.settle ?? 1), 0, 0, 0], base + 144 + k * 4);
+      F32.set([settleDiffusion(p) * (o.settle ?? 1), grainDrag(settleSpeed(p)), 0, 0], base + 144 + k * 4);
     });
     this.act = o.activeChannelDispatch !== false && o.optimized !== false
       ? channelList(this.K, this.channelMask ?? 0) : Array.from({ length: this.K }, (_, k) => k);
     set('p3', this.act.length); this.act.forEach((k, a) => { U32[UF.length + 128 + a] = k; });
+    this.uniformData = u;
     if (this.b) d.queue.writeBuffer(this.b.U, 0, u);
   }
 
   /** Copy a whole CPU sheet to the GPU. */
   upload(sheet) {
+    if (this.lv) this.lv.light = false;
+    this.statusSynced = false;
     const { device: d, b: B, n, w, h } = this, K = this.K, put = (buf, arr, off = 0) => d.queue.writeBuffer(buf, off, arr);
     const u32 = a => { const o = new Uint32Array(n); for (let i = 0; i < n; i++) o[i] = a[i]; return o; };
     put(B.W, sheet.W); put(B.S, sheet.s); put(B.M, u32(sheet.M)); put(B.EVER, u32(sheet.ever));
@@ -269,9 +456,6 @@ export class GpuSheet {
     this.tilt = sheet.tilt ?? null;   // the board's tilt (sheet.js setTilt), for the levelling
     this.setOptions({ mmPerCell: sheet.paper?.mmPerCell ?? 0.3 });
     const fl = new Uint32Array(this.ntiles), cap = sheet.paper.capacity;
-    // The active-tile reduction covers every nonzero W only if loaded surface
-    // water has its M flag. Imported states violating this invariant keep the
-    // ordinary solver until a subsequent whole-sheet upload proves coverage.
     this.zeroWaterCovered = true;
     for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
       const i = y * w + x;
@@ -298,31 +482,54 @@ export class GpuSheet {
       else p.dispatchWorkgroups(nD, indirectOffset ? this.act.length : 1);
       if (timer) p.end();
     };
+    const lvPipe = (name, constants) => {
+      const byName = this.lvPipes ??= new Map(), seen = byName.get(name) ?? byName.set(name, new Map()).get(name), hit = seen.get(constants);
+      if (hit) return hit;
+      const key = `${name}#${JSON.stringify(constants)}`;
+      const pipe = this.p[key] ??= this.device.createComputePipeline({ layout: this.device.createPipelineLayout({ bindGroupLayouts: [this.bgl[name]] }), compute: { module: this.module, entryPoint: name, constants } });
+      seen.set(constants, pipe); return pipe;
+    };
     const nT = Math.ceil(this.ntiles / 64);
     if (o.dt === 0) { pass?.end(); return; }
     steps *= this.timeChunks;
     const ef = (name, groups) => { const p = timer ? timer.pass(enc, name) : pass; p.setPipeline(this.p[name] ?? this.efPipe(...name.split('#'))); p.setBindGroup(0, this.bg[name.split('#')[0]]); p.dispatchWorkgroups(groups); if (timer) p.end(); };
     for (let s = 0; s < steps; s++) {
-      // the pinned edge's feed first, as the CPU sheet's step (edge-feed.js), on the geometry efRefresh made
-      if (this.efOn && this.ef.count) {
-        const groups = Math.ceil(this.ef.count / 256);
-        ef('ef_reset', 1); ef('ef_begin', groups);
-        for (let r = 0; r < this.ef.rounds; r++) { ef(`ef_prep#${r}`, groups); ef(`ef_apply#${r}`, groups); }
+      // the pinned edge's feed first: compact lists fuse into ef_small (1 dispatch); larger lists use parallel rounds + ef_continue
+      if (!o.realtime && this.efOn && this.ef.count && !zeroWater) {
+        if (this.ef.count <= 4096 && this.p.ef_small) {
+          ef('ef_small', 1);
+        } else {
+          const groups = Math.ceil(this.ef.count / 256);
+          ef('ef_reset', 1); ef('ef_begin', groups);
+          for (let r = 0; r < this.ef.rounds; r++) { ef(`ef_prep#${r}`, groups); ef(`ef_apply#${r}`, groups); }
+          if (this.ef.rounds < EF_RMAX && this.p.ef_continue) ef(`ef_continue#${this.ef.rounds}`, 1);
+        }
       }
       go('tiles_prep', 0, [nT]); go('tiles_build', 0, [nT]); go('tiles_args', 0, [1]);
+      if (o.realtime && !zeroWater) go('ef_realtime');
       if (o.optimized !== false) { go('pigment_scan', 12); go('pigment_masks', 0, [nT]); }
-      // the boxes and the levelling, after the feed as the CPU step's (sheet.js levelFilm); their kernels loop over their
-      // work, so any number of workgroups covers it
-      if (!zeroWater) encodeLevel((name, groups, constants = null) => {
-        if (!constants) return go(name, 0, [groups]);
-        const p = timer ? timer.pass(enc, name) : pass, key = `${name}#${JSON.stringify(constants)}`;
-        p.setPipeline(this.p[key] ??= this.device.createComputePipeline({ layout: this.device.createPipelineLayout({ bindGroupLayouts: [this.bgl[name]] }), compute: { module: this.module, entryPoint: name, constants } }));
-        p.setBindGroup(0, this.bg[name]);
-        if (stopSurface) p.dispatchWorkgroupsIndirect(this.b.ARGS, 24); else p.dispatchWorkgroups(groups);
-        if (timer) p.end();
-      }, o, o.mmPerCell ?? 0.3, this.lv, Math.max(1, nD));
-      // Proven W==0 is invariant until upload/writeRect. The retained p3a,
-      // capillary and wet-front passes still run at the original dt.
+      // the boxes and the levelling, after the feed as the CPU step's (sheet.js levelFilm)
+      if (!zeroWater) {
+        if (this.lv) { if (this.lv.since === 0) this.lv.epoch = this.epoch; else if (this.lv.epoch !== this.epoch) this.lv.epoch = -1; }
+        const levelRun = (name, groups, constants = null, indirectOffset) => {
+          if (o.realtime && name === 'lv_cg_continue') { go('lv_realtime_close', 0, [1]); return; }
+          if (o.realtime && name === 'lv_transport_continue') return;
+          if (!constants && indirectOffset === undefined) {
+            go(name, 0, [groups]);
+            if (o.realtime && name === 'lv_subs') go('lv_realtime_subs', 0, [1]);
+            return;
+          }
+          const p = timer ? timer.pass(enc, name) : pass;
+          p.setPipeline(constants ? lvPipe(name, constants) : this.p[name]);
+          p.setBindGroup(0, this.bg[name]);
+          if (indirectOffset !== undefined) p.dispatchWorkgroupsIndirect(this.b.LVI, indirectOffset);
+          else if (stopSurface) p.dispatchWorkgroupsIndirect(this.b.ARGS, 24); else p.dispatchWorkgroups(groups);
+          if (timer) p.end();
+        };
+        // Use a separate scheduling budget: interactive approximation never trains exact-mode budgets.
+        encodeLevel(levelRun, o, o.mmPerCell ?? 0.3,
+          o.realtime ? { ...this.lv, iters: 6, subs: 2, light: false } : this.lv, Math.max(1, nD));
+      }
       if (!zeroWater) {
         go('phase1');
         for (let it = 0; it < this.flowTime.iters; it++) {
@@ -332,16 +539,14 @@ export class GpuSheet {
       }
       go('p3a');
       if (!zeroWater && (o.slide ?? 0) > 0) { go('dep_k'); go('slide_out', 12); go('slide_apply', 12); }
-      // Cell-wise pigment loops improved the measured large sheets with one to
-      // three channels. Keep the parallel passes for small or water-only work.
-      // pore passes split in physical time (flow-time.js poreTime), each published before the next gathers it
       for (let p = 0; p < this.poreTime.iters; p++) {
         if (o.fusedCapillary !== false && this.n >= 480000 && this.act.length > 0 && this.act.length <= 3) go('cap_sp');
         else { go('cap_s'); go('cap_p', 12); }
         if (p + 1 < this.poreTime.iters) go('cap_commit');
       }
       go('p5a'); go('p5b'); go('p5c'); go('wetscan');
-      if (this.efOn) { ef('ef_watch', Math.ceil(this.n / 256)); ef('ef_watch_end', 1); }
+      // Whole-sheet ef_watch is needed only on the last step of a batch (unless stopSurface may halt early)
+      if (!o.realtime && this.efOn && (stopSurface || s === steps - 1)) { ef('ef_watch', Math.ceil(this.n / 256)); ef('ef_watch_end', 1); }
       if (stopSurface) go('surface_boundary', 0, [1]);
     }
     pass?.end();
@@ -351,30 +556,31 @@ export class GpuSheet {
     this.cap = Math.max(1, Math.min(this.ntiles, Math.ceil(cap)));
     this.device.queue.writeBuffer(this.b.U, UOFF.cap, new Uint32Array([this.cap]));
   }
-  // Direct dispatches are cheaper than indirect ones, so the host sizes them from the last tile count it read back, with
-  // room for growth; the shader flags an undersized dispatch.
   noteCount(count) {
     const want = count * 1.5 + 16 + 3 * Math.sqrt(count);
     this.setCap(this.hold > 0 ? Math.max(this.cap, want) : want);
   }
   /** Queue `steps` steps (no waiting). */
   step(steps = 1, chunk = 20, stopSurface = false) {
+    this.statusSynced = false;
     for (let done = 0; done < steps;) {
       const enc = this.device.createCommandEncoder(), k = Math.min(chunk, steps - done);
       this.encodeSteps(enc, k, null, stopSurface); this.device.queue.submit([enc.finish()]); done += k;
     }
   }
   /**
-   * `steps` steps, then the active and wet tile counts read back and used to size the next dispatch. Resolves to whether any
-   * tile is still wet. Nothing is queued when the sheet is known dry and nothing was written since: a step would change nothing.
-   * `surfaceWet` follows whether any water still stands on the surface (damp pores alone do not count), as the CPU sheet's M.
+   * `steps` steps, then ONE combined readback for active/wet counts, edge-feed status, and levelling status.
+   * Nothing is queued when the sheet is known dry and nothing was written since.
    */
   async advance(steps) {
     if (this.knownDry) { this.surfaceWet = false; return false; }
-    await this.efReady(); await this.levelReady();
+    await this.prepareStep();
     const epoch = this.epoch;
     this.step(steps);
-    const c = await this.counters();
+    const { ctr: c, efb, lvs } = await this.readStepStatus(true);
+    if (!this.o.realtime) this.applyEfStatus(efb);
+    this.applyLevelStatus(lvs);
+    this.statusSynced = true;
     this.zeroWaterKnown = this.zeroWaterCovered === true && c[7] === 0 && c[4] === 0 && epoch === this.epoch;
     if (this.hold > 0) this.hold--;
     this.noteCount(c[0]);
@@ -383,23 +589,21 @@ export class GpuSheet {
     this.surfaceWet = c[5] > 0 || epoch !== this.epoch;
     return c[1] > 0;
   }
-  /** Queue a bounded wave but stop at the first original surface-observation boundary.
-   * All later global/tile/pigment dispatches are GPU no-ops. Only the executed
-   * steps are returned; dry pores are preserved for the next glaze. */
+  /** Queue a bounded wave stopping at the first surface-observation boundary. */
   async advanceSurface(steps, quantum) {
     if (!Number.isInteger(quantum) || quantum < 1 || !Number.isInteger(steps) || steps < quantum || steps % quantum) throw new Error('surface batch needs whole observation quanta');
     if (this.knownDry) { this.surfaceWet = false; return { wet: false, steps: 0 }; }
-    await this.efReady(); await this.levelReady();
+    await this.prepareStep();
     const epoch = this.epoch, d = this.device;
-    // CTR[8..11]: enabled, executed steps, original quantum, terminal latch.
-    // ARGS[6..8]: global tile-list/mask work; ordinary kernels use ARGS[0..5].
     d.queue.writeBuffer(this.b.CTR, 32, new Uint32Array([1, 0, quantum, 0]));
     d.queue.writeBuffer(this.b.ARGS, 24, new Uint32Array([Math.ceil(this.ntiles / 64), 1, 1]));
-    // Every active kernel uses the freshly computed tile count, so a wet front
-    // growing inside this wave cannot exceed a stale host dispatch estimate.
     this.step(steps, 20, true);
-    const c = new Uint32Array(await this.readWords('CTR', 48)), ran = c[9];
+    const { ctr: c, efb, lvs } = await this.readStepStatus(true);
+    const ran = c[9];
     d.queue.writeBuffer(this.b.CTR, 32, new Uint32Array(4));
+    if (!this.o.realtime) this.applyEfStatus(efb);
+    this.applyLevelStatus(lvs);
+    this.statusSynced = true;
     this.zeroWaterKnown = this.zeroWaterCovered === true && c[7] === 0 && c[4] === 0 && epoch === this.epoch;
     if (this.hold > 0) this.hold = Math.max(0, this.hold - ran / quantum);
     this.noteCount(c[0]);
@@ -415,21 +619,25 @@ export class GpuSheet {
     await rb.mapAsync(GPUMapMode.READ); const out = rb.getMappedRange().slice(0); rb.destroy(); return out;
   }
   /** [active tile count of the last step, wet tile count after it, largest face depth difference (if level_k ran)] */
-  async counters() { return new Uint32Array(await this.readWords('CTR', 32)); }
+  async counters() {
+    const d = this.device, rb = this.statusRb;
+    const enc = d.createCommandEncoder(); enc.copyBufferToBuffer(this.b.CTR, 0, rb, 0, 32); d.queue.submit([enc.finish()]);
+    await rb.mapAsync(GPUMapMode.READ, 0, 32);
+    const out = new Uint32Array(rb.getMappedRange(0, 32).slice(0)); rb.unmap();
+    return out;
+  }
 
   /** Copy the whole GPU state back into a CPU sheet, top layer included. */
   async download(sheet) {
+    await this.levelReady();
     const { n } = this, K = this.K;
     if (this.efOn) { const v = new Float32Array(await this.readWords('EFS', n * 16)), p = sheet.edgePending?.length === n ? sheet.edgePending : (sheet.edgePending = new Float64Array(n)); for (let i = 0; i < n; i++) p[i] = v[4 * i + 2]; }
     const top = this.hasTop && sheet.layers.length ? sheet.layers[sheet.layers.length - 1] : null;
     const planes = [['W', [sheet.W]], ['S', [sheet.s]], ['M', [sheet.M]], ['EVER', [sheet.ever]],
       ['G', sheet.G], ['P', sheet.P], ['D', sheet.D], ...(top ? [['TOP', top]] : [])];
     const bytes = n * 4 * (4 + K * (top ? 4 : 3));
-    // One snapshot submission and mapping, rather than a GPU round trip for
-    // each pigment field. Keep the old bounded reads for oversized sheets.
-    if (bytes <= this.device.limits.maxBufferSize) {
-      // Reuse the sheet's staging allocation: repeatedly allocating hundreds
-      // of MB improved median time but caused slower outlier snapshots.
+    // Cap persistent whole-sheet readback staging at 128 MiB; oversized sheets stream plane-by-plane below.
+    if (bytes <= Math.min(this.device.limits.maxBufferSize, 128 * 1024 * 1024)) {
       if (!this.snapshotRb || this.snapshotRb.size < bytes) {
         this.snapshotRb?.destroy();
         this.snapshotRb = this.device.createBuffer({ size: Math.max(16, bytes), usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST });
@@ -488,6 +696,7 @@ export class GpuSheet {
   writeRect(rect, packed) {
     const [x0, y0, rw, rh] = rect, d = this.device;
     const area = rw * rh;
+    if (this.lv) this.lv.light = false;
     const mask = observePackedChannels(this.channelMask ?? 0, packed, area, this.K);
     if (mask !== this.channelMask) { this.channelMask = mask; this.setOptions({}); }
     for (let i = 0; i < area; i++) if (packed[i] !== 0 && packed[2 * area + i] !== 1) this.zeroWaterCovered = false;
@@ -529,28 +738,50 @@ export class GpuSheet {
     this.device.queue.submit([enc.finish()]);
     const c = await this.counters(); return new Float32Array(c.buffer)[2];
   }
-  /** GPU version of sheet.js dry(): same schedule (dt, level check every 25 steps, faster time once level). Returns steps taken. */
-  async dry(max = 40000, { level = 60, levelMax = 4000, levelTol = 0.02, dt = 2 } = {}) {
+  /** GPU version of sheet.js dry(): same schedule (dt, level check every 25 steps, faster time once level), with fast pore tail. */
+  async dry(max = 40000, { level = 60, levelMax = 4000, levelTol = 0.02, dt = 2, budgetMs = Infinity, onProgress = null } = {}) {
+    if (this.knownDry) { this.surfaceWet = false; return 0; }
     const oLevel = this.o.dt ?? 1;
+    const started=performance.now(), original={evap:this.o.evap,edgeEvap:this.o.edgeEvap,paperDry:this.o.paperDry};
+    let accelerated=false,lastProgress=started;
     let t = 0, fast = false; this.setOptions({ dt: oLevel });
-    while (t < max) {
-      if (!fast && t >= level && (t >= levelMax || (t % 25 === 0 && await this.surfaceLevel() < levelTol))) { fast = true; this.setOptions({ dt }); }
-      let stop = max;
-      if (!fast) {
-        if (t < levelMax) stop = Math.min(stop, levelMax);
-        stop = Math.min(stop, Math.max(Math.floor(t / 25) * 25 + 25, Math.ceil(level / 25) * 25));
-      } else stop = Math.min(stop, t + 50);
-      const chunk = Math.max(1, stop - t);
-      await this.efReady(); this.step(chunk, 25); t += chunk;
-      const c = await this.counters(); this.noteCount(c[0]); if (c[1] === 0) break;
+    try {
+      while (t < max) {
+        // Interactive replay gives pooling a short natural interval, then speeds
+        // evaporation in both film and pores. Exact callers keep an infinite budget.
+        if(!accelerated&&performance.now()-started>=budgetMs){
+          accelerated=true;fast=true;this.setOptions({dt,evap:Math.max(original.evap??0,1),edgeEvap:Math.max(original.edgeEvap??0,1),paperDry:Math.max(original.paperDry??0,1)});
+        }
+        if(onProgress&&performance.now()-lastProgress>=16){await onProgress();lastProgress=performance.now();}
+        if (!fast && t >= level && (t >= levelMax || (t % 25 === 0 && await this.surfaceLevel() < levelTol))) { fast = true; this.setOptions({ dt }); }
+        let stop = max;
+        if (!fast) {
+          if (t < levelMax) stop = Math.min(stop, levelMax);
+          stop = Math.min(stop, Math.max(Math.floor(t / 25) * 25 + 25, Math.ceil(level / 25) * 25));
+        } else stop = Math.min(stop, t + (this.zeroWaterKnown ? 100 : 50));
+        const chunk = Math.max(1, Math.min(stop - t, Number.isFinite(budgetMs)?2:Infinity));
+        await this.prepareStep();
+        const epoch = this.epoch;
+        this.step(chunk, 25); t += chunk;
+        const { ctr: c, efb, lvs } = await this.readStepStatus(true);
+        this.applyEfStatus(efb);
+        this.applyLevelStatus(lvs);
+        this.statusSynced = true;
+        this.zeroWaterKnown = this.zeroWaterCovered === true && c[7] === 0 && c[4] === 0 && epoch === this.epoch;
+        this.noteCount(c[0]);
+        this.wetTiles = c[1]; this.surfaceTiles = c[5]; this.surfaceWet = c[5] > 0;
+        if (c[1] === 0) break;
+      }
+      const c = await this.counters(); if (c[1] !== 0) throw new Error(`Sheet is still wet after dry() limit of ${max} steps`);
+    } finally {
+      this.setOptions({dt:oLevel,...original});
     }
-    const c = await this.counters(); if (c[1] !== 0) throw new Error(`Sheet is still wet after dry() limit of ${max} steps`);
-    this.setOptions({ dt: oLevel }); this.knownDry = true;
+    this.knownDry = true; this.surfaceWet = false;
     return t;
   }
-  /** sheet.js fix(): pores into the deposit, then the deposit becomes the top dried layer. The superseded layer goes to `topOut`. */
-  async fix(topOut = null) {
-    // a fixed wash has no contact-line demand left (edge-feed.js resetEdgeFeed)
+  /** sheet.js fix(): pores into the deposit, then the deposit becomes the top dried layer.
+   *  When `onBeforeOverwriteTop` is given (GPU fold), avoids reading TOP back to CPU! */
+  async fix(topOut = null, onBeforeOverwriteTop = null) {
     { const e = this.device.createCommandEncoder(); e.clearBuffer(this.b.EFS); this.device.queue.submit([e.finish()]); this.ef.stale = true; }
     this.resetCounters(3);
     const d = this.device, enc = d.createCommandEncoder(), pass = enc.beginComputePass();
@@ -558,6 +789,7 @@ export class GpuSheet {
     d.queue.submit([enc.finish()]);
     if ((await this.counters())[3] === 0) return { hadTop: false, pushed: false };
     const hadTop = this.hasTop;
+    if (hadTop && onBeforeOverwriteTop) await onBeforeOverwriteTop();
     if (hadTop && topOut) for (let k = 0; k < this.K; k++) topOut.set(new Float32Array(await this.readWords('TOP', this.n * 4, k * this.n * 4)), k * this.n);
     const e2 = d.createCommandEncoder(), p2 = e2.beginComputePass();
     p2.setPipeline(this.p.fix_b); p2.setBindGroup(0, this.bg.fix_b); p2.dispatchWorkgroups(Math.ceil(this.w / 16), Math.ceil(this.h / 16)); p2.end();
@@ -565,11 +797,17 @@ export class GpuSheet {
     this.hasTop = true; this.setOptions({});
     return { hadTop, pushed: true };
   }
-  /** fix() for a CPU sheet whose layer list should follow: the superseded layer is filled in and a placeholder is pushed. */
-  async fixInto(sheet) {
-    const K = this.K, n = this.n, out = this.hasTop ? new Float32Array(K * n) : null, r = await this.fix(out);
+  /** fix() for a CPU sheet whose layer list should follow: the superseded layer is filled in (or GPU-folded via onFoldTop) and a placeholder is pushed. */
+  async fixInto(sheet, onFoldTop = null) {
+    const K = this.K, n = this.n;
+    const out = this.hasTop && !onFoldTop ? new Float32Array(K * n) : null;
+    const r = await this.fix(out, onFoldTop);
     if (!r.pushed) return false;
-    if (r.hadTop) { const top = sheet.layers[sheet.layers.length - 1]; for (let k = 0; k < K; k++) top[k].set(out.subarray(k * n, (k + 1) * n)); }
+    if (r.hadTop && out) {
+      const top = sheet.layers[sheet.layers.length - 1];
+      for (let k = 0; k < K; k++) top[k].set(out.subarray(k * n, (k + 1) * n));
+    }
+    if (r.hadTop && onFoldTop && sheet.layers.length > 0) sheet.layers.pop();
     sheet.layers.push(sheet.pigments.map(() => new Float32Array(n)));
     return true;
   }

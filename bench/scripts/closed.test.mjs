@@ -79,10 +79,13 @@ test('a closed claude turn has its own sandbox off, no user settings and no kept
   } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
 });
 
-test('the guard\'s log cannot be changed by the session it polices: lines leave its folder as written, and the pipe cannot be removed or replaced', { skip }, async () => {
+test('the guard\'s log cannot be changed by the session it polices: lines leave its folder as written, and the pipe cannot be removed or replaced', { skip }, async t => {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'unpaint-bench-')), keep = fs.mkdtempSync(path.join(os.tmpdir(), 'kept-')), kept = path.join(keep, 'a1-violations.jsonl'), ws = path.join(tmp, 'ws');
   fs.mkdirSync(path.join(ws, 'bench'), { recursive: true }); fs.symlinkSync(path.join(REPO, 'node_modules'), path.join(ws, 'node_modules'));
   const log = guardLog(tmp, kept);
+  // closeTurn can reject before its try/finally (for example when loopback is forbidden).
+  // Always stop the pipe reader, or a failed setup leaves the test process alive.
+  t.after(async () => { await log.stop(); fs.rmSync(tmp, { recursive: true, force: true }); fs.rmSync(keep, { recursive: true, force: true }); });
   // what a session might try after a blocked read: empty the log, remove it, put a file of its own in its place, move its folder
   const tries = ['node -e \'require("fs").appendFileSync(process.env.BENCH_VIOLATIONS, JSON.stringify({ kind: "readFileSync", path: "target.png" }) + "\\n")\'',
     'python3 -c \'import os; f = open(os.environ["BENCH_VIOLATIONS"], "a"); f.write("{\\"kind\\": \\"python.open\\"}\\n"); f.close()\'',
@@ -96,7 +99,7 @@ test('the guard\'s log cannot be changed by the session it polices: lines leave 
     assert.deepEqual(end, { intact: true, lines: 2 });
     assert.deepEqual(fs.readFileSync(kept, 'utf8').trim().split('\n').map(l => JSON.parse(l).kind), ['readFileSync', 'python.open']);
     assert.ok(!fs.existsSync(path.join(path.dirname(log.file), 'other')));
-  } finally { await turn.done(); await log.stop(); fs.rmSync(tmp, { recursive: true, force: true }); fs.rmSync(keep, { recursive: true, force: true }); }
+  } finally { await turn.done(); }
 });
 
 test('a guard log whose pipe is gone when the turn ends is a violation of its own', { skip }, async () => {

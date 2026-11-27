@@ -45,3 +45,17 @@ test('shifted plane views and aliased strength retain the original cell update o
     assert.deepEqual(after.W, before.W);
   }
 });
+
+test('shared empty planes preserve film removal bits even for signed zero and infinite strength',()=>{
+  for(const zeroValue of [0,-0,.25,NaN])for(const infinite of [false,true]){
+    const make=()=>{
+      const sheet=fixture(0,false),zero=new Float32Array(sheet.n);zero[12]=zeroValue;
+      sheet._zeroLayer=zero;sheet.layers[2][0]=zero;sheet.layers[3][2]=zero;
+      sheet.resist.fill(1);sheet.resistStrength=new Float32Array(sheet.n).fill(.37);
+      if(infinite)sheet.resistStrength[8]=-Infinity;
+      return sheet;
+    };
+    const before=make(),after=make();liftResist(before);liftResist(after,{byPlane:true});
+    assert.deepEqual(new Uint32Array(after._zeroLayer.buffer),new Uint32Array(before._zeroLayer.buffer));
+  }
+});

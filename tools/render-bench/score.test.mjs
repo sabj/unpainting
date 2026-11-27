@@ -78,3 +78,14 @@ test('a sheet is wet while any cell has surface water or pores over 2% full', ()
   assert.equal(anyWet({ n: 2, paper, M: Uint8Array.of(0, 0), s: Float32Array.of(0, 0.03) }), true);
   assert.equal(anyWet({ n: 2, paper, M: Uint8Array.of(0, 1), s: Float32Array.of(0, 0) }), true);
 });
+
+test('benchmark GPU drying observes counters per batch rather than per step',async()=>{
+  const {reportWet}=await import('./render-bench.mjs');
+  const options=[],ops=[];
+  const sheet={_gpu:{ctrl:new Int32Array(8),step:(s,o)=>options.push(o.dt),call({op}){ops.push(op);this.ctrl[1]=options.length<48?1:0;}}};
+  const dry=reportWet(sheet);
+  const result=await dry({transport:{dt:.6},maxSteps:100,checkpoint:async()=>true});
+  assert.deepEqual(result,{dry:true,steps:48});
+  assert.deepEqual(options.slice(0,16),Array(16).fill(.6));assert.deepEqual(options.slice(16),Array(32).fill(2));
+  assert.equal(ops.length,3);
+});

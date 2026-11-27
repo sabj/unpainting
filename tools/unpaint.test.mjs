@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { resolveSubjects, planPrepare, poolSummary, runSummary, validateBenchmarkStart } from './unpaint.mjs';
+import { resolveSubjects, planPrepare, poolSummary, runSummary } from './unpaint.mjs';
 
 const HERE = path.dirname(new URL(import.meta.url).pathname);
 const CLI = path.join(HERE, 'unpaint.mjs');
@@ -76,21 +76,4 @@ test('unpaint pods status runs cleanly without mutating state', () => {
   const out = execFileSync(process.execPath, [CLI, 'pods', 'status'], { cwd: ROOT, encoding: 'utf8' });
   assert.match(out, /Render pool:/);
   assert.match(out, /Pod renter:/);
-});
-
-test('validateBenchmarkStart rejects bad args, dirty checkouts, and reused --out folders before pods can start', () => {
-  const cleanGit = (...a) => (a[0] === 'status' ? '' : 'deadbeef00000000000000000000000000000000');
-  const dirtyGit = (...a) => (a[0] === 'status' ? ' M README.md' : 'deadbeef00000000000000000000000000000000');
-  assert.throws(() => validateBenchmarkStart(['--start', '--with-pods'], { git: cleanGit }), /--out DIR/);
-  assert.throws(() => validateBenchmarkStart(['--start', '--with-pods', '--out', '/tmp/x', '--bogus'], { git: cleanGit }), /unknown benchmark option/);
-  assert.throws(() => validateBenchmarkStart(['--start', '--with-pods', '--out', '/tmp/x'], { git: dirtyGit }), /uncommitted changes/);
-
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'unpaint-reuse-test-'));
-  try {
-    fs.writeFileSync(path.join(tmp, 'launch.json'), JSON.stringify({ commit: '1111111100000000000000000000000000000000', runs: [] }));
-    assert.throws(() => validateBenchmarkStart(['--start', '--with-pods', '--out', tmp], { git: cleanGit }), /already has a launch.json/);
-    assert.throws(() => validateBenchmarkStart(['--start', '--with-pods', '--resume', '--out', tmp], { git: cleanGit }), /--resume refused/);
-  } finally {
-    fs.rmSync(tmp, { recursive: true, force: true });
-  }
 });

@@ -9,7 +9,7 @@
 // an average, cherry-picked seed or functional test cannot satisfy that gate.
 import { makePaper } from '../lab/media/paper.js';
 import { coldPressField } from './cold-press-field.mjs';
-import { createSheet, step, fix, setClip, totals, layersOf, clipRuns } from '../lab/media/sheet.js';
+import { DEFAULTS, createSheet, step, fix, setClip, totals, layersOf, clipRuns } from '../lab/media/sheet.js';
 import { createBrush, dip, stroke } from '../lab/media/brush.js';
 import { layerRT, renderLayers, renderLayersCached } from '../lab/media/km.js';
 import { BY_KEY } from '../lab/media/pigments.js';
@@ -8787,22 +8787,75 @@ export function nativePatchRect({x0,y0,x1,y1},sw,sh,W,H){
   const px0=Math.max(0,Math.floor(x0*W/sw)),py0=Math.max(0,Math.floor(y0*H/sh)),px1=Math.min(W,Math.ceil((x1+1)*W/sw)),py1=Math.min(H,Math.ceil((y1+1)*H/sh));
   return {x:px0,y:py0,w:Math.max(0,px1-px0),h:Math.max(0,py1-py0)};
 }
-export async function simulateNativePassages(study,{width=NATIVE_PAINT_LIMITS.width,seed=301,maskFor,onCheckpoint=async()=>{},isCancelled=()=>false,yieldWork=nativeYield,depositDurationMs=0,checkpointIntervalMs=0,paperTemplate=null,onPaper=()=>{},onBrush=null,travelMs=0,skipPacing=()=>false,limits=NATIVE_PAINT_LIMITS,onSheet=null}={}){
+// Keep the physical dt transition at step 16, even when observations are batched.
+// Batches respect the transition and step budget; transport parameters are unchanged.
+export async function nativeDrySchedule({maxSteps,advance,checkpoint=async()=>{},batchSize=1}){
+  if(!Number.isInteger(batchSize)||batchSize<1)throw new RangeError('dry batchSize must be a positive integer');
+  for(let j=0;j<maxSteps;){
+    const count=Math.min(batchSize,maxSteps-j,j<16?16-j:Infinity);
+    const wet=await advance(count,j<16?.6:2);j+=count;
+    if(!wet)return {dry:true,steps:j};
+    if(await checkpoint(j)===false)return {dry:false,steps:j};
+  }
+  return {dry:false,steps:maxSteps};
+}
+
+export function nativeWebGpuEnabled(search=''){
+  const q=new URLSearchParams(search);
+  return q.get('physics')!=='cpu'&&q.get('nowebgpu')!=='1';
+}
+
+// CPU brushes remain authoritative. Upload once at the passage boundary, keep
+// drying resident, and download only for visible checkpoints and the next brush.
+export function browserNativeDry(search=''){
+  let gpu=null,device=null,attached=null,disabled=!nativeWebGpuEnabled(search)||!globalThis.navigator?.gpu;
+  const run=async(sheet,transport,work)=>{
+    if(disabled)return null;
+    const fields=[sheet.W,sheet.s,sheet.M,sheet.ever,...sheet.G,...sheet.P,...sheet.D,...sheet.layers.flat()];
+    const saved=fields.map(a=>a.slice()),pending=sheet.edgePending?.slice();
+    try{
+      const {GpuSheet,openDevice}=await import('../lab/gpu/gpu-sheet.js');
+      if(!device)device=(await openDevice()).device;
+      if(!gpu)gpu=await GpuSheet.create(device,sheet.pigments,{...DEFAULTS,...transport});
+      gpu.setOptions({...DEFAULTS,...transport});
+      if(attached!==sheet){gpu.attach(sheet);attached=sheet;}else gpu.upload(sheet);
+      const result=await work(gpu);
+      await gpu.download(sheet);
+      sheet._nativeBackend='gpu';return result;
+    }catch(error){
+      if(error.name==='AbortError')throw error;
+      // Restore the operation boundary before replaying the exact CPU schedule.
+      fields.forEach((a,i)=>a.set(saved[i]));sheet.edgePending=pending;sheet.wetDirty=1;
+      disabled=true;sheet._nativeBackend='cpu';sheet._nativeGpuReason=error.message;return null;
+    }
+  };
+  const dry=({sheet,transport,maxSteps,checkpoint})=>run(sheet,transport,g=>nativeDrySchedule({maxSteps,batchSize:16,
+    advance:async(count,dt)=>{g.setOptions({...transport,dt});return g.advance(count);},
+    checkpoint:async j=>checkpoint(j,()=>g.download(sheet))}));
+  dry.flow=async(sheet,transport)=>{
+    const wet=await run(sheet,transport,g=>g.advance(1));
+    return wet===null?step(sheet,transport):wet;
+  };
+  dry.close=()=>{gpu?.destroy();device?.destroy();gpu=null;device=null;attached=null;};
+  return dry;
+}
+
+export async function simulateNativePassages(study,{width=NATIVE_PAINT_LIMITS.width,seed=301,maskFor,onCheckpoint=null,isCancelled=()=>false,yieldWork=nativeYield,depositDurationMs=0,checkpointIntervalMs=0,paperTemplate=null,onPaper=()=>{},onBrush=null,travelMs=0,skipPacing=()=>false,limits=NATIVE_PAINT_LIMITS,onSheet=null,onDry=null,onFlow=null}={}){
   const started=performance.now(),passages=planNativePassages(study),keys=nativePalette(passages);
   width=nativeSheetWidth(width,keys,limits);
   const height=Math.round(width/1.2),n=width*height,scale=width/1200,mmPerCell=.2/scale;
   const paperReused=paperTemplate?.materialVersion===NATIVE_PAPER_VERSION&&paperTemplate.w===width&&paperTemplate.h===height;
-  const paper=paperReused?paperTemplate:makeNativePaper(width,height),pigments=keys.map(k=>BY_KEY[k]);
+  const paperAt=performance.now(),paper=paperReused?paperTemplate:makeNativePaper(width,height),pigments=keys.map(k=>BY_KEY[k]),paperMs=performance.now()-paperAt;
   if(!paperReused)onPaper(paper);
-  const sheet=createSheet(paper,pigments);onSheet?.(sheet,{width,height,keys,paper});let strokes=0,steps=0,checkpoints=0,strokeSegments=0,brushDips=0,brushLifts=0,clearWaterStrokes=0,lastCheckpoint=-Infinity;
-  const timings={paperMs:performance.now()-started,maskMs:0,depositMs:0,transportMs:0};
-  const flow=options=>{const t=performance.now(),active=step(sheet,options);timings.transportMs+=performance.now()-t;steps++;return active;};
+  const sheet=createSheet(paper,pigments);await onSheet?.(sheet,{width,height,keys,paper});let strokes=0,steps=0,checkpoints=0,strokeSegments=0,brushDips=0,brushLifts=0,clearWaterStrokes=0,lastCheckpoint=-Infinity;
+  const timings={paperMs,setupMs:performance.now()-started-paperMs,maskMs:0,depositMs:0,transportMs:0};
+  const flow=async options=>{const t=performance.now(),active=onFlow?await onFlow(sheet,options):step(sheet,options);timings.transportMs+=performance.now()-t;steps++;return active;};
   const check=()=>{if(isCancelled())throw new DOMException('Cancelled','AbortError');};
-  const stats=()=>({nativeWidth:width,nativeHeight:height,nativeCells:n,channels:keys,strokes,strokeSegments,brushDips,brushLifts,clearWaterStrokes,steps,fixedLayers:sheet.layers.length,...totals(sheet),elapsedMs:performance.now()-started,timings:{...timings},paperReused,ink:'custom variable-pressure vector ink',drying:'accelerated native transport',previewOptics:'sharp 1200px ink; 4x4 native mass average + RGB multiply paint preview; final exact layered KM'});
+  const stats=()=>({nativeWidth:width,nativeHeight:height,nativeCells:n,channels:keys,strokes,strokeSegments,brushDips,brushLifts,clearWaterStrokes,steps,backend:sheet._nativeBackend??(sheet._gpu?'gpu':'cpu'),gpuReason:sheet._nativeGpuReason??null,fixedLayers:sheet.layers.length,...totals(sheet),elapsedMs:performance.now()-started,timings:{...timings},paperReused,ink:'custom variable-pressure vector ink',drying:'accelerated native transport',previewOptics:'sharp 1200px ink; 4x4 native mass average + RGB multiply paint preview; final exact layered KM'});
   // The time limit counts the simulation's own work, not the time spent
   // showing frames or waiting for the live brush's pace (idleMs).
   let idleMs=0;const overBudget=()=>performance.now()-started-idleMs>limits.maxMs;
-  const publish=async(stage,progress,complete=false,force=false)=>{check();if(!complete&&!force&&performance.now()-lastCheckpoint<checkpointIntervalMs)return;checkpoints++;const shownAt=performance.now();await onCheckpoint({sheet,stage,progress,complete,force,metrics:stats()});lastCheckpoint=performance.now();idleMs+=lastCheckpoint-shownAt;check();};
+  const publish=async(stage,progress,complete=false,force=false)=>{check();if(!onCheckpoint)return;if(!complete&&!force&&performance.now()-lastCheckpoint<checkpointIntervalMs)return;checkpoints++;const shownAt=performance.now();await onCheckpoint({sheet,stage,progress,complete,force,metrics:stats()});lastCheckpoint=performance.now();idleMs+=lastCheckpoint-shownAt;check();};
   const markCount=passages.reduce((n,p)=>n+p.marks.length,0);
   // Live painting (travelMs): the brush moves at one speed over every pass,
   // so the plate's whole travel takes travelMs; a pause at each lift. The
@@ -8834,17 +8887,29 @@ export async function simulateNativePassages(study,{width=NATIVE_PAINT_LIMITS.wi
         await yieldWork();check();
       }
       if(travelTotal>0)await travelWait(PLAYBACK.liftMs);
-      strokes++;brushLifts++;if(gesture.prewet)clearWaterStrokes++;if(!passage.flat&&(!mark.batchedFlow||gi===gestures.length-1))flow(transport);
+      strokes++;brushLifts++;if(gesture.prewet)clearWaterStrokes++;if(!passage.flat&&(!mark.batchedFlow||gi===gestures.length-1))await flow(transport);
       }
     }
     setClip(sheet,null);await publish(`${passage.id} · wet pigment`,.22+.78*(start+span*.4),false,pi===passages.length-1);
     if(passage.flat){
-      for(let j=0;j<NATIVE_FLAT_SETTLE.steps;j++)if(!flow({...transport,dt:NATIVE_FLAT_SETTLE.dt}))break;
+      for(let j=0;j<NATIVE_FLAT_SETTLE.steps;j++)if(!await flow({...transport,dt:NATIVE_FLAT_SETTLE.dt}))break;
       dryInPlace(sheet);fix(sheet);await publish(`${passage.id} · dry`,.22+.78*(start+span),pi===passages.length-1,true);continue;
     }
     let dryDone=false;
-    for(let j=0;j<limits.maxSteps;j++){
-      dryDone=!flow({...transport,dt:j<16?.6:2});if(dryDone)break;
+    if(onDry){
+      const at=performance.now(),dryStartSteps=steps;
+      const result=await onDry({sheet,transport,maxSteps:limits.maxSteps,flow:options=>step(sheet,options),
+        checkpoint:async(j,sync=async()=>{})=>{
+          steps=dryStartSteps+j;check();
+          if(onCheckpoint&&performance.now()-lastCheckpoint>=checkpointIntervalMs){await sync();await publish(`${passage.id} · flow and pooling`,.22+.78*(start+span*(.4+.58*(1-Math.exp(-j/90)))));}
+          await yieldWork();check();return !overBudget();
+        }});
+      timings.transportMs+=performance.now()-at;
+      if(result){steps=dryStartSteps+result.steps;dryDone=result.dry;if(!dryDone)throw new Error('Native wash is still wet at the time limit; painting remains incomplete');}
+      else steps=dryStartSteps;
+    }
+    for(let j=0;!dryDone&&j<limits.maxSteps;j++){
+      dryDone=!await flow({...transport,dt:j<16?.6:2});if(dryDone)break;
       if((j&3)===3){await publish(`${passage.id} · flow and pooling`,.22+.78*(start+span*(.4+.58*(1-Math.exp(-j/90)))));await yieldWork();check();if(overBudget())break;}
     }
     if(!dryDone)throw new Error('Native wash is still wet at the time limit; painting remains incomplete');
@@ -9550,7 +9615,8 @@ async function renderNativePainting(payload,emit,waitForFrame=async()=>{}){
     const bitmap=patch.transferToImageBitmap();
     emit({revision,native:true,patch:{x:rect.x,y:rect.y,w:rect.w,h:rect.h},index:frameIndex++,stage,progress,complete:false,blob:null,frameBlob:null,elapsed:performance.now()-started,bitmap,metrics:{...frameMetrics(metrics),renderTimings:{...renderTimings},totalMs:performance.now()-started,fictionalConstruction:!!genome.correspondence}},[bitmap]);
   };
-  const result=await simulateNativePassages(grounded,{seed:nativePlateSeed(genome,scene),maskFor:nativeMaskRasterizer(),paperTemplate:payload.paperTemplate,onPaper:paper=>emit({revision,nativeMaterial:true,paper}),onBrush,depositDurationMs:playback?0:settle.depositMs,travelMs:playback?pacing.washMs:0,skipPacing:()=>nativePlaybackSkip.on,checkpointIntervalMs:playback?PLAYBACK.frameMs:composer?NATIVE_COMPOSED_FRAME_MS:NATIVE_FULL_FRAME_MS,onCheckpoint:async({sheet,stage,progress,complete,force,metrics})=>{
+  const gpuDry=browserNativeDry(payload.physicsSearch??globalThis.location?.search??'');
+  let result;try{result=await simulateNativePassages(grounded,{onDry:gpuDry,onFlow:gpuDry.flow,seed:nativePlateSeed(genome,scene),maskFor:nativeMaskRasterizer(),paperTemplate:payload.paperTemplate,onPaper:paper=>emit({revision,nativeMaterial:true,paper}),onBrush,depositDurationMs:playback?0:settle.depositMs,travelMs:playback?pacing.washMs:0,skipPacing:()=>nativePlaybackSkip.on,checkpointIntervalMs:playback?PLAYBACK.frameMs:composer?NATIVE_COMPOSED_FRAME_MS:NATIVE_FULL_FRAME_MS,onCheckpoint:async({sheet,stage,progress,complete,force,metrics})=>{
     const live=playback&&!nativePlaybackSkip.on;
     if(playback&&!live&&!complete&&!force&&performance.now()-lastFullAt<PLAYBACK.refreshMs)return;
     // After a turn the line drawing is already up: show each passage as it
@@ -9596,6 +9662,7 @@ async function renderNativePainting(payload,emit,waitForFrame=async()=>{}){
     lastStreamed=pc.getImageData(0,0,W,H).data;
     await send(stage,progress,false,frameMetrics(metrics));
   }});
+  }finally{gpuDry.close();}
   return {...result,totalMs:performance.now()-started};
 }
 
@@ -10437,7 +10504,7 @@ async function mount() {
       };
       worker.onerror=event=>{event.preventDefault();if(prefetch===job)finish(false);};
       const inkPaperRaster=paperRaster();
-      worker.postMessage({kind:'settle',genome:value.genome,scene:value.scene,morph:bridgeRecipe(value),fieldPlate:value.fieldPlate,composition:value.morph.composition,revision:0,paperTemplate:nativePaperTemplate,inkPaperRaster,outputScale:targetBaseScale()});
+      worker.postMessage({kind:'settle',physicsSearch:location.search,genome:value.genome,scene:value.scene,morph:bridgeRecipe(value),fieldPlate:value.fieldPlate,composition:value.morph.composition,revision:0,paperTemplate:nativePaperTemplate,inkPaperRaster,outputScale:targetBaseScale()});
     }catch{job.worker?.terminate();prefetch=null;canvas.dataset.prefetch='failed';}
   }
   // Prepared plates: the next Morph destination and the next Random plate are
@@ -10478,7 +10545,7 @@ async function mount() {
       };
       worker.onerror=event=>{event.preventDefault();finish(false);};
       const inkPaperRaster=paperRaster();
-      worker.postMessage({kind:'settle',genome:value.genome,scene:value.scene,morph:bridgeRecipe(value),fieldPlate:value.fieldPlate,composition:value.morph.composition,revision:0,paperTemplate:nativePaperTemplate,inkPaperRaster,outputScale:request.outputScale,recordFrames:record});
+      worker.postMessage({kind:'settle',physicsSearch:location.search,genome:value.genome,scene:value.scene,morph:bridgeRecipe(value),fieldPlate:value.fieldPlate,composition:value.morph.composition,revision:0,paperTemplate:nativePaperTemplate,inkPaperRaster,outputScale:request.outputScale,recordFrames:record});
       return job;
     }catch{job.worker?.terminate();preparedJobs.delete(key);return null;}
   }
@@ -10842,7 +10909,7 @@ async function mount() {
         painter.frames++;painter.lastRenderMs=message.metrics.totalMs;
         const uiNow=performance.now(),updateUI=message.complete||uiNow-lastNativeUI>=100;
         if(updateUI){lastNativeUI=uiNow;
-        canvas.dataset.nativeSteps=String(message.metrics.steps??0);canvas.dataset.nativeLayers=String(message.metrics.fixedLayers??0);canvas.dataset.nativeWater=String(message.metrics.water??0);
+        canvas.dataset.nativeBackend=message.metrics.backend??'cpu';canvas.dataset.nativeSteps=String(message.metrics.steps??0);canvas.dataset.nativeLayers=String(message.metrics.fixedLayers??0);canvas.dataset.nativeWater=String(message.metrics.water??0);
         canvas.dataset.nativePaperReused=String(message.metrics.paperReused??false);canvas.dataset.nativeCells=String(message.metrics.nativeCells??0);canvas.dataset.nativeRenderMs=String(message.metrics.totalMs);canvas.dataset.nativeSnapMaxDiff=String(message.metrics.snapMaxDiff??'');canvas.dataset.nativeSnapOver1=String(message.metrics.snapOver1??'');canvas.dataset.nativeSnapBox=JSON.stringify(message.metrics.snapBox??null);canvas.dataset.nativeSnapSamples=JSON.stringify(message.metrics.snapSamples??null);canvas.dataset.nativeTimings=JSON.stringify({engine:message.metrics.timings,render:message.metrics.renderTimings});canvas.dataset.nativeCheckpoints=String(result.streamedFrames);canvas.dataset.nativePreviewOptics=message.metrics.previewOptics??'custom ink';canvas.dataset.nativeStrokeSegments=String(message.metrics.strokeSegments??0);canvas.dataset.nativeClearWaterStrokes=String(message.metrics.clearWaterStrokes??0);canvas.dataset.nativeCacheBytes=String(result.bytes);canvas.dataset.nativeInk='custom variable-pressure ink';if(message.metrics.inkHash)canvas.dataset.nativeInkHash=message.metrics.inkHash;if(message.metrics.inkMarksRendered)canvas.dataset.nativeInkMarks=String(message.metrics.inkMarksRendered);if(message.metrics.finalPixelHash)canvas.dataset.nativeFinalPixelHash=message.metrics.finalPixelHash;
         status.textContent=message.complete?'':message.stage;
         }
@@ -10858,7 +10925,7 @@ async function mount() {
       const inkPaperRaster=paperRaster();
       // Structured clone keeps immutable template arrays in the main thread;
       // cancellation can terminate the entire Worker without losing material.
-      settledWorker.postMessage({kind:'settle',genome:value.genome,scene:value.scene,morph:bridgeRecipe(value),fieldPlate:value.fieldPlate,composition:value.morph.composition,revision,paperTemplate:nativePaperTemplate,inkPaperRaster,sendPaper:!inkPaperRaster,outputScale,playback:!!rerun,turned:!!value.turned});
+      settledWorker.postMessage({kind:'settle',physicsSearch:location.search,genome:value.genome,scene:value.scene,morph:bridgeRecipe(value),fieldPlate:value.fieldPlate,composition:value.morph.composition,revision,paperTemplate:nativePaperTemplate,inkPaperRaster,sendPaper:!inkPaperRaster,outputScale,playback:!!rerun,turned:!!value.turned});
     }catch(error){fail(error.message);}
     return promise;
   }

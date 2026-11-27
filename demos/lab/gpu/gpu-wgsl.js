@@ -136,6 +136,11 @@ fn pigment_masks(@builtin(global_invocation_id) g: vec3<u32>) {
   } }
   TL[u.ntiles + 1u + g.x] = bits;
 }
+// Scratch audit: QX/QY/SC and OUTM/OUT4 are cleared before pigment culling
+// because apply_g/slide_apply gather neighbours. PN/DD are cell-local, produced
+// by cap_p/cap_sp and consumed under the same frozen mask in p5a/cap_commit;
+// absent channels are cleared there too. Edge-feed EFC has no pigment culling:
+// ef_begin fills every active channel and ef_apply guards EFS donor water.
 fn hasPigment(c: Cx, k: u32) -> bool { return u.p2 == 0u || (TL[u.ntiles + 1u + (c.y / 16u) * u.tw + c.x / 16u] & (1u << k)) != 0u; }
 
 // ---- 1. drying and absorption ------------------------------------------------------------------------------------
@@ -161,6 +166,19 @@ fn phase1(@builtin(workgroup_id) wid: vec3<u32>, @builtin(local_invocation_id) l
 }
 
 // ---- 2. flow ----------------------------------------------------------------------------------------------------
+fn concAt(i: u32) -> f32 {
+  let wi = W[i];
+  if (wi <= 1e-6) { return 0.0; }
+  var s = 0.0;
+  for (var a = 0u; a < u.p3; a++) { s += G[physicalChannel(a) * u.n + i]; }
+  return s / wi;
+}
+fn faceDrive(i: u32, j: u32, wi: f32, wj: f32, p: f32, rate: f32) -> f32 {
+  let hi = wi + u.slope * PAPER3[i].z;
+  var f = rate * (hi - wj - u.slope * PAPER3[j].z);
+  if (u.mar != 0.0) { f += p * u.mar * (concAt(i) - concAt(j)) * min(wi, wj); }
+  return f;
+}
 @compute @workgroup_size(16, 16)
 fn faces(@builtin(workgroup_id) wid: vec3<u32>, @builtin(local_invocation_id) lid: vec3<u32>) {
   let c = cx(wid, lid); if (!c.ok) { return; }
@@ -174,6 +192,7 @@ fn faces(@builtin(workgroup_id) wid: vec3<u32>, @builtin(local_invocation_id) li
       let m = max(wi, wj) / u.flowDepth;
       let rate = min(0.25, max(0.0, p * u.flow * select(m * m, 1.0, m >= 1.0)));
       fx = rate * (wi - wj);
+      if (u.slope != 0.0 || u.mar != 0.0) { fx = faceDrive(i, i + 1u, wi, wj, p, rate); }
     }
     if (c.y < u.h - 1u && M[i + u.w] == 1u) {
       let wj = W[i + u.w];
@@ -181,6 +200,7 @@ fn faces(@builtin(workgroup_id) wid: vec3<u32>, @builtin(local_invocation_id) li
       let m = max(wi, wj) / u.flowDepth;
       let rate = min(0.25, max(0.0, p * u.flow * select(m * m, 1.0, m >= 1.0)));
       fy = rate * (wi - wj);
+      if (u.slope != 0.0 || u.mar != 0.0) { fy = faceDrive(i, i + u.w, wi, wj, p, rate); }
     }
   }
   FX[i] = fx; FY[i] = fy;
@@ -210,8 +230,11 @@ fn pflux(f: f32, wi: f32, wj: f32, gi: f32, gj: f32, si: f32, sj: f32) -> f32 {
 }
 @compute @workgroup_size(16, 16)
 fn pflux_k(@builtin(workgroup_id) wid: vec3<u32>, @builtin(local_invocation_id) lid: vec3<u32>) {
-  let c = cx(wid, lid); if (!c.ok || !hasPigment(c, c.z)) { return; }
+  let c = cx(wid, lid); if (!c.ok) { return; }
   let i = c.i; let base = c.z * u.n;
+  // Neighbour gathers must never consume scratch left by a culled pigment tile.
+  QX[base + i] = 0.0; QY[base + i] = 0.0; SC[base + i] = 1.0;
+  if (!hasPigment(c, c.z)) { return; }
   var qx = 0.0; var qy = 0.0;
   if (M[i] == 1u) {
     let wi = W[i]; let gi = G[base + i];
@@ -222,8 +245,11 @@ fn pflux_k(@builtin(workgroup_id) wid: vec3<u32>, @builtin(local_invocation_id) 
 }
 @compute @workgroup_size(16, 16)
 fn ppout(@builtin(workgroup_id) wid: vec3<u32>, @builtin(local_invocation_id) lid: vec3<u32>) {
-  let c = cx(wid, lid); if (!c.ok || !hasPigment(c, c.z)) { return; }
+  let c = cx(wid, lid); if (!c.ok) { return; }
   let i = c.i; let base = c.z * u.n;
+  // Neighbour gathers must never consume scratch left by a culled pigment tile.
+  SC[base + i] = 1.0;
+  if (!hasPigment(c, c.z)) { return; }
   if (M[i] != 1u) { SC[base + i] = 1.0; return; }
   var o = max(QX[base + i], 0.0) + max(QY[base + i], 0.0);
   if (c.x > 0u && M[i - 1u] == 1u) { o += max(-QX[base + i - 1u], 0.0); }
@@ -235,8 +261,11 @@ fn ppout(@builtin(workgroup_id) wid: vec3<u32>, @builtin(local_invocation_id) li
 // left/up flux is recomputed with the original function and operand order.
 @compute @workgroup_size(16, 16)
 fn pflux_out(@builtin(workgroup_id) wid: vec3<u32>, @builtin(local_invocation_id) lid: vec3<u32>) {
-  let c = cx(wid, lid); if (!c.ok || !hasPigment(c, c.z)) { return; }
+  let c = cx(wid, lid); if (!c.ok) { return; }
   let i = c.i; let base = c.z * u.n;
+  // Neighbour gathers must never consume scratch left by a culled pigment tile.
+  QX[base + i] = 0.0; QY[base + i] = 0.0; SC[base + i] = 1.0;
+  if (!hasPigment(c, c.z)) { return; }
   var qx = 0.0; var qy = 0.0;
   if (M[i] == 1u) {
     let wi = W[i]; let gi = G[base + i];
@@ -283,11 +312,21 @@ fn apply_g(@builtin(workgroup_id) wid: vec3<u32>, @builtin(local_invocation_id) 
 }
 
 // ---- 3. pigment exchange ---------------------------------------------------------------------------------------
-// settling (src/media/settling.mjs): 1 - exp(-(v B / h + D / l^2) dt), B = 1 + gamma hollow, l = min(h, 0.02 mm)
+// Grain-water closure shared with grain-water.mjs. The first 0.03 mm is held
+// among fibres; connected-film conductance grows as free depth cubed.
+fn grainMobilityG(Wi: f32) -> f32 {
+  let h = max(0.0, Wi - 0.03); let h3 = h * h * h;
+  return h3 / (h3 + 0.06 * 0.06 * 0.06);
+}
+fn grainSlideG(Wi: f32) -> f32 {
+  let h = max(0.0, Wi - 0.03);
+  return 0.12 * h * h / (h * h * h + 0.06 * 0.06 * 0.06);
+}
+// Vertical landing, connected-film hollow capture and Brownian deposition, as in settling.mjs.
 fn hollowAt(i: u32) -> f32 { let p = PAPER3[i]; return max(0.0, (u.toothLo + u.toothSpan * p.x - p.w) / u.hollowUnit); }
 fn settleShareG(v: f32, df: f32, gg: f32, hol: f32, Wi: f32) -> f32 {
   let h = max(0.001, Wi); let l = min(h, 0.02);
-  let x = (v * (1.0 + gg * hol) / h + df / (l * l)) * u.dt;
+  let x = (v / h + v * gg * hol * grainMobilityG(Wi) / 0.06 + df / (l * l)) * u.dt;
   if (x < 0.01) { return x * (1.0 - x * (0.5 - x / 6.0)); }
   return 1.0 - exp(-x);
 }
@@ -316,7 +355,7 @@ fn p3a(@builtin(workgroup_id) wid: vec3<u32>, @builtin(local_invocation_id) lid:
     let gg = pa.x;
     let down = Gk * settleShareG(select(pb.x, (1.0 - u.coSettle) * pb.x + u.coSettle * vMix, u.coSettle > 0.0), pigC(k).x, gg, select(hol, hol * max(0.0, 1.0 - settled * u.granFill), u.granFill > 0.0), Wi);
     let shape = max(0.0, 1.0 + (hh - 1.0) * gg);
-    let up = Dk * shape * (pa.y * wetting * u.dt + pa.z * turnover);
+    let up = Dk * shape * (pa.y * wetting * u.dt + pa.z * turnover * grainMobilityG(Wi));
     let dn = min(Gk, max(0.0, down)); let uu = min(Dk, max(0.0, up));
     Dk += dn - uu; Gk += uu - dn;
     if (rewet) { let r = min(top, (top * u.rewetLift * u.dt) / pb.y); TOP[q] = top - r; Gk += r; }
@@ -339,13 +378,16 @@ fn dep_k(@builtin(workgroup_id) wid: vec3<u32>, @builtin(local_invocation_id) li
 fn surf(j: u32, fl: f32, fill: f32) -> f32 { return (1.0 - fl) * PAPER3[j].w + fl * PAPER3[j].x + fill * DEP[j]; }
 @compute @workgroup_size(16, 16)
 fn slide_out(@builtin(workgroup_id) wid: vec3<u32>, @builtin(local_invocation_id) lid: vec3<u32>) {
-  let c = cx(wid, lid); if (!c.ok || !hasPigment(c, c.z) || M[c.i] != 1u) { return; }
+  let c = cx(wid, lid); if (!c.ok || M[c.i] != 1u) { return; }
   let i = c.i; let q = c.z * u.n + i;
+  // OUT4 is also levelling/backrun scratch: its .y may be 1 even for absent pigment.
+  // Every wet neighbour is in TL (poreHalo >= 1); clear every active channel before culling.
   OUTM[q] = 0.0; OUT4[q] = vec4<f32>(0.0);
+  if (!hasPigment(c, c.z)) { return; }
   let Wi = W[i]; let Dk = D[q]; let pa = pigA(c.z); let pb = pigB(c.z);
   let gg = pa.x;
   if (Wi <= 0.0 || gg <= 0.0 || Dk <= 0.0) { return; }
-  let film = min(3.0, 0.12 / max(0.04, Wi)) * select(Wi / u.film, 1.0, Wi > u.film);
+  let film = grainSlideG(Wi);
   let fill = fillAt(i); let here = surf(i, pb.z, fill); let rep = pa.w;
   var ex = vec4<f32>(0.0);
   if (c.x < u.w - 1u && M[i + 1u] == 1u) { ex.x = max(0.0, here - surf(i + 1u, pb.z, fill) - rep); }
@@ -354,7 +396,10 @@ fn slide_out(@builtin(workgroup_id) wid: vec3<u32>, @builtin(local_invocation_id
   if (c.y > 0u && M[i - u.w] == 1u) { ex.w = max(0.0, here - surf(i - u.w, pb.z, fill) - rep); }
   let sum = ex.x + ex.y + ex.z + ex.w;
   if (sum <= 0.0) { return; }
-  let moved = Dk * min(0.2, u.slide * gg * film * sum * u.dt);
+  var moved = Dk * min(0.2, u.slide * pigC(c.z).y * gg * film * sum * u.dt);
+  if (u.slideCap > 0.0 && fill > 0.0) {
+    for (var e = 0u; e < 4u; e++) { if (ex[e] > 0.0) { moved = min(moved, u.slideCap * ex[e] / (fill * (1.0 + ex[e] / sum))); } }
+  }
   OUTM[q] = moved; OUT4[q] = moved * ex / sum;
 }
 @compute @workgroup_size(16, 16)
@@ -405,8 +450,10 @@ fn pmove(a: u32, b: u32, dir: u32, base: u32, out: ptr<function, f32>, inn: ptr<
 }
 @compute @workgroup_size(16, 16)
 fn cap_p(@builtin(workgroup_id) wid: vec3<u32>, @builtin(local_invocation_id) lid: vec3<u32>) {
-  let c = cx(wid, lid); if (!c.ok || !hasPigment(c, c.z)) { return; }
+  let c = cx(wid, lid); if (!c.ok) { return; }
   let i = c.i; let base = c.z * u.n;
+  PN[base + i] = 0.0; DD[base + i] = 0.0;
+  if (!hasPigment(c, c.z)) { return; }
   var o = 0.0; var inn = 0.0; var dep = 0.0;
   if (c.x < u.w - 1u) { pmove(i, i + 1u, 0u, base, &o, &inn, &dep, true); pmove(i + 1u, i, 1u, base, &o, &inn, &dep, false); }
   if (c.x > 0u) { pmove(i, i - 1u, 1u, base, &o, &inn, &dep, true); pmove(i - 1u, i, 0u, base, &o, &inn, &dep, false); }
@@ -438,8 +485,9 @@ fn cap_sp(@builtin(workgroup_id) wid: vec3<u32>, @builtin(local_invocation_id) l
   if (c.y > 0u) { ds[6] = capflux(i, i - u.w, 3u); ds[7] = capflux(i - u.w, i, 2u); v -= ds[6]; v += ds[7]; }
   S2[i] = v;
   for (var a = 0u; a < u.p3; a++) {
-    let k = physicalChannel(a); if (!hasPigment(c, k)) { continue; }
-    let base = k * u.n;
+    let k = physicalChannel(a); let base = k * u.n;
+    PN[base + i] = 0.0; DD[base + i] = 0.0;
+    if (!hasPigment(c, k)) { continue; }
     var o = 0.0; var inn = 0.0; var dep = 0.0;
     if (c.x < u.w - 1u) { pmove_flux(i, i + 1u, ds[0], base, &o, &inn, &dep, true); pmove_flux(i + 1u, i, ds[1], base, &o, &inn, &dep, false); }
     if (c.x > 0u) { pmove_flux(i, i - 1u, ds[2], base, &o, &inn, &dep, true); pmove_flux(i - 1u, i, ds[3], base, &o, &inn, &dep, false); }
@@ -477,6 +525,21 @@ fn p5a(@builtin(workgroup_id) wid: vec3<u32>, @builtin(local_invocation_id) lid:
 }
 // the value a raster-order walk sees for cell j when it is at cell i: cells before i are final, cells after are not
 fn sSeen(j: u32, i: u32) -> f32 { return select(S[j], S2[j], j < i); }
+// water (M) within R cells of (x, y) in each of the four directions (sheet.js heldHole)
+fn heldHole(x: u32, y: u32, R: u32) -> bool {
+  for (var d = 0u; d < 4u; d++) {
+    var held = false;
+    for (var k = 1u; k <= R; k++) {
+      var xx = i32(x); var yy = i32(y);
+      if (d == 0u) { xx += i32(k); } else if (d == 1u) { xx -= i32(k); } else if (d == 2u) { yy += i32(k); } else { yy -= i32(k); }
+      if (xx < 0 || yy < 0 || xx >= i32(u.w) || yy >= i32(u.h)) { break; }
+      let j = u32(yy) * u.w + u32(xx);
+      if (M[j] != 0u) { held = true; break; }
+    }
+    if (!held) { return false; }
+  }
+  return true;
+}
 @compute @workgroup_size(16, 16)
 fn p5b(@builtin(workgroup_id) wid: vec3<u32>, @builtin(local_invocation_id) lid: vec3<u32>) {
   let c = cx(wid, lid); if (!c.ok) { return; }
@@ -488,11 +551,14 @@ fn p5b(@builtin(workgroup_id) wid: vec3<u32>, @builtin(local_invocation_id) lid:
   if (c.y < u.h - 1u) { nb[2] = i + u.w; nbOk[2] = true; }
   if (c.y > 0u) { nb[3] = i - u.w; nbOk[3] = true; }
   if (M[i] == 0u) {
-    var feeding = false; var wn = 0.0; var ws = 0.0; var fed = false;
+    var feeding = false; var wn = 0.0; var ws = 0.0; var hn = 0.0; var fed = false;
+    var sides = 0.0;
+    for (var d = 0u; d < 4u; d++) { if (nbOk[d] && M[nb[d]] != 0u) { sides += 1.0; } }
+    let ease = select(1.0, max(0.0, 1.0 - u.enclose * (sides - 1.0) / 3.0), u.enclose > 0.0);
     for (var d = 0u; d < 4u; d++) {
       if (!nbOk[d]) { continue; }
       let j = nb[d]; if (M[j] == 0u) { continue; }
-      wn += 1.0; ws += W[j]; if (W[j] > u.film) { feeding = true; }
+      wn += 1.0; ws += W[j]; hn += PAPER3[j].z; if (W[j] > u.film) { feeding = true; }
       // a wet neighbour's front reaching this cell
       if (W[j] > u.wetEps) {
         let jx = i32(c.x); let jy = i32(c.y);
@@ -500,13 +566,14 @@ fn p5b(@builtin(workgroup_id) wid: vec3<u32>, @builtin(local_invocation_id) lid:
         let damp = select(0.0, min(1.0, sSeen(i, j) / (u.capSigma * pi.x)), EVER[i] == 1u);
         let aligned = abs(pi.z * f32(jx - ix) + pi.w * f32(jy - iy)) * pi.y;
         let throat = PAPER3[i].y;
-        let need = (u.spill + u.spillHeight * PAPER3[i].z) * (1.0 - u.dampEase * damp) * exp(damp * (u.pinning * 2.0 * throat - u.pinFibre * aligned));
+        let need = (u.spill + u.spillHeight * PAPER3[i].z) * (1.0 - u.dampEase * damp) * exp(damp * (u.pinning * 2.0 * throat - u.pinFibre * aligned)) * ease;
         if (W[j] > need) { fed = true; }
       }
     }
     var newly = fed;
     if (feeding && EVER[i] == 1u && si > u.capSigma * pi.x) { newly = true; }
     else if (wn >= 4.0 && ws / wn > u.film) { newly = true; }
+    else if (u.holeFill > 0.0 && wn > 0.0 && ws / wn > u.film && PAPER3[i].z < hn / wn && heldHole(c.x, c.y, u32(u.holeFill))) { newly = true; }
     if (newly) { NEWF[i] = 1u; }
     return;
   }
@@ -535,8 +602,9 @@ fn p5c(@builtin(workgroup_id) wid: vec3<u32>, @builtin(local_invocation_id) lid:
 fn level_k(@builtin(workgroup_id) wid: vec3<u32>, @builtin(local_invocation_id) lid: vec3<u32>) {
   let c = cx(wid, lid); if (!c.ok || M[c.i] != 1u) { return; }
   var m = 0.0;
-  if (c.x < u.w - 1u && M[c.i + 1u] == 1u) { m = max(m, abs(W[c.i] - W[c.i + 1u])); }
-  if (c.y < u.h - 1u && M[c.i + u.w] == 1u) { m = max(m, abs(W[c.i] - W[c.i + u.w])); }
+  let si = W[c.i] + u.slope * PAPER3[c.i].z;
+  if (c.x < u.w - 1u && M[c.i + 1u] == 1u) { m = max(m, abs(si - W[c.i + 1u] - u.slope * PAPER3[c.i + 1u].z)); }
+  if (c.y < u.h - 1u && M[c.i + u.w] == 1u) { m = max(m, abs(si - W[c.i + u.w] - u.slope * PAPER3[c.i + u.w].z)); }
   if (m > 0.0) { atomicMax(&CTR[2], bitcast<u32>(m)); }
 }
 // whole-sheet: pores into the deposit, and whether any deposit exists
@@ -594,4 +662,41 @@ fn efHalted() -> bool { return atomicLoad(&CTR[8]) != 0u && atomicLoad(&CTR[11])
 fn o4get(q: u32) -> vec4<f32> { return OUT4[q]; }
 fn o4set(q: u32, v: vec4<f32>) { OUT4[q] = v; }
 const FIXED_BED: bool = false;
-` + edgeFeedWgsl({ channel: 'physicalChannel', count: 'u.p3' }) + filmLevelWgsl({ channel: 'physicalChannel', count: 'u.p3' });
+` + edgeFeedWgsl({ channel: 'physicalChannel', count: 'u.p3' }) + filmLevelWgsl({ channel: 'physicalChannel', count: 'u.p3' }) + String.raw`
+
+// Interactive edge drying reads only the frozen mask, writes only its own water.
+// No pigment is removed: existing levelling/flow feeds the thinned pinned rim.
+fn realtimeEdge(x: u32, y: u32) -> bool {
+  let i = y * u.w + x;
+  return x == 0u || y == 0u || x + 1u == u.w || y + 1u == u.h ||
+    (x > 0u && M[i - 1u] == 0u) || (x + 1u < u.w && M[i + 1u] == 0u) ||
+    (y > 0u && M[i - u.w] == 0u) || (y + 1u < u.h && M[i + u.w] == 0u);
+}
+@compute @workgroup_size(16, 16)
+fn ef_realtime(@builtin(workgroup_id) wid: vec3<u32>, @builtin(local_invocation_id) lid: vec3<u32>) {
+  let c = cx(wid, lid); if (!c.ok || M[c.i] != 1u || W[c.i] <= 0.0) { return; }
+  var band = select(0.0, 1.0, realtimeEdge(c.x, c.y));
+  if (band == 0.0) {
+    if ((c.x > 0u && realtimeEdge(c.x - 1u, c.y)) ||
+        (c.x + 1u < u.w && realtimeEdge(c.x + 1u, c.y)) ||
+        (c.y > 0u && realtimeEdge(c.x, c.y - 1u)) ||
+        (c.y + 1u < u.h && realtimeEdge(c.x, c.y + 1u))) { band = 0.35; }
+  }
+  W[c.i] = max(0.0, W[c.i] - u.dt * u.edgeEvap * 0.65 * band);
+}
+// Publish bounded partial CG iterates to the unchanged conservative flux kernels.
+@compute @workgroup_size(64)
+fn lv_realtime_close(@builtin(global_invocation_id) id: vec3<u32>) {
+  for (var b = id.x; b < LVX[0]; b += 64u) {
+    let B = lvBX(b);
+    if (LVX[B + 14u] == 1u) { LVX[B + 14u] = 3u; }
+  }
+}
+@compute @workgroup_size(64)
+fn lv_realtime_subs(@builtin(global_invocation_id) id: vec3<u32>) {
+  for (var b = id.x; b < LVX[0]; b += 64u) {
+    let B = lvBX(b); LVX[B + 15u] = min(2u, LVX[B + 15u]);
+  }
+}
+
+`;

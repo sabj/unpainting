@@ -184,19 +184,40 @@ body.canvas-focus{overflow:hidden}.canvas-focus :is(.paint-nav,.paint-head,.pane
 <link rel="stylesheet" href="lab/app.css">
 </head>
 <body>
-<button id="exit-focus" hidden>Exit fullscreen</button>
-<nav class="paint-nav" aria-label="unpainting"><a href="lab/" aria-current="page">Paint Lab</a><a href="lab/strokes/">Stroke bench</a><a href="./">All demos</a><a href="https://github.com/sabj/unpainting">Source on GitHub</a><span class="paint-beta">0.4.0-rc.5</span></nav>
+<button id="exit-focus" hidden title="Exit fullscreen (Esc / H)">Exit fullscreen <small>Esc</small></button>
+<div id="focus-dock" class="paint-controls" role="group" aria-label="Fullscreen painting tools" hidden>
+  <div class="focus-tools" role="group" aria-label="Instruments">
+    <button data-tool="round" aria-label="Round brush" title="Round brush (R)" aria-pressed="true">Round</button>
+    <button data-tool="flat" aria-label="Flat brush" title="Flat brush (F)" aria-pressed="false">Flat</button>
+    <button data-tool="water" aria-label="Clean water" title="Clean water (W)" aria-pressed="false">Water</button>
+    <button data-tool="pen" aria-label="Dip pen" title="Dip pen (I)" aria-pressed="false">Pen</button>
+    <button data-tool="pencil" aria-label="Pencil" title="Pencil (P)" aria-pressed="false">Pencil</button>
+    <button data-tool="dryer" aria-label="Hair dryer" title="Hair dryer (D)" aria-pressed="false">Dryer</button>
+  </div>
+  <button id="focus-pigment" popovertarget="focus-palette" title="Choose pigment (1–9)" aria-label="Choose pigment"><i></i></button>
+  <div id="focus-palette" popover role="group" aria-label="Pigment palette"></div>
+  <label class="focus-water" title="Brush water load">Water <input id="focus-water" type="range" min="0.1" max="3" step="0.05" value="2" aria-label="Brush water load"></label>
+  <div class="focus-actions" role="group" aria-label="Sheet actions">
+    <button data-action="undo" title="Undo (Cmd/Ctrl+Z)" disabled>Undo</button><button data-action="redo" title="Redo (Shift+Cmd/Ctrl+Z)" disabled>Redo</button>
+    <button data-action="redip" title="Re-dip (X)">Re-dip <span class="charge" aria-hidden="true"><i></i><i></i></span></button>
+    <button data-action="dry-layer" title="Dry layer (Shift+D)">Dry layer</button>
+    <button data-action="clear" title="New sheet">New</button>
+    <button data-action="exit-focus" title="Exit fullscreen (Esc / H)" aria-label="Exit fullscreen">⛶ <span>Exit</span></button>
+  </div>
+</div>
+<nav class="paint-nav" aria-label="unpainting"><a href="lab/" aria-current="page">Paint Lab</a><a href="lab/strokes/">Stroke bench</a><a href="./">All demos</a><a href="https://github.com/sabj/unpainting">Source on GitHub</a><span class="paint-beta">0.5.0-dev</span></nav>
 <main>
 <header class="paint-head">
 <p class="paint-kicker">unpainting</p>
-<div class="paint-title"><h1>Paint Lab</h1><button class="help-toggle" popovertarget="paint-help">How it works</button><a class="help-toggle" href="lab/strokes/">Stroke bench</a></div>
+<div class="paint-title"><h1>Paint Lab</h1><span class="studio-version">0.5.0-dev</span><button class="help-toggle" popovertarget="paint-help">How it works</button><a class="help-toggle" href="lab/strokes/">Stroke bench</a></div>
+<div class="stage-heading"><span id="sheet-title">Sheet</span><span id="engine-pill" title="Live engine, physical cell size and median input-to-frame time">Starting engine…</span><button id="studio-toggle" aria-expanded="false" aria-controls="run-settings mode-note operation-controls operation-timeline" title="Playback settings, masks and stroke history">Studio</button><button id="focus-view" aria-pressed="false" title="Fullscreen (H)">⛶ <span>Fullscreen</span></button></div>
 <div id="paint-help" popover role="dialog" aria-labelledby="paint-help-title">
 <header><strong id="paint-help-title">How it works</strong><button popovertarget="paint-help" popovertargetaction="hide" aria-label="Close help">Close ×</button></header>
 <p>Choose a complete stroke-budget painting, carry on a painting, or try a technique. Live runs its full recorded strokes through the simulator here. Jump to a thumbnail to continue from that sheet state, or choose Carry on painting. Replay shows the original saved frames without fades, with a labelled stroke path.</p>
-<p>Drag to paint. Pinch to zoom, use two fingers to pan. Fit resets the view.</p>
+<p>Drag straight onto the paper to paint. Try Wash, Glaze, Dry brush or Detail in Brush. Let a layer dry before glazing. Pinch or scroll to zoom; use two fingers, middle-drag or Space+drag to pan. Fit resets the view.</p>
 <p>A stylus controls pressure. The round brush has a round cursor; the flat brush shows its width and direction.</p>
 <p>Mouse and finger pressure is fixed by default. Turn off “Fixed mouse / finger pressure” for a gentle response to drawing speed. Hold Alt or the stylus barrel button for clean water.</p>
-<p>R round · F flat · W water · I ink · P pencil · D dryer · Shift+D dry layer. [ / ] resize. Space pauses drying. Escape exits focus. Cmd/Ctrl+Z undoes; add Shift to redo.</p>
+<p>R round · F flat · W water · I ink · P pencil · D dryer · Shift+D dry layer. [ / ] resize. Space pauses drying. 1–9 choose pigments · Shift+1–4 choose brush presets · X re-dips · H toggles fullscreen · 0 fits the paper. Escape exits fullscreen. Cmd/Ctrl+Z undoes; add Shift to redo.</p>
 </div>
 <p class="paint-lede">Watercolor, ink and pencil on simulated paper. Pick a picture to watch it painted, or drag on the paper to begin.</p>
 </header>
@@ -204,19 +225,22 @@ body.canvas-focus{overflow:hidden}.canvas-focus :is(.paint-nav,.paint-head,.pane
 
 <div class="lab">
   <div class="stage">
-<div class="stage-heading"><span id="sheet-title">Sheet</span><button id="focus-view" aria-pressed="false">⛶ Fullscreen</button></div>
+
   <div class="toolbar" id="run-settings"><label>Mode <select id="run-mode" aria-label="Playback mode"><option value="replay" selected>Recording · the painter's real frames</option><option value="live">Live · paint a complete painting here</option></select></label><label id="live-budget" hidden>Painting <select id="stroke-limit" aria-label="Recorded painting"></select></label></div>
   <p id="mode-note">Recording · original saved frames, stepped without fades. Overlay: stroke path.</p>
 
     <div id="return-sheet" class="toolbar paint-controls" hidden><button id="keep-painting">Keep painting</button><button id="dismiss-return">Start fresh</button></div>
-    <div class="sheet" id="sheet"><canvas id="canvas" width="480" height="360" tabindex="0" role="img" aria-label="Paper. Drag to paint."></canvas><canvas id="film" class="film" hidden aria-hidden="true"></canvas><img id="seek-preview" hidden alt="Selected painting state"><div id="welcome"><h2>What will you make?</h2><div><button data-start="blank">Start a blank painting</button><button data-start="example">See an example</button><button data-start="technique">See a technique</button></div></div><span id="paint-hint" aria-hidden="true">Drag to paint</span><canvas id="cursor" class="cursor" aria-hidden="true"></canvas></div>
+    <div class="sheet" id="sheet"><canvas id="canvas" width="480" height="360" tabindex="0" role="img" aria-label="Paper. Drag to paint."></canvas><canvas id="film" class="film" hidden aria-hidden="true"></canvas><img id="seek-preview" hidden alt="Selected painting state"><div id="welcome"><h2>The paper is yours.</h2><p>Drag anywhere to paint.</p><div><button data-start="blank">Start fresh</button><button data-start="example">See an example</button><button data-start="technique">See a technique</button></div></div><span id="paint-hint" aria-hidden="true">Drag to paint</span><canvas id="cursor" class="cursor" aria-hidden="true"></canvas></div>
     <div id="current-materials" hidden aria-label="Current materials"></div>
     <section id="sequence" hidden aria-labelledby="sequence-title"><h2 id="sequence-title">Live study · jump in anywhere</h2><div class="sequence-row"><figure><img id="sequence-target" alt=""><figcaption>Target</figcaption></figure><nav id="sequence-thumbs" aria-label="Painting timeline"></nav></div></section>
     <div class="sheetbar">
-      <span id="state" class="state">Drag to paint</span>
-      <div class="toolbar paint-controls" role="toolbar" aria-label="Sheet"><button id="reset-view" aria-label="Fit paper" title="Reset zoom and pan">Fit</button><button id="clear" aria-label="New sheet">New</button><button id="undo" disabled title="Undo (Cmd/Ctrl+Z)">Undo</button><button id="redo" disabled title="Redo (Shift+Cmd/Ctrl+Z)">Redo</button><button id="redip" type="button">Re-dip</button><label><input id="auto-redip" type="checkbox" checked> Auto re-dip each wet stroke</label><output id="load-state" aria-live="polite"></output><button id="dry-layer" title="Dry the current layer (Shift+D)">Dry layer</button><button id="save" aria-label="Save image">Save</button></div>
+      <div class="sheet-status"><span id="state" class="state">Drag to paint</span><div id="drying" class="drying" hidden><span id="drying-label">Drying</span><progress id="drying-progress" max="1" aria-label="Share of peak wet area dried"></progress></div></div>
+      <div class="toolbar paint-controls" role="group" aria-label="Sheet">
+        <div class="toolbar-group"><button id="undo" disabled title="Undo (Cmd/Ctrl+Z)">Undo</button><button id="redo" disabled title="Redo (Shift+Cmd/Ctrl+Z)">Redo</button></div>
+        <div class="toolbar-group"><button id="redip" type="button" title="Re-dip (X)">Re-dip <output id="load-state" class="charge" aria-hidden="true"><i></i><i></i></output></button><button id="dry-layer" title="Dry the current layer (Shift+D)">Dry layer</button></div>
+        <div class="toolbar-group"><button id="reset-view" aria-label="Fit paper" title="Fit paper (0)">Fit</button><button id="clear" aria-label="New sheet" title="New sheet">New</button><button id="save" aria-label="Save image" title="Save painting as PNG">Save</button></div>
+      </div>
     </div>
-    <div id="drying" class="drying" hidden><span id="drying-label">Drying</span><progress id="drying-progress" max="1" aria-label="Share of peak wet area dried"></progress></div>
     <p id="step-caption" hidden></p>
     <div class="playbar" id="playbar" hidden><button id="play-pause" aria-pressed="false">Pause</button><progress id="play-progress" max="1" value="0" aria-label="Progress of the painting"></progress><button id="skip">Carry on painting</button></div>
 
@@ -224,6 +248,13 @@ body.canvas-focus{overflow:hidden}.canvas-focus :is(.paint-nav,.paint-head,.pane
     <details class="targets" id="quick-catalogue"><summary id="targets-title">Quick start · more paintings &amp; techniques</summary>
   <div id="painting-picker" role="group" aria-labelledby="targets-title"></div>
   <p class="target-credit" id="target-credit" aria-live="polite"></p>
+<details class="notes">
+  <summary>About the paper &amp; brushes</summary>
+  <p>Water spreads, soaks into the paper and dries. Pigment settles into its texture; dry washes remain transparent layers.</p>
+  <p>Use a loaded brush for flowing marks, less water for dry brush. The brush reloads with each stroke.</p>
+  <p class="muted">The simulation draws on Curtis et al. (1997), Strassmann (1986) and Kim et al. The physics, the painter and this page are in <a href="https://github.com/sabj/unpainting">sabj/unpainting</a>.</p>
+  <p class="muted">Everything runs in this browser: no picture, stroke or painting leaves it. Autosave keeps your sheet in this browser only.</p>
+</details>
 </details>
 
     <figure id="target-figure" class="target-figure" hidden><img id="target-image" alt=""><figcaption id="target-caption"></figcaption></figure>
@@ -238,23 +269,27 @@ body.canvas-focus{overflow:hidden}.canvas-focus :is(.paint-nav,.paint-head,.pane
       <button data-panel-toggle="paper" aria-expanded="false" aria-controls="painting-controls"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3h10l4 4v14H5Z M15 3v5h4 M8 12h8 M8 16h5"/></svg><span>Paper</span></button>
     </div>
     <section data-panel-section="brush" aria-labelledby="paint-with">
-      <h2 id="paint-with">Your tools</h2>
+      <h2 id="paint-with">Brush</h2>
       <div class="instrument-tools">
         <p class="label" id="tool-label">Instrument</p>
         <div class="seg tools" role="group" aria-labelledby="tool-label">
-          <button data-tool="round" aria-pressed="true" aria-label="Round brush" title="Round brush">Round</button>
-          <button data-tool="flat" aria-pressed="false" aria-label="Flat brush" title="Flat brush">Flat</button>
-          <button data-tool="water" aria-pressed="false" aria-label="Clean water" title="Clean water">Water</button>
-          <button data-tool="pen" aria-pressed="false" aria-label="Dip pen" title="Dip pen">Pen</button>
-          <button data-tool="pencil" aria-pressed="false" title="Pencil">Pencil</button>
-          <button data-tool="dryer" aria-pressed="false" aria-label="Hair dryer" title="Hair dryer: dries the paper under it and blows wet paint away">Dryer</button>
+          <button data-tool="round" aria-pressed="true" aria-label="Round brush" title="Round brush (R)">Round</button>
+          <button data-tool="flat" aria-pressed="false" aria-label="Flat brush" title="Flat brush (F)">Flat</button>
+          <button data-tool="water" aria-pressed="false" aria-label="Clean water" title="Clean water (W)">Water</button>
+          <button data-tool="pen" aria-pressed="false" aria-label="Dip pen" title="Dip pen (I)">Pen</button>
+          <button data-tool="pencil" aria-pressed="false" title="Pencil (P)">Pencil</button>
+          <button data-tool="dryer" aria-pressed="false" aria-label="Hair dryer" title="Hair dryer (D): dries the paper under it and blows wet paint away">Dryer</button>
         </div>
+      </div>
+      <div id="brush-presets" class="seg presets" role="group" aria-label="Watercolor feel presets">
+        <button data-preset="wash" aria-pressed="false" title="Wide, wet wash (Shift+1)">Wash</button><button data-preset="glaze" aria-pressed="false" title="Dilute glaze on a dry layer (Shift+2)">Glaze</button><button data-preset="dry" aria-pressed="false" title="Dry brush on the paper tooth (Shift+3)">Dry brush</button><button data-preset="detail" aria-pressed="false" title="Fine round brush (Shift+4)">Detail</button>
       </div>
       <div>
         <label class="row" for="size">Size <input id="size" type="range" min="2" max="30" step="0.5" value="10"><output for="size" id="size-out">10 mm</output></label>
         <label class="row" for="water">Water <input id="water" type="range" min="0.1" max="3" step="0.05" value="2"><output for="water" id="water-out">2</output></label>
         <label class="row" for="amount">Pigment <input id="amount" type="range" min="0.05" max="1.2" step="0.05" value="0.5"><output for="amount" id="amount-out">0.5</output></label>
       </div>
+      <label class="check auto-redip"><input id="auto-redip" type="checkbox" checked>Auto re-dip each wet stroke</label>
     </section>
     <section data-panel-section="colors" aria-label="Colors">
       <fieldset id="pigment-set">
@@ -304,8 +339,9 @@ body.canvas-focus{overflow:hidden}.canvas-focus :is(.paint-nav,.paint-head,.pane
         <div>
           <p class="label" id="model-label">Brush model</p>
           <div class="seg" role="group" aria-labelledby="model-label">
-            <button data-model="row" aria-pressed="true">Row of bristles</button>
-            <button data-model="tuft" aria-pressed="false">Deformable tuft</button>
+            <button data-model="row" aria-pressed="true">Row</button>
+            <button data-model="tuft" aria-pressed="false">Tuft</button>
+            <button data-model="section" aria-pressed="false">Section</button>
           </div>
         </div>
         <div>
@@ -317,13 +353,7 @@ body.canvas-focus{overflow:hidden}.canvas-focus :is(.paint-nav,.paint-head,.pane
   </aside>
 </div>
 
-<details class="notes">
-  <summary>About the paper &amp; brushes</summary>
-  <p>Water spreads, soaks into the paper and dries. Pigment settles into its texture; dry washes remain transparent layers.</p>
-  <p>Use a loaded brush for flowing marks, less water for dry brush. The brush reloads with each stroke.</p>
-  <p class="muted">The simulation draws on Curtis et al. (1997), Strassmann (1986) and Kim et al. The physics, the painter and this page are in <a href="https://github.com/sabj/unpainting">sabj/unpainting</a>.</p>
-  <p class="muted">Everything runs in this browser: no picture, stroke or painting leaves it. Autosave keeps your sheet in this browser only.</p>
-</details>
+
 </main>
 <script type="module" src="lab/lab.js"></script>
 <canvas id="scratch" aria-hidden="true"></canvas></body></html>

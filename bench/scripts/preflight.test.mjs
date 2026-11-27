@@ -80,6 +80,29 @@ test('verifyComparisonRun and verifyTearsheetContract reject CPU fallbacks, enla
   assert.throws(() => verifyTearsheetContract({ models: ['opus'], stages: ['100%'] }), /missing required model families/);
   assert.throws(() => verifyTearsheetContract({ models: ['argon', 'astra', 'opus'], stages: ['100%'] }), /progressive stages required/);
 });
+test('comparison GPU evidence is explicit, from one record, and consistent across records', () => {
+  const dimensions = { sourceWidth: 300, sheetWidth: 300 };
+  const verify = (card, speed) => {
+    const files = {
+      '/r/run-card.json': JSON.stringify({ dimensions, ...card }),
+      ...(speed ? { '/r/paint-speed-summary.json': JSON.stringify({ width: 300, ...speed }) } : {}),
+    };
+    return verifyComparisonRun('/r', { exists: p => p in files, readFile: p => files[p] });
+  };
+  const gpu = { backend: 'gpu', fallback: false }, cpu = { backend: 'cpu', fallback: true };
+  for (const fallback of [undefined, null, 0, 'false', true]) {
+    assert.throws(() => verify({ gpuBackend: { backend: 'gpu', fallback } }), /invalid GPU evidence/);
+    assert.throws(() => verify({ gpuBackend: gpu }, { backend: { backend: 'gpu', fallback } }), /invalid GPU evidence/, 'a card cannot supply a missing summary fallback field');
+  }
+  assert.throws(() => verify({ gpuBackend: cpu }, { backend: gpu }), /invalid GPU evidence/, 'the summary cannot hide a CPU card');
+  assert.throws(() => verify({ gpuBackend: gpu }, { backend: cpu }), /invalid GPU evidence/);
+  assert.throws(() => verify({}), /no backend recorded/);
+  assert.equal(verify({ gpuBackend: gpu }).ok, true);
+  assert.equal(verify({}, { backend: gpu }).ok, true);
+  assert.equal(verify({ gpuBackend: gpu }, { backend: gpu }).ok, true);
+  assert.equal(verify({ backend: 'gpu', fallback: false }).ok, true, 'flat legacy records still need explicit fallback evidence');
+  assert.equal(verify({}, { backend: 'gpu', fallback: false }).ok, true);
+});
 test('rerender discovers all 60 stored V4 plans with gzipped line files and enforces --gpu on and comparison gates', async () => {
   assert.throws(() => parseRerenderArgs(['--gpu', 'off']), /rerender requires --gpu on/);
   const jobs = discoverStoredPlans();
@@ -133,7 +156,7 @@ test('the comparison gate has no size floor: it admits every target in bench/v2/
     assert.throws(() => verifyComparisonRun('/r', { ...run(4 * sourceWidth), ...rerenderGate({ width: 4 * sourceWidth }) }), /the render width never exceeds the source width/, `${id} at four times its width`);
   }
   // a smaller source is no reason to refuse: a thumbnail painted at its own width passes, and fails only when enlarged
-  const tiny = w => { const card = JSON.stringify({ gpuBackend: { backend: 'gpu' }, dimensions: { sourceWidth: 120, paintWidth: w, sheetWidth: w } }); return { exists: p => p === '/t/run-card.json', readFile: () => card }; };
+  const tiny = w => { const card = JSON.stringify({ gpuBackend: { backend: 'gpu', fallback: false }, dimensions: { sourceWidth: 120, paintWidth: w, sheetWidth: w } }); return { exists: p => p === '/t/run-card.json', readFile: () => card }; };
   assert.equal(verifyComparisonRun('/t', tiny(120)).ok, true);
   assert.throws(() => verifyComparisonRun('/t', tiny(300)), /2\.5 cells for each source pixel/);
 });

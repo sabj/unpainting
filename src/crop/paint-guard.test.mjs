@@ -1,7 +1,7 @@
 // --paintguard: a forced box checked against the painter's own pick.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { guardForcedBox, guardNote, paintGuardOptions } from './paint-guard.mjs';
+import { guardForcedBox, guardForcedBoxBatched, guardNote, paintGuardOptions } from './paint-guard.mjs';
 import { widePalette } from './palettewide.mjs';
 import { paperOf, pickPalette } from './palettepick.mjs';
 
@@ -81,4 +81,20 @@ test('widePalette with a forced sepia box: the guard records its decision and cl
   assert.ok(palette.box.keys.length > 2);
   assert.ok(palette.box.sampleError < plain.palette.box.sampleError);
   assert.match(note, /paint guard/);
+});
+
+
+test('batched guard follows the same disjoint add, merge and recovery candidates as the CPU', async () => {
+  const forced = [P('a'), P('b')], own = [P('c'), P('d'), P('e')];
+  for (const mode of ['add', 'merge', 'replace']) for (const max of [3, 5]) {
+    const options = { forced, own, mode, max, threshold: 0.15 };
+    const score = scoreFor(['c', 'd', 'e']);
+    const cpuCalls = [], gpuCalls = [];
+    const cpu = guardForcedBox({ ...options, score: ps => { cpuCalls.push(ps); return score(ps); } });
+    const batched = await guardForcedBoxBatched({ ...options, scoreBatch: async trials => {
+      gpuCalls.push(...trials); return trials.map(score);
+    } });
+    assert.deepEqual(batched, cpu);
+    assert.deepEqual(gpuCalls, cpuCalls, `${mode}, max=${max}: score the exact ordered CPU candidates`);
+  }
 });

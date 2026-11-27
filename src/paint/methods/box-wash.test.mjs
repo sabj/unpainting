@@ -15,7 +15,8 @@ const O = { ...DEFAULTS }; // the painter's sheet: each pigment granulates by it
 /** Lay 0.035 of the paint in 0.1 of water over a block, dry it, and read the grain (coefficient of variation of the
  *  dried mass inside the block) and how much of the dried layer new water takes up. */
 function wash(pigment) {
-  const sheet = createSheet(makePaper(W, H, { seed: 7, mmPerCell: 0.259 }), [pigment]);
+  // Isolate pigment grain from centimetre-scale pooling in a buckled sheet.
+  const sheet = createSheet(makePaper(W, H, { seed: 7, cockle: { rmsMm: 0 }, mmPerCell: 0.259 }), [pigment]);
   region(i => deposit(sheet, i, 0.1, [0.035]));
   for (let k = 0; k < STEPS; k++) step(sheet, O);
   const vals = []; let water = 0;
@@ -42,8 +43,8 @@ test('with physics off every paint lays the same grain and takes up the same sha
 
 test('with physics on, ultramarine and cerulean granulate and phthalo lays a smooth wash', () => {
   const um = get('ultramarine', true), ce = get('cerulean', true), ph = get('phthaloblue', true), off = get('phthaloblue', false);
-  // measured at rc8-next (wash physics, paper relief): ultramarine 0.435, cerulean 0.408, phthalo 0.333, reference 0.347;
-  // the paper's own relief now roughens every wash, so the granulators stand above phthalo by about a fifth (it was 2.5 times)
+  // With residence-dependent grain sorting on unbuckled paper: ultramarine 0.156, cerulean 0.155,
+  // phthalo 0.107, reference 0.108. The same bound holds without counting cockle's pooling as grain.
   assert.ok(um.cv > 1.15 * ph.cv, `ultramarine grain ${um.cv.toFixed(4)} vs phthalo ${ph.cv.toFixed(4)}`);
   assert.ok(ce.cv > 1.15 * ph.cv, `cerulean grain ${ce.cv.toFixed(4)} vs phthalo ${ph.cv.toFixed(4)}`);
   assert.ok(ph.cv <= off.cv * 1.05, `phthalo is no rougher than the reference wash (${ph.cv.toFixed(4)} vs ${off.cv.toFixed(4)})`);
@@ -69,8 +70,8 @@ test('physics changes the sheet and not the amount of paint laid', () => {
  *  sheet's drying rate. It was the correlation, which is blind to how much: a level film stands deeper over a hollow
  *  (the slope term in the flow), so even a staining paint's faint variation follows the height (-0.90 for phthalo
  *  against -0.86 for ultramarine), while its amount is a fifth of ultramarine's (-0.07 against -0.37). */
-function hollowShare(pigment, evap, water = 0.1) {
-  const paper = makePaper(W, H, { seed: 7, mmPerCell: 0.259 }), sheet = createSheet(paper, [pigment]);
+function hollowShare(pigment, evap, water) {
+  const paper = makePaper(W, H, { seed: 7, cockle: { rmsMm: 0 }, mmPerCell: 0.259 }), sheet = createSheet(paper, [pigment]);
   const o = { ...O, evap: O.evap * evap, edgeEvap: O.edgeEvap * evap };
   region(i => deposit(sheet, i, water, [0.035]));
   dry(sheet, 40000, o);
@@ -82,15 +83,18 @@ function hollowShare(pigment, evap, water = 0.1) {
   return sxy / syy / mx * Math.sqrt(syy / ids.length);
 }
 
-test('a granulating paint gathers in the hollows of the grain field, slow or fast, and a staining one far less', () => {
-  // At rc7 a slow wash gathered more (-0.373 against -0.331), but only by its grains rolling into each cell's own pits:
-  // with the slide off it was -0.206 against -0.202. On the grain field the two are -0.22 and -0.23; that the hollows
-  // fill more as a wash dries slowly is not modelled at this scale (work/lead-04/work/proof/grain/GRAIN.md).
+test('a pooled granulating paint gathers in the hollows more than a thin pass, slow or fast; a staining one far less', () => {
+  // A 0.3 mm pool supports grain sorting while it stands; a 0.04 mm pass soon disconnects among the fibres.
+  // Equal pigment loading rules out dilution. At both drying rates the pool must retain a strong hollow bias,
+  // and more than the thin pass. Before the residence fix the two were nearly alike.
   const um = physicalPigment(paint('ultramarine')), ph = physicalPigment(paint('phthaloblue'));
-  const slow = hollowShare(um, 0.4), fast = hollowShare(um, 3), stain = hollowShare(ph, 0.4);
+  const slow = hollowShare(um, 0.4, 0.3), fast = hollowShare(um, 3, 0.3);
   assert.ok(slow < -0.15 && fast < -0.15, `ultramarine against the grain field: slow ${slow.toFixed(3)}, fast ${fast.toFixed(3)}`);
-  // phthalo follows the field only where the film's water stands (-0.09 here, -0.10 at rc7 against paper height)
-  assert.ok(Math.abs(stain) < Math.abs(slow) / 2, `phthalo blue gathers in the hollows ${stain.toFixed(3)} against ultramarine's ${slow.toFixed(3)}`);
+  for (const [evap, pooled] of [[0.4, slow], [3, fast]]) {
+    const thin = hollowShare(um, evap, 0.04), stain = hollowShare(ph, evap, 0.3);
+    assert.ok(Math.abs(pooled) > 2 * Math.abs(thin), `drying ${evap}: pooled ${pooled.toFixed(3)} vs thin ${thin.toFixed(3)}`);
+    assert.ok(Math.abs(stain) < Math.abs(pooled) / 2, `drying ${evap}: phthalo ${stain.toFixed(3)} against ultramarine ${pooled.toFixed(3)}`);
+  }
 });
 
 /** Share of a brushed ultramarine wash's cell-to-cell variation that is a one-cell checkerboard: three flat lanes of

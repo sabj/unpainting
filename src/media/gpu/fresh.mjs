@@ -66,6 +66,36 @@ export class FreshMap {
     }
     return out;
   }
+  /** Disjoint stale sub-rectangles strictly inside `rects`, with no GROW expansion.
+   * Never includes a fresh tile and never extends outside any input rectangle. */
+  staleRectsExact(rects) {
+    if (this.all) return [];
+    const out = [];
+    for (const [rx, ry, rw, rh] of rects) {
+      if (rw <= 0 || rh <= 0) continue;
+      const rx1 = rx + rw, ry1 = ry + rh;
+      const tx0 = Math.max(0, Math.floor(rx / TILE)), ty0 = Math.max(0, Math.floor(ry / TILE));
+      const tx1 = Math.min(this.tw, ceilDiv(rx1, TILE)), ty1 = Math.min(this.th, ceilDiv(ry1, TILE));
+      let previous = new Map();
+      for (let ty = ty0; ty < ty1; ty++) {
+        const current = new Map(), row = ty * this.tw;
+        const y0 = Math.max(ry, ty * TILE), y1 = Math.min(ry1, (ty + 1) * TILE);
+        for (let tx = tx0; tx < tx1;) {
+          if (this.tiles[row + tx] === this.epoch) { tx++; continue; }
+          const start = tx++;
+          while (tx < tx1 && this.tiles[row + tx] !== this.epoch) tx++;
+          const x0 = Math.max(rx, start * TILE), x1 = Math.min(rx1, tx * TILE);
+          const key = x0 + ':' + x1;
+          let run = previous.get(key);
+          if (run && run[1] + run[3] === y0) run[3] = y1 - run[1];
+          else { run = [x0, y0, x1 - x0, y1 - y0]; out.push(run); }
+          current.set(key, run);
+        }
+        previous = current;
+      }
+    }
+    return out;
+  }
   /** The stale tiles `rect` touches: their tile-aligned bounding rectangle, or null when all of them are fresh. */
   staleBounds(rect) {
     if (this.all) return null;

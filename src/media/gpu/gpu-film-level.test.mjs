@@ -23,7 +23,7 @@ let device = null;
 async function gpu(t) {
   if (device) return device;
   try { const w = await import('webgpu'); Object.assign(globalThis, w.globals); ({ device } = await openGpu(w.create([]))); return device; }
-  catch (e) { t.skip(`GPU unavailable: ${e.message}`); return null; }
+  catch (e) { if (process.env.GPU_REQUIRED === '1') throw e; t.skip(`GPU unavailable: ${e.message}`); return null; }
 }
 test.after(() => device?.destroy());
 
@@ -113,4 +113,98 @@ test('a puddle run into damp paint (backrun.mjs) on the GPU as on the CPU: water
   }
   assert.ok(dW < 1e-4, `water differs by ${dW}`);
   assert.ok(dG + dD < 2e-4, `pigment differs by ${dG} suspended, ${dD} settled`);
+});
+
+test('the GPU bloom uses the fibre entry head, including rotation and release by a deeper puddle', { timeout: 120000 }, async t => {
+  // Isolate entry pressure from thin-film stranding as well as settling. The
+  // 0.01 mm fixture lies exactly on holdDepth; its f32 storage is below the
+  // CPU's double threshold but equal to the GPU's f32 threshold.
+  const O = { ...DEFAULTS, dt: 0.1, mmPerCell: MM, evap: 0, paperDry: 0, absorb: 0, edgeEvap: 0, capRate: 0, flow: 0, diffuse: 0, filmDiffuse: 0, settle: 0, lift: 0, slide: 0, holdDepth: 0 };
+  for (const vertical of [false, true]) for (const depth of [0.2, 0.4]) {
+    const centre = 48 * N + 48;
+    const make = () => {
+      const s = createSheet(makePaper(N, N, { seed: 3, mmPerCell: MM }), [ULTRAMARINE, PHTHALO]);
+      s.paper.surface.fill(0.5); s.paper.throat.fill(0.5); s.paper.grain.fill(1);
+      s.paper.fdx.fill(vertical ? 0 : 1); s.paper.fdy.fill(vertical ? 1 : 0);
+      for (let i = 0; i < s.n; i++) deposit(s, i, 0.01, [0.01, 0.005]);
+      s.W[centre] = depth;
+      return s;
+    };
+    const r = await both(t, make, O, 1); if (!r) return;
+    const { cpu, gs } = r, along = vertical ? N : 1, across = vertical ? 1 : N;
+    assert.ok(cpu.W[centre + along] > 0.02, 'the water ran along the fibres');
+    if (depth === 0.2) assert.ok(Math.abs(cpu.W[centre + across] - 0.01) < 1e-8, 'the fibre edge pinned the front');
+    else assert.ok(cpu.W[centre + across] > 0.02, 'more head released the front');
+    const dW = worst(cpu.W, gs.W), dG = worst(cpu.G[0], gs.G[0]), dD = worst(cpu.D[0], gs.D[0]);
+    t.diagnostic(JSON.stringify({ vertical, depth, dW, dG, dD }));
+    assert.ok(dW < 1e-6 && dG + dD < 1e-6, 'the CPU and GPU use the same entry pressure');
+    for (const s of [cpu, gs]) {
+      const ref = make();
+      assert.ok(Math.abs(water(s) / water(ref) - 1) < 1e-6);
+      for (const k of [0, 1]) assert.ok(Math.abs(pigment(s, k) / pigment(ref, k) - 1) < 1e-6);
+    }
+  }
+});
+
+test('the film and back-run agree on water stored exactly at shine-off on CPU and GPU', { timeout: 120000 }, async t => {
+  const O = { ...DEFAULTS, dt: 0.1, mmPerCell: MM, evap: 0, paperDry: 0, absorb: 0, edgeEvap: 0, capRate: 0, flow: 0, diffuse: 0, filmDiffuse: 0, settle: 0, lift: 0, slide: 0, holdDepth: 0 };
+  const make = () => {
+    const s = createSheet(makePaper(N, N, { seed: 3, mmPerCell: MM }), [ULTRAMARINE, PHTHALO]);
+    s.paper.surface.fill(0.5); s.paper.throat.fill(0); s.paper.grain.fill(1);
+    s.paper.fdx.fill(1); s.paper.fdy.fill(0);
+    for (let i = 0; i < s.n; i++) deposit(s, i, O.levelFloor, [0.01, 0.005]);
+    s.W[48 * N + 48] = 0.2;
+    return s;
+  };
+  const r = await both(t, make, O, 1); if (!r) return;
+  assert.ok(r.cpu.W[48 * N + 49] > O.levelFloor, 'a damp receiver took water through its throat');
+  const dW = worst(r.cpu.W, r.gs.W), dG = worst(r.cpu.G[0], r.gs.G[0]);
+  t.diagnostic(JSON.stringify({ dW, dG }));
+  assert.ok(dW < 1e-6 && dG < 1e-6, 'no finite jump at the shared float32 boundary');
+  for (const s of [r.cpu, r.gs]) {
+    const ref = make();
+    assert.ok(Math.abs(water(s) / water(ref) - 1) < 1e-6);
+    for (const k of [0, 1]) assert.ok(Math.abs(pigment(s, k) / pigment(ref, k) - 1) < 1e-6);
+  }
+});
+
+test('a film stored exactly at holdDepth does not strand pigment on either backend', { timeout: 120000 }, async t => {
+  const O = { ...DEFAULTS, dt: 0.1, mmPerCell: MM, level: 0, evap: 0, paperDry: 0, absorb: 0, edgeEvap: 0, capRate: 0, flow: 0, diffuse: 0, filmDiffuse: 0, settle: 0, lift: 0, slide: 0 };
+  const make = () => {
+    const s = createSheet(makePaper(N, N, { seed: 3, mmPerCell: MM }), [ULTRAMARINE, PHTHALO]);
+    for (let i = 0; i < s.n; i++) deposit(s, i, O.holdDepth, [0.05, 0.02]);
+    return s;
+  };
+  const r = await both(t, make, O, 1); if (!r) return;
+  const ref = make();
+  for (const s of [r.cpu, r.gs]) {
+    assert.ok(worst(s.D[0], ref.D[0]) < 1e-8, 'only a film strictly thinner than holdDepth strands paint');
+    assert.ok(worst(s.G[0], ref.G[0]) < 1e-8);
+    for (const k of [0, 1]) assert.ok(Math.abs(pigment(s, k) / pigment(ref, k) - 1) < 1e-6);
+  }
+});
+
+test('a marginal bloom receiver admits a continuous conservative push on CPU and GPU', { timeout: 120000 }, async t => {
+  const O = { ...DEFAULTS, dt: 0.1, mmPerCell: MM, evap: 0, paperDry: 0, absorb: 0, edgeEvap: 0, capRate: 0, flow: 0, diffuse: 0, filmDiffuse: 0, settle: 0, lift: 0, slide: 0, holdDepth: 0, pinning: 0 };
+  const centre = 48 * N + 48;
+  for (const depth of [0.04999463, O.levelFloor, 0.05003053, O.puddle]) {
+    const make = () => {
+      const s = createSheet(makePaper(N, N, { seed: 3, mmPerCell: MM }), [ULTRAMARINE, PHTHALO]);
+      s.paper.surface.fill(0.5); s.paper.throat.fill(0);
+      for (const [offset, w] of [0.2, 0.01, depth].entries()) deposit(s, centre + offset - 1, w, [0, 0]);
+      s.D[0][centre] = 0.05; s.D[1][centre] = 0.02;
+      return s;
+    };
+    const r = await both(t, make, O, 1); if (!r) return;
+    const dW = worst(r.cpu.W, r.gs.W), dG = worst(r.cpu.G[0], r.gs.G[0]), dD = worst(r.cpu.D[0], r.gs.D[0]);
+    assert.ok(dW < 1e-6 && dG + dD < 1e-6, 'marginal receiver agrees on both backends');
+    if (depth < O.puddle) assert.ok(r.cpu.G[0][centre + 1] > 0.003 && r.gs.G[0][centre + 1] > 0.003, 'the front still advances through the refilling tooth');
+    else assert.equal(r.cpu.G[0][centre + 1], 0, 'a flooded receiver admits no capillary push');
+    for (const s of [r.cpu, r.gs]) {
+      const ref = make();
+      assert.ok(Math.abs(water(s) / water(ref) - 1) < 1e-6);
+      for (const k of [0, 1]) assert.ok(Math.abs(pigment(s, k) / pigment(ref, k) - 1) < 1e-6);
+    }
+    t.diagnostic(JSON.stringify({ depth, dW, dG, dD, pushed: r.cpu.G[0][centre + 1] }));
+  }
 });

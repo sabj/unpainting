@@ -53,6 +53,16 @@ function fixture(enabled) {
   if(enabled){local.W=guard(local.W);local.s=guard(local.s);local.M=guard(local.M);local.ever=guard(local.ever);
     for(const name of ['G','P','D'])local[name]=local[name].map(guard);}
   const dispatch = m => {
+    if(m.op==='downRects') {
+      const output=new Float32Array(m.rects.reduce((sum,r)=>sum+r[2]*r[3],0)*fields(remote).length);let at=0;
+      for(const rect of m.rects){dispatch({op:'down',rect});const size=rect[2]*rect[3]*fields(remote).length;output.set(link.rectData.subarray(0,size),at);at+=size;}
+      link.rectData.set(output);return;
+    }
+    if(m.op==='upRects') {
+      fullBrushPigments ||= m.signedZero===true;logical.push(m.logicalRect);let at=0;
+      for(const [x,y,w,h] of m.rects){const area=w*h;fields(remote).forEach((plane,k)=>{for(let row=0;row<h;row++)plane.set(m.data.subarray(at+k*area+row*w,at+k*area+(row+1)*w),(y+row)*remote.w+x);});at+=area*fields(remote).length;}
+      return;
+    }
     if (m.op === 'step') {
       step(remote, O);
       if(local._cpuDemandWindow)for(const plane of raw)plane.fill(plane instanceof Float32Array?NaN:173);
@@ -144,9 +154,11 @@ test('a section brush reads ahead through the GPU link and keeps its wet film an
     assert.deepEqual(ahead.rows, base.rows);
     assert.deepEqual(ahead.logical, base.logical);
     assert.deepEqual(ahead.tape, base.tape);
-    assert.equal(ahead.link.stats.downAhead, 1);
+    assert.ok((ahead.link.stats.downAhead??0)<=1);
+    assert.ok(ahead.link.stats.downBytes<=base.link.stats.downBytes*2,'speculation must stay within the local demand budget');
     // the hand's read-ahead (cpu-contact-lookahead.mjs) already reads once a flow without the entry prefetch, so the
-    // prefetch adds no read and both stay near one a flow (the entry read, the prefetch and one more besides): round 10 reads, flat 11, for 8 flows
+    // prefetch adds no read; oversized speculation is rejected in favor of the
+    // same local demand. Both stay near one read a flow.
     const flows = ahead.tape.reduce((n, m) => n + (m.fl?.length ?? 0), 0);
     assert.ok(flows > 0, 'the stroke flows');
     assert.ok(ahead.link.stats.down <= base.link.stats.down, `the prefetch added reads: ${base.link.stats.down} to ${ahead.link.stats.down}`);

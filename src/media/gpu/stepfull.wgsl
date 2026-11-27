@@ -362,14 +362,24 @@ fn apply_g_tile(wid: vec3<u32>, lid: vec3<u32>) {
 }
 
 // 3. pigment exchange
-// settling (settling.mjs): the share of the suspension that falls through a film Wi mm deep in one step at speed v mm/s,
-// and Brownian diffusion D mm^2/s to the fibres, 1 - exp(-(v B / h + D / l^2) dt) with B = 1 + gamma hollow and
-// l = min(h, 0.02 mm) (FIBRE_GAP_MM); a series where the exponent is small keeps f32's digits
+// Grain-water closure shared with grain-water.mjs. The first 0.03 mm is held
+// among fibres; connected-film conductance grows as free depth cubed.
+fn grainMobilityG(Wi: f32) -> f32 {
+  let h = max(0.0, Wi - 0.03); let h3 = h * h * h;
+  return h3 / (h3 + 0.06 * 0.06 * 0.06);
+}
+fn grainSlideG(Wi: f32) -> f32 {
+  let h = max(0.0, Wi - 0.03);
+  return 0.12 * h * h / (h * h * h + 0.06 * 0.06 * 0.06);
+}
+// Settling (settling.mjs): vertical landing v/h, residence-dependent hollow
+// capture v*gamma*hollow*M/0.06, and Brownian diffusion D/l^2. A series
+// where the exponent is small keeps f32's digits.
 // how deep a cell lies below the tooth level under it, in the paper's hollow unit (paper.mjs toothHollow)
 fn hollowAt(i: u32) -> f32 { let p = PAPER3[i]; return max(0.0, (u.toothLo + u.toothSpan * p.x - p.w) / u.hollowUnit); }
 fn settleShareG(v: f32, df: f32, gg: f32, hol: f32, Wi: f32) -> f32 {
   let h = max(0.001, Wi); let l = min(h, 0.02);
-  let x = (v * (1.0 + gg * hol) / h + df / (l * l)) * u.dt;
+  let x = (v / h + v * gg * hol * grainMobilityG(Wi) / 0.06 + df / (l * l)) * u.dt;
   if (x < 0.01) { return x * (1.0 - x * (0.5 - x / 6.0)); }
   return 1.0 - exp(-x);
 }
@@ -399,7 +409,7 @@ fn p3a_tile(wid: vec3<u32>, lid: vec3<u32>) {
     let gg = pa.x;
     let down = Gk * settleShareG(select(pb.x, (1.0 - u.coSettle) * pb.x + u.coSettle * vMix, u.coSettle > 0.0), pigC(k).x, gg, select(hol, hol * max(0.0, 1.0 - settled * u.granFill), u.granFill > 0.0), Wi);
     let shape = max(0.0, 1.0 + (hh - 1.0) * gg);
-    let up = Dk * shape * (pa.y * wetting * u.dt + pa.z * turnover);
+    let up = Dk * shape * (pa.y * wetting * u.dt + pa.z * turnover * grainMobilityG(Wi));
     let dn = min(Gk, max(0.0, down)); let uu = min(Dk, max(0.0, up));
     Dk += dn - uu; Gk += uu - dn;
     if (rewet) { let r = min(top, (top * u.rewetLift * u.dt) / pb.y); TOP[q] = top - r; Gk += r; }
@@ -439,7 +449,7 @@ fn slide_out_tile(wid: vec3<u32>, lid: vec3<u32>) {
   let Wi = W[i]; let Dk = D[q]; let pa = pigA(c.z); let pb = pigB(c.z);
   let gg = pa.x;
   if (Wi <= 0.0 || gg <= 0.0 || Dk <= 0.0) { return; }
-  let film = min(3.0, 0.12 / max(0.04, Wi)) * select(Wi / u.film, 1.0, Wi > u.film);
+  let film = grainSlideG(Wi);
   let fill = fillAt(i); let here = surf(i, pb.z, fill); let rep = pa.w;
   var ex = vec4<f32>(0.0);
   if (c.x < u.w - 1u && M[i + 1u] == 1u) { ex.x = max(0.0, here - surf(i + 1u, pb.z, fill) - rep); }
@@ -448,7 +458,7 @@ fn slide_out_tile(wid: vec3<u32>, lid: vec3<u32>) {
   if (c.y > 0u && M[i - u.w] == 1u) { ex.w = max(0.0, here - surf(i - u.w, pb.z, fill) - rep); }
   let sum = ex.x + ex.y + ex.z + ex.w;
   if (sum <= 0.0) { return; }
-  var moved = Dk * min(0.2, u.slide * gg * film * sum * u.dt);
+  var moved = Dk * min(0.2, u.slide * pigC(c.z).y * gg * film * sum * u.dt);
   // slideCap (sheet.mjs): no move may close more than slideCap of the slope it rolls down, so grains do not overfill a
   // neighbour and roll back the next step (the checkerboard in granulated washes)
   if (u.slideCap > 0.0 && fill > 0.0) {
@@ -793,7 +803,7 @@ fn p3a_dep_tile(wid: vec3<u32>, lid: vec3<u32>) {
       let gg = pa.x;
       let down = Gk * settleShareG(select(pb.x, (1.0 - u.coSettle) * pb.x + u.coSettle * vMix, u.coSettle > 0.0), pigC(k).x, gg, select(hol, hol * max(0.0, 1.0 - settled * u.granFill), u.granFill > 0.0), Wi);
       let shape = max(0.0, 1.0 + (hh - 1.0) * gg);
-      let up = Dk * shape * (pa.y * wetting * u.dt + pa.z * turnover);
+      let up = Dk * shape * (pa.y * wetting * u.dt + pa.z * turnover * grainMobilityG(Wi));
       let dn = min(Gk, max(0.0, down)); let uu = min(Dk, max(0.0, up));
       Dk += dn - uu; Gk += uu - dn;
       if (rewet) { let r = min(top, (top * u.rewetLift * u.dt) / pb.y); TOP[q] = top - r; Gk += r; }
@@ -849,7 +859,7 @@ fn slide_out_all_tile(wid: vec3<u32>, lid: vec3<u32>) {
     let Dk = D[q]; let pa = pigA(k); let pb = pigB(k);
     let gg = pa.x;
     if (Wi <= 0.0 || gg <= 0.0 || Dk <= 0.0) { continue; }
-    let film = min(3.0, 0.12 / max(0.04, Wi)) * select(Wi / u.film, 1.0, Wi > u.film);
+    let film = grainSlideG(Wi);
     // The drop to each lower neighbour, as differences of the surface's parts: the CPU works the surfaces out in double and
     // subtracts them, and two f32 surfaces near 1 subtracted lose the few digits a small slope has. The parts' own
     // differences keep them.
@@ -861,7 +871,7 @@ fn slide_out_all_tile(wid: vec3<u32>, lid: vec3<u32>) {
     if (okU) { ex.w = max(0.0, (f1 * (p0.w - pU.w) + fl * (p0.x - pU.x) + gU) - rep); }
     let sum = ex.x + ex.y + ex.z + ex.w;
     if (sum <= 0.0) { continue; }
-    var moved = Dk * min(0.2, u.slide * gg * film * sum * u.dt);
+    var moved = Dk * min(0.2, u.slide * pigC(k).y * gg * film * sum * u.dt);
     if (u.slideCap > 0.0 && fill > 0.0) {
       for (var e = 0u; e < 4u; e++) { if (ex[e] > 0.0) { moved = min(moved, u.slideCap * ex[e] / (fill * (1.0 + ex[e] / sum))); } }
     }
@@ -1916,8 +1926,30 @@ fn stroke_metered() {
   BSTR[H_CUR]=bitcast<f32>(cur);hdr_store();
 }
 
-// Fast ordinary dry only, dispatched after a whole-frontier maximum-water gate.
-// Visit the whole sheet to clear residual pore traces outside the active tiles.
+// Exact pore-only tail gate, as sheet.mjs quietDryTail. A sub-threshold film is
+// still liquid, and saturated pores can still transport water and pigment.
+// EVER is deliberately absent: a past wash does not keep dry paper mobile.
+@compute @workgroup_size(256)
+fn quiet_dry_check(@builtin(global_invocation_id) g: vec3<u32>) {
+  let i = g.x; if (i >= u.n) { return; }
+  if (M[i] != 0u || W[i] != 0.0 || S[i] > u.capEps * PAPER[i].x || (u.paperDry <= 0.0 && S[i] > 0.0)) {
+    atomicStore(&CTR[12], 1u);
+  }
+}
+
+// Speculative chunk probe; its result is consumed only with zero film/water
+// counters from this same chunk. The standalone check above remains unconditional.
+@compute @workgroup_size(256)
+fn quiet_dry_probe(@builtin(global_invocation_id) g: vec3<u32>) {
+  if (atomicLoad(&CTR[6]) != 0u || atomicLoad(&CTR[7]) != 0u) { return; }
+  let i = g.x; if (i >= u.n) { return; }
+  if (M[i] != 0u || W[i] != 0.0 || S[i] > u.capEps * PAPER[i].x || (u.paperDry <= 0.0 && S[i] > 0.0)) {
+    atomicStore(&CTR[12], 1u);
+  }
+}
+
+// Forced evaporation after a dry limit (sheet.mjs evaporateInPlace). Ordinary
+// quiet tails use quiet_pore_tail after the whole-sheet transport gate.
 @compute @workgroup_size(256)
 fn quiet_dry_tail(@builtin(global_invocation_id) g: vec3<u32>) {
   let i = g.x; if (i >= u.n) { return; }
@@ -1925,6 +1957,18 @@ fn quiet_dry_tail(@builtin(global_invocation_id) g: vec3<u32>) {
   for (var ka = 0u; ka < u.nAct; ka++) {
     let q = klAt(ka) * u.n + i;
     D[q] += G[q] + P[q]; G[q] = 0.0; P[q] = 0.0;
+  }
+}
+
+// Only pore pigment changes phase in a pore-only tail. Inert surface pigment
+// outside M stays where the ordinary steps leave it, including at fixation.
+@compute @workgroup_size(256)
+fn quiet_pore_tail(@builtin(global_invocation_id) g: vec3<u32>) {
+  let i = g.x; if (i >= u.n) { return; }
+  S[i] = 0.0; S[u.n + i] = 0.0;
+  for (var ka = 0u; ka < u.nAct; ka++) {
+    let q = klAt(ka) * u.n + i;
+    D[q] += P[q]; P[q] = 0.0;
   }
 }
 

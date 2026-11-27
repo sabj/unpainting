@@ -45,6 +45,19 @@ fn p5ab(@builtin(workgroup_id) wid: vec3<u32>, @builtin(local_invocation_id) lid
 `;
 export const FINISH_WET_SCAN_14 = `
 @compute @workgroup_size(16, 16)
+fn apply_f0_p3a_dep(@builtin(workgroup_id) wid: vec3<u32>, @builtin(local_invocation_id) lid: vec3<u32>) {
+  if (u.p3 != 2u) { apply_f0_tile(wid, lid); p3a_dep_tile(wid, lid); return; }
+  if (lid.x == 0u && lid.y == 0u) { passTileCount = TL[u.ntiles]; }
+  workgroupBarrier();
+  let count = workgroupUniformLoad(&passTileCount);
+  for (var tile = wid.x; tile < count; tile += u32(u.padB)) {
+    let at = vec3<u32>(tile, wid.y, wid.z);
+    apply_f0_tile(at, lid);
+    p3a_dep_tile(at, lid);
+    workgroupBarrier();
+  }
+}
+@compute @workgroup_size(16, 16)
 fn apply_f1_p3a_dep(@builtin(workgroup_id) wid: vec3<u32>, @builtin(local_invocation_id) lid: vec3<u32>) {
   if (u.p3 != 2u) { apply_f1_tile(wid, lid); p3a_dep_tile(wid, lid); return; }
   if (lid.x == 0u && lid.y == 0u) { passTileCount = TL[u.ntiles]; }

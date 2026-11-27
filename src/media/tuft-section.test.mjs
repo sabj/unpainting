@@ -24,7 +24,7 @@ test('a tuft holds its film while it has free liquid, and sucks below its retent
   assert.ok(headOf(1, 0.4, 0.9) > 0.89 && headOf(0.7, 0.4, 0.9) > 0.75, 'near full head over most of the load');
   assert.ok(headOf(0.2, 0.4, 0.9) < 0 && headOf(0.1, 0.4, 0.9) < headOf(0.3, 0.4, 0.9));
   // reach: a loaded lane past the deepest pit, a damp one only the hills
-  assert.ok(toothReach(0.9, 0.9, 1, 0) > 1 && toothReach(-0.15, 0.9, 1, 0.55) < 0);
+  assert.ok(toothReach(1, 1, 0) > 1 && toothReach(0.18, 1, 0.55) < 0);
 });
 
 test('a loaded round lays the same paint per millimetre and runs out at the same distance at 0.25 and 0.1 mm cells', () => {
@@ -212,6 +212,21 @@ test('exchangeCell moves nothing from an empty lane and never makes a negative',
   deposit(sheet, 5, 0.3, [0.1, 0]);
   exchangeCell(sheet, 5, lane, 10, 4, 0.5, 1, headOf(0, 0.4, 0.9), 1, buf);
   assert.ok(lane.water > 0 && lane.pig[0] > 0 && sheet.W[5] >= 0 && sheet.G[0][5] >= 0);
+});
+
+test('dry pores draw pigment from retained liquid, continuously down to a bone-dry tuft', () => {
+  const amounts = [];
+  for (const sat of [0, 0.05, 0.1, 0.15, 0.2]) {
+    const sheet = createSheet(paperAt(4, 4, 0.25), pigments), lane = { water: 10 * sat, pig: [5 * sat, 2 * sat] };
+    const before = [lane.water, ...lane.pig];
+    exchangeCell(sheet, 5, lane, 10, 2, 0.1, 0.5, headOf(sat, 0.2, 0.22), 1, new Float64Array(2));
+    const t = totals(sheet);
+    assert.ok(Math.abs(lane.water + t.water - before[0]) < 1e-7);
+    for (let k = 0; k < 2; k++) assert.ok(Math.abs(lane.pig[k] + t.pig[k] - before[k + 1]) < 1e-7);
+    amounts.push(t.pig[0]);
+  }
+  assert.equal(amounts[0], 0);
+  for (let j = 1; j < amounts.length; j++) assert.ok(amounts[j] > amounts[j - 1], 'damp bristles release progressively more retained pigment');
 });
 
 test('two overlapping wet sweeps dry with no density step at their seam', async () => {

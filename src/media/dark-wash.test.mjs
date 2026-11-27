@@ -15,11 +15,13 @@ const lin = v => { v /= 255; return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.
 function wash(conc, CELL = 0.25) {
   const w = Math.round(60 / CELL), h = Math.round(40 / CELL), n = w * h;
   // a sheet without cockle (paper.mjs): what this measures is the lanes, the levelling or the grain, not the pooling
-  const paper = makePaper(w, h, { cockle: { rmsMm: 0 }, seed: 9, scale: 1, toothScale: 0.2, fibres: 0.5, tooth: 0.7, proudBlur: 1, mmPerCell: CELL, coldPress: { mmPerCell: CELL, bumpMm: [0.8, 3], cover: 2.4, swell: 0.45, swellMm: [4, 8] } });
+  // Select physical rough relief explicitly: tooth/bump knobs do not choose a physical surface.
+  const paper = makePaper(w, h, { relief: 'rough', cockle: { rmsMm: 0 }, seed: 9, scale: 1, toothScale: 0.2, fibres: 0.5, tooth: 0.7, proudBlur: 1, mmPerCell: CELL, coldPress: { mmPerCell: CELL, bumpMm: [0.8, 3], cover: 2.4, swell: 0.45, swellMm: [4, 8] } });
   const sheet = createSheet(paper, pigments), r = 12.5 / CELL;
   for (let y = 10, k = 0; y <= 30; y += 5, k++) {
     const b = B.createBrush({ model: 'section', radius: r, seed: 101 + k, flat: true, bristles: Math.max(12, Math.ceil(r * 2)), capacity: 100, belly: 12, feed: 0.4, give: 0.9, free: 0.4, film: 0.25, splay: 0.03, stiffness: 8, wetMix: 0.3, bridge: 0.9, bridgeSoft: 3 });
-    B.dip(b, { water: 0.5, conc: [conc / 2, conc / 2] });
+    // Saturation now controls bristle reach: a heavy continuous wash uses a full load.
+    B.dip(b, { water: 1, conc: [conc / 2, conc / 2] });
     const [a, z] = k % 2 ? [55, 5] : [5, 55], per = 0.7 * CELL / 80; let t = 0;
     B.stroke(b, sheet, [{ x: a / CELL, y: y / CELL, p: 0.9 }, { x: z / CELL, y: y / CELL, p: 0.9 }], { upright: 'sweep', speed: 80, between: () => { for (t += per; t >= O.dt - 1e-12; t -= O.dt) step(sheet, O); } });
     for (let i = 0; i < 5; i++) step(sheet, O);

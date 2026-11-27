@@ -14,8 +14,10 @@
 export function finishField(D, w, h, blur, { background = 0.35, subject = 0.35, centre = 0.35, scale = 0.06, lab = null, distinct = 0.6 } = {}) {
   const n = w * h, side = Math.min(w, h);
   const B = blur(D, w, h, Math.max(2, 0.02 * side));
-  const busy = blur(Float32Array.from(D, (v, i) => Math.abs(v - B[i])), w, h, Math.max(2, scale * side));
-  let peak = 0; for (let i = 0; i < n; i++) peak = Math.max(peak, busy[i]);
+  const diff = new Float32Array(n);
+  for (let i = 0; i < n; i++) diff[i] = Math.abs(D[i] - B[i]);
+  const busy = blur(diff, w, h, Math.max(2, scale * side));
+  let peak = 0; for (let i = 0; i < n; i++) if (busy[i] > peak) peak = busy[i];
   // Distinct from the ground: busy clouds or sand texture are not subject. A cell's distance to the nearest
   // border colour (sky, sea, sand, a wall) says how much it stands out.
   let dist = null;
@@ -29,8 +31,9 @@ export function finishField(D, w, h, blur, { background = 0.35, subject = 0.35, 
       cen = acc.map((q, c) => (q[3] ? [q[0] / q[3], q[1] / q[3], q[2] / q[3]] : cen[c]));
     }
     dist = new Float32Array(n); let dPeak = 0;
-    for (let i = 0; i < n; i++) { let bd = Infinity; for (const c of cen) bd = Math.min(bd, Math.hypot(lab.L[i] - c[0], lab.a[i] - c[1], lab.b[i] - c[2])); dist[i] = bd; dPeak = Math.max(dPeak, bd); }
-    dist = blur(Float32Array.from(dist, v => (dPeak > 1e-9 ? v / dPeak : 0)), w, h, Math.max(2, 0.02 * side));
+    for (let i = 0; i < n; i++) { let bd = Infinity; for (const c of cen) bd = Math.min(bd, Math.hypot(lab.L[i] - c[0], lab.a[i] - c[1], lab.b[i] - c[2])); dist[i] = bd; if (bd > dPeak) dPeak = bd; }
+    if (dPeak > 1e-9) { const inv = 1 / dPeak; for (let i = 0; i < n; i++) dist[i] *= inv; } else dist.fill(0);
+    dist = blur(dist, w, h, Math.max(2, 0.02 * side));
   }
   const S = new Float32Array(n);
   for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
@@ -39,10 +42,12 @@ export function finishField(D, w, h, blur, { background = 0.35, subject = 0.35, 
     S[i] = s * (1 - centre) + c * centre;
   }
   const sorted = Float32Array.from(S).sort(), top = sorted[Math.floor(n * (1 - subject))], low = sorted[Math.floor(n * 0.1)];
-  return Float32Array.from(S, v => {
-    const t = Math.max(0, Math.min(1, (v - low) / Math.max(1e-6, top - low)));
-    return background + (1 - background) * t * t * (3 - 2 * t);
-  });
+  const span = Math.max(1e-6, top - low), out = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    const t = Math.max(0, Math.min(1, (S[i] - low) / span));
+    out[i] = background + (1 - background) * t * t * (3 - 2 * t);
+  }
+  return out;
 }
 
 /** A passage's mask clipped to the cells whose finish reaches its place in the run (0 first value, 1 last). */

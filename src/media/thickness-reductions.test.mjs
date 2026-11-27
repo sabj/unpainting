@@ -25,3 +25,41 @@ test('thickness reductions preserve per-cell rounding, order, and layer invalida
     }
   }
 });
+
+test('selective thickness extends each channel lazily and invalidates changed lower layers', () => {
+  const sheet=createSheet(makePaper(12,8),Array.from({length:4},()=>({K:[1,1,1],S:[.1,.1,.1]})));
+  sheet._zeroLayer=new Float32Array(sheet.n);
+  const layer=l=>Array.from({length:4},(_,k)=>k===2?sheet._zeroLayer:Float32Array.from({length:sheet.n},(_,i)=>(l+k+i%7)*.013));
+  const check=channels=>{
+    const selected=thickness(sheet,{channels}),old=process.env.LAYER_CACHE;
+    process.env.LAYER_CACHE='0';
+    try {
+      const plain=thickness(sheet);
+      for(const k of new Set(channels.filter(k=>Number.isInteger(k)&&k>=0&&k<sheet.K)))assert.deepEqual(selected[k],plain[k]);
+    } finally {if(old===undefined)delete process.env.LAYER_CACHE;else process.env.LAYER_CACHE=old;}
+  };
+  for(let l=0;l<6;l++){
+    sheet.layers.push(layer(l));sheet.G[1][l]=.03;
+    check([1,1,-1,7,.5]);
+    assert.equal(sheet._thickLower.sum[0],undefined,'unqueried pigment is not allocated');
+  }
+  check([0,2,3]);
+  const cached=sheet._thickLower;
+  sheet.layers[2][1][4]=.75;layersChanged(sheet);check([1]);assert.notEqual(sheet._thickLower,cached);
+  sheet.layers[1]=layer(9);check([0,1]);
+  sheet.layers.length=2;check([0,1,2,3]);
+  sheet.layers=sheet.layers.slice();check([0,1,2,3]);
+  assert.deepEqual(thickness(sheet,{channels:[-1,.5,99]}),new Array(sheet.K));
+});
+
+test('selective thickness notices deferred GPU archives populated in place',()=>{
+  const sheet=createSheet(makePaper(4,4),Array.from({length:2},()=>({K:[1,1,1],S:[.1,.1,.1]})));
+  sheet.layers=Array.from({length:3},()=>Array.from({length:2},()=>new Float32Array(sheet.n)));
+  let filled=false;
+  sheet._gpu={syncTop(_sheet,_sums,mask){
+    if(mask===2&&!filled){sheet.layers[0][1].fill(.25);sheet.layers[0]._cacheVersion=1;filled=true;}
+  },wetSums(){return null;},syncAll(){}};
+  assert.equal(thickness(sheet,{channels:[0]})[0][0],0);
+  assert.equal(thickness(sheet,{channels:[1]})[1][0],.25);
+  assert.equal(thickness(sheet)[1][0],.25);
+});

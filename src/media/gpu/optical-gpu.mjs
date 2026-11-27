@@ -6,6 +6,10 @@ function pairs(values, divisor = 1) { const out = new Float32Array(values.length
 // the paper or preparatory ink under it does not require rendering the stack again.
 export class GpuOpticalComposite {
   static async create(device, n, pigments, micro = null, width = n) {
+    // Guard every storage binding, including mask checkpoints, before host/GPU allocation.
+    const largest = Math.max(16, 96*n, 4*n*pigments.length, 56*pigments.length);
+    if (!Number.isSafeInteger(largest) || largest > device.limits.maxStorageBufferBindingSize || largest > device.limits.maxBufferSize)
+      throw new RangeError(`optical-gpu storage binding exceeds device limits (${largest} bytes)`);
     const self = new GpuOpticalComposite();Object.assign(self,{device,n,pigments,micro,width,stats:{layers:0,frames:0,readBytes:0}});
     device.pushErrorScope('validation');self.init();const error=await device.popErrorScope();if(error)throw new Error(error.message);return self;
   }

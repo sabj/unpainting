@@ -114,6 +114,8 @@ def live_clients():
             c = json.loads(f.read_text())
         except Exception:
             continue
+        if c.get("only") is not None and "pod" not in c["only"]:
+            continue
         if alive(int(c["pid"])):
             out.append((int(c["pid"]), int(c.get("sessions", 1)), c["commit"]))
     return out

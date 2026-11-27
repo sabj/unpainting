@@ -1,12 +1,13 @@
-// Native Fast approximates the tail of CLI ordinary drying with a larger timestep; flowing, leveling and
-// dry checks are unchanged. Transport and settling differ, so it is not pixel-equivalent.
+// Native Fast uses larger drying steps on both backends; it keeps the same transport and dry-admission rules.
+// The resulting transport/settling schedule differs from Full, so the two modes are not pixel-equivalent.
+import { DRY_TAIL_CHUNK_DT } from '../../src/media/time-chunks.mjs';
 export function nativePaintMode(mode = 'fast') {
   if (!['fast', 'full'].includes(mode)) throw Error('--mode takes fast or full');
   return {
     mode,
     approximate: mode === 'fast',
     approximation: mode === 'fast'
-      ? 'ordinary CLI dry uses dt >= 14 after leveling dt >= 140 below 3*wetEps, and analytic settlement below wetEps; quiet pore transport is approximated'
+      ? `ordinary CLI dry uses dt >= 14 after leveling, split into substeps no longer than ${DRY_TAIL_CHUNK_DT}; only pore-local evaporation finishes analytically, after the surface is gone and no pore can wick`
       : 'prior ordinary drying schedule unchanged',
     scope: 'paint-plate ordinary dry calls, including its calibration; other instrument APIs retain their schedules',
     wetFlow: 'unchanged',

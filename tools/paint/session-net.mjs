@@ -70,14 +70,16 @@ export function makeToolbox(python, { tmp = os.tmpdir(), pathNow = process.env.P
   let said; try { said = execFileSync(python, ['-c', PROBE], { encoding: 'utf8', timeout: 60000 }).trim(); } catch (e) { throw new Error(`the session's toolbox Python (${python}) lacks a library it must have (numpy, pillow, scipy, scikit-image, opencv): ${String(e.stderr || e.message).trim().split('\n').pop()}`); }
   const dir = fs.mkdtempSync(path.join(tmp, 'unpaint-toolbox-')), bin = path.join(dir, 'bin'); fs.mkdirSync(bin);
   const put = (name, body) => { fs.writeFileSync(path.join(bin, name), body); fs.chmodSync(path.join(bin, name), 0o755); };
-  for (const p of ['python3', 'python']) put(p, `#!/bin/sh\nfor a in "$@"; do case "$a" in pip|ensurepip) echo ${JSON.stringify(NO_INSTALL)} >&2; exit 1;; esac; done\nexec ${JSON.stringify(python)} "$@"\n`);
+  // Resolve any symlinked worktree .venv to its real venv dir so seatbelt (deny repo) never blocks exec, while keeping bin/python inside the venv so pyvenv.cfg activates it.
+  const venv = path.dirname(path.dirname(python)), realVenv = fs.realpathSync(venv), realPython = path.join(realVenv, path.relative(venv, python));
+  for (const p of ['python3', 'python']) put(p, `#!/bin/sh\nfor a in "$@"; do case "$a" in pip|ensurepip) echo ${JSON.stringify(NO_INSTALL)} >&2; exit 1;; esac; done\nexec ${JSON.stringify(realPython)} "$@"\n`);
   for (const i of INSTALLERS) put(i, `#!/bin/sh\necho ${JSON.stringify(NO_INSTALL)} >&2\nexit 1\n`);
   // a shell started inside reads its start-up files from here, not the user's (whose own PATH would put other Pythons and npm first)
   const first = `# the session's toolbox first on PATH\nexport PATH=${JSON.stringify(bin)}:"$PATH"\n`;
   for (const f of ['.zshenv', '.zprofile', '.zshrc', 'bashenv']) fs.writeFileSync(path.join(dir, f), first);
   // what the Python reads to run: its venv, and the interpreter the venv stands on (its real place and the one pyvenv.cfg names)
-  const venv = path.dirname(path.dirname(python)), real = fs.realpathSync(python), cfg = (() => { try { return /^home\s*=\s*(.+)$/m.exec(fs.readFileSync(path.join(venv, 'pyvenv.cfg'), 'utf8'))?.[1].trim(); } catch { return null; } })();
-  const readable = [...new Set([dir, venv, fs.realpathSync(venv), path.dirname(path.dirname(real)), ...(cfg ? [path.dirname(cfg)] : [])])];
+  const real = fs.realpathSync(python), cfg = (() => { try { return /^home\s*=\s*(.+)$/m.exec(fs.readFileSync(path.join(realVenv, 'pyvenv.cfg'), 'utf8'))?.[1].trim(); } catch { return null; } })();
+  const readable = [...new Set([dir, venv, realVenv, path.dirname(path.dirname(real)), ...(cfg ? [path.dirname(cfg), ...(fs.existsSync(cfg) ? [path.dirname(fs.realpathSync(cfg))] : [])] : [])])];
   return { dir, bin, python, said, readable, env: { PATH: `${bin}:${pathNow}`, ZDOTDIR: dir, BASH_ENV: path.join(dir, 'bashenv'), ENV: path.join(dir, 'bashenv'), PIP_NO_INDEX: '1', PIP_DISABLE_PIP_VERSION_CHECK: '1', PYTHONNOUSERSITE: '1' } };
 }
 

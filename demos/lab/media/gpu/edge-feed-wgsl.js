@@ -17,17 +17,22 @@
 // almost nothing, and no box's sums change.
 export const EF_RMAX = 32;
 export const EF_BMAX = 256;
+export const EF_TAIL = 16 + EF_BMAX * (EF_RMAX + 1);
 // The host shader names its pigment list (`channel(a)` the a-th pigment worked on, `count` of them) and defines
 // efHalted(): true where a queued step must do nothing (the Lab's surface batches).
-export const edgeFeedWgsl = ({ channel = 'klAt', count = 'u.nAct' } = {}) => `
+export const edgeFeedWgsl = ({ channel = 'klAt', count = 'u.nAct', parallel = false } = {}) => `
 @group(0) @binding(45) var<storage, read> EFL: array<u32>;
 @group(0) @binding(46) var<storage, read> EFG: array<vec4<f32>>;
-@group(0) @binding(47) var<storage, read_write> EFS: array<vec4<f32>>;   // W0, rho, unmet demand, evaporated by the feed
+// Scalar struct members are separate memory locations; apply writes z/w while neighbours read x/y.
+// Keep the existing 16-byte state/readback layout and storage-binding count in the painter and Lab.
+struct EfState { x: f32, y: f32, z: f32, w: f32 }
+@group(0) @binding(47) var<storage, read_write> EFS: array<EfState>;   // W0, rho, unmet demand, evaporated by the feed
 @group(0) @binding(48) var<storage, read_write> EFC: array<f32>;         // each pigment's concentration at the substep's start
 @group(0) @binding(49) var<storage, read_write> EFB: array<atomic<u32>>;
 @group(0) @binding(50) var<storage, read_write> EFP: array<u32>;         // what the host reads to make the geometry: 4 bits a cell
 override ROUND: u32 = 0u;
 const EF_RMAX: u32 = ${EF_RMAX}u;
+const EF_TAIL: u32 = ${EF_TAIL}u;
 fn efBox(b: u32) -> u32 { return 16u + b * (EF_RMAX + 1u); }
 // the box's time left at the start of round r, as edgeFeed's loop spends it
 fn efRemaining(b: u32, r: u32) -> f32 {
@@ -63,33 +68,42 @@ fn ef_begin(@builtin(global_invocation_id) gid: vec3<u32>) {
   if (W[i] > 0.0) { atomicOr(&EFB[efBox(b)], 1u); }
   efCandidate(i, b, 0u, W[i]);
 }
-@compute @workgroup_size(256)
-fn ef_prep(@builtin(global_invocation_id) gid: vec3<u32>) {
-  let q = gid.x; if (q >= EFL[0] || efLate(ROUND) || efHalted()) { return; }
+fn efPrepCell(q: u32, r: u32) {
   let i = EFL[1u + 2u * q]; let b = EFL[2u + 2u * q];
-  if (!efActive(b, ROUND)) { return; }
-  atomicMax(&EFB[3], ROUND + 1u);
-  let sub = efSub(b, ROUND);
-  if (q == 0u && ROUND + 1u == atomicLoad(&EFB[1])) {
+  if (!efActive(b, r)) { return; }
+  atomicMax(&EFB[3], r + 1u);
+  let sub = efSub(b, r);
+  if (q == 0u && r + 1u == atomicLoad(&EFB[1])) {
     for (var bb = 0u; bb < atomicLoad(&EFB[0]); bb++) {
-      if (efActive(bb, ROUND) && bitcast<f32>(atomicLoad(&EFB[efBox(bb) + 1u + ROUND])) < efRemaining(bb, ROUND)) { atomicAdd(&EFB[2], 1u); }
+      if (efActive(bb, r) && bitcast<f32>(atomicLoad(&EFB[efBox(bb) + 1u + r])) < efRemaining(bb, r)) { atomicAdd(&EFB[2], 1u); }
     }
   }
+  efPrep(i, sub);
+}
+fn efPrep(i: u32, sub: f32) {
   let w0 = W[i]; let dem = EFG[i].w;
   var s = EFS[i];
   s.x = w0; s.y = select(1.0, min(1.0, 0.5 * w0 / (sub * dem)), dem > 0.0);
   EFS[i] = s;
-  for (var ka = 0u; ka < u.nAct; ka++) {
-    let k = klAt(ka);
-    EFC[k * u.n + i] = select(0.0, G[k * u.n + i] / w0, w0 > 1e-12);
+  // Only outgoing donors can supply pigment. Tiny-water donors retain zero concentration,
+  // guarded below, so their stale EFC entries are never read.
+  if (w0 > 1e-12 && dem > 0.0) {
+    for (var ka = 0u; ka < u.nAct; ka++) {
+      let k = klAt(ka);
+      EFC[k * u.n + i] = G[k * u.n + i] / w0;
+    }
   }
 }
-@compute @workgroup_size(256)
-fn ef_apply(@builtin(global_invocation_id) gid: vec3<u32>) {
-  let q = gid.x; if (q >= EFL[0] || efLate(ROUND) || efHalted()) { return; }
+fn efApplyCell(q: u32, r: u32) {
   let i = EFL[1u + 2u * q]; let b = EFL[2u + 2u * q];
-  if (!efActive(b, ROUND)) { return; }
-  let sub = efSub(b, ROUND);
+  if (!efActive(b, r)) { return; }
+  let total = atomicLoad(&EFB[1]);
+  let rem = efRemaining(b, r);
+  let sub = select(min(rem, bitcast<f32>(atomicLoad(&EFB[efBox(b) + 1u + r]))), rem, r + 1u >= total);
+  let wn = efApply(i, sub);
+  if (r + 1u < total && rem - sub > 1e-12) { efCandidate(i, b, r + 1u, wn); }
+}
+fn efApply(i: u32, sub: f32) -> f32 {
   let x = i % u.w;
   // the four faces: neighbour, flux from this cell towards it; the flux of a face is stored at its -x / -y cell
   var nbr = array<u32, 4>(0u, 0u, 0u, 0u);
@@ -113,7 +127,7 @@ fn ef_apply(@builtin(global_invocation_id) gid: vec3<u32>) {
   }
   for (var ka = 0u; ka < u.nAct; ka++) {
     let k = klAt(ka); var cout = 0.0;
-    for (var e = 0u; e < 4u; e++) { if (vol[e] != 0.0) { cout = cout + vol[e] * EFC[k * u.n + src[e]]; } }
+    for (var e = 0u; e < 4u; e++) { if (vol[e] != 0.0 && EFS[src[e]].x > 1e-12) { cout = cout + vol[e] * EFC[k * u.n + src[e]]; } }
     if (cout != 0.0) { let p = k * u.n + i; G[p] = max(0.0, G[p] + cout); }
   }
   let water = max(0.0, own.x + inner);
@@ -122,20 +136,100 @@ fn ef_apply(@builtin(global_invocation_id) gid: vec3<u32>) {
   let wn = water - ev;
   W[i] = wn;
   if (wn > 0.0) { M[i] = 1u; }
-  EFS[i] = vec4<f32>(own.x, own.y, pending, own.w + (water - wn));
-  if (ROUND + 1u < atomicLoad(&EFB[1])) { efCandidate(i, b, ROUND + 1u, wn); }
+  EFS[i].z = pending;
+  EFS[i].w = own.w + (water - wn);
+  return wn;
+}
+@compute @workgroup_size(256)
+fn ef_prep(@builtin(global_invocation_id) gid: vec3<u32>) {
+  let q = gid.x; if (q >= EFL[0] || efLate(ROUND) || efHalted()) { return; }
+  efPrepCell(q, ROUND);
+}
+@compute @workgroup_size(256)
+fn ef_apply(@builtin(global_invocation_id) gid: vec3<u32>) {
+  let q = gid.x; if (q >= EFL[0] || efLate(ROUND) || efHalted()) { return; }
+  efApplyCell(q, ROUND);
+}
+// Finish any remaining edge-feed rounds beyond the host's parallel budget in this same step.
+// One workgroup checks whether any box still has time left; if not, it returns immediately with zero cell work.
+var<workgroup> efMore: u32;
+var<workgroup> efTotal: u32;
+var<workgroup> efCnt: u32;
+@compute @workgroup_size(256)
+fn ef_continue(@builtin(local_invocation_index) li: u32) {
+  if (li == 0u) {
+    efTotal = select(atomicLoad(&EFB[1]), 0u, efHalted());
+    efCnt = EFL[0];
+  }
+  let total = workgroupUniformLoad(&efTotal);
+  let count = workgroupUniformLoad(&efCnt);
+  if (count == 0u) { return; }
+  for (var r = ROUND; r < total; r++) {
+    if (li == 0u) {
+      var any = 0u;
+      let nb = atomicLoad(&EFB[0]);
+      for (var bb = 0u; bb < nb; bb++) { if (efActive(bb, r)) { any = 1u; break; } }
+      efMore = any;
+    }
+    if (workgroupUniformLoad(&efMore) == 0u) { break; }
+    for (var q = li; q < count; q += 256u) { efPrepCell(q, r); }
+    storageBarrier(); workgroupBarrier();
+    for (var q = li; q < count; q += 256u) { efApplyCell(q, r); }
+    storageBarrier(); workgroupBarrier();
+  }
+}
+// Run reset, begin and all active rounds in one workgroup dispatch when the edge-feed cell list is compact.
+// Keeps W, G, EFG, EFS and EFB resident in L1/L2 and collapses up to 66 dispatches into 1 with identical arithmetic.
+@compute @workgroup_size(256)
+fn ef_small(@builtin(local_invocation_index) li: u32) {
+  if (li == 0u) {
+    let halted = efHalted();
+    efTotal = select(atomicLoad(&EFB[1]), 0u, halted);
+    efCnt = select(EFL[0], 0u, halted);
+    if (!halted) { atomicStore(&EFB[15], 0u); }
+  }
+  let total = workgroupUniformLoad(&efTotal);
+  let count = workgroupUniformLoad(&efCnt);
+  if (count == 0u) { return; }
+  let words = atomicLoad(&EFB[0]) * (EF_RMAX + 1u);
+  for (var q = li; q < words; q += 256u) { atomicStore(&EFB[16u + q], select(0x7f800000u, 0u, q % (EF_RMAX + 1u) == 0u)); }
+  storageBarrier(); workgroupBarrier();
+  for (var q = li; q < count; q += 256u) {
+    let i = EFL[1u + 2u * q]; let b = EFL[2u + 2u * q];
+    if (W[i] > 0.0) { atomicOr(&EFB[efBox(b)], 1u); }
+    efCandidate(i, b, 0u, W[i]);
+  }
+  storageBarrier(); workgroupBarrier();
+  for (var r = 0u; r < total; r++) {
+    if (li == 0u) {
+      var any = 0u;
+      let nb = atomicLoad(&EFB[0]);
+      for (var bb = 0u; bb < nb; bb++) { if (efActive(bb, r)) { any = 1u; break; } }
+      efMore = any;
+    }
+    if (workgroupUniformLoad(&efMore) == 0u) { break; }
+    for (var q = li; q < count; q += 256u) { efPrepCell(q, r); }
+    storageBarrier(); workgroupBarrier();
+    for (var q = li; q < count; q += 256u) { efApplyCell(q, r); }
+    storageBarrier(); workgroupBarrier();
+  }
 }
 // (gathered in the workgroup first, then one global atomic a workgroup: the same counts and bounds, without every wet
 // cell of the sheet contending for the same five words)
-var<workgroup> efWa: array<atomic<u32>, 5>;
+var<workgroup> efWa: array<atomic<u32>, 6>;
 @compute @workgroup_size(256)
 fn ef_watch(@builtin(global_invocation_id) gid: vec3<u32>, @builtin(local_invocation_index) li: u32) {
-  if (li == 0u) { atomicStore(&efWa[0], 0u); atomicStore(&efWa[1], 0xffffffffu); atomicStore(&efWa[2], 0xffffffffu); atomicStore(&efWa[3], 0u); atomicStore(&efWa[4], 0u); }
+  if (li == 0u) { atomicStore(&efWa[0], 0u); atomicStore(&efWa[1], 0xffffffffu); atomicStore(&efWa[2], 0xffffffffu); atomicStore(&efWa[3], 0u); atomicStore(&efWa[4], 0u); atomicStore(&efWa[5], 0u); }
   workgroupBarrier();
   let i = gid.x;
   if (i < u.n && !efHalted()) {
-    if (M[i] == 1u || EVER[i] == 1u) { atomicAdd(&efWa[0], 1u); }
-    if (M[i] == 1u || S[i] > 0.02 * PAPER[i].x) {
+    let inFoot = M[i] == 1u || EVER[i] == 1u;
+    let isDamp = M[i] == 1u || S[i] > 0.02 * PAPER[i].x;
+    if (inFoot) {
+      atomicAdd(&efWa[0], 1u);
+      if (isDamp) { atomicAdd(&efWa[5], 1u); }
+    }
+    if (isDamp) {
       let x = i % u.w; let y = i / u.w;
       atomicMin(&efWa[1], x); atomicMin(&efWa[2], y); atomicMax(&efWa[3], x); atomicMax(&efWa[4], y);
     }
@@ -143,6 +237,9 @@ fn ef_watch(@builtin(global_invocation_id) gid: vec3<u32>, @builtin(local_invoca
   workgroupBarrier();
   if (li == 0u) {
     let c = atomicLoad(&efWa[0]); if (c > 0u) { atomicAdd(&EFB[5], c); }
+    if (arrayLength(&EFB) >= EF_TAIL + 3u) {
+      let fd = atomicLoad(&efWa[5]); if (fd > 0u) { atomicAdd(&EFB[EF_TAIL + 1u], fd); }
+    }
     if (atomicLoad(&efWa[1]) != 0xffffffffu) {
       atomicMin(&EFB[6], atomicLoad(&efWa[1])); atomicMin(&EFB[7], atomicLoad(&efWa[2])); atomicMax(&EFB[8], atomicLoad(&efWa[3])); atomicMax(&EFB[9], atomicLoad(&efWa[4]));
     }
@@ -169,8 +266,121 @@ fn ef_pack(@builtin(global_invocation_id) gid: vec3<u32>) {
 fn ef_watch_end() {
   if (efHalted()) { return; }
   var moved = false;
-  for (var k = 0u; k < 5u; k++) { if (atomicLoad(&EFB[5u + k]) != atomicLoad(&EFB[10u + k])) { moved = true; } }
+  let hasTail = arrayLength(&EFB) >= EF_TAIL + 3u;
+  if (hasTail && atomicLoad(&EFB[EF_TAIL]) == 1u) {
+    if (atomicLoad(&EFB[5]) != atomicLoad(&EFB[10]) || atomicLoad(&EFB[EF_TAIL + 1u]) != atomicLoad(&EFB[EF_TAIL + 2u])) { moved = true; }
+  } else {
+    for (var k = 0u; k < 5u; k++) { if (atomicLoad(&EFB[5u + k]) != atomicLoad(&EFB[10u + k])) { moved = true; } }
+  }
   if (moved) { atomicStore(&EFB[4], 1u); }
   atomicStore(&EFB[5], 0u); atomicStore(&EFB[6], 0xffffffffu); atomicStore(&EFB[7], 0xffffffffu); atomicStore(&EFB[8], 0u); atomicStore(&EFB[9], 0u);
+  if (hasTail) { atomicStore(&EFB[EF_TAIL + 1u], 0u); }
 }
+${parallel ? edgeParallelWgsl : ''}
 `.replaceAll('klAt(', `${channel}(`).replaceAll('u.nAct', count);
+
+// Painter-only parallel schedule. The default shader keeps the Lab's buffers and entry points unchanged.
+// EF_META caches a box's remaining time/substep once per round; EF_ARGS is never bound by its indirect consumers.
+const edgeParallelWgsl = `
+@group(0) @binding(60) var<storage, read_write> EF_META: array<vec4<f32>>;
+@group(0) @binding(61) var<storage, read_write> EF_ARGS: array<u32>;
+var<workgroup> efMin: array<atomic<u32>, ${EF_BMAX}>;
+var<workgroup> efWet: array<atomic<u32>, ${EF_BMAX}>;
+var<workgroup> efAny: atomic<u32>;
+fn efLocalReset(li: u32) {
+  atomicStore(&efMin[li], 0x7f800000u); atomicStore(&efWet[li], 0u);
+  if (li == 0u) { atomicStore(&efAny, 0u); }
+  workgroupBarrier();
+}
+fn efLocalCandidate(i: u32, b: u32, water: f32) {
+  let g = EFG[i]; let rate = g.w + g.x;
+  if (rate > 0.0 && water > 2.0 * u.wetEps) {
+    atomicMin(&efMin[b], bitcast<u32>(0.5 * water / rate));
+    atomicOr(&efAny, 1u);
+  }
+}
+fn efPublish(li: u32, r: u32) {
+  workgroupBarrier();
+  if (li < atomicLoad(&EFB[0])) {
+    let candidate = atomicLoad(&efMin[li]);
+    if (candidate != 0x7f800000u) { atomicMin(&EFB[efBox(li) + 1u + r], candidate); }
+  }
+  if (li == 0u && atomicLoad(&efAny) != 0u && r > 0u) { atomicMax(&EFB[15], r); }
+}
+@compute @workgroup_size(256)
+fn ef_begin_parallel(@builtin(global_invocation_id) gid: vec3<u32>, @builtin(local_invocation_index) li: u32) {
+  efLocalReset(li);
+  let q = gid.x;
+  if (q < EFL[0] && !efHalted()) {
+    let i = EFL[1u + 2u * q]; let b = EFL[2u + 2u * q];
+    if (W[i] > 0.0) { atomicOr(&efWet[b], 1u); }
+    efLocalCandidate(i, b, W[i]);
+  }
+  efPublish(li, 0u);
+  if (li < atomicLoad(&EFB[0]) && atomicLoad(&efWet[li]) != 0u) { atomicOr(&EFB[efBox(li)], 1u); }
+}
+@compute @workgroup_size(256)
+fn ef_round_prep(@builtin(local_invocation_index) li: u32) {
+  if (li == 0u) { atomicStore(&efAny, 0u); }
+  workgroupBarrier();
+  if (li < atomicLoad(&EFB[0])) {
+    let rem = efRemaining(li, ROUND);
+    let go = !efHalted() && atomicLoad(&EFB[efBox(li)]) != 0u && rem > 1e-12;
+    var sub = 0.0;
+    if (go) {
+      sub = efSub(li, ROUND);
+      atomicOr(&efAny, 1u);
+      atomicMax(&EFB[3], ROUND + 1u);
+      if (ROUND + 1u == atomicLoad(&EFB[1]) && bitcast<f32>(atomicLoad(&EFB[efBox(li) + 1u + ROUND])) < rem) { atomicAdd(&EFB[2], 1u); }
+    }
+    EF_META[li] = vec4<f32>(rem, sub, select(0.0, 1.0, go), 0.0);
+  }
+  workgroupBarrier();
+  if (li == 0u) {
+    EF_ARGS[0] = select(0u, (EFL[0] + 255u) / 256u, atomicLoad(&efAny) != 0u);
+    EF_ARGS[1] = 1u; EF_ARGS[2] = 1u;
+  }
+}
+// Cache the immutable start-of-round box state in each workgroup. Preparing
+// these few boxes alongside the cells removes a separate dispatch per round;
+// no workgroup depends on another one's metadata writes.
+var<workgroup> efRoundMeta: array<vec4<f32>, ${EF_BMAX}>;
+fn efLoadRound(li: u32) -> bool {
+  if (li == 0u) { efMore = select(0u, 1u, !efLate(ROUND) && !efHalted()); }
+  if (workgroupUniformLoad(&efMore) == 0u) { return false; }
+  if (li < atomicLoad(&EFB[0])) {
+    let rem = efRemaining(li, ROUND);
+    let go = atomicLoad(&EFB[efBox(li)]) != 0u && rem > 1e-12;
+    var sub = 0.0;
+    if (go) { sub = efSub(li, ROUND); }
+    efRoundMeta[li] = vec4<f32>(rem, sub, select(0.0, 1.0, go), 0.0);
+  }
+  workgroupBarrier();
+  return true;
+}
+@compute @workgroup_size(256)
+fn ef_prep_parallel(@builtin(global_invocation_id) gid: vec3<u32>, @builtin(local_invocation_index) li: u32) {
+  if (!efLoadRound(li)) { return; }
+  if (gid.x < atomicLoad(&EFB[0]) && efRoundMeta[li].z != 0.0) {
+    atomicMax(&EFB[3], ROUND + 1u);
+    if (ROUND + 1u == atomicLoad(&EFB[1]) && bitcast<f32>(atomicLoad(&EFB[efBox(li) + 1u + ROUND])) < efRoundMeta[li].x) { atomicAdd(&EFB[2], 1u); }
+  }
+  let q = gid.x; if (q >= EFL[0]) { return; }
+  let i = EFL[1u + 2u * q]; let m = efRoundMeta[EFL[2u + 2u * q]];
+  if (m.z != 0.0) { efPrep(i, m.y); }
+}
+@compute @workgroup_size(256)
+fn ef_apply_parallel(@builtin(global_invocation_id) gid: vec3<u32>, @builtin(local_invocation_index) li: u32) {
+  if (!efLoadRound(li)) { return; }
+  efLocalReset(li);
+  let q = gid.x;
+  if (q < EFL[0]) {
+    let i = EFL[1u + 2u * q]; let b = EFL[2u + 2u * q]; let m = efRoundMeta[b];
+    if (m.z != 0.0) {
+      let wn = efApply(i, m.y);
+      if (ROUND + 1u < atomicLoad(&EFB[1]) && m.x - m.y > 1e-12) { efLocalCandidate(i, b, wn); }
+    }
+  }
+  efPublish(li, ROUND + 1u);
+}
+`;

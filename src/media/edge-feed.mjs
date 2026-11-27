@@ -155,7 +155,10 @@ export function edgeFeed(sheet, o, box, mm) {
   }
   const nAct = active.length, wetFloor = 2 * (o.wetEps ?? 0.004);
   let remaining = dt, evaporated = 0;
+  // the water each face carried, for a pigment grid finer than this one (two-grids/flux-ledger.mjs); null when there is none
+  const FL = sheet._flux ?? null;
   while (remaining > 1e-12) {
+    FL?.film?.begin(box);
     let sub = remaining;
     for (let q = 0; q < n; q++) { const i = order[q], rate = dem[i] + ex[i]; if (rate > 0 && W[i] > wetFloor) sub = Math.min(sub, 0.5 * W[i] / rate); }
     // The last microlayer is no longer a source; faces are limited together
@@ -172,6 +175,7 @@ export function edgeFeed(sheet, o, box, mm) {
         const j = dir ? i + w : i + 1, donor = f > 0 ? i : j, receiver = f > 0 ? j : i, v = sub * Math.abs(f) * rho[donor];
         if (!(v > 0)) continue;
         inner[donor] -= v; inner[receiver] += v;
+        if (FL) { (dir ? FL.fy : FL.fx)[i] += f > 0 ? v : -v; FL.film?.face(i, dir, f > 0 ? v : -v); }
         const w0 = W0[donor], dl = lev[donor] - lev[receiver];
         for (let a = 0; a < nAct; a++) {
           const k = active[a], ck = cout[k], g = w0 > 1e-12 ? v * G[k][donor] / w0 : 0;
@@ -192,6 +196,7 @@ export function edgeFeed(sheet, o, box, mm) {
       if (W[i] > 0) M[i] = 1;
       for (let a = 0; a < nAct; a++) { const k = active[a]; G[k][i] = Math.max(0, G[k][i] + cout[k][i]); }
     }
+    FL?.film?.end();
     remaining -= sub;
   }
   for (let q = 0; q < n; q++) lev[order[q]] = 0;

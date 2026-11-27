@@ -70,7 +70,7 @@ function rounded(points, soft, legMm) {
  * @param soft (inside cell, outside cell or -1 off the sheet) => true when that boundary is a soft one
  * @returns Array<{points: number[][], soft: boolean[]}> soft[q] is for the segment from points[q] to the next point
  */
-export function outlineLoops(ids, id, box, w, h, { cellMm, tolMm, soft = () => false }) {
+export function outlineLoops(ids, id, box, w, h, { cellMm, tolMm, soft = () => false, xOff = 0, yOff = 0 }) {
   const W = w + 1, from = [], to = [], flag = [], next = new Map();
   const add = (a, b, f) => { const e = from.length; from.push(a); to.push(b); flag.push(f ? 1 : 0); const l = next.get(a); if (l) l.push(e); else next.set(a, [e]); };
   for (let y = box.y0; y <= box.y1; y++) for (let x = box.x0; x <= box.x1; x++) {
@@ -87,7 +87,7 @@ export function outlineLoops(ids, id, box, w, h, { cellMm, tolMm, soft = () => f
     if (used[e0]) continue;
     const chain = []; let e = e0;
     for (;;) { used[e] = 1; chain.push(e); const l = next.get(to[e]); let nx = -1; for (const c of l) if (!used[c]) { nx = c; break; } if (nx < 0) break; e = nx; }
-    const pts = chain.map(c => [(from[c] % W) * cellMm, Math.floor(from[c] / W) * cellMm]), kept = simplify(pts, tolMm);
+    const pts = chain.map(c => [((from[c] % W) + xOff) * cellMm, (Math.floor(from[c] / W) + yOff) * cellMm]), kept = simplify(pts, tolMm);
     if (kept.length < 3) continue;
     const softs = kept.map((a, q) => { const b = q + 1 < kept.length ? kept[q + 1] : pts.length; let s = 0; for (let c = a; c < b; c++) s += flag[chain[c]]; return s * 2 > b - a; });
     const curve = rounded(kept.map(i => pts[i]), softs, 4 * tolMm);
@@ -111,11 +111,43 @@ export const washStrokeHold = round => (round ? false : 'sweep');
  */
 export function loopsMask(loops, w, h, mm) {
   const mask = new Uint8Array(w * h);
-  for (let y = 0; y < h; y++) {
-    const py = (y + .5) * mm, xs = [];
-    for (const { points: P } of loops) for (let q = 0, m = P.length; q < m; q++) { const a = P[q], b = P[(q + 1) % m]; if ((a[1] <= py) !== (b[1] <= py)) xs.push(a[0] + (py - a[1]) * (b[0] - a[0]) / (b[1] - a[1])); }
+  if (!loops.length) return mask;
+  let allY0 = Infinity, allY1 = -Infinity;
+  const spans = new Array(loops.length);
+  for (let k = 0; k < loops.length; k++) {
+    const P = loops[k].points;
+    let ly0 = Infinity, ly1 = -Infinity;
+    for (let q = 0; q < P.length; q++) {
+      const py = P[q][1];
+      if (py < ly0) ly0 = py;
+      if (py > ly1) ly1 = py;
+    }
+    spans[k] = [ly0, ly1];
+    if (ly0 < allY0) allY0 = ly0;
+    if (ly1 > allY1) allY1 = ly1;
+  }
+  if (!(allY1 >= allY0)) return mask;
+  const yStart = Math.max(0, Math.floor(allY0 / mm - 0.5));
+  const yEnd = Math.min(h - 1, Math.ceil(allY1 / mm - 0.5));
+  const xs = [];
+  for (let y = yStart; y <= yEnd; y++) {
+    const py = (y + .5) * mm;
+    xs.length = 0;
+    for (let k = 0; k < loops.length; k++) {
+      const [ly0, ly1] = spans[k];
+      if (py < ly0 || py > ly1) continue;
+      const P = loops[k].points;
+      for (let q = 0, m = P.length; q < m; q++) {
+        const a = P[q], b = P[q + 1 < m ? q + 1 : 0];
+        if ((a[1] <= py) !== (b[1] <= py)) xs.push(a[0] + (py - a[1]) * (b[0] - a[0]) / (b[1] - a[1]));
+      }
+    }
+    if (xs.length < 2) continue;
     xs.sort((a, b) => a - b);
-    for (let q = 0; q + 1 < xs.length; q += 2) for (let x = Math.max(0, Math.ceil(xs[q] / mm - .5)), e = Math.min(w - 1, Math.ceil(xs[q + 1] / mm - .5) - 1); x <= e; x++) mask[y * w + x] = 1;
+    const row = y * w;
+    for (let q = 0; q + 1 < xs.length; q += 2) {
+      for (let x = Math.max(0, Math.ceil(xs[q] / mm - .5)), e = Math.min(w - 1, Math.ceil(xs[q + 1] / mm - .5) - 1); x <= e; x++) mask[row + x] = 1;
+    }
   }
   return mask;
 }

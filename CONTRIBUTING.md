@@ -9,6 +9,8 @@ npm run bench:test    # the scorer and the benchmark's records
 npx knip              # unused code
 ```
 
+On a shared machine, `npm test -- --test-concurrency=2` and `npm run bench:test -- --test-concurrency=2` limit each suite to two test workers. Run the suites in turn. Extra Node test options are passed before the file patterns so Node applies them.
+
 - The painter refuses to paint from uncommitted changes. Commit first, or pass `--allowdirty 1` for a scratch run, which is recorded as dirty.
 - No new default-off flags: a painting change is proven and on, or it stays on a branch. `npm test` checks painter options against `src/paint/option-ledger.json`. Never add names to that file; remove a name when its option is deleted.
 - A pipeline change updates [how it paints](docs/how-it-paints.md) in the same pull request.

@@ -19,6 +19,26 @@ const SEG_PROBE = [
 
 const MIN_DISK_BYTES = 20 * 1024 ** 3;
 
+// sketch-map.py uses HF_HOME and the default main revision. An empty cache, a
+// missing weight or a broken download must not pass a release preflight.
+function lineModelWeights(root) {
+  const cache = path.join(root, "work/line-models/hf");
+  const repo = path.join(cache, "hub/models--lllyasviel--Annotators");
+  let revision = null;
+  try {
+    const ref = fs.readFileSync(path.join(repo, "refs/main"), "utf8").trim();
+    if (/^[a-f0-9]{40}$/i.test(ref)) revision = ref;
+  } catch { /* no cached main revision */ }
+  const missing = ["sk_model.pth", "sk_model2.pth"].filter(name => {
+    if (!revision) return true;
+    try {
+      const stat = fs.statSync(path.join(repo, "snapshots", revision, name));
+      return !stat.isFile() || stat.size === 0;
+    } catch { return true; }
+  });
+  return { cache, revision, missing, ready: missing.length === 0 };
+}
+
 function probeSegPython(python, run) {
   if (!python) return { ready: false, path: null, error: "no segmentation python found" };
   const r = run(python, ["-c", SEG_PROBE], { encoding: "utf8", timeout: 60000 });
@@ -66,13 +86,17 @@ export function runDoctor({
   const freeGiB = +(freeBytes / 1024 ** 3).toFixed(2);
   const diskOk = freeBytes >= MIN_DISK_BYTES;
 
-  // the line models (torch, controlnet_aux) were the removed line extraction's (0.4); nothing here asks for them
+  // The ordinary painter accepts prepared drawings; release comparisons also
+  // require the optional lineart tools and their already-cached weights (AGENTS.md).
+  const models = strictModels ? { packages: lp.model, ...lineModelWeights(root) } : null;
   const warnings = [];
   const failures = [];
   if (!gitOk) failures.push(!code.git ? "git metadata missing" : `working tree is dirty (${code.tracked.length} tracked, ${code.untracked.length} untracked)`);
   if (!lineOk) failures.push(lp.fallback ? `line python fell back (${lp.fallback})` : !lp.ready ? `line python missing numpy/opencv (${lp.error ?? "not ready"})` : "line python missing scikit-image");
   if (!seg.ready) failures.push(`seg python not ready (${seg.error ?? "missing packages"})`);
   if (!samOk) failures.push("SAM checkpoint sam_vit_b_01ec64.pth missing");
+  if (models && !models.packages) failures.push("lineart python missing torch or controlnet_aux");
+  if (models && !models.ready) failures.push(`lineart weights missing or empty: ${models.missing.join(", ")} (work/line-models/hf; cached main revision required)`);
   if (!diskOk) failures.push(`free disk ${freeGiB} GiB is below 20 GiB floor`);
 
   return {
@@ -84,6 +108,7 @@ export function runDoctor({
       linePython: { ok: lineOk, path: lp.path, from: lp.from, python: lp.python, numpy: lp.numpy, opencv: lp.opencv, scikitImage: lp["scikit-image"] },
       segPython: { ok: seg.ready, ...seg },
       samCheckpoint: { ok: samOk, path: samPath },
+      ...(models ? { lineModels: { ok: models.packages && models.ready, ...models } } : {}),
       disk: { ok: diskOk, freeGiB, floorGiB: 20 },
     },
   };

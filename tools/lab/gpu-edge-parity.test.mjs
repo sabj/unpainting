@@ -24,7 +24,7 @@ const worst = (a, b) => { let m = 0; for (let i = 0; i < a.length; i++) m = Math
 // Dawn's instance and adapter must stay reachable or the GC frees them under the running device (the CLI keeps them the same way)
 const KEEP = [];
 async function device() {
-  try { const w = await import('webgpu'); Object.assign(globalThis, w.globals); const gpu = w.create([]); KEEP.push(gpu); const o = await openDevice(gpu); KEEP.push(o.adapter); return o.device; } catch { return null; }
+  try { const w = await import('webgpu'); Object.assign(globalThis, w.globals); const gpu = w.create([]); KEEP.push(gpu); const o = await openDevice(gpu); KEEP.push(o.adapter); return o.device; } catch (e) { if (process.env.GPU_REQUIRED === '1') throw e; return null; }
 }
 async function runGpu(dev, opts, mm) {
   const sheet = blob(mm), g = await GpuSheet.create(dev, PIGMENTS, { ...DEFAULTS, ...opts });
@@ -46,4 +46,57 @@ for (const mm of [0.3, 0.1]) for (const [name, opts] of cases) test(`the lab Web
   assert.ok(pig < 2e-3, `GPU and CPU pigment differ by ${pig}`);
   if (opts.edgeEvap) assert.ok(worst(cpu.edgePending ?? [0], gpu.edgePending ?? [0]) < 1e-4, 'unmet edge demand');
   dev.destroy();
+});
+
+
+test('the Lab keeps deposited grains still below the connected-film threshold, as the CPU does', async t => {
+  const dev = await device(); if (!dev) return t.skip('no WebGPU adapter');
+  const opts = { ...DEFAULTS, mmPerCell: .3, edgeEvap: 0, evap: 0, absorb: 0, paperDry: 0,
+    capRate: 0, slope: 0, level: 0, invade: 0, spill: 0, diffuse: 0, settle: 0, lift: 0,
+    rewetLift: 0, scour: 10, slide: 1, slideCap: 1 };
+  const make = () => {
+    const s = createSheet(makePaper(48, 40, { seed: 9, mmPerCell: .3 }), PIGMENTS);
+    for (let y = 5; y < 35; y++) for (let x = 5; x < 43; x++) {
+      const i = y * s.w + x; deposit(s, i, x < 24 ? .025 : .012, [0]);
+      s.D[0][i] = .1 + .08 * ((x + y) % 2);
+    }
+    return s;
+  };
+  const cpu = make(), gpu = make(), original = cpu.D[0].slice();
+  const g = await GpuSheet.create(dev, PIGMENTS, opts);
+  try {
+    for (let i = 0; i < 8; i++) step(cpu, opts);
+    g.attach(gpu); g.setOptions(opts); await g.advance(8); await g.download(gpu);
+    assert.equal(worst(cpu.D[0], original), 0, 'the CPU grain cannot roll in disconnected water');
+    assert.equal(worst(gpu.D[0], original), 0, 'the GPU grain cannot roll or scour in disconnected water');
+    assert.equal(gpu.G[0].reduce((a, b) => a + b, 0), 0, 'flow alone cannot lift the disconnected bed');
+    assert.ok(worst(cpu.W, gpu.W) < 2e-6, 'the physical water flow still runs');
+  } finally { g.destroy(); dev.destroy(); }
+});
+
+
+test('the Lab exchanges and sorts mixed grains in a connected pool with the CPU rates and donor caps', async t => {
+  const dev = await device(); if (!dev) return t.skip('no WebGPU adapter');
+  const pigments = [PIGMENTS[0], { ...PIGMENTS[0], rho: .047, omega: .5, gamma: .85, floc: .3 }];
+  const opts = { ...DEFAULTS, mmPerCell: .25, edgeEvap: 0, evap: 0, absorb: 0, paperDry: 0,
+    capRate: 0, slope: 0, level: 0, invade: 0, spill: 0, slideCap: 1 };
+  const make = () => {
+    const s = createSheet(makePaper(48, 40, { seed: 9, mmPerCell: .25 }), pigments);
+    for (let y = 5; y < 35; y++) for (let x = 5; x < 43; x++) {
+      const i = y * s.w + x, water = x < 24 ? .08 : .2;
+      deposit(s, i, water, [.8 * water, .2 * water]); s.D[0][i] = .02; s.D[1][i] = .03;
+    }
+    return s;
+  };
+  const cpu = make(), gpu = make(), original = cpu.D[1].slice();
+  const mass = s => s.G.map((_, k) => s.G[k].reduce((a, b) => a + b, 0) + s.P[k].reduce((a, b) => a + b, 0) + s.D[k].reduce((a, b) => a + b, 0));
+  const before = mass(cpu), g = await GpuSheet.create(dev, pigments, opts);
+  try {
+    for (let i = 0; i < 12; i++) step(cpu, opts);
+    g.attach(gpu); g.setOptions(opts); await g.advance(12); await g.download(gpu);
+    assert.ok(worst(cpu.D[1], original) > .001, 'the wet grains actually settled or moved');
+    assert.ok(worst(cpu.W, gpu.W) < 2e-4);
+    for (const key of ['G', 'P', 'D']) for (let k = 0; k < 2; k++) assert.ok(worst(cpu[key][k], gpu[key][k]) < 2e-4, `${key}[${k}]`);
+    for (const s of [cpu, gpu]) for (const [k, value] of mass(s).entries()) assert.ok(Math.abs(value / before[k] - 1) < 1e-5);
+  } finally { g.destroy(); dev.destroy(); }
 });

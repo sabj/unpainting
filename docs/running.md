@@ -33,6 +33,8 @@ A painting needs the picture, a line drawing file and one or more studies. A stu
 
 The painter first splits the picture into regions. This needs a model called SAM and its Python ([setup](../tools/seg/README.md#segmentation)). `npm run doctor` says what is missing. That Python also runs the benchmark's scorer: `export BENCH_SCORE_PYTHON=$PWD/.venv-seg/bin/python`. The painter refuses to paint from uncommitted source changes unless `--allowdirty 1`.
 
+Before release or benchmark comparisons, run `npm run doctor -- --strict` ([comparison rules](../AGENTS.md#release-and-benchmark-comparisons)). It also requires the line Python's `torch` and `controlnet_aux` packages and both lineart weights (`sk_model.pth`, `sk_model2.pth`) in the cached main revision under `work/line-models/hf`. This check reads local files and never downloads models.
+
 - `--drawingfile STEM`: the lines, drawn as they are. Without it no line is drawn. `--inkrecipe wash` draws them in pen; the default is pencil ([ink](ink.md)).
 - `--washplan STUDY.png[:MIN[:glaze]],...`: the studies, coarse to fine. `MIN` is the smallest shape in mm² that study lays; each later study adds only what is darker.
 - `--width` is the sheet's width in cells, the small squares the simulator tracks. It cannot be more than the picture's width in pixels. `--sheetmm` is the sheet's width in millimetres. The default sheet is a 6 × 4 inch postcard.

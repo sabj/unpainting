@@ -18,6 +18,7 @@ import './plate/load-order.mjs';
 import {fileURLToPath} from 'node:url';
 import {createJSONLWriter} from './painter/jsonl-writer.mjs';
 import {onCheckFailure} from '../src/media/checks.mjs';
+import {destroyAuxGpuDevice} from '../src/media/gpu/aux-device.mjs';
 
 import {setup} from './plate/setup.mjs';
 import {plan} from './plate/plan.mjs';
@@ -50,6 +51,7 @@ try {
   await finish(ctx);
 } finally {
   try { ctx.sheet?._gpu?.close(); } catch {}
+  try { destroyAuxGpuDevice(); } catch {}
   JSONL.close();
   removeLogFailureHook();
   process.off('exit', JSONL.close);

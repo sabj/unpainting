@@ -20,6 +20,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { randomUUID } from 'node:crypto';
 import { execFileSync, spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { jobInputs, workerArgs, workerEnv, homePaths } from './render-ship.mjs';
@@ -75,22 +76,69 @@ export function daemonProcessAlive(dir, ps = pid => execFileSync('ps', ['-p', St
 /** The jobs the benchmark itself paints (cli.mjs: a session's looks, its final, a prepare). Any other kind (an
  * operator's replay or profile) goes after them: it takes a place only while no benchmark job waits for the same kind of
  * place, one at a time in the whole pool. */
-export const BENCHMARK_KINDS = new Set(['look', 'look stopped at a stage', 'painting']);
-export function claim(dir, slot, info, isAlive = alive) {
-  const f = path.join(dir, 'claims', `${slot}.json`); fs.mkdirSync(path.dirname(f), { recursive: true });
-  const held = readJson(f); if (held && !isAlive(held.pid)) fs.rmSync(f, { force: true });
-  if (!BENCHMARK_KINDS.has(info.kind)) {
-    // only a benchmark job waiting for the same kind of place (a pod, or this Mac and the mini) holds it back: a final
-    // waiting for a pod does not keep an operator's look off an idle mini
-    const w = path.join(dir, 'waiting'), waiting = (fs.existsSync(w) ? fs.readdirSync(w) : []).map(n => readJson(path.join(w, n))).filter(x => x && isAlive(x.pid));
-    const samePlace = x => POD_KINDS.has(x.kind) === POD_KINDS.has(info.kind);
-    if (waiting.some(x => BENCHMARK_KINDS.has(x.kind) && samePlace(x)) || Object.values(claims(dir, isAlive)).some(c => !BENCHMARK_KINDS.has(c.kind))) return false;
-  }
-  try { fs.writeFileSync(f, JSON.stringify({ ...info, pid: info.pid ?? process.pid, since: Date.now() }), { flag: 'wx' }); return true; } catch (e) { if (e.code === 'EEXIST') return false; throw e; }
+export const BENCHMARK_KINDS = new Set(['plan', 'look', 'look stopped at a stage', 'painting']);
+const jobPriority = w => {
+  const k = w.kind ?? 'look';
+  if (k === 'plan') return 1;
+  return BENCHMARK_KINDS.has(k) ? 0 : 2;
+};
+// A filesystem bakery lock serializes each slot's mutations without reaping a
+// mutable lock pathname. Every contender has an immutable unique directory;
+// dead contenders can be ignored/removed without deleting a successor's lock.
+// A missing ticket means its live owner is still choosing and must be waited for.
+function withClaimLock(dir, slot, change) {
+  const f = path.join(dir, 'claims', `${slot}.json`), locks = f + '.locks';
+  fs.mkdirSync(locks, { recursive: true });
+  const id = `${process.pid}-${randomUUID()}`, mine = path.join(locks, id);
+  fs.mkdirSync(mine);
+  const contenders = () => fs.readdirSync(locks).filter(n => {
+    if (n === id || alive(Number(n.split('-')[0]))) return true;
+    fs.rmSync(path.join(locks, n), { recursive: true, force: true }); return false;
+  });
+  try {
+    const ticket = 1 + contenders().reduce((max, n) => Math.max(max, readJson(path.join(locks, n, 'ticket.json'))?.ticket ?? 0), 0);
+    fs.writeFileSync(path.join(mine, 'ticket.json'), JSON.stringify({ ticket }));
+    for (const n of contenders()) {
+      if (n === id) continue;
+      const other = readJson(path.join(locks, n, 'ticket.json'));
+      // A contender may have finished since the directory snapshot.
+      if ((!other && fs.existsSync(path.join(locks, n))) || (other && (other.ticket < ticket || other.ticket === ticket && n < id))) return null;
+    }
+    return change(f);
+  } finally { fs.rmSync(mine, { recursive: true, force: true }); }
 }
-/** The claim's painter is running on its worker (the mini counts it among its own painters from then on). */
-export function markStarted(dir, slot) { const f = path.join(dir, 'claims', `${slot}.json`), c = readJson(f); if (c) writeJson(f, { ...c, started: Date.now() }); }
-export const release = (dir, slot) => fs.rmSync(path.join(dir, 'claims', `${slot}.json`), { force: true });
+function eligibleKinds(w) {
+  const allowed = w.only ?? (POD_KINDS.has(w.kind) ? ['pod'] : ['local', 'mini', 'pod']);
+  return new Set(allowed);
+}
+const sharePlaces = (a, b) => [...eligibleKinds(a)].some(k => eligibleKinds(b).has(k));
+export function claim(dir, slot, info, isAlive = alive) {
+  return withClaimLock(dir, slot, f => {
+    const held = readJson(f);
+    if (held && isAlive(held.pid)) return false;
+    if (!BENCHMARK_KINDS.has(info.kind)) {
+      const w = path.join(dir, 'waiting'), waiting = (fs.existsSync(w) ? fs.readdirSync(w) : []).map(n => readJson(path.join(w, n))).filter(x => x && isAlive(x.pid));
+      const kind = slot.startsWith('pod-') ? 'pod' : slot.startsWith('mini-') ? 'mini' : 'local';
+      if (waiting.some(x => BENCHMARK_KINDS.has(x.kind) && eligibleKinds(x).has(kind)) || Object.values(claims(dir, isAlive)).some(c => !BENCHMARK_KINDS.has(c.kind))) return false;
+    }
+    if (fs.existsSync(f)) fs.rmSync(f, { force: true });
+    try { fs.writeFileSync(f, JSON.stringify({ ...info, pid: info.pid ?? process.pid, since: Date.now() }), { flag: 'wx' }); return true; } catch (e) { if (e.code === 'EEXIST') return false; throw e; }
+  }) ?? false;
+}
+/** Update only the job that still owns this slot. */
+export function markStarted(dir, slot, jobId) {
+  const changed = withClaimLock(dir, slot, f => { const c = readJson(f); if (c?.job === jobId) { writeJson(f, { ...c, started: Date.now() }); return true; } return false; });
+  return changed === null ? sleep(10).then(() => markStarted(dir, slot, jobId)) : changed;
+}
+export function release(dir, slot, jobId) {
+  const changed = withClaimLock(dir, slot, f => {
+    if (jobId === undefined || readJson(f)?.job !== jobId) return false;
+    fs.rmSync(f, { force: true }); return true;
+  });
+  // Another process can be in the tiny critical section; releasing must wait,
+  // while acquiring simply tries another slot or the next scheduling tick.
+  return changed === null ? sleep(10).then(() => release(dir, slot, jobId)) : changed;
+}
 /** The claims held now, by slot, the dead ones left out. */
 export function claims(dir, isAlive = alive) {
   const d = path.join(dir, 'claims'), out = {};
@@ -103,16 +151,22 @@ export function claims(dir, isAlive = alive) {
  * that. `couldTake(w)`: whether an earlier waiter could take one of the places free now; one that could not (a pod-only
  * job while only the mini is free, a job whose commit no free pod holds) does not hold back a later job that can.
  */
-export function waitRank(dir, id, isAlive = alive, couldTake = () => true) {
+export function waitRank(dir, id, isAlive = alive, couldTake = null) {
   const d = path.join(dir, 'waiting'); const mine = readJson(path.join(d, `${id}.json`)); if (!mine) return 0;
-  const pods = k => POD_KINDS.has(k);   // a look and a painting wait for different places
-  return (fs.existsSync(d) ? fs.readdirSync(d) : []).map(n => readJson(path.join(d, n))).filter(w => w && w.id !== id && pods(w.kind) === pods(mine.kind) && isAlive(w.pid) && (w.since < mine.since || (w.since === mine.since && w.id < id)) && couldTake(w)).length;
+  const myPrio = jobPriority(mine);
+  return (fs.existsSync(d) ? fs.readdirSync(d) : []).map(n => readJson(path.join(d, n))).filter(w => {
+    if (!w || w.id === id || !isAlive(w.pid)) return false;
+    const p = jobPriority(w);
+    if (p > myPrio) return false;
+    if (p === myPrio && !(w.since < mine.since || (w.since === mine.since && w.id < id))) return false;
+    return couldTake ? couldTake(w) : sharePlaces(w, mine);
+  }).length;
 }
 
 /** Say that this process paints through the pool and runs `sessions` sessions; the pods follow the live total. Cleared at exit. */
-export function registerClient(dir, { sessions, commit }) {
+export function registerClient(dir, { sessions, commit, only = process.env.UNPAINT_POOL_ONLY?.split(',') ?? null }) {
   const f = path.join(dir, 'clients', `${process.pid}.json`);
-  writeJson(f, { pid: process.pid, sessions, commit, since: Date.now() });
+  writeJson(f, { pid: process.pid, sessions, commit, only: typeof only === 'string' ? only.split(',') : only, since: Date.now() });
   process.on('exit', () => fs.rmSync(f, { force: true }));
   return f;
 }
@@ -138,8 +192,9 @@ export function places({ pods = [], mini = null, local = DEFAULT_LOCAL, commit, 
   // the pods' places level by level, so paintings spread over the pods before any pod takes a second one
   const up = pods.filter(p => p.ready && p.trees?.[commit.slice(0, 8)] && (p.limit ?? Infinity) * 1000 - now > POD_MARGIN_S * 1000);
   for (let k = 0; k < Math.max(0, ...up.map(p => p.slots ?? 1)); k++) for (const p of up) if (k < (p.slots ?? 1)) out.push({ slot: k ? `pod-${p.name}-${k}` : `pod-${p.name}`, worker: { kind: 'pod', name: p.name, host: p.ip, port: p.port, rate: p.rate, slots: p.slots ?? 1, tree: p.trees[commit.slice(0, 8)], base: '/root/render-pool' } });
-  // the operator may name the mini for full-size paintings too (UNPAINT_POOL_ONLY=mini, or mini,pod): it is free and
-  // paints one faster than a pod; it comes after the pods, so the mini's places stay with the looks while a pod is free
+  // the operator may name the mini or this Mac for full-size paintings too (UNPAINT_POOL_ONLY=local,mini): both are free and
+  // paint faster than a pod; they come after any pods, so local/mini stay with looks while a pod is free
+  if (POD_KINDS.has(kind) && only?.includes('local')) for (let k = 0; k < local; k++) out.push({ slot: `local-${k}`, worker: { kind: 'local', name: 'this Mac' } });
   if (POD_KINDS.has(kind) && only?.includes('mini') && mini) for (let k = 0; k < (mini.slots ?? 2); k++) out.push({ slot: `mini-${k}`, worker: { kind: 'mini', name: 'Mac mini', host: mini.host ?? 'mini', slots: mini.slots ?? 2 } });
   return out.filter(p => p.worker.name !== avoid && (!only || only.includes(p.worker.kind)));
 }
@@ -193,16 +248,43 @@ const miniOwn = home => ({ PAINTER_SEG_PYTHON: `${home}/work/unpainting-04-worke
  * The mini's checkout at `commit` (~/work/unpainting-c-<8>), made when it is not there: the commit pushed to the
  * mini's trunk checkout as mini/c-<8>, a detached worktree, npm ci. Throws WorkerFailure when it cannot be made.
  */
-async function miniCheckout(remote, commit, repo) {
+export async function miniCheckout(remote, commit, repo) {
   const h8 = commit.slice(0, 8), d = `work/unpainting-c-${h8}`;
-  const probe = async () => (await remote.script(`cd ~ && echo HOME=$HOME; git -C ~/${d} rev-parse HEAD 2>/dev/null; test -d ~/${d}/node_modules && echo MODULES\n`)).out;
+  const probe = async () => (await remote.script(`cd ~ && echo HOME=$HOME; git -C ~/${d} rev-parse HEAD 2>/dev/null; test -f ~/${d}/.ready && echo READY\n`)).out;
   let said = await probe();
-  if (!said.includes(commit) || !said.includes('MODULES')) {
+  if (!said.includes(commit) || !said.includes('READY')) {
     const p = await remote.run('git', ['-C', repo, 'push', '-f', `${remote.w.host}:work/unpainting-04-worker`, `${commit}:refs/heads/mini/c-${h8}`], { timeout: 900000 });
     if (p.code !== 0) throw new WorkerFailure(`could not send commit ${h8} to the mini: ${(p.err || '').trim().slice(-200)}`);
-    await remote.script(`cd ~/work/unpainting-04-worker && (test -d ~/${d} || git worktree add -q --detach ~/${d} ${commit}) && cd ~/${d} && npm ci --no-audit --no-fund >/dev/null 2>&1; echo MADE\n`, 1800000);
+    const made = await remote.script(`
+LOCK=~/${d}.setup-lock
+for attempt in {1..1800}; do
+  if mkdir "$LOCK" 2>/dev/null; then
+    echo $$ > "$LOCK/pid"
+    trap 'rm -rf "$LOCK"' EXIT
+    cd ~/work/unpainting-04-worker &&
+      (test -d ~/${d} || git worktree add -q --detach ~/${d} ${commit}) &&
+      cd ~/${d} &&
+      { test -f .ready && test "$(git rev-parse HEAD)" = ${q(commit)} ||
+        { rm -f .ready && git checkout -q --detach ${q(commit)} && npm ci --no-audit --no-fund >/dev/null 2>&1 && touch .ready; }; } && echo MADE
+    exit
+  fi
+  if [ -d "$LOCK.reap" ] && [ -n "$(find "$LOCK.reap" -maxdepth 0 -mmin +1 2>/dev/null)" ]; then
+    rmdir "$LOCK.reap" 2>/dev/null || true
+  fi
+  if mkdir "$LOCK.reap" 2>/dev/null; then
+    lpid=$(cat "$LOCK/pid" 2>/dev/null)
+    if { [ -n "$lpid" ] && ! kill -0 "$lpid" 2>/dev/null; } || { [ ! -f "$LOCK/pid" ] && [ -n "$(find "$LOCK" -maxdepth 0 -mmin +1 2>/dev/null)" ]; }; then
+      rm -rf "$LOCK" 2>/dev/null || true
+    fi
+    rmdir "$LOCK.reap" 2>/dev/null || true
+  fi
+  sleep 1
+done
+exit 1
+`, 1800000);
+    if (!made.out.includes('MADE')) throw new WorkerFailure(`the mini could not prepare checkout ${h8}`);
     said = await probe();
-    if (!said.includes(commit) || !said.includes('MODULES')) throw new WorkerFailure(`the mini has no usable checkout of ${h8} (${d})`);
+    if (!said.includes(commit) || !said.includes('READY')) throw new WorkerFailure(`the mini has no usable checkout of ${h8} (${d})`);
   }
   return { home: /HOME=(\S+)/.exec(said)[1], tree: `${/HOME=(\S+)/.exec(said)[1]}/${d}` };
 }
@@ -249,7 +331,7 @@ async function paintRemoteSteps(job, worker, { remote, at, repo, onLine = () => 
   const tShip = Date.now();
   const started = await remote.script(`cd ${q(J)} && (nohup node render-worker.mjs > worker.out 2>&1 < /dev/null & echo $! > pid) && sleep 1 && echo STARTED $(cat pid)\n`, 60000);
   if (!/STARTED \d+/.test(started.out)) throw new WorkerFailure(`the painter did not start on ${worker.name}: ${(started.err || started.out).trim().slice(-300)}`);
-  onStarted();
+  await onStarted();
   // follow it: the result file, whether its process lives, and the log from where it was read to
   let read = 0, lostSince = null, result = null, rest = '';
   const logOut = fs.createWriteStream(job.logFile);
@@ -285,7 +367,8 @@ async function paintRemoteSteps(job, worker, { remote, at, repo, onLine = () => 
     result.stopped.sheet = sheet;
   }
   homeRecords(job.out, { root, out, localOut: job.out });
-  await remote.script(`rm -rf ${q(J)}; echo GONE\n`, 60000);
+  const pruneCache = worker.kind === 'pod' ? `find ${q(`${base}/cache`)} -type f -mmin +5 -delete 2>/dev/null || true; ` : '';
+  await remote.script(`rm -rf ${q(J)}; ${pruneCache}echo GONE\n`, 60000);
   const tPull = Date.now();
   return { done: result.done, stopped: result.stopped, endedEarly: result.endedEarly ?? false, seconds: { ship: (tShip - t0) / 1000, paint: (tPaint - tShip) / 1000, pull: (tPull - tPaint) / 1000 } };
 }
@@ -321,7 +404,7 @@ export async function paintOnPool(job, { dir, env = process.env, local, gpuCount
         const x = await local(job.command, { cwd: job.cwd, logFile: job.logFile, onLine: job.onLine });
         if (x.done?.signal) throw new WorkerFailure(`the painter on this Mac was stopped by ${x.done.signal}`);
         r = { ...x, seconds: { ship: 0, paint: (Date.now() - t) / 1000, pull: 0 } };
-      } else r = await paintRemote({ ...job, id, inputs, poolDir: dir, shellEnv: env }, got.worker, { remote: remoteFor(got.worker), repo, onLine: job.onLine, onStarted: () => markStarted(dir, got.slot) });
+      } else r = await paintRemote({ ...job, id, inputs, poolDir: dir, shellEnv: env }, got.worker, { remote: remoteFor(got.worker), repo, onLine: job.onLine, onStarted: () => markStarted(dir, got.slot, id) });
       const held = (Date.now() - t) / 1000;
       tries.push({ worker: got.worker.name, kind: got.worker.kind, ok: true, seconds: Math.round(held) });
       const render = { mode: 'pool', worker: got.worker.name, workerKind: got.worker.kind, waitSeconds: Math.round(waited), paintSeconds: Math.round(r.seconds.paint), copySeconds: +(r.seconds.ship + r.seconds.pull).toFixed(1), sendSeconds: +r.seconds.ship.toFixed(1), returnSeconds: +r.seconds.pull.toFixed(1), heldSeconds: Math.round(held), costUSD: +tries.reduce((a, x) => a + (x.costUSD ?? 0), costOf(got.worker, held)).toFixed(4), tries, inputs: inputs.length };
@@ -334,7 +417,7 @@ export async function paintOnPool(job, { dir, env = process.env, local, gpuCount
       logLine(dir, `${new Date().toISOString()} ${job.kind ?? 'painting'} ${path.basename(job.out)} FAILED on ${got.worker.name}: ${e.message}`);
       avoid = got.worker.name;
       if (fs.existsSync(job.out)) fs.rmSync(job.out, { recursive: true, force: true });
-    } finally { release(dir, got.slot); }
+    } finally { await release(dir, got.slot, id); }
   }
   throw new WorkersFailed(`render pool: the painting failed on two workers and is not painted anywhere else: ${tries.map(t => `${t.worker}: ${t.why}`).join('; ')}`);
 }
@@ -358,8 +441,8 @@ async function takePlace({ dir, env, id, commit, avoid, gpuCount, kind, remoteFo
       // however stale its heartbeat (it is busy setting up a pod); one that is gone is waited for a while, then a plain stop
       const podsAt = readJson(path.join(dir, 'pods.json'))?.updated, nowS = Date.now() / 1000;
       let why = 'every place is busy';
-      // (a painting the operator lets the mini take does not need a pod, so it does not need the daemon)
-      if (POD_KINDS.has(kind) && !any.some(p => p.worker.kind === 'mini')) {
+      // (a painting the operator lets the mini or this Mac take does not need a pod, so it does not need the daemon)
+      if (POD_KINDS.has(kind) && !any.some(p => p.worker.kind === 'mini' || p.worker.kind === 'local')) {
         const state = podsDaemon({ updated: podsAt, nowS, processAlive: daemonAlive() }), said = `${path.join(dir, 'pods.json')} ${podsAt ? `last written ${Math.round(nowS - podsAt)} s ago` : 'is missing'}`;
         if (state === 'never') throw new Error(`render pool: a full-size painting is painted on a pod, and the pods daemon is not running (${said}, no daemon process); start it: python3 tools/cloud/render-pool-pods.py ${dir}`);
         if (state === 'gone') { goneSince ??= nowS; if (nowS - goneSince > DAEMON_GONE_GRACE_S) throw new Error(`render pool: a full-size painting is painted on a pod, and the pods daemon has stopped (${said}, no daemon process for ${Math.round((nowS - goneSince) / 60)} min); start it: python3 tools/cloud/render-pool-pods.py ${dir}`); why = `the pods daemon's process is gone (${said}); waiting ${Math.round(DAEMON_GONE_GRACE_S / 60)} min for it to be started again`; }
@@ -378,11 +461,9 @@ async function takePlace({ dir, env, id, commit, avoid, gpuCount, kind, remoteFo
         }
         open.push(p);
       }
-      // a look takes a pod's place only past the ones the waiting paintings will take
-      if (!POD_KINDS.has(kind)) { let keep = podPlacesKept(dir); for (let i = 0; i < open.length && keep > 0; i++) if (open[i].worker.kind === 'pod') { open.splice(i--, 1); keep--; } }
       // an earlier waiter counts only when one of the places open to this job is a place it could take too
       const openSlots = new Set(open.map(p => p.slot)), rank = waitRank(dir, id, alive, w => places({ pods, mini, local: most, commit: w.commit ?? commit, kind: w.kind, only: w.only ?? null }).some(p => openSlots.has(p.slot)));
-      if (open.length > rank) for (const p of open) if (claim(dir, p.slot, { job: id, kind, worker: p.worker.name })) return p;
+      if (open.length > rank) for (const p of open) if (claim(dir, p.slot, { job: id, kind, only, worker: p.worker.name })) return p;
       tick(why);
       await sleep(pollMs + Math.random() * 1000);
     }

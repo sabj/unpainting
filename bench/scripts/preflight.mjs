@@ -36,10 +36,20 @@ export function verifyComparisonRun(runDir, { requireGpu = true, requireSegments
   const card = exists(cardPath) ? JSON.parse(readFile(cardPath)) : null;
   const speed = exists(speedPath) ? JSON.parse(readFile(speedPath)) : null;
   if (!card && !speed) throw new Error(`comparison run ${runDir} is missing run-card.json and paint-speed-summary.json`);
-  const backend = speed?.backend?.backend ?? card?.gpuBackend?.backend ?? card?.backend?.backend ?? card?.backend;
-  const fallback = speed?.backend?.fallback ?? card?.gpuBackend?.fallback ?? card?.backend?.fallback ?? false;
-  if (requireGpu && (backend !== 'gpu' || fallback)) {
-    throw new Error(`comparison run ${runDir} used backend "${backend ?? 'unknown'}" (fallback=${fallback}); GPU hardware is required for timing and quality comparisons`);
+  const records = [
+    ['paint-speed-summary.json', speed?.backend, speed?.fallback],
+    ['run-card.json gpuBackend', card?.gpuBackend],
+    ['run-card.json backend', card?.backend, card?.fallback],
+  ].filter(([, record]) => record != null).map(([file, record, fallback]) => ({
+    file, backend: typeof record === 'string' ? record : record.backend,
+    fallback: typeof record === 'string' ? fallback : record.fallback,
+  }));
+  const backend = records[0]?.backend;
+  // A missing fallback field is not evidence of a hardware run. Check every
+  // recorded backend so a healthy speed summary cannot hide a fallback card.
+  if (requireGpu && (!records.length || records.some(r => r.backend !== 'gpu' || r.fallback !== false))) {
+    const evidence = records.map(r => `${r.file}: backend "${r.backend ?? 'unknown'}" (fallback=${r.fallback ?? 'unrecorded'})`).join(', ') || 'no backend recorded';
+    throw new Error(`comparison run ${runDir} has invalid GPU evidence (${evidence}); GPU hardware is required for timing and quality comparisons; record backend "gpu" and fallback false explicitly`);
   }
   // the sheet's cells across; a card from before sheetWidth was recorded has only the output's width, which --inkres widens
   const width = Number(card?.dimensions?.sheetWidth ?? card?.dimensions?.paintWidth ?? speed?.width ?? card?.width ?? card?.frame?.[0] ?? 0);

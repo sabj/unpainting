@@ -64,3 +64,18 @@ export function sectionContactLookahead(brush,path,{k,t,spacing,count,w,h,reach=
   }
   return bounds;
 }
+/** Tight sequence of chunked boxes along the next `count` section-brush steps, avoiding giant diagonal bounding boxes. */
+export function sectionContactLookaheadStrip(brush,path,{k,t,spacing,count,w,h,reach=1.45,firstReach=reach,pad=3,stride=12}){
+  const rects=[];let acc=null,n=0;
+  for(let j=0;j<count&&k<path.length;){
+    const a=path[k-1],b=path[k],seg=Math.hypot(b.x-a.x,b.y-a.y)||1e-6;
+    if(t>seg){t-=seg;k++;continue;}
+    const u=t/seg,radius=a.r===undefined?brush.radius:a.r+((b.r??a.r)-a.r)*u;
+    const R=(j===0?firstReach:reach)*radius+pad;
+    acc=add(acc,box(a.x+(b.x-a.x)*u,a.y+(b.y-a.y)*u,R,R,w,h));
+    if(++n>=stride){if(acc)rects.push(acc);acc=null;n=0;}
+    t+=spacing;j++;
+  }
+  if(acc)rects.push(acc);
+  return rects;
+}

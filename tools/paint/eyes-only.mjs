@@ -63,6 +63,94 @@ const INLINE = /\b(python[\d.]*|node|ruby|perl)\s+(-c|-e|--eval|-p|-\s*<<|<<)/;
 /** Whether a file of the folder is a program, by its name. */
 export const isProgram = name => /\.(py|m?js|cjs|ts|sh|zsh|bash|rb|pl|r|jl|swift|c|go)$/i.test(name);
 
+const SLASH_LANG = /\.(m?js|cjs|ts|swift|c|go)$/i;
+
+/** Strip language comments outside quoted string literals so prose notes referencing a picture name do not trigger a DQ. */
+function stripComments(text, slashLang) {
+  let out = '', q = '', i = 0;
+  const s = String(text ?? '');
+  while (i < s.length) {
+    const ch = s[i], nx = s[i + 1];
+    if (q) {
+      out += ch;
+      if (ch === '\\' && i + 1 < s.length) { out += nx; i += 2; continue; }
+      if (ch === q) q = '';
+      i++; continue;
+    }
+    if (ch === '"' || ch === "'") { q = ch; out += ch; i++; continue; }
+    if (slashLang && ch === '/' && nx === '/') { while (i < s.length && s[i] !== '\n') i++; continue; }
+    if (slashLang && ch === '/' && nx === '*') { i += 2; while (i < s.length && !(s[i] === '*' && s[i + 1] === '/')) i++; i += 2; continue; }
+    if (!slashLang && ch === '#') { while (i < s.length && s[i] !== '\n') i++; continue; }
+    out += ch; i++;
+  }
+  return out;
+}
+
+/** Strip balanced `open('seen.md', ...).write(...)` / `Path('seen.md').write_text(...)` calls in O(n) without regex backtracking. */
+function stripCallBody(s, headRe) {
+  let out = '', pos = 0;
+  headRe.lastIndex = 0;
+  let m;
+  while ((m = headRe.exec(s)) !== null) {
+    out += s.slice(pos, m.index);
+    let i = headRe.lastIndex, depth = 1, q = '';
+    while (i < s.length && depth > 0) {
+      const ch = s[i];
+      if (q) {
+        if (ch === '\\' && i + 1 < s.length) { i += 2; continue; }
+        if (ch === q) q = '';
+      } else if (ch === '"' || ch === "'") q = ch;
+      else if (ch === '(') depth++;
+      else if (ch === ')') depth--;
+      i++;
+    }
+    pos = i;
+    headRe.lastIndex = i;
+  }
+  return out + s.slice(pos);
+}
+
+/** Remove required `seen.md` prose writes (heredocs, echo/printf redirects, or direct open('seen.md').write calls). */
+function stripSeenMdWrites(text) {
+  let s = String(text ?? '')
+    .replace(/(?:^|[\n;&|]\s*)(?:cat\s+)?>>?\s*["']?(?:\.\/)?seen\.md["']?\s*<<-?\s*['"]?(\w+)['"]?[\s\S]*?(?:\n\1(?=\s*(?:[\n;&|]|$))|$)/g, '\n')
+    .replace(/(?:^|[\n;&|]\s*)cat\s+<<-?\s*['"]?(\w+)['"]?\s*>>?\s*["']?(?:\.\/)?seen\.md["']?[\s\S]*?(?:\n\1(?=\s*(?:[\n;&|]|$))|$)/g, '\n')
+    .replace(/(?:^|[\n;&|]\s*)(?:echo|printf)\b[^\n]*?>>?\s*["']?(?:\.\/)?seen\.md["']?/g, '\n');
+  s = stripCallBody(s, /\bopen\(\s*["'](?:\.\/)?seen\.md["'][^)\n]*\)\s*\.\s*write\(/g);
+  s = stripCallBody(s, /\bPath\(\s*["'](?:\.\/)?seen\.md["']\s*\)\s*\.\s*write_text\(/g);
+  return s;
+}
+
+/** Split a shell string into top-level command segments while keeping inline heredoc bodies intact. */
+function shellSegments(raw) {
+  const s = stripSeenMdWrites(raw);
+  const segs = [];
+  let cur = '', i = 0;
+  const lines = s.split('\n');
+  while (i < lines.length) {
+    const ln = lines[i++];
+    if (/^\s*(\.\/)?unpaint\s+show\b/.test(ln)) continue;
+    const hm = ln.match(/<<-?\s*['"]?(\w+)['"]?/);
+    if (hm) {
+      const marker = hm[1];
+      let body = ln;
+      while (i < lines.length) {
+        const bl = lines[i++];
+        body += '\n' + bl;
+        if (bl.trim() === marker) break;
+      }
+      if (cur.trim()) { segs.push(cur.trim()); cur = ''; }
+      segs.push(body.trim());
+    } else {
+      for (const part of ln.split(/[;&|]+/)) {
+        if (!/^\s*(\.\/)?unpaint\s+show\b/.test(part) && part.trim()) segs.push(part.trim());
+      }
+    }
+  }
+  if (cur.trim()) segs.push(cur.trim());
+  return segs;
+}
+
 /**
  * A session's transcript and scripts read for pictures read with code. `steps`: readTranscript()'s tool steps
  * ({kind, text, output, denied}); `scripts`: [{name, text}] the programs it wrote; `pictures`: eyesOnlyOf().
@@ -76,13 +164,26 @@ export function pictureReadsByCode({ steps = [], scripts = [], pictures = [] }) 
   const blocked = [], inScripts = [], commands = [];
   for (const s of steps) {
     if (s.kind !== 'shell') continue;
-    // the viewer's own command is not code reading a picture: ./unpaint show FILE
-    const text = String(s.text).split(/[\n;&|]+/).filter(part => !/^\s*(\.\/)?unpaint\s+show\b/.test(part)).join('\n');
     const said = [...(s.denied ?? []), ...String(s.output ?? '').split('\n')].find(l => DENIED.test(l) && named.test(l));
-    if (said) blocked.push({ command: cut(s.text), said: cut(said) });
-    else if (named.test(text)) (INLINE.test(text) ? inScripts : commands).push({ ...(INLINE.test(text) ? { name: 'a program in a shell command' } : {}), command: cut(s.text), names: named.exec(text)[2] });
+    if (said) { blocked.push({ command: cut(s.text), said: cut(said) }); continue; }
+    // Unwrap outer `/bin/zsh -lc "..."` or `/bin/bash -lc "..."` wrappers so heredocs & segments parse cleanly
+    let raw = String(s.text ?? '');
+    const wrap = raw.match(/^\s*(?:\/bin\/)?(?:z|ba)?sh\s+-[a-z]*c\s+(["'])([\s\S]*?)\1?\s*$/);
+    if (wrap) raw = wrap[2].replace(/\\(["'\\$])/g, '$1');
+    for (const seg of shellSegments(raw)) {
+      const isInline = INLINE.test(seg);
+      const cleaned = isInline ? stripComments(seg, /\bnode\b/.test(seg)) : seg;
+      if (!named.test(cleaned)) continue;
+      (isInline ? inScripts : commands).push({ ...(isInline ? { name: 'a program in a shell command' } : {}), command: cut(s.text), names: named.exec(cleaned)[2] });
+      break;
+    }
   }
-  for (const f of scripts) { const line = String(f.text ?? '').split('\n').find(l => named.test(l)); if (line && isProgram(f.name)) inScripts.push({ name: f.name, line: cut(line), names: named.exec(line)[2] }); }
+  for (const f of scripts) {
+    if (!isProgram(f.name)) continue;
+    const cleaned = stripSeenMdWrites(stripComments(f.text, SLASH_LANG.test(f.name)));
+    const line = cleaned.split('\n').find(l => named.test(l));
+    if (line) inScripts.push({ name: f.name, line: cut(line), names: named.exec(line)[2] });
+  }
   return { blocked, scripts: inScripts, commands };
 }
 

@@ -1,5 +1,5 @@
 import {tapeBase,tapeFlow,tapeRenderBase} from './worker/tape-sheet.js';
-import {OPERATION_NAMES, footprint, applyHandOperation, watchContact} from './worker/operations.js';
+import {OPERATION_NAMES, footprint, handToolOperation, watchContact} from './worker/operations.js';
 import { runTape, SHEET_FIELDS } from './worker/live-tape.js';
 import { contactAudit } from './worker/contact-audit.js';
 import { releasePath } from './ui/contact.js';
@@ -15,9 +15,10 @@ import { handBrushOptions, needsRedip } from './brush-load.js';
 // The colour render follows the physics: the WebGPU path composes straight from the GPU buffers, the CPU path draws with
 // WebGL2 (render-gpu.js) or as pixels.
 //
-// The simulation advances on a step budget per frame and never inside a stroke; dried washes older than the top one are
+// The simulation advances on a step budget per frame, including GPU Section strokes; dried washes older than the top one are
 // folded into the paper's colour, so memory stays flat; a new sheet cancels any demonstration; a held pen blots.
 import { makePaper } from './media/paper.js';
+import { makePaperGpu } from './media/gpu/paper-gpu.js';
 import { SURFACES, DEFAULT_SURFACE, paperOptions, paperReflectance } from './media/papers.js';
 import { createSheet, step, fix, liftResist, setClip, DEFAULTS } from './media/sheet.js';
 import { layerRT } from './media/km.js';
@@ -55,9 +56,10 @@ let paused = false, ticks = 0, strokes = 0, paperSeed = 7, lastTool = null, mark
 let W = 0, H = 0, N = 0, dpi = REF_DPI, res = 1, paperIn = [8, 6], paper, sheet, graphite, baseR, active = null, speed = 2, dryer = false, dirty = true, generation = 0, wasWet = false;
 let gpu = null, gpuCanvas = null, baseDirty = true, graphiteDirty = true, renderMs = 0, renderCount = 0, lostTimer = 0, failBlob = false, gpuEpoch = 0;
 let perturb = 0, skipRender = false, frameCount = 0, glDims = null;
+let dryFinishDirty = true, dryCoarseRgba = null;
 // A frame's steps go to the GPU in chunks of about CHUNK_MS each, the chunk's size found by feedback on their times, until
 // the frame's budget is spent. Pointer down, pause and clear end it at the next chunk.
-const CHUNK_MS = 8, DRY_CHUNK_MS = 8, DRY_RENDER_MS = 500;
+const CHUNK_MS = 8, DRY_CHUNK_MS = 8, DRY_RENDER_MS = 500, FRAME_MS = 16;
 let chunkSteps = 2, inputArrived = false, pendingInput = 0, lastDryBoost = 1;
 let dryWait = null, dryPeak = 0, dryStart = 0, lastDryDraw = 0;
 let quickDry = false, quickDryStarted = 0;
@@ -70,6 +72,7 @@ let surface = DEFAULT_SURFACE, paperMemo = null, baseIsBare = true; // the kind 
 // demoPlaying: the budget a playing demonstration ('play') or painting in progress ('fast') takes; simTime: the sheet's own
 // clock, the sum of its time steps; gpuFrameMs: the last frame's WebGPU step time; moveT: when the page sent the last stroke
 
+let fastScript = false;
 let demoPlaying = null, simTime = 0, gpuFrameMs = 0, moveT = 0, lastInputDraw = 0;
 let phys = null, physReason = '', physCtx = null, physName = '', stepDebt = 0, lastDt = null, lastWet = false, det = false, frameMs = 0, stepMs = 0, stepCount = 0, strokeMs = 0;
 
@@ -94,14 +97,19 @@ async function newSheet({ paperW = 8, paperH = 6, dpi: d = REF_DPI, seed = 7, na
   // a fine sheet's paper takes a second or more to make, and New sheet asks for the same paper again
   const memo = `${surface} ${W} ${H} ${dpi} ${seed}`;
   // mmPerCell tells the brush the cell's real size, for the hand's millimetre-scale wander and the wet rim's tooth
-  if (paperMemo?.key !== memo) paperMemo = { key: memo, paper: { ...makePaper(W, H, paperOptions(surface, dpi, seed)), mmPerCell: MM / dpi } };
+  if (paperMemo?.key !== memo) {
+    const opts = paperOptions(surface, dpi, seed);
+    const built = phys && !phys.lost ? await makePaperGpu(phys.device, W, H, opts) : makePaper(W, H, opts);
+    paperMemo = { key: memo, paper: { ...built, mmPerCell: MM / dpi } };
+  }
   paper = paperMemo.paper;
   NAMES = [...SHEET_START]; PIGS = NAMES.map(k => BY_KEY[k]);
   sheet = createSheet(paper, PIGS); graphite = new Float32Array(N);
   baseR = new Float32Array(N * 3); // reflectance of the paper with every folded (older) dried wash on it
   baseR.set(bareBase());
   baseIsBare = true;
-  dirty = true; baseDirty = true; graphiteDirty = true;
+  dirty = true; baseDirty = true; graphiteDirty = true; dryFinishDirty = true; dryCoarseRgba = null;
+  phys?.finish?.invalidate(true);
   if (phys) { phys.setOptions({ sizing: SURFACES[surface].sizing, edgeWidth: edgeCells() }); phys.setPigments(PIGS); await phys.load(sheet, baseR, graphite); }
   else if (gpu && gpuCanvas && (glDims[0] !== W || glDims[1] !== H || glDims[2] !== PIGS.length)) rebuildGl();
   postMessage({ type: 'sheet', width: W, height: H, dpi, paperIn, surface, physics: phys ? 'webgpu' : 'cpu' });
@@ -117,12 +125,12 @@ function rebuildGl() {
 async function takePigments(keys) {
   const added=keys.filter(key=>!NAMES.includes(key));
   if (!added.length) return;
-  if (phys) await phys.syncAll(sheet);
+  if (phys) await phys.syncAll(sheet, baseR);
   NAMES = [...NAMES, ...added]; PIGS = [...PIGS, ...added.map(key=>BY_KEY[key])];
   for(const key of added)addPigment(sheet, BY_KEY[key]);
   if (phys) { phys.setPigments(PIGS); await phys.load(sheet, baseR, graphite); baseDirty = true; graphiteDirty = true; }
   else if (gpu && gpuCanvas) rebuildGl();
-  dirty = true;
+  dirty = true; dryFinishDirty = true; dryCoarseRgba = null;
 }
 
 // composite one layer of per-pigment masses over a reflectance buffer, in place
@@ -158,9 +166,31 @@ const concOf = (pigment, amount) => NAMES.map(k => (k === pigment ? amount : 0))
 // ---- instruments ---------------------------------------------------------------------------------------------------
 // With WebGPU physics the sheet's truth is on the GPU. An instrument reads the stale tiles of the rectangle it can reach
 // back to the CPU copy, works there, and sends the rectangle up.
+function canSectionGpu(brush, K) {
+  const hs = brush?.hairs, link = phys?.sectionLink;
+  // Keep in sync with brush.js onGpu(). Plan-size rejection is guarded by
+  // SectionPlanLink.beginStroke before it can touch a stale CPU sheet.
+  return !!(phys && !phys.lost && sheet._sectionStroke && link?.brushGpu && !link.paused
+    && brush?.model === 'section' && K <= 16 && hs?.length > 0 && hs.length <= 576
+    && (hs.length + 2) * (4 + K) <= 4000 && Array.isArray(brush.resP)
+    && brush.resP.length === K && hs.every(h => h.pig && h.pig.length === K));
+}
 async function touching(points, reach, work) {
   const t0 = performance.now();
-  if (!phys) work(); else { const rect = phys.rect(points, reach); await phys.ensureFresh(sheet, rect); work(); phys.up(sheet, rect); }
+  dryFinishDirty = true; dryCoarseRgba = null;
+  if (!phys) work();
+  else if (active?.kind === 'brush' && canSectionGpu(active.brush, sheet.K)) {
+    // Only the brush reservoir comes back; Section never reads CPU sheet cells.
+    // Its next segment needs the previous segment's actual remaining load.
+    await phys.sectionPending;
+    phys.sectionWrote = false;
+    phys.sectionGpuOnly = true;
+    try {
+      work();
+      if (!phys.sectionWrote && points.some(p => Math.hypot(p.x - points[0].x, p.y - points[0].y) >= 0.4))
+        throw new Error('Section GPU contact did not submit paint');
+    } finally { phys.sectionGpuOnly = false; phys.sectionWrote = false; }
+  } else { const rect = phys.rect(points, reach); await phys.ensureFresh(sheet, rect); work(); phys.up(sheet, rect); }
   strokeMs += performance.now() - t0;
 }
 // the cells a brush step can touch: the painter's own margin round a stroke (the footprint, the tuft's hairs, the hand's wander)
@@ -187,11 +217,8 @@ function nameOperation(kind, mask=null, extra={}) {
  postMessage({type:'operation',...operation});
 }
 async function handOperation(a,b) {
- const mask=footprint(W,H,a,b,active.radius);
- if(phys)await phys.syncAll(sheet);
- applyHandOperation(sheet,active.kind,mask);
- if(phys)await phys.load(sheet,baseR,graphite);
- masksDirty=true;operation={...operation,mask};dirty=baseDirty=true;
+ const {mask,rect}=await handToolOperation(sheet,active.kind,a,b,active.radius,phys,baseR);
+ if(active.kind==='mask')masksDirty=true;operation={...operation,mask,rect};dirty=baseDirty=true;dryFinishDirty=true;dryCoarseRgba=null;
 }
 let heldTool=null;
 const toolLoad=()=>{const a=active||heldTool;if(a?.kind==='pen')return {water:a.pen.ink,pigment:a.pen.ink*a.pen.conc.reduce((s,v)=>s+v,0)};if(a?.kind==='brush')return {water:a.brush.resW+a.brush.hairs.reduce((s,h)=>s+h.water,0),pigment:brushPigment(a.brush)};return null;};
@@ -271,13 +298,14 @@ async function move(pt) {
   if (active.kind === 'dryer') await touching([a, b], dryerReach(active.dryer), () => blow(active.dryer, sheet, b, TICK));
   else if (active.kind === 'brush') { const br = active.brush, pts = br.tip ? [a, b, br.tip] : [a, b]; await touching(pts, brushReach(br), () => stroke(br, sheet, [a, b], { lift: false })); }
   else if (active.kind === 'pen') { const v = Math.max(0.3, b.v ?? 1); await touching([a, b], penReach(active.pen), () => penStroke(active.pen, sheet, [{ ...a, v }, { ...b, v }])); }
-  else { pencilStroke(active.pencil, paper, graphite, [a, b]); graphiteDirty = true; }
+  else { pencilStroke(active.pencil, paper, graphite, [a, b]); graphiteDirty = true; dryFinishDirty = true; dryCoarseRgba = null; }
   active.last = pt; dirty = true;
 }
 async function end(endpoint) {
   if (active?.kind === 'brush') {
     const br = active.brush, last = active.last, tail = endpoint ?? last;
     await touching(br.tip ? [last, tail, br.tip] : [last, tail], brushReach(br), () => stroke(br, sheet, releasePath(last, tail), { lift: true }));
+    if (phys && br.model === 'section') await phys.sectionPending;
     active.mark.paint = Math.max(0, active.mark.before - brushPigment(br));
     if (active.auditPoints?.length) await auditContact('after-lift', br, active.auditPoints);
   } else if (active?.kind === 'pen') active.mark.paint = Math.max(0, active.mark.before - (active.pen.ink + active.pen.drop) * 7);
@@ -322,13 +350,34 @@ const cursorState = () => {
 async function render() {
   const t0 = performance.now();
   let rgba = null, drawn = 0;
-  if (phys) { if (!phys.lost) { drawPhys(); if (physCtx) drawn = gpuEpoch; else rgba = await phys.readPixels(); } }
-  else if (gpu) { if (!gpu.isLost()) { renderGl(); drawn = gpuEpoch; } } else rgba = renderCpu();
   let wetCells = 0; if (phys) wetCells = lastWet ? 1 : 0; else for (let i = 0; i < N; i++) wetCells += sheet.M[i];
+  if (phys) {
+    if (!phys.lost) {
+      const wantSmoothDry = Boolean(physCtx && phys.finish && !det && !skipRender && !active && !pendingInput && inputQuiet() && !wetCells && strokes > 0 && !demoPlaying);
+      if (wantSmoothDry) {
+        if (dryFinishDirty) {
+          try {
+            await phys.syncAll(sheet, baseR);
+            const res = await phys.finish.render({ sheet, pigments: PIGS, paper, baseR: renderBase(), graphite, wantCoarse: true });
+            dryCoarseRgba = res.coarseRgba;
+            dryFinishDirty = false;
+          } catch {
+            dryCoarseRgba = null;
+          }
+        }
+        if (dryCoarseRgba) { phys.presentRgba(physCtx, dryCoarseRgba); drawn = gpuEpoch; }
+        else { drawPhys(); drawn = gpuEpoch; }
+      } else {
+        drawPhys();
+        if (physCtx) drawn = gpuEpoch; else rgba = await phys.readPixels();
+      }
+    }
+  }
+  else if (gpu) { if (!gpu.isLost()) { renderGl(); drawn = gpuEpoch; } } else rgba = renderCpu();
   renderMs += performance.now() - t0; renderCount++;
   const drawnMove = moveT; moveT = 0;
-  if ((drawnMove || demoPlaying==='live') && phys) await phys.idle(); // acknowledge completed GPU work, not only submission
-  const drying = !active && !paused && Boolean(wetCells) && (!demoPlaying || Boolean(dryWait));
+  if ((det || demoPlaying === 'live' && quality === 'full') && phys) await phys.idle();
+  const drying = !active && !paused && Boolean(wetCells) && (!demoPlaying || fastScript || Boolean(dryWait));
   const wetArea = phys ? (dryWait === 'surface' ? phys.sheet.surfaceTiles : phys.sheet.wetTiles) : wetCells;
   if (drying) dryPeak = Math.max(dryPeak, wetArea || 0);
   const dryingProgress = drying && dryPeak ? Math.max(0, 1 - wetArea / dryPeak) : 0;
@@ -350,7 +399,7 @@ function timedGpu(runs) {
 
 // Both renders of the current sheet with timings, for the equivalence check and the speed comparison.
 async function probe({ runs = 5 }) {
-  if (phys) await phys.syncAll(sheet);
+  if (phys) await phys.syncAll(sheet, baseR);
   const cpuRgba = renderCpu(); let t = performance.now();
   for (let i = 0; i < runs; i++) renderCpu();
   const cpuMs = (performance.now() - t) / runs;
@@ -375,6 +424,16 @@ async function probe({ runs = 5 }) {
 async function frame(force = false, exact = false) {
   // A timer already queued ahead of pointerdown must not start another long drying frame.
   if (!sheet || (!exact && (pendingInput || demoPlaying === 'live'))) return;
+  // Section contacts stay on the GPU, so wet physics can run under the brush.
+  // CPU tools still require a quiet hand before stepping invalidates their copy.
+  const realtime = Boolean(phys && quality === 'fast' && !det && (!demoPlaying || fastScript || Boolean(dryWait)) && !exact);
+  if (phys && phys.sheet.o?.realtime !== realtime) phys.setOptions({ realtime });
+  const gpuContact = active?.kind === 'brush' && canSectionGpu(active.brush, sheet.K);
+  const liveSection = realtime && (!active || gpuContact);
+  if (quality === 'fast' && !exact && !demoPlaying && !liveSection && (active || !inputQuiet())) {
+    if (dirty && !skipRender) { await render(); dirty = false; }
+    return;
+  }
   if (paused && !force) { if (dirty) { await render(); dirty = false; } return; }
   // A deliberate Dry layer or demo drying stage uses the existing strong dryer at every resolution.
   // This is accelerated drying, not a promise of the same evolution as slow natural drying.
@@ -385,7 +444,8 @@ async function frame(force = false, exact = false) {
   // Keeping pore evaporation at its natural rate made a finished landscape wait another13s.
   const dryBoost = strongDry ? 4 : 1;
   const dryingOptions = { dt, evap: DEFAULTS.evap * dryBoost, edgeEvap: DEFAULTS.edgeEvap * dryBoost, paperDry: DEFAULTS.paperDry * dryBoost };
-  stepDebt += (force ? 1 : speed) * res * res; const want = Math.floor(stepDebt); stepDebt -= want;
+  // Present more often, retaining the old 40 ms clock's steps per second.
+  stepDebt += (force ? 1 : speed * (exact ? 1 : FRAME_MS / 40)) * res * res; const want = Math.floor(stepDebt); stepDebt -= want;
   let wet = false, steps = 0;
   if (phys) {
     if (dt !== lastDt || dryBoost !== lastDryBoost) { phys.setOptions(dryingOptions); lastDt = dt; lastDryBoost = dryBoost; }
@@ -393,10 +453,10 @@ async function frame(force = false, exact = false) {
     // follows the wet area. A check that counts steps runs them all.
     const fastDry = !exact && !active && (quickDry || dryer || Boolean(dryWait));
     const mode = active ? 'stroke' : fastDry ? 'drying' : skipping ? 'skip' : demoPlaying ?? 'idle';
-    // A painting in progress takes no steps while its own stroke is down. Each step leaves the CPU copy stale, and a fine
-    // sheet's wide wash brush then read its whole reach back for every point: about 6 MB a point at 200 dpi.
-    // the physics in hand for the whole frame: a check may swap it out while this frame waits on the GPU
-    const ph = phys, run = exact ? want : active && demoPlaying === 'fast' ? 0 : fastDry ? Infinity : want, t1 = performance.now();
+    // Scale live work with Speed, within the frame time budget.
+    // CPU brushes stay paused; checks and demonstrations retain exact scheduling.
+    // Hold this physics instance while awaiting GPU completion.
+    const ph = phys, run = liveSection && !fastDry ? (speed > 0 || force ? Math.max(1, Math.round(speed * (active ? 0.5 : 1.5))) : 0) : exact ? want : quality === 'fast' && active && !gpuContact && demoPlaying !== 'play' && demoPlaying !== 'intro' ? 0 : fastDry ? Infinity : want, t1 = performance.now();
     let any = false; inputArrived = false;
     while (steps < run) {
       if (!exact && steps > 0 && (performance.now() - t1 >= GPU_BUDGET_MS[mode] || inputArrived || (!force && paused))) break;
@@ -406,7 +466,7 @@ async function frame(force = false, exact = false) {
       // Preserve the old adaptive smaller quantum until feedback can carry a full boundary.
       const surfaceBatch = !exact && fastDry && dryWait === 'surface' && Math.floor(chunkSteps) >= boundary;
       const wave = surfaceBatch ? boundary * Math.max(1, Math.floor(chunkSteps / boundary)) : boundary;
-      const n = exact ? run : Math.min(run - steps, wave, mode === 'stroke' ? 1 : Math.max(1, Math.floor(chunkSteps)));
+      const n = exact ? run : Math.min(run - steps, wave, realtime || mode === 'stroke' ? 1 : Math.max(1, Math.floor(chunkSteps)));
       const measured = !ph.sheet.knownDry, t2 = performance.now();
       let ran = n;
       if (surfaceBatch) { const result = await ph.stepSurface(n, boundary); wet = result.wet; ran = result.steps; }
@@ -435,7 +495,15 @@ async function frame(force = false, exact = false) {
     const ready = !wetNow(); quickDry = false; dirty = true;
     operation=null;postMessage({ type: 'dry-layer-done', ready });
   }
-  if (!wet && wasWet && !active) { if (phys) await phys.fix(sheet); else fix(sheet); foldLayers(); dirty = true; }
+  if (!wet && wasWet && !active) {
+    if (phys) {
+      const canFoldGpu = !sheet.resist && !sheet._liveTape;
+      const { foldedOnGpu } = await phys.fix(sheet, baseR, { foldOnGpu: canFoldGpu, foldFine: canFoldGpu && !det && !skipRender });
+      if (foldedOnGpu) { baseIsBare = false; baseDirty = false; }
+      else foldLayers();
+    } else { fix(sheet); foldLayers(); }
+    dirty = true; dryFinishDirty = true; dryCoarseRgba = null;
+  }
   wasWet = wet;
   if ((wet || dirty) && !pendingInput && !skipRender && !skipping) { await render(); dirty = false; }
   frameCount++;
@@ -443,7 +511,7 @@ async function frame(force = false, exact = false) {
 }
 const frameLocked = (force, exact) => locked(() => frame(force, exact));
 let frameQueued = false;
-setInterval(() => { if (det || frameQueued) return; frameQueued = true; locked(() => { frameQueued = false; return frame(); }).catch(onFailure); }, 40);
+setInterval(() => { if (det || frameQueued || pendingInput) return; frameQueued = true; locked(() => { frameQueued = false; return frame(); }).catch(onFailure); }, FRAME_MS);
 
 // Whether water still stands on the paper. A demonstration's next layer waits for this, not for the pores to dry, on
 // both physics: waiting for the WebGPU sheet to be wholly dry laid every glaze on fixed paint, flat and hard-edged,
@@ -489,25 +557,95 @@ async function play(name, deterministic = false, allowed = () => true) {
   let done = 0;
   const tell = phase => { if (!deterministic) postMessage({ type: 'progress', done, total, phase }); };
   const waiting = wait => async (...args) => { tell('drying'); await wait(...args); done++; tell('painting'); };
-  const api = { W, H, caption: text => { if (!deterministic) postMessage({ type: 'caption', text }); }, begin: (pt, t) => { tell('painting');if(!deterministic)postMessage({type:'materials',phase:t.tool==='pen'?'Drawing':t.tool==='water'?'Wetting the paper':name==='glaze'?'Glazing':'Wash',tool:t.tool==='pen'?'Dip pen':t.tool==='flat'?'Flat brush':t.tool==='water'?'Water brush':'Round brush',pigments:t.tool==='water'?[]:[BY_KEY[t.tool==='pen'?'walnut':t.pigment]||BY_KEY.walnut]});return locked(() => begin(pt, t)); }, move: pt => locked(() => move(pt)), end: async () => { await locked(end); done++; tell('painting'); }, pauseFor, alive, dryAll: waiting(dryAll), settle: waiting(settle) };
-  // a painting in progress is played fast: no steps during its strokes, the largest GPU budget and a strong dryer
+  const api = { W, H, caption: text => { if (!deterministic) postMessage({ type: 'caption', text }); }, begin: (pt, t) => {
+    // Live scripts use the resident Section brush for ordinary wash tools.
+    // Explicit Tuft choices and deterministic/Full scripts retain their model.
+    if(!deterministic&&!det&&quality==='fast'&&phys&&!t.model&&['round','flat','water'].includes(t.tool))t={...t,model:'section'};
+    tell('painting');if(!deterministic)postMessage({type:'materials',phase:t.tool==='pen'?'Drawing':t.tool==='water'?'Wetting the paper':name==='glaze'?'Glazing':'Wash',tool:t.tool==='pen'?'Dip pen':t.tool==='flat'?'Flat brush':t.tool==='water'?'Water brush':'Round brush',pigments:t.tool==='water'?[]:[BY_KEY[t.tool==='pen'?'walnut':t.pigment]||BY_KEY.walnut]});return locked(() => begin(pt, t)); }, move: pt => locked(() => move(pt)), end: async () => { await locked(end); done++; tell('painting'); }, pauseFor, alive, dryAll: waiting(dryAll), settle: waiting(settle) };
+  // Interactive scripts share the resident brush/solver budget; reference scripts keep their clock.
+  fastScript = !deterministic && !det && quality === 'fast';
   demoPlaying = example ? 'fast' : 'play';
-  try { return await script(api); } finally { demoPlaying = null; if (skipping) { skipping = false; dirty = true; } }
+  try { return await script(api); } finally { fastScript = false; demoPlaying = null; if (skipping) { skipping = false; dirty = true; } }
 }
 
-// Ten undoable actions, with an exact checkpoint at each visitor stroke end.
+// Ten undoable actions. Each lift captures an exact boundary, but readback,
+// compression and IndexedDB wait until the hand has rested for 250 ms.
 let history = [], historyAt = -1, autosaveEnabled = false, savedTick = -1, saving = false;
+const INPUT_IDLE_MS = 250;
+let checkpointTimer = null, lastInteractiveInput = -Infinity;
+const inputQuiet = () => performance.now() - lastInteractiveInput >= INPUT_IDLE_MS;
+function cancelCheckpointTimer() { clearTimeout(checkpointTimer); checkpointTimer = null; }
+function appendHistory(entry) {
+  for (const old of history.splice(historyAt + 1)) old.capture?.dispose();
+  history.push(entry);
+  if (history.length > 11) history.shift().capture?.dispose();
+  historyAt = history.length - 1; historyStatus();
+}
+async function materializeCheckpoint(at) {
+  const entry = history[at];
+  if (!entry || entry instanceof Uint8Array) return entry;
+  if (entry.capture) {
+    const snapshot = await entry.capture.read();
+    const top = snapshot.fields.layers; delete snapshot.fields.layers;
+    Object.assign(entry.value.fields, snapshot.fields);
+    if (top) entry.value.fields.layers.push(top);
+    if (snapshot.baseR) entry.value.baseR = snapshot.baseR;
+    entry.capture = null;
+  }
+  const bytes = await encodeState(entry.value); history[at] = bytes;
+  return bytes;
+}
+async function flushCheckpoints(idle = false) {
+  cancelCheckpointTimer();
+  let capturedTick;
+  for (let i = 0; i < history.length; i++) {
+    if (idle && (active || pendingInput || !inputQuiet())) { deferCheckpoints(); return; }
+    if (i === historyAt) capturedTick = history[i]?.value?.ticks;
+    if (!(history[i] instanceof Uint8Array)) await materializeCheckpoint(i);
+  }
+  if (history[historyAt] && (!idle || (!active && !pendingInput && inputQuiet()))) await autosave(history[historyAt], capturedTick);
+}
+function deferCheckpoints() {
+  cancelCheckpointTimer();
+  checkpointTimer = setTimeout(() => {
+    checkpointTimer = null;
+    locked(() => active || pendingInput || !inputQuiet() ? deferCheckpoints() : flushCheckpoints(true)).catch(onFailure);
+  }, INPUT_IDLE_MS);
+}
+const MAX_PENDING_CAPTURE_BYTES = 256 * 1024 * 1024;
+const pendingCaptureBytes = () => history.reduce((sum, entry) => sum + (entry.capture?.bytes ?? 0), 0);
+async function deferStrokeCheckpoint() {
+  let value, capture;
+  if (phys) {
+    // CPU-only metadata is small; the large physical planes stay on the GPU.
+    const fields = Object.fromEntries(SHEET_FIELDS.filter(k => !['W', 's', 'M', 'ever', 'G', 'P', 'D'].includes(k)).map(k => [k, sheet[k]]));
+    if (phys.sheet.hasTop && fields.layers.length) fields.layers = fields.layers.slice(0, -1);
+    const bytes = phys.captureStateBytes(sheet, { baseIsBare });
+    // Reserve before allocating: even a transient third capture can exhaust GPU memory.
+    while (history.some(e => e.capture) && (pendingCaptureBytes() + bytes > MAX_PENDING_CAPTURE_BYTES
+      || history.filter(e => e.capture).length >= 2)) {
+      await materializeCheckpoint(history.findIndex(e => e.capture));
+    }
+    if (bytes > MAX_PENDING_CAPTURE_BYTES) {
+      // A single oversized sheet cannot use staging within this budget.
+      appendHistory(await exactState()); deferCheckpoints(); return;
+    }
+    value = structuredClone(stateValue(fields, phys.captureBase(sheet, { baseIsBare }) ? null : baseR));
+    capture = phys.captureState(sheet, { baseIsBare });
+  } else value = structuredClone(stateValue());
+  appendHistory({ value, capture }); deferCheckpoints();
+}
 const reportSaveError = () => postMessage({ type: 'autosave', error: 'Autosave unavailable in this browser. Use Save image to keep a copy.' });
 const initialSavedSheet = savedSheet();
 initialSavedSheet.then(saved => { if (saved) postMessage({ type: 'resume-available', savedAt: saved.savedAt }); }).catch(reportSaveError);
-async function autosave(bytes) {
+async function autosave(bytes, atTick = ticks) {
   if (!autosaveEnabled && !strokes) return;
   autosaveEnabled = true;
-  try { await saveSheet(bytes); savedTick = ticks; postMessage({ type: 'autosave', savedAt: Date.now() }); } catch { reportSaveError(); }
+  try { await saveSheet(bytes); savedTick = atTick; postMessage({ type: 'autosave', savedAt: Date.now() }); } catch { reportSaveError(); }
 }
 // Stroke checkpoints already preserve wet paint. The periodic save only captures
 // its final dry state: a full-sheet download while drying can hold up the next stroke.
-const idleSaveReady = () => sheet && !active && !demoPlaying && !pendingInput && autosaveEnabled && savedTick !== ticks
+const idleSaveReady = () => sheet && !active && !demoPlaying && !pendingInput && inputQuiet() && history.every(v => v instanceof Uint8Array) && autosaveEnabled && savedTick !== ticks
   && !lastWet && !wetNow() && (!phys || phys.sheet.knownDry);
 setInterval(() => {
   if (saving || !idleSaveReady()) return;
@@ -515,18 +653,19 @@ setInterval(() => {
 }, 5000);
 const historyStatus = () => postMessage({ type: 'history', undo: historyAt > 0, redo: historyAt < history.length - 1 });
 async function exactState() {
-  if (phys) await phys.syncAll(sheet);
-  const fields = Object.fromEntries(SHEET_FIELDS.map(k => [k, sheet[k]]));
+  if (phys) await phys.syncAll(sheet, baseR);
+  return encodeState(stateValue());
+}
+function stateValue(fields = Object.fromEntries(SHEET_FIELDS.map(k => [k, sheet[k]])), savedBase = baseR) {
   // Bare paper is deterministic from the saved surface, dimensions and seed.
   // Preserve actual reflectance whenever an older wash has been folded into it.
-  return encodeState({ version: 2, fields, baseR: baseIsBare ? null : baseR, baseIsBare, graphite, names: NAMES, pigments: PIGS, recordedPaper: NAMES.some(k=>k.startsWith('recorded-'))?paper:null, paperIn, dpi, surface, seed: paperSeed,
-    ticks, simTime, strokes, marks, lastTool, paused, dryer, speed, wasWet, lastWet, stepDebt, lastDt });
+  return { version: 2, fields, baseR: baseIsBare ? null : savedBase, baseIsBare, graphite, names: NAMES, pigments: PIGS, recordedPaper: NAMES.some(k=>k.startsWith('recorded-'))?paper:null, paperIn, dpi, surface, seed: paperSeed,
+    ticks, simTime, strokes, marks, lastTool, paused, dryer, speed, wasWet, lastWet, stepDebt, lastDt };
 }
 async function checkpoint() {
+  await flushCheckpoints();
   const bytes = await exactState();
-  history.splice(historyAt + 1); history.push(bytes);
-  if (history.length > 11) history.shift();
-  historyAt = history.length - 1; historyStatus(); await autosave(bytes);
+  appendHistory(bytes); await autosave(bytes);
 }
 async function restoreExact(bytes) {
   const v = await decodeState(bytes);
@@ -540,15 +679,17 @@ async function restoreExact(bytes) {
   ({ ticks, simTime, strokes, marks, lastTool, paused, dryer, speed, wasWet, lastWet, stepDebt, lastDt } = v);
   if (phys) { phys.setPigments(PIGS); await phys.load(sheet, baseR, graphite); }
   else if (gpu && gpuCanvas) rebuildGl();
-  dirty = baseDirty = graphiteDirty = true;
+  dirty = baseDirty = graphiteDirty = true; dryFinishDirty = true; dryCoarseRgba = null;
   await render();
 }
 async function travel(delta) {
+  await flushCheckpoints();
   const next = historyAt + delta;
   if (next < 0 || next >= history.length) return;
   await restoreExact(history[next]); historyAt = next; historyStatus(); await autosave(history[next]);
 }
 async function replaceSheet(fn) {
+  await flushCheckpoints();
   if (sheet && historyAt >= 0) history[historyAt] = await exactState();
   await fn(); await checkpoint();
 }
@@ -558,7 +699,7 @@ async function replaceSheet(fn) {
 // back (sheet-state.js) for the default papers; loading one is a moment where playing it at 200 dpi is minutes.
 const stateFile = (name, d) => new URL(`./examples/${name}-${d}dpi.sheet`, import.meta.url);
 async function captureSheet() {
-  if (phys) await phys.syncAll(sheet);
+  if (phys) await phys.syncAll(sheet, baseR);
   return packSheet(sheet, baseR, bareBase(), graphite, { paperIn, dpi, surface, seed: paperSeed, names: NAMES, strokes, wet: wetNow() || lastWet });
 }
 // Load a saved sheet in place of the current one. Resolves false when there is none for this resolution, to play it instead.
@@ -578,7 +719,7 @@ async function loadSheet(name, alive = () => true) {
   strokes = h.strokes; wasWet = h.wet; lastWet = h.wet;
   if (phys) { phys.setPigments(PIGS); await phys.load(sheet, baseR, graphite); } else if (gpu && gpuCanvas) rebuildGl();
   postMessage({ type: 'sheet', width: W, height: H, dpi, paperIn, surface, physics: phys ? 'webgpu' : 'cpu' });
-  dirty = true; baseDirty = true; graphiteDirty = true;
+  dirty = true; baseDirty = true; graphiteDirty = true; dryFinishDirty = true; dryCoarseRgba = null;
   return true;
 }
 
@@ -608,17 +749,27 @@ function restoreSoon(attempt = 0) {
   if (!gpu || attempt > 30 || (attempt > 0 && !gpu.isLost())) return;
   gpu.restore(); setTimeout(() => restoreSoon(attempt + 1), 50);
 }
-// Save in GPU mode: the canvas as a PNG, or the pixels read back if the canvas cannot encode itself.
-async function snapshot() {
+// Save in GPU mode: 2x sub-cell smooth KM finish on WebGPU, or WebGL2 canvas PNG / pixel readback fallback.
+async function snapshot({ native = false } = {}) {
+  if (phys && !phys.lost) {
+    await phys.syncAll(sheet, baseR);
+    if (phys.finish && !native) {
+      try {
+        const { fineRgba, fineWidth, fineHeight } = await phys.finish.render({ sheet, pigments: PIGS, paper, baseR: renderBase(), graphite, wantCoarse: false });
+        postMessage({ type: 'snapshot', rgba: fineRgba, width: fineWidth, height: fineHeight }, [fineRgba.buffer]);
+        return;
+      } catch { /* fall through to 1x WebGPU composer readback */ }
+    }
+    baseDirty = true; drawPhys(); const rgba = await phys.readPixels(); postMessage({ type: 'snapshot', rgba, width: W, height: H }, [rgba.buffer]);
+    return;
+  }
   try {
-    if (phys) throw new Error('read back'); // the WebGPU canvas is presented at the end of a task: read the composed pixels instead
     // the canvas keeps no drawing buffer between tasks, so draw again and encode in this same task
     if (!gpu || gpu.isLost()) throw new Error('no renderer');
     renderGl(true);
     if (failBlob) { failBlob = false; throw new Error('forced'); }
     postMessage({ type: 'snapshot', blob: await gpuCanvas.convertToBlob() });
   } catch {
-    if (phys && !phys.lost) { baseDirty = true; drawPhys(); const rgba = await phys.readPixels(); postMessage({ type: 'snapshot', rgba, width: W, height: H }, [rgba.buffer]); return; }
     if (!gpu || gpu.isLost()) { postMessage({ type: 'snapshot', blob: null }); return; }
     renderGl(true); const rgba = gpu.readPixels(); postMessage({ type: 'snapshot', rgba, width: W, height: H }, [rgba.buffer]);
   }
@@ -659,11 +810,11 @@ const lab = {
   reset: opts => locked(() => newSheet(opts)),
   play: name => play(name, true),
   idle: () => (phys ? phys.idle() : Promise.resolve()),
-  sync: () => locked(() => phys?.syncAll(sheet)),
+  sync: () => locked(() => phys?.syncAll(sheet, baseR)),
   drawPixels: async () => { if (!phys) return null; baseDirty = true; graphiteDirty = true; drawPhys(); return phys.readPixels(); },
   state: () => ({ sheet, baseR, graphite, phys, N, W, H, dpi }),
   setPhys: p => { phys = p; }, getPhys: () => phys, stats: () => ({ frames: frameCount, stepMs, stepCount, frameMs, renderMs, renderCount, strokeMs, ticks, strokes, phys: phys ? { ...phys.stats } : null }),
-  resetStats: () => { frameCount = 0; stepMs = 0; stepCount = 0; frameMs = 0; renderMs = 0; renderCount = 0; strokeMs = 0; phys && Object.assign(phys.stats, { steps: 0, stepMs: 0, down: 0, downMs: 0, downBytes: 0, up: 0, upMs: 0, fixes: 0, fullDown: 0 }); },
+  resetStats: () => { frameCount = 0; stepMs = 0; stepCount = 0; frameMs = 0; renderMs = 0; renderCount = 0; strokeMs = 0; phys && Object.assign(phys.stats, { steps: 0, stepMs: 0, down: 0, downMs: 0, downBytes: 0, up: 0, upMs: 0, fixes: 0, fullDown: 0, fullUp: 0 }); },
   renderCpu, det: on => { det = on; }, marks: () => marks, dpi: () => dpi, skipRender: on => { skipRender = on; },
   setPerturb: v => { perturb = v; }, setDryer: on => { dryer = on; }, wetNow: () => locked(wetNow), lastWet: () => lastWet, frame: () => frameLocked(false, true),
 };
@@ -678,14 +829,15 @@ async function liveTape(data,current){
     await newSheet({paperW:tape.paperIn?.[0]??tape.w/60,paperH:tape.paperIn?.[1]??tape.h/60,dpi:tape.dpi??60,seed:tape.paper?.seed??9});
     demoPlaying='live';
     PIGS=tape.pigments;NAMES=PIGS.map((_,i)=>`recorded-${i}`);
-    paper=makePaper(W,H,tape.paper);
+    paper = phys && !phys.lost ? await makePaperGpu(phys.device, W, H, tape.paper) : makePaper(W, H, tape.paper);
     sheet=createSheet(paper,PIGS);sheet._liveTape=true;if(saved){Object.assign(sheet,saved.fields);sheet.wetDirty=1;}baseR.set(Float32Array.from(tapeBase(tape,paper),v=>v/255));baseIsBare=false;
-    if(phys){phys.setPigments(PIGS);await phys.load(sheet,baseR,graphite);}else if(gpu)rebuildGl();
-    paused=false;masksDirty=true;strokes=saved?.tape.done||0;await render();
+    if(phys){phys.setPigments(PIGS);await phys.load(sheet,baseR,graphite);phys.finish?.invalidate(true);}else if(gpu)rebuildGl();
+    paused=false;masksDirty=true;dryFinishDirty=true;dryCoarseRgba=null;strokes=saved?.tape.done||0;await render();
     postMessage({type:'live-ready',liveRun:data.liveRun,done:strokes,total:tape.strokeCount});
   });
   // An import's pen drawing (its first data.fastStrokes strokes) is laid without per-stroke frames or waits; a frame is
-  // shown about four times a second. Recorded tapes have no fastStrokes and replay as before.
+  // shown about four times a second. Full recorded playback retains its original pacing.
+  const interactive=()=>quality==='fast'&&!det;
   const fast=done=>done<(data.fastStrokes||0);let fastNow=false,fastDrawn=0;
   const fastFrame=async()=>{if(performance.now()-fastDrawn<250)return false;fastDrawn=performance.now();await locked(async()=>{if(current()){await render();dirty=false;}});return true;};
   let completed=saved?.tape.done||0,deadline=performance.now(),strokeStart=0,lastPresent=0,presentTravelMs=0,sawWash=tape.marks.slice(0,saved?.tape.index||0).some(m=>m.k==='s');
@@ -700,12 +852,17 @@ async function liveTape(data,current){
       postMessage({type:'materials',liveRun:data.liveRun,phase,tool:isPen?'Dip pen':mark.wt?'Water brush':tool.flat?'Flat brush':'Round brush',pigments:tape.pigments.map((p,i)=>({...p,amount:conc[i]||0})).filter(p=>p.amount>0),done,total});
     },
     end:async()=>{if(current()){
+      if(phys&&active?.brush?.model==='section')await phys.sectionPending;
       // Flush the last deposited point before lifting, including very short strokes.
       if(presentTravelMs>0&&!fastNow)await locked(()=>render());
       presentTravelMs=0;active=null;replayPoint=null;
     }},
-    touch:(pts,reach,fn)=>locked(async()=>{
+    touch:(pts,reach,fn,{between=false}={})=>locked(async()=>{
       if(!current())return null;
+      if(!between&&active?.kind==='brush'&&canSectionGpu(active.brush,sheet.K)){
+        await touching(pts,reach,fn);
+        return null;
+      }
       const points=active?.brush?.tip?[...pts,active.brush.tip]:pts;
       const rect=phys?phys.rect(points,reach):[
         Math.max(0,Math.floor(Math.min(...points.map(p=>p.x))-reach)),
@@ -737,34 +894,84 @@ async function liveTape(data,current){
       active=null;replayPoint=null;
       if(['dip','ink'].includes(event.kind)&&fast(event.done)){if(!liveCarry)await apply();return;}
       let mask=event.mask;
-      if(event.kind==='dry'||event.kind==='flow')await locked(async()=>{if(phys)await phys.syncAll(sheet);mask=Uint8Array.from(sheet.W,(v,i)=>v>0||sheet.s[i]>0?1:0);});
+      if(event.kind==='dry'||event.kind==='flow')await locked(async()=>{
+        if(phys){mask=await phys.sheet.wetMask();}
+        else mask=Uint8Array.from(sheet.W,(v,i)=>v>0||sheet.s[i]>0?1:0);
+      });
+      if(interactive()&&event.kind==='paint'&&tape.marks[event.index]?.k==='g'){await apply();return;}
       operation={...event,mask};postMessage({type:'operation',liveRun:data.liveRun,...operation});
-      await locked(()=>render());
+      if(!interactive()||performance.now()-lastPresent>=16){await locked(()=>render());lastPresent=performance.now();}
       // Show the affected area before and after the action, including removal.
       const hold=['dip','ink','flow'].includes(event.kind)?35:180;
-      await sleep(Math.max(20,hold/liveSpeed));
+      if(!interactive())await sleep(Math.max(20,hold/liveSpeed));
       while(livePaused&&current()&&!liveCarry)await sleep(30);
       if(!current()||liveCarry)return;
       // An imported event may carry its own transport options (o) for flow and drying.
       liveOptions=tape.marks[event.index]?.o??null;try{await apply();}finally{liveOptions=null;}if(!current())return;masksDirty=true;
-      await locked(()=>current()?render():undefined);await sleep(Math.max(20,hold/liveSpeed));
+      if(!interactive()||performance.now()-lastPresent>=16){await locked(()=>current()?render():undefined);lastPresent=performance.now();await sleep(0);}if(!interactive())await sleep(Math.max(20,hold/liveSpeed));
       if(current())operation=null;
       // An import pauses once its pen drawing is down and dry, and offers the washes.
       if(current()&&data.pauseAfter===event.index){livePaused=true;await locked(()=>current()?render():undefined);postMessage({type:'live-paused',liveRun:data.liveRun,done:event.done,total:event.total});}
     },
     progress:async(done,total)=>{if(!current())return;strokes=completed=done;
       if(fastNow){if(await fastFrame()||done===data.fastStrokes)postMessage({type:'progress',liveRun:data.liveRun,done,total,phase:'painting'});return;}
-      await locked(async()=>{await render();dirty=false;});
+      if(!interactive()||performance.now()-lastPresent>=16){await locked(async()=>{await render();dirty=false;});lastPresent=performance.now();await sleep(0);}
       postMessage({type:'progress',liveRun:data.liveRun,done,total,phase:'painting'});
-      await sleep(Math.max(30/liveSpeed,280/liveSpeed-(performance.now()-strokeStart)));},
-    mutate:fn=>locked(async()=>{if(!current())return;if(phys)await phys.syncAll(sheet);fn();if(phys)await phys.load(sheet,baseR,graphite);dirty=baseDirty=true;}),
+      if(!interactive())await sleep(Math.max(30/liveSpeed,280/liveSpeed-(performance.now()-strokeStart)));},
+    graphite:!interactive()?null:async(batch,draw)=>{
+      // No live timer physics runs here. One coherence boundary for the whole
+      // group preserves wet pigment and all other planes, including a late pencil pass.
+      let count=0;await locked(async()=>{
+        if(!current())return;
+        if(phys)await phys.syncAll(sheet,baseR);
+        let shown=performance.now();
+        for(const mark of batch){
+          if(!current()||liveCarry)break;
+          while(livePaused&&current()&&!liveCarry)await sleep(30);
+          if(!current()||liveCarry)break;
+          draw(mark);count++;
+          if(performance.now()-shown>=16){
+            if(phys)phys.upload(sheet);
+            await render();await sleep(0);shown=performance.now();
+          }
+        }
+        if(phys){phys.upload(sheet);phys.finish?.invalidate(false);}
+        dirty=true;dryFinishDirty=true;dryCoarseRgba=null;
+      });return count;
+    },
+    mutate:fn=>locked(async()=>{if(!current())return;if(phys)await phys.syncAll(sheet, baseR);fn();if(phys){phys.upload(sheet);phys.finish?.invalidate(false);}dirty=baseDirty=true;dryFinishDirty=true;dryCoarseRgba=null;}),
     flow:(dry,m)=>locked(async()=>{if(!current())return;
-      if(phys)await phys.syncAll(sheet);tapeFlow(liveOptions?{...tape,opts:{...tape.opts,...liveOptions}}:tape,sheet,dry,m);if(phys)await phys.load(sheet,baseR,graphite);baseDirty=true;
-      lastDt=null;ticks++;dirty=true;})
-  },saved?.tape);}finally{if(current()){active=null;replayPoint=null;operation=null;demoPlaying=null;paused=false;await locked(async()=>{await render();await checkpoint();});postMessage({type:'played',liveRun:data.liveRun,name:'live',example:true,wet:sheet.W.some(v=>v>0)||sheet.s.some(v=>v>0),strokes:completed});}}
+      const opts={...DEFAULTS,...tape.opts,...(liveOptions??{})};
+      const gpuOk = phys && !phys.lost && !(opts.fixedBed > 0);
+      if (gpuOk) {
+        await phys.sectionPending;
+        const quick=interactive();
+        phys.setOptions({ ...opts, realtime:quick, mmPerCell: sheet.paper?.mmPerCell ?? 0.3 });
+        if (dry) {
+          await phys.sheet.dry(m?.m ?? 40000, { level: m?.l ?? 60, levelMax: m?.lm ?? 4000, levelTol: m?.lt ?? 0.02, dt: quick?Math.max(m?.dt??2,8):m?.dt??2, budgetMs:quick?180:Infinity, onProgress:quick?async()=>{await render();await sleep(0);}:null });
+          await phys.fix(sheet, baseR, { foldOnGpu: false });
+          phys.stale = true; phys.topStale = true; phys.fresh.stale();
+        } else {
+          await phys.step(1);
+        }
+      } else {
+        if(phys)await phys.syncAll(sheet, baseR);
+        // Archived fixed-bed passages need CPU transport. Use its established
+        // analytic pore tail in Fast mode too; Full keeps the recorded schedule.
+        const quick=dry&&interactive();
+        const cpuTape=liveOptions||quick?{...tape,opts:{...opts,...(quick?{evap:opts.evap*4,edgeEvap:opts.edgeEvap*4,paperDry:opts.paperDry*4}:{})}}:tape;
+        tapeFlow(cpuTape,sheet,dry,quick?{...m,at:true,dt:Math.max(m?.dt??2,8)}:m);
+        if(phys)phys.upload(sheet);
+      }
+      baseDirty=true;lastDt=null;ticks++;dirty=true;dryFinishDirty=true;dryCoarseRgba=null;})
+  },saved?.tape);}finally{if(current()){active=null;replayPoint=null;operation=null;if(!interactive())demoPlaying=null;paused=false;await locked(async()=>{await render();await checkpoint();});demoPlaying=null;dirty=true;postMessage({type:'played',liveRun:data.liveRun,name:'live',example:true,wet:sheet.W.some(v=>v>0)||sheet.s.some(v=>v>0),strokes:completed});}}
 }
 
 onmessage = ({ data }) => {
+  if (['down', 'move', 'up'].includes(data.type)) {
+    lastInteractiveInput = performance.now();
+    if (data.type === 'down') cancelCheckpointTimer();
+  }
   if (['reset', 'clear', 'resume', 'down', 'load', 'play', 'intro', 'undo', 'redo', 'base', 'live', 'stop-live'].includes(data.type)) playbackRequest++;
   const request = playbackRequest, current = () => request === playbackRequest;
   const run = fn => locked(fn).catch(onFailure);
@@ -779,7 +986,7 @@ onmessage = ({ data }) => {
   else if(data.type==='carry-live'){liveCarry=true;livePaused=false;}
   else if (data.type === 'config') configure(data);
   else if (data.type === 'canvas') run(() => onCanvas(data));
-  else if (data.type === 'snapshot') run(snapshot);
+  else if (data.type === 'snapshot') run(() => snapshot(data));
   else if (data.type === 'debug') { if (data.action === 'lose') gpu?.lose(); else if (data.action === 'restore') restoreSoon(); else if (data.action === 'failBlob') failBlob = true; else if (data.action === 'loseDevice') phys?.device.destroy(); }
   else if (data.type === 'kernels') input(async () => {
     if (!phys) { postMessage({ type: 'kernels', supported: false }); return; }
@@ -795,7 +1002,7 @@ onmessage = ({ data }) => {
       postMessage({ type: 'kernels', supported: true, rows });
     } finally { timer.destroy(); await restoreExact(saved); }
   });
-  else if (data.type === 'contact-audit') run(async () => { if (phys) { if (data.neighborCells?.length) await phys.syncAll(sheet); else await phys.ensureFresh(sheet, data.rect); } postMessage({type:'contact-audit',stage:data.stage ?? 'paper',strokes,at:performance.now(),verdict:contactVerdict(),measurement:contactAudit(sheet,null,data.rect,data.neighborCells??[])}); });
+  else if (data.type === 'contact-audit') run(async () => { if (phys) { if (data.neighborCells?.length) await phys.syncAll(sheet, baseR); else await phys.ensureFresh(sheet, data.rect); } postMessage({type:'contact-audit',stage:data.stage ?? 'paper',strokes,at:performance.now(),verdict:contactVerdict(),measurement:contactAudit(sheet,null,data.rect,data.neighborCells??[])}); });
   else if (data.type === 'probe') { if (sheet) run(() => probe(data)); }
   else if (data.type === 'reset') input(() => replaceSheet(() => newSheet(data)));
   else if (data.type === 'resume') input(async () => { const saved = await savedSheet(); if (saved) { await restoreExact(saved.bytes); autosaveEnabled = true; await checkpoint(); } });
@@ -806,17 +1013,19 @@ onmessage = ({ data }) => {
   else if (data.type === 'remove-mask' || data.type === 'remove-boundary') input(async()=>{
     if(!sheet||demoPlaying)return;
     if(active)await end();
+    await flushCheckpoints();
     const kind=data.type==='remove-mask'?'unmask':'unclip';
     nameOperation(kind,kind==='unmask'?sheet.resist:sheet.clip);await render();
     await sleep(180);
-    if(phys)await phys.syncAll(sheet);
+    if(phys)await phys.syncAll(sheet, baseR);
     if(kind==='unmask'){liftResist(sheet);foldLayers();}else setClip(sheet,null);
-    if(phys)await phys.load(sheet,baseR,graphite);
-    masksDirty=true;await render();await sleep(180);operation=null;await render();await checkpoint();
+    if(phys){phys.upload(sheet);phys.setBase(renderBase());phys.finish?.invalidate(false);}
+    masksDirty=true;baseDirty=false;dryFinishDirty=true;dryCoarseRgba=null;await render();await sleep(180);operation=null;await render();await checkpoint();
   });
   else if (data.type === 'dry-layer') input(async () => {
     if (!sheet || demoPlaying) return;
     if (active) { await end(); await checkpoint(); }
+    else await flushCheckpoints();
     nameOperation('dry',new Uint8Array(N).fill(1));
     paused = false; quickDry = true; quickDryStarted = performance.now(); dryPeak = 0; dryStart = ticks; dirty = true;
     await render();
@@ -829,7 +1038,7 @@ onmessage = ({ data }) => {
     // Rendering each stale batch (and awaiting its GPU completion) compounds cursor lag.
     for (const pt of data.pts) await move(pt);
     if (Number.isFinite(data.t)) moveT = data.t;
-    if (dirty && sheet && (pendingInput === 1 || performance.now() - lastInputDraw >= 16)) { await render(); dirty = false; lastInputDraw = performance.now(); }
+    if (dirty && sheet && (pendingInput === 1 || performance.now() - lastInputDraw >= 14)) { await render(); dirty = false; lastInputDraw = performance.now(); }
   });
   else if (data.type === 'up') input(async () => {
     if (!active) return;
@@ -837,7 +1046,7 @@ onmessage = ({ data }) => {
     // Present the lifted brush and final deposited paint before downloading and
     // compressing the sheet for undo. Saving must not delay the visible lift.
     await render(); dirty = false;
-    await checkpoint();
+    await deferStrokeCheckpoint();
   });
   else if (data.type === 'speed') { inputArrived = true; speed = data.value; }
   else if (data.type === 'skip') { if (demoPlaying) skipping = true; }
@@ -851,8 +1060,8 @@ onmessage = ({ data }) => {
       if (data.width !== W || data.height !== H) throw new Error(`base image ${data.width}x${data.height} does not match the ${W}x${H} sheet`);
       const px = data.rgba, white = data.white;
       for (let i = 0; i < N; i++) for (let c = 0; c < 3; c++) baseR[i * 3 + c] *= Math.min(1.02, px[i * 4 + c] / white[c]);
-      baseIsBare = false; baseDirty = true; dirty = true;
-      if (phys) await phys.load(sheet, baseR, graphite);
+      baseIsBare = false; baseDirty = true; dirty = true; dryFinishDirty = true; dryCoarseRgba = null;
+      if (phys) { phys.setBase(baseR); phys.finish?.invalidate(false); }
     });
     if (current()) { await render(); dirty = false; postMessage({ type: 'played', name: 'film', example: true, wet: false, strokes }); }
   });
@@ -900,6 +1109,7 @@ onmessage = ({ data }) => {
     (async () => {
       const loaded = await input(async () => {
         if (!current()) return false;
+        await flushCheckpoints();
         if (historyAt >= 0) history[historyAt] = await exactState();
         return data.type === 'load' && await loadSheet(data.name, current);
       });

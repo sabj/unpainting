@@ -16,6 +16,9 @@ import {renderLayers} from '../../src/media/km.mjs';
 import {materialProfile,drawMaterial} from '../../src/paint/methods/material-profiles.mjs';
 import {makeInkRes} from '../../src/paint/methods/ink-res.mjs';
 import {drawFineMaterial} from '../../src/paint/methods/fine-material.mjs';
+// CPU-current observations can leave asynchronous pigment uploads queued. Drain
+// them before terminating the worker, so Dawn is not torn down in shader creation.
+function closeGpu(sheet){const link=sheet._gpu;if(!link)return;try{link.call({op:'idle'});}finally{link.close();}}
 const hash=b=>crypto.createHash('sha256').update(b).digest('hex');
 const dir=t=>{const d=fs.mkdtempSync(path.join(os.tmpdir(),'native-operations-'));t.after(()=>fs.rmSync(d,{recursive:true,force:true}));return d;};
 async function reconstruct(directory){
@@ -81,7 +84,7 @@ test('GPU recording parity through brush, fine carry, drawing dry and graphite',
  const {coherent,step}=await import('../../src/media/sheet.mjs');
  {const probe=createSheet(makePaper(8,8,{seed:15}),[materialProfile('graphite-HB').pigment]);let info;
   try{info=attachGpu(probe,DEFAULTS,{mode:'on',log:()=>{}});}catch(e){if(process.env.GPU_REQUIRED==='1')throw e;t.skip(`no GPU: ${e.message}`);return;}
-  finally{probe._gpu?.close();}
+  finally{closeGpu(probe);}
   if(info.backend!=='gpu'){if(process.env.GPU_REQUIRED==='1')assert.fail(`no GPU: ${info.reason}`);t.skip(`no GPU: ${info.reason}`);return;}}
  const width=48,height=32,pigments=[materialProfile('graphite-HB').pigment,materialProfile('drawing-ink').pigment],directory=dir(t);
  function run(record){
@@ -97,7 +100,7 @@ test('GPU recording parity through brush, fine carry, drawing dry and graphite',
    dry(sheet,30000,DEFAULTS,{levelMax:90,dt:14,analyticTail:true});capture('dry');fine.settle();
    drawMaterial(sheet,[{points:[{x:5,y:25,s:.6},{x:38,y:26,s:.7}]}],new Float32Array(sheet.n),width,height,{medium:'graphite-HB',mmPerCell:1,O:DEFAULTS,...(record?{afterStroke:()=>capture('graphite'),afterDry:()=>capture('drawing-dry')}:{})});capture('layer');
    const pixels=view();writer?.finish(pixels);coherent(sheet);return {pixels,fields:Object.fromEntries(['W','s','G','P','D','layers'].map(k=>[k,structuredClone(sheet[k])])),fineFields:Object.fromEntries(['W','s','G','P','D','layers'].map(k=>[k,structuredClone(fine.fine[k])]))};
-  }finally{sheet._gpu.close();}
+  }finally{closeGpu(sheet);}
  }
  const off=run(false),on=run(true);assert.deepEqual(on.pixels,off.pixels);assert.deepEqual(on.fields,off.fields);assert.deepEqual(on.fineFields,off.fineFields);
  const {manifest,rgb}=await reconstruct(directory);assert.deepEqual(Buffer.from(rgb),Buffer.from(on.pixels));const kinds=manifest.events.map(e=>e.operation);for(const kind of ['brush','ink','ink-carry','ink-wet','ink-settle','drawing-dry','graphite','dry','layer','final'])assert(kinds.includes(kind),kind);
@@ -134,7 +137,7 @@ test('refill boundaries capture every physical ink segment without changing gest
    drawFineMaterial(fine,[{points:[{x:3,y:12,s:.6,nw:.8},{x:74,y:12,s:.6,nw:.8}]}],{w,h,medium:'drawing-ink',sourceInk:true,mmPerCell:.25,O:DEFAULTS,pen:{reservoir:2},audit,afterStroke:e=>gestureCallbacks.push(e.reloads),...(record?{afterSegment:e=>{segments.push({reason:e.reason,pixels:Buffer.from(view())});writer.capture(view(),{operation:'ink',reason:e.reason});}}:{})});
    const pixels=Buffer.from(view());writer?.finish(pixels);coherent(main);
    return {pixels,tape:structuredClone(tape),audit,segments,gestureCallbacks,fields:Object.fromEntries(['W','s','G','P','D','layers'].map(k=>[k,structuredClone(fine.fine[k])])),mainFields:Object.fromEntries(['W','s','G','P','D','layers'].map(k=>[k,structuredClone(main[k])]))};
-  }finally{recordMarks(false);main._gpu?.close();}
+  }finally{recordMarks(false);closeGpu(main);}
  }
  const off=run(false),on=run(true);assert.deepEqual(on.pixels,off.pixels);assert.deepEqual(on.tape,off.tape);assert.deepEqual(on.fields,off.fields);assert.deepEqual(on.mainFields,off.mainFields);assert.deepEqual(on.audit,off.audit);assert.deepEqual(on.gestureCallbacks,off.gestureCallbacks);assert.equal(on.gestureCallbacks.length,1);
  const penMarks=on.tape.filter(m=>m.k==='P');assert(penMarks.length>1,'fixture must refill inside one gesture');assert.equal(new Set(penMarks.map(m=>m.gestureId)).size,1);assert.equal(on.segments.length,penMarks.length);assert.equal(on.segments.at(-1).reason,'gesture-end');assert(on.segments.slice(0,-1).every(e=>e.reason==='refill'));
@@ -163,7 +166,7 @@ for(const demand of ['0','1'])test('main GPU refill frames read current ink and 
    drawMaterial(main,[{points:[{x:4,y:12,s:.6,nw:.8},{x:94,y:12,s:.6,nw:.8}]}],new Float32Array(w*h),w,h,{medium:'drawing-ink',mmPerCell:.25,O:DEFAULTS,pen:{reservoir:.5},dryInk:false,audit,afterStroke:()=>gestures++,...(record?{afterSegment:e=>{const topStale=main._gpu.topStale,version=main._gpu.version,rgb=view(),reference=renderLayers(layersOf(main),pigments,base,w*h,1);assert.equal(hash(rgb),hash(reference),'production frame equals current physical pigment');assert.equal(main._gpu.version,version,'observation cannot advance GPU physics');events.push({version,topStale,hash:hash(rgb),reason:e.reason});writer.capture(rgb,{operation:'ink',reason:e.reason});}}:{})});
    const pixels=Buffer.from(view());writer?.finish(pixels);coherent(main);
    return {pixels,tape:structuredClone(tape),audit,gestures,events,fields:Object.fromEntries(['W','s','G','P','D','layers'].map(k=>[k,structuredClone(main[k])]))};
-  }finally{recordMarks(false);main._gpu.close();}
+  }finally{recordMarks(false);closeGpu(main);}
  }
  const off=run(false),on=run(true);assert.deepEqual(on.pixels,off.pixels);assert.deepEqual(on.fields,off.fields);assert.deepEqual(on.tape,off.tape);assert.deepEqual(on.audit,off.audit);assert.equal(on.gestures,1);
  assert(on.events.length>3);assert(on.events.some((e,i,a)=>i&&e.version===a[i-1].version&&e.hash!==a[i-1].hash),'two real segments between GPU flow steps must have different frames');

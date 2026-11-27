@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createBrush, dip, candidateContact, ContactWorkspace } from './brush.mjs';
+import { createBrush, dip, stroke, candidateContact, ContactWorkspace, setStrokeVariety } from './brush.mjs';
 import { makePaper } from './paper.mjs';
 import { createSheet } from './sheet.mjs';
 
@@ -75,5 +75,31 @@ test('mask-only predictions lazily read stamps without a full-plane copy', () =>
     assert.deepEqual(actual.mask,expected.mask); assert.equal(actual.continuation.touched,undefined);
     assert.ok(workspace.readCells.length<sheet.n/4);
     delete sheet.touched.slice; delete workspace.touched.set; sheet.clock+=10;
+  }
+});
+
+test('section and tuft workspaces retain exact contact, disk halos and live continuation state', () => {
+  const workspace = new ContactWorkspace();
+  for (const model of ['section', 'tuft']) for (const flat of [false, true]) {
+    const sheet = createSheet(makePaper(96, 72, {seed:9, fibres:0}), [{K:[1,.5,.2],S:[.1,.1,.1],rho:.1,omega:.2,gamma:.1}]);
+    sheet.clip = Uint8Array.from({length:sheet.n}, (_, i) => i % 11 !== 0);
+    const brush = createBrush({model, flat, radius:8, bristles:19, seed:4});
+    dip(brush, {water:.7, conc:[1]});
+    setStrokeVariety(brush, .8);
+    stroke(brush, sheet, [{x:5,y:8},{x:30,y:20}], {lift:false});
+    for (const neighborRadius of [0,1,3,5]) for (const lift of [true,false]) for (const upright of [false,true,'sweep']) {
+      for (const path of [
+        [{x:28,y:18,r:7,p:.2},{x:50,y:40,r:12,p:1},{x:90,y:20,r:8,p:.3}],
+        [{x:95,y:70},{x:104,y:80}], [], [{x:200,y:200},{x:210,y:210}],
+      ]) {
+        const options = {neighborRadius,lift,upright};
+        const before = JSON.stringify(brush), touched = sheet.touched?.slice(), strengths = sheet.contactStrength?.slice(), water = sheet.W.slice();
+        const expected = candidateContact(brush, sheet, path, options);
+        assert.deepEqual(candidateContact(brush, sheet, path, {...options,workspace}), expected);
+        assert.deepEqual(candidateContact(brush, sheet, path, {...options,workspace,includeTouched:false}), {...expected,continuation:{...expected.continuation,touched:undefined}});
+        assert.equal(JSON.stringify(brush), before);
+        assert.deepEqual(sheet.touched, touched); assert.deepEqual(sheet.contactStrength, strengths); assert.deepEqual(sheet.W, water);
+      }
+    }
   }
 });

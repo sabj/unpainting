@@ -15,7 +15,10 @@ import { preparePassageBed } from '../../src/paint/techniques/passage-plan.mjs';
 export function prepareWetBed({ settings, bristles, seed, pigments, target, points, prepOpts, observe, gate, advance, createBrush, dip, thirsty, stroke }) {
   const zeros = () => new Array(pigments).fill(0);
   const clean = depositDepth => createBrush({ ...settings, bristles, bridge: 0, breakup: .05, streak: 0, depositDepth, seed });
-  const wet = () => { const p = gate(); const b = clean(p.saturationMax >= .5 ? .1 : 0); dip(b, { water: .55, conc: zeros() }); stroke(b, target, points, prepOpts); };
+  // Start with a moderate 0.55 load; if cold-press pits remain dry after a pass (toothReach scales as sat^3),
+  // load more clean water on retries so the liquid bridges the hollows instead of repeating the same dry skip.
+  let wets = 0;
+  const wet = () => { const p = gate(); const b = clean(p.saturationMax >= .5 ? .1 : 0); const water = Math.min(.95, .55 + .15 * wets++); dip(b, { water, conc: zeros() }); stroke(b, target, points, prepOpts); };
   const pickup = () => { const b = clean(0); dip(b, { water: .08, conc: zeros() }); thirsty(b, { water: .08 }); stroke(b, target, points, prepOpts); };
   return preparePassageBed({ observe, maxActions: 16, wet, pickup, advance });
 }

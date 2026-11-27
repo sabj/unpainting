@@ -2,7 +2,7 @@
 """Tiny RunPod client. RUNPOD_API_KEY comes from the environment, or from the .env file named by UNPAINTING_ENV_FILE
 (default: .env at the repository root, which git ignores). It never goes on argv.
   api.py rp-gql "<graphql query>"            RunPod GraphQL
-  api.py rp METHOD /path [json-body]        RunPod REST (rest.runpod.io/v1)
+  api.py rp METHOD /path [json-body]        RunPod REST (api.runpod.io/v2), e.g. rp GET /pods lists the pods
 """
 import json, os, sys, urllib.request, urllib.error
 from pathlib import Path
@@ -24,7 +24,7 @@ def call(url, method="GET", body=None, headers=None):
     try: return json.loads(t)
     except Exception: return t
 def rp(method, path, body=None):
-    return call("https://rest.runpod.io/v1"+path, method, body, {"Authorization":"Bearer "+env("RUNPOD_API_KEY")})
+    return call("https://api.runpod.io/v2"+path, method, body, {"Authorization":"Bearer "+env("RUNPOD_API_KEY")})
 def rpgql(q):
     return call("https://api.runpod.io/graphql", "POST", {"query":q}, {"Authorization":"Bearer "+env("RUNPOD_API_KEY")})
 if __name__=="__main__":

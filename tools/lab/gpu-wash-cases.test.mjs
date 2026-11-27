@@ -25,9 +25,11 @@ test('the wash cases dry to the same rim and colour on the GPU sheet as on the C
   if (!(await hasGpu())) return t.skip('no GPU adapter');
   const out = fs.mkdtempSync(path.join(os.tmpdir(), 'gpu-wash-'));
   try {
+    // Compare sheet solvers from the same sequential brush loading. The parallel
+    // section brush has its own contact tests and does not reproduce CPU lane depletion.
     const run = backend => {
       const dir = path.join(out, backend);
-      execFileSync(process.execPath, [path.join(ROOT, 'tools/lab/wash-cases.mjs'), ROOT, dir, '--backend', backend, '--cells', String(MM), '--modes', 'full', '--cases', CASES.join(',')], { stdio: 'pipe' });
+      execFileSync(process.execPath, [path.join(ROOT, 'tools/lab/wash-cases.mjs'), ROOT, dir, '--backend', backend, '--cells', String(MM), '--modes', 'full', '--cases', CASES.join(',')], { stdio: 'pipe', env: { ...process.env, GPU_STROKES: '0' } });
       return { dir, info: JSON.parse(fs.readFileSync(path.join(dir, 'cases.json'), 'utf8')) };
     };
     const cpu = run('cpu'), gpu = run('gpu');

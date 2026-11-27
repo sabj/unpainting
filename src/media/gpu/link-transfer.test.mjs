@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { GpuLink } from './link.mjs';
+import { GpuLink, attachGpu } from './link.mjs';
+import { createSheet, DEFAULTS } from '../sheet.mjs';
+import { makePaper } from '../paper.mjs';
 
 function fixture(instrument = true) {
   const w = 8, h = 8, n = w * h, K = 1, planes = 7;
@@ -56,4 +58,56 @@ test('flow attribution scope is restored after transport throws', () => {
   f.link.up = () => { throw new Error('transport failed'); };
   assert.throws(() => f.link.step(f.sheet, {}), /transport failed/);
   assert.equal(f.link.transferPhase, 'outside-stroke');
+});
+
+test('GPU initialization transfers private copies and retains owner arrays and Buffer masks',t=>{
+  const sheet=createSheet(makePaper(8,8),[{K:[1,1,1],S:[.1,.1,.1],rho:.05,omega:1,gamma:0}]);
+  sheet.G[0][3]=.125;sheet.D[0][3]=.25;sheet.P[0][3]=.5;
+  sheet.layers.push([new Float32Array(sheet.n).fill(.125)]);
+  sheet.resist=Buffer.alloc(sheet.n);sheet.resist[7]=1;
+  const planes=[sheet.W,sheet.s,sheet.M,sheet.ever,...sheet.G,...sheet.D,...sheet.P,...sheet.layers[0],sheet.resist];
+  const before=planes.map(a=>Uint8Array.from(new Uint8Array(a.buffer,a.byteOffset,a.byteLength)));
+  const info=attachGpu(sheet,{...DEFAULTS,edgeEvap:0},{mode:process.env.GPU_REQUIRED?'on':'auto',log:()=>{}});
+  if(info.backend!=='gpu'){t.skip('GPU unavailable');return;}
+  try{
+    planes.forEach((a,i)=>assert.deepEqual(new Uint8Array(a.buffer,a.byteOffset,a.byteLength),before[i]));
+    sheet._gpu.call({op:'sums',mask:1});
+    assert.equal(sheet._gpu.sumData[3],.875);
+  }finally{sheet._gpu.close();}
+});
+
+
+test('initial pigment masks retain numeric semantics for signed zeros, NaNs, subviews and tails',()=>{
+ for(let n=1;n<=17;n++){
+  const planes=Array.from({length:5},()=>new Float32Array(n+2).subarray(1,n+1));
+  planes[0].fill(-0);planes[1][n-1]=NaN;planes[2][0]=Number.MIN_VALUE;planes[3][n-1]=-.25;
+  let expected=0;
+  for(let k=0;k<planes.length;k++)if(planes[k].some(v=>v!==0))expected|=1<<k;
+  assert.equal(GpuLink.maskOf(planes.length,k=>planes[k],n),expected);
+  assert.equal(GpuLink.maskOf(planes.length,k=>Array.from(planes[k]),n),expected);
+ }
+});
+
+test('paper gate scratch reuse never overwrites a live cached cell set',()=>{
+  const {sheet,link}=fixture();
+  link.stale=true;link.fresh.stale();link.paperVersion=-1;
+  let calls=0;
+  link.call=msg=>{
+    assert.equal(msg.op,'paperGate');calls++;
+    link.rectData.fill(0);link.rectData[0]=.003;link.rectData[2]=1;
+  };
+  for(let offset=0;offset<12;offset++){
+    const cells=Array.from({length:40},(_,i)=>(i+offset)%sheet.n);
+    assert.ok(link.measurePaperGate(sheet,cells,null,[0,0,8,8],true).dry);
+    const before=calls;
+    for(const entry of [...link.paperGateCache]){
+      const query=Array.from(entry.cells);
+      assert.ok(link.measurePaperGate(sheet,query,null,[0,0,8,8],true).dry);
+      assert.deepEqual(Array.from(entry.cells),query);
+    }
+    assert.equal(calls,before,'every retained request is still a cache hit');
+    assert.ok(link.paperGateCache.length<=8);
+  }
+  assert.equal(calls,12);
+  assert.ok(link.paperGateIndices,'the retired allocation is available for reuse');
 });

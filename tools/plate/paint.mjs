@@ -29,6 +29,7 @@ import crypto from 'node:crypto';
 import path from 'node:path';
 import sharp from 'sharp';
 import {step, thickness, thicknessInto, thicknessTotals, blot, coherent} from '../../src/media/sheet.mjs';
+import {rampedWaitSteps} from '../../src/media/time-chunks.mjs';
 import {thirsty, edgeHalfWidth} from '../../src/media/brush.mjs';
 import {unmix} from '../../src/crop/pigments.mjs';
 import {dropMask} from '../../src/crop/blockin.mjs';
@@ -205,28 +206,35 @@ if (TECH_CAL && L_START === 0) {
 // a painting script's passages: planned colour against what the plate lays, measured on the next dry sheet (script-colour-check.mjs)
 const SCRIPT_CHECK = ctx.VALUE_PLAN?.summary?.source === 'painting script' ? createScriptColourCheck({ out, w, SC, W2 }) : null;
 // the sheet cells the pen's ink lies on (and one cell round them), which the script colour check leaves out
-const inkedCells = () => { const t = thickness(ctx.sheet)[PIGS.length]; if (!t) return null; const m = new Uint8Array(t.length); let any = 0; for (let i = 0; i < t.length; i++) if (t[i] > 1e-4) { any = 1; const x = i % W2; m[i] = 1; if (x > 0) m[i - 1] = 1; if (x < W2 - 1) m[i + 1] = 1; if (i >= W2) m[i - W2] = 1; if (i + W2 < t.length) m[i + W2] = 1; } return any ? m : null; };
+const inkedCells = () => { const t = thickness(ctx.sheet, { channels: [PIGS.length] })[PIGS.length]; if (!t) return null; const m = new Uint8Array(t.length); let any = 0; for (let i = 0; i < t.length; i++) if (t[i] > 1e-4) { any = 1; const x = i % W2; m[i] = 1; if (x > 0) m[i - 1] = 1; if (x < W2 - 1) m[i + 1] = 1; if (i >= W2) m[i - W2] = 1; if (i + W2 < t.length) m[i + W2] = 1; } return any ? m : null; };
 // the pen is set before any wash: the ink's whole thickness (every dried layer and what is wet, never the top layer
 // alone, which empties at each dry) is held as it was before the first wash, and once the sheet is next dry the first
 // wash must have moved none of it out of its cells (ink-held.mjs); more than INK_MOVED_MOST stops the run
 let INK_HOLD = null, GRAPHITE_HOLD = null;
+const drawHeldChannelList = () => [ctx.GRAPHITE ? ctx.GRAPHITE_AT : null, PIGS.length].filter(j => Number.isInteger(j) && j >= 0 && j < ctx.sheet.K);
 if (ctx.VALUE_PLAN && L_START === 0) {
-  const before = Float32Array.from(thickness(ctx.sheet)[PIGS.length] ?? []); let t = 0; for (let i = 0; i < before.length; i++) t += before[i];
+  const th0 = thickness(ctx.sheet, { channels: drawHeldChannelList() });
+  const before = Float32Array.from(th0[PIGS.length] ?? []); let t = 0; for (let i = 0; i < before.length; i++) t += before[i];
   // (the pen's fine sheet, --inkres, carries its ink down onto this sheet, so it is held here too)
   if (t > 0) INK_HOLD = { before, checked: false };
   else console.log('ink held: no pen on the sheet before the first wash; nothing to check');
   // the pencil likewise: graphite is fixed under the washes; how much of it the first wash moved is recorded
   // (graphite-held.json) for the drawing harness, which holds it to its stated amount
-  if (ctx.GRAPHITE) { const g = Float32Array.from(thickness(ctx.sheet)[ctx.GRAPHITE_AT] ?? []); if (g.some(v => v > 0)) GRAPHITE_HOLD = { before: g, checked: false }; }
+  if (ctx.GRAPHITE) { const g = Float32Array.from(th0[ctx.GRAPHITE_AT] ?? []); if (g.some(v => v > 0)) GRAPHITE_HOLD = { before: g, checked: false }; }
 }
 const checkInkHeld = when => {
+  const need = [];
+  if (GRAPHITE_HOLD && !GRAPHITE_HOLD.checked) need.push(ctx.GRAPHITE_AT);
+  if (INK_HOLD && !INK_HOLD.checked) need.push(PIGS.length);
+  if (!need.length) return;
+  const th = thickness(ctx.sheet, { channels: need });
   if (GRAPHITE_HOLD && !GRAPHITE_HOLD.checked) {
-    const g = inkMoved(GRAPHITE_HOLD.before, thickness(ctx.sheet)[ctx.GRAPHITE_AT]); GRAPHITE_HOLD.checked = true;
+    const g = inkMoved(GRAPHITE_HOLD.before, th[ctx.GRAPHITE_AT]); GRAPHITE_HOLD.checked = true;
     console.log(`pencil held: the first wash moved ${(100 * g.moved).toFixed(3)}% of the pencil's graphite out of its cells, ${(100 * g.lost).toFixed(3)}% off the sheet (${when})`);
     fs.writeFileSync(path.join(out, 'graphite-held.json'), JSON.stringify({ moved: g.moved, lost: g.lost, when }));
   }
   if (!INK_HOLD || INK_HOLD.checked) return;
-  const r = inkMoved(INK_HOLD.before, thickness(ctx.sheet)[PIGS.length]); INK_HOLD.checked = true;
+  const r = inkMoved(INK_HOLD.before, th[PIGS.length]); INK_HOLD.checked = true;
   console.log(`ink held: the first wash moved ${(100 * r.moved).toFixed(2)}% of the pen's ink out of its cells, ${(100 * r.lost).toFixed(2)}% off the sheet (${when})`);
   fs.writeFileSync(path.join(out, 'ink-held.json'), JSON.stringify({ moved: r.moved, lost: r.lost, most: INK_MOVED_MOST, when }));
   if (r.moved > INK_MOVED_MOST) throw Error(`the first wash moved ${(100 * r.moved).toFixed(1)}% of the pen's ink (most ${100 * INK_MOVED_MOST}%): the pen was not set before the washes (--inkfast) or was still wet`);
@@ -235,12 +243,14 @@ const checkInkHeld = when => {
 // over them has dried, how much of them it moved out of their cells is recorded (drawing-phases-held.jsonl) for the
 // drawing harness, as the first wash's is (graphite-held.json, ink-held.json)
 let PHASE_HELD = null;
-const heldChannels = () => [ctx.GRAPHITE ? ['graphite', ctx.GRAPHITE_AT] : null, ['ink', PIGS.length]].filter(c => c && thickness(ctx.sheet)[c[1]]);
-ctx.onDrawingPhase = k => { PHASE_HELD = { k, before: heldChannels().map(([name, j]) => [name, j, Float32Array.from(thickness(ctx.sheet)[j])]) }; };
+const heldChannels = th => [ctx.GRAPHITE ? ['graphite', ctx.GRAPHITE_AT] : null, ['ink', PIGS.length]].filter(c => c && th[c[1]]);
+ctx.onDrawingPhase = k => { const th = thickness(ctx.sheet, { channels: drawHeldChannelList() }); PHASE_HELD = { k, before: heldChannels(th).map(([name, j]) => [name, j, Float32Array.from(th[j])]) }; };
 const readPhaseHeld = () => {
+  const channels = PHASE_HELD.before.filter(([, , before]) => before.some(v => v > 0)).map(([, j]) => j);
+  const th = channels.length ? thickness(ctx.sheet, { channels }) : [];
   for (const [name, j, before] of PHASE_HELD.before) {
     if (!before.some(v => v > 0)) continue;
-    const r = inkMoved(before, thickness(ctx.sheet)[j]);
+    const r = inkMoved(before, th[j]);
     JSONL.append(path.join(out, 'drawing-phases-held.jsonl'), JSON.stringify({ phaseBeforeWash: PHASE_HELD.k, medium: name, moved: r.moved, lost: r.lost }) + '\n');
     console.log(`drawing phase held: the washes after the phase before wash ${PHASE_HELD.k + 1} moved ${(100 * r.moved).toFixed(3)}% of the ${name} out of its cells`);
   }
@@ -253,7 +263,10 @@ for (let L = L_START; L < ctx.layers.length; L++) {
   if (layer._erase) { await eraseStep(ctx, L, { dry, O, out, JSONL, shoot, MARKTAPE, cellMm: num('sheetmm', DEFAULT_SHEET_MM) / W2 }); continue; }
   colourMass('before-pass', {pass:L+1,value:layer.value,pigment:layer.pigment});
   if (opt('feedback', '1') !== '0') {
-    if (FEEDBACK_LAG && FEEDBACK_BASE && !FEEDBACK_FRESH) {
+    const needOnsheet = Boolean(DELIVERY || TECH_CAL || AWARE_DIR || RESUME_DIR || REMIX);
+    if (!needOnsheet) {
+      ONSHEET = ONSHEET ?? true;
+    } else if (FEEDBACK_LAG && FEEDBACK_BASE && !FEEDBACK_FRESH) {
       const { onsheet: B, booked: E } = FEEDBACK_BASE; ONSHEET = new Float32Array(B.length);
       for (let k = 0; k < B.length; k++) ONSHEET[k] = Math.max(0, B[k] + expected[k] - E[k]);
       feedbackStats.predicted++;
@@ -789,7 +802,7 @@ for (let L = L_START; L < ctx.layers.length; L++) {
   // A wash of the wash plan (layered-washes.mjs) is many sweeps laid into one wet film. It is left to level before it
   // dries, in fast mode too: dried at once, each sweep's own wet edge dried where it lay and the sweeps showed as stripes
   // with dark rims, never merging into one wash.
-  else{const oneWetWash=layer.shapes.some(sh=>Array.isArray(sh._valuePlan?.strokes));const dryFollows=NATIVE_PAINT_MODE.mode==='fast'&&!oneWetWash&&(wetInto||endOfValue||nextOther);const settle=dryFollows?Math.min(num('settle',60),num('fastsettle',0)):num('settle',60);clock('flow',()=>{for(let q=0;q<settle;q++)step(ctx.sheet,O);});}
+  else{const oneWetWash=layer.shapes.some(sh=>Array.isArray(sh._valuePlan?.strokes));const dryFollows=NATIVE_PAINT_MODE.mode==='fast'&&!oneWetWash&&(wetInto||endOfValue||nextOther);const settle=dryFollows?Math.min(num('settle',60),num('fastsettle',0)):num('settle',60);clock('flow',()=>{if(NATIVE_PAINT_MODE.mode==='fast'&&settle>=20&&(O.dt??1)<.5){for(const phase of rampedWaitSteps(settle,O.dt)){const opts=phase.dt===O.dt?O:{...O,dt:phase.dt};for(let q=0;q<phase.steps;q++)step(ctx.sheet,opts);}}else{for(let q=0;q<settle;q++)step(ctx.sheet,O);}});}
   colourMass('after-flow',{pass:L+1});
   if (earlyBoundary) { /* Existing ordinary dry completed earlier, before idle flow. */ }
   else if (sessionNext) { /* --washsession 2: one wet session with the next pigment of this wash */ }
