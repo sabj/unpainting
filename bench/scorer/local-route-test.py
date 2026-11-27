@@ -212,6 +212,19 @@ class OpenAILocalRoute(unittest.TestCase):
         self.assertIn('google/gemma-4-31b-it (quality)', rep['perJudgeOverlap'])
         self.assertIn('# Local vs. Cloud Judge Comparison', clc.to_markdown(rep))
 
+    def test_parse_versus_auto_and_quality_aggregation(self):
+        import s04_readings as R
+        r1 = R.parse_versus_auto('{"score_a": 6.4, "score_b": 5.2, "winner": "A", "why": "cleaner edges"}', cand_is_a=True)
+        r2 = R.parse_versus_auto('{"score_a": 5.4, "score_b": 6.6, "winner": "B", "why": "better washes"}', cand_is_a=False)
+        r3 = R.parse_versus_auto('{"score_a": 6.2, "score_b": 5.5, "winner": "A", "why": "luminous lights"}', cand_is_a=True)
+        self.assertEqual((r1['overall'], r1['autoScore'], r1['win']), (6.4, 5.2, 'cand'))
+        self.assertEqual((r2['overall'], r2['autoScore'], r2['win']), (6.6, 5.4, 'cand'))
+        q = R.quality({'j1': [r1, r2, r3]}, ['j1'])
+        self.assertAlmostEqual(q['score'], 6.4)
+        self.assertAlmostEqual(q['autoScore'], 5.4)
+        self.assertAlmostEqual(q['diffVsAuto'], 1.2)
+        self.assertEqual(q['winPct'], 100.0)
+
 
 if __name__ == '__main__':
     unittest.main()

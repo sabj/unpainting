@@ -34,7 +34,7 @@ def derive(paintings, originals, w=WEIGHTS, quality_mode="blind", combined_mode=
     """Adds share, combined and the Auto adjustment to each painting (in place) and returns them."""
     for p in paintings:
         q = p["quality"]["score"]
-        if quality_mode == "anchored":
+        if quality_mode in ("anchored", "versus-auto"):
             p["share"] = 10.0 * q if q is not None else None
         else:
             o = (originals.get(p.get("original") or p["subject"]) or {}).get("quality", {}).get("score")

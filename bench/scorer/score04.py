@@ -79,27 +79,37 @@ def read_json(path):
 
 class Job:
     """One reading of one picture (or sequence) by every judge, three times each."""
-    def __init__(self, key, kind, images, text_of, ctx, tokens, parse, data_uri):
+    def __init__(self, key, kind, images, text_of, ctx, tokens, parse, data_uri, alternate_ab=False):
         self.key, self.kind, self.images, self.ctx, self.tokens, self.parse = key, kind, images, ctx, tokens, parse
-        self.text_of, self.data_uri, self._content, self._lock = text_of, data_uri, None, threading.Lock()
+        self.text_of, self.data_uri, self._content, self._lock = text_of, data_uri, {}, threading.Lock()
+        self.alternate_ab = alternate_ab
         self.imagesSha = R.sha("".join(file_sha(f) for f, _ in images))
         self.promptSha = R.sha("".join(t for t in text_of))
-        self.options = {"ctx": ctx, "maxTokens": tokens, "longSidePx": [px for _, px in images]}
+        self.options = {"ctx": ctx, "maxTokens": tokens, "longSidePx": [px for _, px in images], **({"alternateAB": True} if alternate_ab else {})}
 
-    def content(self):
+    def content(self, rep_idx=1):
+        swap = bool(self.alternate_ab and rep_idx % 2 == 0)
         with self._lock:   # several readings of one job may be in flight at once: the pictures are encoded once
-            if self._content is None:
+            if swap not in self._content:
+                imgs = [self.images[0], self.images[2], self.images[1]] if swap else self.images
                 c = []
-                for t, (f, px) in zip(self.text_of, self.images):
+                for t, (f, px) in zip(self.text_of, imgs):
                     c += [{"type": "text", "text": t}, {"type": "image_url", "image_url": {"url": self.data_uri(f, px)}}]
-                self._content = c
-            return self._content
+                self._content[swap] = c
+            return self._content[swap]
+
+    def parser_for(self, rep_idx=1):
+        if not self.alternate_ab:
+            return self.parse
+        cand_is_a = (rep_idx % 2 == 1)
+        return lambda raw, ca=cand_is_a: self.parse(raw, cand_is_a=ca)
 
 
 def jobs_for(paintings, originals, rubric, data_uri, quality_mode="blind"):
     """Every job, painting by painting: Auto's first (the others are adjusted against it), each painting's three
     jobs, and its original's quality just after the first painting of it, so a painting can be complete early."""
     out, seen = [], set()
+    auto_by_subj = {e["subject"]: e["painting"] for e in paintings if e.get("auto") and e.get("painting")}
     for e in sorted(paintings, key=lambda e: not e.get("auto")):
         sid = e.get("original")
         if quality_mode == "blind" and sid in originals and sid not in seen:
@@ -112,7 +122,11 @@ def jobs_for(paintings, originals, rubric, data_uri, quality_mode="blind"):
         said = "% of the finished picture on the sheet" if e.get("scheme") == "progress10" else "% complete"
         texts = [head + "\nOpening: the untouched paper (not scored)"] + [f"Snapshot {k + 1}: {p}{said}" for k, (_, p) in enumerate(snaps)]
         out.append(Job(e["id"], "sequence", [(e["opening"], SNAP_PX)] + [(f, SNAP_PX) for f, _ in snaps], texts, SEQ_CTX, SEQ_TOKENS, lambda raw, n=len(snaps): R.parse_sequence(raw, n), data_uri))
-        if quality_mode == "anchored":
+        if quality_mode == "versus-auto" and not e.get("auto") and e["subject"] in auto_by_subj:
+            out.append(Job(e["id"], "single", [(e["target"], ONE_PX), (e["painting"], ONE_PX), (auto_by_subj[e["subject"]], ONE_PX)],
+                           [R.QUALITY_VERSUS_AUTO.format(style=e["style"]) + "\nImage 1 (Original watercolour):", "Image 2 (Painting A):", "Image 3 (Painting B):"],
+                           ONE_CTX, ONE_TOKENS, R.parse_versus_auto, data_uri, alternate_ab=True))
+        elif quality_mode in ("anchored", "versus-auto"):
             out.append(Job(e["id"], "single", [(e["target"], ONE_PX), (e["painting"], ONE_PX)],
                            [R.QUALITY_ANCHORED.format(style=e["style"]) + "\nImage 1 (9.0/10 REFERENCE STANDARD):", "Image 2 (CANDIDATE PAINTING TO SCORE):"],
                            ONE_CTX, ONE_TOKENS, R.parse_anchored, data_uri))
@@ -163,7 +177,7 @@ def read_all(jobs, cfg, judge, out, say=print, jrec=None, rubric_sha=None, fresh
 
     def read(jb, m, k, f, key):
         t = time.time()
-        r, why = R.ask(lambda model, c: judge.post(cfg, model, c, max_tokens=jb.tokens, num_ctx=jb.ctx), m, jb.content(), jb.parse)
+        r, why = R.ask(lambda model, c: judge.post(cfg, model, c, max_tokens=jb.tokens, num_ctx=jb.ctx), m, jb.content(k), jb.parser_for(k))
         new = {"ok": bool(r), "judge": m, "kind": jb.kind, "cacheKey": key, "repeat": repeat, "promptSha": jb.promptSha, "imagesSha": jb.imagesSha, "seconds": round(time.time() - t, 1), **(r or {"error": why})}
         write(f, json.dumps(new, indent=1))
         return new
@@ -225,7 +239,7 @@ def main(argv=None, judge=s04_judge, env=None, say=print):
     ap.add_argument("--combined-mode", default=None, choices=T.COMBINED_MODES, help="combined formula: weighted (0.4 2:1 H:Q) or gated (0.5.1 Q * min(1, H / 65))")
     a = ap.parse_args(argv)
     if a.profile == "0.5.1":
-        a.quality_mode = a.quality_mode or "anchored"
+        a.quality_mode = a.quality_mode or "versus-auto"
         a.combined_mode = a.combined_mode or "gated"
         env = {**(os.environ if env is None else env)}
         env.setdefault("JUDGE_PANEL", "open3v2")
@@ -286,7 +300,7 @@ def main(argv=None, judge=s04_judge, env=None, say=print):
     data_uri = lambda f, px: SP.data_uri(load_rgb(f), px)
     names = ("results.json", "SCORES.md") if a.repeat == 1 else (f"results-repeat-{a.repeat}.json", f"SCORES-repeat-{a.repeat}.md")
     done, written = set(), set()
-    whole = lambda e: ({(e["id"], "sequence"), (e["id"], "single"), (e["id"], "likeness")} | (set() if a.quality_mode == "anchored" else {("original--" + e["original"], "single")})) <= done
+    whole = lambda e: ({(e["id"], "sequence"), (e["id"], "single"), (e["id"], "likeness")} | (set() if a.quality_mode in ("anchored", "versus-auto") else {("original--" + e["original"], "single")})) <= done
 
     def on_done(key, kind):
         # results.json and SCORES.md are rewritten as each painting completes, so a page can show the scores as they come
@@ -295,7 +309,7 @@ def main(argv=None, judge=s04_judge, env=None, say=print):
         if now and len(written) + len(now) < len(paintings):
             written.update(e["id"] for e in now)
             ready = [e for e in paintings if e["id"] in written]
-            res, faults = results(a, cfg, jrec, rubric, rubric_sha, ready, failed, {k: v for k, v in originals.items() if a.quality_mode == "anchored" or ("original--" + k, "single") in done}, got)
+            res, faults = results(a, cfg, jrec, rubric, rubric_sha, ready, failed, {k: v for k, v in originals.items() if a.quality_mode in ("anchored", "versus-auto") or ("original--" + k, "single") in done}, got)
             res["inProgress"] = {"paintingsScored": len(ready), "of": len(paintings), "note": "scoring is still running: this file is rewritten as each painting completes"}
             write(os.path.join(a.out, names[0]), json.dumps(res, indent=1))
             write(os.path.join(a.out, names[1]), T.markdown(res))
@@ -325,11 +339,30 @@ def results(a, cfg, jrec, rubric, rubric_sha, paintings, failed, originals, got)
                      "opening": e["opening"], "drawingFrame": {"file": e["drawing"][0], "pct": e["drawing"][1]} if e["drawing"] else None, "firstWash": e["firstWash"],
                      "snapshots": [{"file": f, "pct": p, **({"frame": e["frames"][k]} if k < len(e["frames"]) else {"finished": True})} for k, (f, p) in enumerate(e["snapshots"])], "human": h, "quality": q, "likeness": lk, "cheat": cheat_summary(e["cheat"])})
     for sid, o in originals.items():
-        if qmode == "anchored":
-            o["quality"] = {"score": 9.0, "judges": {}, "criteria": None, "spread": 0.0, "anchored": True, "faults": []}
+        if qmode in ("anchored", "versus-auto"):
+            o["quality"] = {"score": 9.0 if qmode == "anchored" else None, "judges": {}, "criteria": None, "spread": 0.0, "anchored": qmode == "anchored", "versusAuto": qmode == "versus-auto", "faults": []}
         else:
             o["quality"] = R.quality(got[("original--" + sid, "single")], cfg["panel"])
             faults += [f"original of {sid}, quality: {x}" for x in o["quality"]["faults"]]
+    # In versus-auto mode, calibrate each Auto painting's quality from the mean of same-call Auto scores across its subject's models
+    if qmode == "versus-auto":
+        auto_seen = {}
+        auto_j_seen = {}
+        for r in rows:
+            if r.get("auto") or r.get("failed"):
+                continue
+            q = r.get("quality") or {}
+            if q.get("autoScore") is not None:
+                auto_seen.setdefault(r["subject"], []).append(q["autoScore"])
+            for jm, jv in (q.get("judges") or {}).items():
+                dj = (q.get("diffJudges") or {}).get(jm)
+                if jv is not None and dj is not None:
+                    auto_j_seen.setdefault((r["subject"], jm), []).append(jv - dj)
+        for r in rows:
+            if r.get("auto") and r["subject"] in auto_seen:
+                av = sum(auto_seen[r["subject"]]) / len(auto_seen[r["subject"]])
+                jmap = {jm: round(sum(vs) / len(vs), 3) for (s, jm), vs in auto_j_seen.items() if s == r["subject"] and vs}
+                r["quality"] = {**r["quality"], "score": round(av, 3), "judges": jmap or r["quality"].get("judges", {}), "fromComparisons": len(auto_seen[r["subject"]])}
     # the failed runs: rows with no reading, counted as failures by the table and the summary
     none_h = {"percent": None, "meanOf5": None, "thirds": None, "perSnapshot": None, "drawing": None, "finished": None, "tells": {}, "yes": 0, "of": 0, "why": None, "judges": {}, "faults": []}
     for e in failed:

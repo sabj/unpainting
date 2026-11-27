@@ -106,7 +106,17 @@ Rate from 0.0 to 10.0 (decimals allowed):
 
 Reply with JSON only, no prose: {{"wash_craft":n,"value_light":n,"colour_harmony":n,"overall":n,"critique":"one blunt sentence"}}"""
 ANCHORED_CRITERIA = ("wash_craft", "value_light", "colour_harmony")
-QUALITY_MODES = ("blind", "anchored")
+QUALITY_VERSUS_AUTO = """You are an experienced watercolour juror comparing two paintings (Painting A and Painting B) made in a watercolour simulator, shown beside the Original watercolour they are based on.
+Style expected: {style}.
+
+Judge WATERCOLOUR CRAFT of Painting A and Painting B beside the Original:
+- Look for luminous preserved white paper, transparent washes, confident wet-in-wet and hard/soft/lost edge variety, clear light-to-dark value hierarchy, cohesive colour harmony, and believable brushwork.
+- Penalize flat pasted-on shapes, muddy/overworked washes, harsh dry stripes, timid washed-out tone, or digital/opaque artifacts.
+- Do NOT assign a score to the Original; use it purely as the real watercolour reference.
+- Score BOTH Painting A and Painting B from 0.0 to 10.0 (decimals allowed) using the full range where warranted, and avoid identical scores unless the two paintings are genuinely indistinguishable in craft.
+
+Reply with JSON only, no prose: {{"score_a":n,"score_b":n,"winner":"A"|"B"|"tie","why":"one concise sentence"}}"""
+QUALITY_MODES = ("blind", "anchored", "versus-auto")
 
 LIKENESS = """Two pictures follow. The first is an original picture. The second is a painting made of it, in this style: {style}.
 Judge one thing only: how well is the second a painting OF the first? Look at the subject, the composition and the placing of the big shapes, the pattern of light and dark, and the colour. It is a painting, not a copy: do not ask for it to match the original mark for mark or pixel for pixel, and do not judge how well it is painted.
@@ -148,7 +158,7 @@ def sequence_prompt(scheme, rubric, style, n, drawing):
 
 
 def prompt_hashes(rubric, scheme=DEFAULT_SCHEME, quality_mode="blind"):
-    q = QUALITY_ANCHORED if quality_mode == "anchored" else SINGLE
+    q = QUALITY_VERSUS_AUTO if quality_mode == "versus-auto" else (QUALITY_ANCHORED if quality_mode == "anchored" else SINGLE)
     return {"sequence": sha(sequence_prompt(scheme, rubric, "{style}", "{n}", True)), "single": sha(q), "likeness": sha(LIKENESS)}
 
 
@@ -371,6 +381,27 @@ def parse_anchored(raw):
     return None
 
 
+def parse_versus_auto(raw, cand_is_a=True):
+    """A side-by-side Candidate-vs-Auto craft reply as {overall, autoScore, diffVsAuto, win, critique}, or None."""
+    for m in reversed(re.findall(r"\{[^{}]*\}", re.sub(r"```(?:json)?", "", raw or ""))):
+        try:
+            d = json.loads(m)
+            sa = _finite_in(d["score_a"], 0.0, 10.0)
+            sb = _finite_in(d["score_b"], 0.0, 10.0)
+            cand, auto = (sa, sb) if cand_is_a else (sb, sa)
+            w_raw = str(d.get("winner") or ("A" if sa > sb else "B" if sb > sa else "tie")).strip().upper()
+            if w_raw not in ("A", "B", "TIE"):
+                w_raw = "A" if sa > sb else "B" if sb > sa else "TIE"
+            win = "cand" if ((cand_is_a and w_raw == "A") or (not cand_is_a and w_raw == "B")) else ("auto" if w_raw in ("A", "B") else "tie")
+            out = {"overall": cand, "autoScore": auto, "diffVsAuto": round(cand - auto, 3), "win": win}
+            if d.get("why"):
+                out["critique"] = str(d["why"])[:300]
+            return out
+        except Exception:
+            pass
+    return None
+
+
 def parse_likeness(raw):
     """A likeness reply as {likeness: 1 to 5, why}, or None."""
     for m in reversed(re.findall(r"\{[^{}]*\}", re.sub(r"```(?:json)?", "", raw or ""))):
@@ -458,8 +489,18 @@ def quality(by_judge, panel, criteria=CRITERIA):
     med = {m: statistics.median(r["overall"] for r in rs) for m, rs in ok.items()}
     crit = {c: sum(statistics.median(r[c] for r in rs) for rs in ok.values()) / len(ok) for c in criteria if all(c in r for rs in ok.values() for r in rs)}
     critiques = {m: rs[0].get("critique") for m, rs in ok.items() if rs[0].get("critique")}
+    extra = {}
+    if all("autoScore" in r and "diffVsAuto" in r for rs in ok.values() for r in rs):
+        a_med = {m: statistics.median(r["autoScore"] for r in rs) for m, rs in ok.items()}
+        d_med = {m: statistics.median(r["diffVsAuto"] for r in rs) for m, rs in ok.items()}
+        all_r = [r for rs in ok.values() for r in rs]
+        wins = sum(1.0 for r in all_r if r.get("win") == "cand") + 0.5 * sum(1.0 for r in all_r if r.get("win") == "tie")
+        extra = {"autoScore": round(sum(a_med.values()) / len(a_med), 3),
+                 "diffVsAuto": round(sum(d_med.values()) / len(d_med), 3),
+                 "diffJudges": {m: round(v, 3) for m, v in d_med.items()},
+                 "winPct": round(100.0 * wins / max(1, len(all_r)), 1)}
     return {"score": sum(med.values()) / len(med), "judges": med, "criteria": crit or None, "spread": max(med.values()) - min(med.values()),
-            **({"critiques": critiques} if critiques else {}), "faults": []}
+            **extra, **({"critiques": critiques} if critiques else {}), "faults": []}
 
 
 def likeness(by_judge, panel):
