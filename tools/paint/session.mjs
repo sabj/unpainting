@@ -489,20 +489,20 @@ const q = s => `"${String(s).replace(/[\\"]/g, '\\$&')}"`;
  * `local`: the command talks to its own helper over this machine's loopback, and runs its shell on a pseudo-terminal.
  * `eyes` {pictures, viewers}: the pictures of the folder only a viewer may read (eyes-only.mjs eyesRule).
  */
-export function seatbelt({ deny, write, cwd, local = false, gated = false, readable = [], hidden = [], metadata = [], eyes = null }) {
+export function seatbelt({ deny, write, cwd, ownDirs = [], local = false, gated = false, readable = [], hidden = [], metadata = [], eyes = null }) {
   // hidden: folders nothing may list or read (the home folder, other users, other volumes), save what is read again after
-  // them: its own folder, `readable` (the toolbox, the model command's own program and settings) and `write`
+  // them: its own folder, `ownDirs` (this session's isolated HOME/CODEX_HOME/TMPDIR), `readable` and `write`
   // gated: nothing goes out but to this machine's loopback, where the session's gate (session-net.mjs) passes the
   // model's own service only; readable: folders read again after the denials (the toolbox's Python)
-  // other sessions' folders, by name: a working session's (unpaint-session-) and a level 1 attempt's (unpaint-bench-)
-  const closedOff = `(deny file-read* file-write* ${deny.map(d => `(subpath ${q(d)})`).join(' ')} (regex #"/unpaint-session-") (regex #"/unpaint-bench-"))`;
+  // other sessions' folders, by name: a working session's (unpaint-session-), its isolated home (unpaint-iso-) and a level 1 attempt's (unpaint-bench-)
+  const closedOff = `(deny file-read* file-write* ${deny.map(d => `(subpath ${q(d)})`).join(' ')} (regex #"/unpaint-session-") (regex #"/unpaint-iso-") (regex #"/unpaint-bench-"))`;
   return ['(version 1)', '(allow default)',
     '(deny file-write*)', `(allow file-write* ${write.map(d => `(subpath ${q(d)})`).join(' ')} (literal "/dev/null") (literal "/dev/dtracehelper") (regex #"^/dev/tty"))`,
     closedOff,
     // (the temporary folders are read again after the hidden ones, and other sessions live in them: the denials are said
     // again after that, or a later rule would open what an earlier one closed)
     ...(hidden.length ? [`(deny file-read* ${hidden.map(d => `(subpath ${q(d)})`).join(' ')})`, `(allow file-read* ${write.map(d => `(subpath ${q(d)})`).join(' ')})`, closedOff] : []),
-    `(allow file-read* file-write* (subpath ${q(cwd)}))`, ...readable.map(d => `(allow file-read* (subpath ${q(d)}))`), ...metadata.map(d => `(allow file-read-metadata (literal ${q(d)}))`),
+    `(allow file-read* file-write* (subpath ${q(cwd)}))`, ...ownDirs.map(d => `(allow file-read* file-write* (subpath ${q(d)}))`), ...readable.map(d => `(allow file-read* (subpath ${q(d)}))`), ...metadata.map(d => `(allow file-read-metadata (literal ${q(d)}))`),
     '(deny network*)', ...(gated ? ['(allow network-outbound (remote ip "localhost:*"))'] : ['(allow network-outbound (remote tcp "*:443") (remote udp "*:53") (remote tcp "*:53") (literal "/private/var/run/mDNSResponder"))', '(allow network-inbound (local udp "*:*"))']), '(allow system-socket)',
     ...(local ? ['(allow network-bind (local ip "localhost:*"))', '(allow network-inbound (local ip "localhost:*"))', '(allow network-outbound (remote ip "localhost:*"))', '(allow pseudo-tty)', '(allow file-read* file-write* file-ioctl (literal "/dev/ptmx") (regex #"^/dev/ttys[0-9]+$"))'] : []),
     // eyes: {pictures, viewers}: the session's pictures are read by the model command's own program only (eyes-only.mjs); last, so it wins
@@ -523,11 +523,13 @@ export function seatbelt({ deny, write, cwd, local = false, gated = false, reada
  */
 export function sessionCall(author, { prompt, cwd, deny = [], images = [], home = os.homedir(), tmp = os.tmpdir(), sessionHome = null, gate = null, toolbox = null, eyesOnly = null }) {
   const real = d => { try { return fs.realpathSync(d); } catch { return d; } }, all = [...new Set(deny.flatMap(d => [d, real(d)]))];
-  // Per-session isolated tmp dir (outside cwd so dotfiles never pollute the session record or anti-cheat scan)
+  // Per-session isolated tmp/home dir (outside cwd so dotfiles never pollute the session record or anti-cheat scan).
+  // Kept in ownDirs so it is allowed AFTER closedOff denies all other /unpaint-iso-* and /unpaint-session-* folders.
   const isoHome = sessionHome ? real(sessionHome) : null;
   const isoTmp = isoHome ? path.join(isoHome, 'tmp') : null;
   if (isoTmp) fs.mkdirSync(isoTmp, { recursive: true });
-  const writeTmp = isoTmp ? [isoTmp] : [real(tmp), '/private/tmp', '/private/var/folders'];
+  const ownDirs = isoHome ? [isoHome] : [];
+  const writeTmp = [real(tmp), '/private/tmp', '/private/var/folders', ...(isoTmp ? [isoTmp] : [])];
   const tmpEnv = isoTmp ? { TMPDIR: isoTmp } : {};
   // eyesOnly: the folder's pictures that are for looking at (eyes-only.mjs): under a profile of this harness only the
   // model command's own program reads them. A command that is not installed has no viewer to name: it is not started.
@@ -539,7 +541,7 @@ export function sessionCall(author, { prompt, cwd, deny = [], images = [], home 
     // exposure, SIGN_IN_EXPOSURE); measured, it signs in and answers without ~/.claude or ~/.claude.json
     const bin = (() => { try { return real(execFileSync('/usr/bin/which', ['claude'], { encoding: 'utf8' }).trim()); } catch { return null; } })();
     const signIn = [path.join(home, 'Library', 'Keychains')];
-    const profile = seatbelt({ deny: all, write: [...new Set([...writeTmp, '/private/var/folders'])], cwd: real(cwd), local: true, gated: true, eyes,
+    const profile = seatbelt({ deny: all, write: [...new Set(writeTmp)], cwd: real(cwd), ownDirs, local: true, gated: true, eyes,
       readable: [...new Set([...(toolbox?.readable ?? []), ...(bin ? [path.dirname(bin)] : []), ...signIn])], hidden: [...new Set([home, real(home), '/Users', '/Volumes'])], metadata: [path.join(home, '.local', 'bin'), path.join(home, '.local', 'bin', 'claude'), home] });
     const settings = { sandbox: { enabled: false }, permissions: { deny: all.map(d => `Read(/${d}/**)`) } };
     return { cmd: 'sandbox-exec', env: { ...tmpEnv, CLAUDE_CODE_DISABLE_AUTO_MEMORY: '1', BASH_DEFAULT_TIMEOUT_MS: '120000', BASH_MAX_TIMEOUT_MS: '600000', DISABLE_TELEMETRY: '1', DISABLE_ERROR_REPORTING: '1', CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: '1', ...proxyEnv(gate.url), ...(toolbox?.env ?? {}) }, unset: [], profile, gated: true, signIn,
@@ -568,7 +570,7 @@ export function sessionCall(author, { prompt, cwd, deny = [], images = [], home 
       codexEnv.CODEX_HOME = own;
     }
     const signIn = gate ? [own] : [];
-    const profile = seatbelt({ deny: all, write: [...new Set([own, ...writeTmp, '/private/var/folders'])], cwd: real(cwd), gated: Boolean(gate), eyes,
+    const profile = seatbelt({ deny: all, write: [...new Set([own, ...writeTmp])], cwd: real(cwd), ownDirs, gated: Boolean(gate), eyes,
       readable: gate ? [...new Set([...(toolbox?.readable ?? []), ...(codex ? [codex] : [])])] : [], hidden: gate ? [...new Set([home, real(home), '/Users', '/Volumes'])] : [], metadata: gate ? [...(codex ? [path.dirname(codex)] : []), home] : [] });
     return { cmd: 'sandbox-exec', env: { ...tmpEnv, ...codexEnv, ...(gate ? proxyEnv(gate.url) : {}), ...(toolbox?.env ?? {}) }, unset: [], profile, gated: Boolean(gate), signIn,
       args: ['-p', profile, 'codex', 'exec', '--json', '-m', author.id, ...(author.effort ? ['-c', `model_reasoning_effort="${author.effort}"`] : []), ...(gate ? ['--ignore-user-config', '-c', 'analytics.enabled=false'] : []), '--dangerously-bypass-approvals-and-sandbox', '--skip-git-repo-check', '--ephemeral', '-C', cwd, ...images.flatMap(f => ['-i', f]), '--', prompt],
@@ -586,7 +588,7 @@ export function sessionCall(author, { prompt, cwd, deny = [], images = [], home 
     const museEnv = isoHome
       ? { ...own.env, HOME: isoHome, XDG_CONFIG_HOME: path.join(home, '.config'), XDG_DATA_HOME: museDataRoot }
       : { ...own.env };
-    const profile = seatbelt({ deny: all, write: [...new Set([...museWrite, ...writeTmp, '/private/var/folders'])], cwd: real(cwd), local: true, gated: Boolean(gate), eyes,
+    const profile = seatbelt({ deny: all, write: [...new Set([...museWrite, ...writeTmp])], cwd: real(cwd), ownDirs, local: true, gated: Boolean(gate), eyes,
       readable: gate ? [...new Set([...(toolbox?.readable ?? []), ...own.readable])] : [], hidden: gate ? [...new Set([home, real(home), '/Users', '/Volumes'])] : [], metadata: gate ? own.metadata : [] });
     return { cmd: 'sandbox-exec', env: { ...tmpEnv, ...museEnv, ...(gate ? proxyEnv(gate.url) : {}), ...(toolbox?.env ?? {}) }, unset: [], profile, gated: Boolean(gate), signIn,
       // its transcript is not its output: it is the log it keeps under its isolated data folder, in a folder named for the session
@@ -603,7 +605,7 @@ export function sessionCall(author, { prompt, cwd, deny = [], images = [], home 
     // its sign-in (accepted exposure, SIGN_IN_EXPOSURE): its handle in Application Support and the login keychain; its own folder seen, not listed
     const signIn = gate ? [path.join(home, 'Library', 'Application Support', 'antigravity'), path.join(home, 'Library', 'Keychains')] : [];
     const readable = [...(toolbox?.readable ?? []), ...(gate && agy ? [agy] : []), ...signIn];
-    const profile = seatbelt({ deny: all, write: [...new Set([path.join(home, '.gemini'), ...writeTmp, '/private/var/folders'])], cwd: real(cwd), local: true, gated: Boolean(gate), eyes, readable: [...new Set(readable)], hidden: gate ? [...new Set([home, real(home), '/Users', '/Volumes'])] : [], metadata: gate && agy ? [path.dirname(agy), home] : [] });
+    const profile = seatbelt({ deny: all, write: [...new Set([path.join(home, '.gemini'), ...writeTmp])], cwd: real(cwd), ownDirs, local: true, gated: Boolean(gate), eyes, readable: [...new Set(readable)], hidden: gate ? [...new Set([home, real(home), '/Users', '/Volumes'])] : [], metadata: gate && agy ? [path.dirname(agy), home] : [] });
     return { cmd: 'sandbox-exec', env: { ...tmpEnv, DO_NOT_TRACK: '1', ...(gate ? proxyEnv(gate.url) : {}), ...(toolbox?.env ?? {}) }, unset: [], profile, serial: true, gated: Boolean(gate), signIn,
       args: ['-p', profile, 'agy', '-p', prompt, '--model', author.id, '--dangerously-skip-permissions', '--output-format', 'stream-json'],
       probe: file => ({ cmd: 'sandbox-exec', args: ['-p', profile, '/bin/cat', file] }),

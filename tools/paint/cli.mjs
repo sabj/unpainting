@@ -520,7 +520,7 @@ async function sessionRun(r) {
     say(r, `the code planner's plan was taken prepared (${preparedFolder})${prepared.painting ? ', and its full-size painting with it' : ''}: nothing of it is made on the session's clock${terms.plan ? '' : terms.autoPlan ? `; it is handed to read (its washes in numbers), never as a choice (${OWN_SCRIPT_ONLY})` : `; it is not handed to the session (${OWN_SCRIPT_ONLY})`}`);
     // the model's folder: a temporary one outside the repository; it is kept in the run folder when the session ends
     const cwd = r.sessionDir, real = fs.realpathSync(cwd), listing = toEdit(auto.plate), base = await baseOf(r);
-    const sessionHome = fs.mkdtempSync(path.join(os.tmpdir(), `unpaint-session-home-${author.key}-`));
+    const sessionHome = fs.mkdtempSync(path.join(os.tmpdir(), `unpaint-iso-${author.key}-`));
     // a choice's tools are checked against the drawing and the forms of this run; nothing is written for a check
     const checkTools = t => { try { const g = resolveTools(t, base); return { record: g.record, said: g.said, warnings: g.warnings }; } catch (e) { throw new Error(tidy(e.message)); } };
     try {
@@ -938,7 +938,7 @@ async function prepareRun(r) {
  */
 async function preflightRun(r) {
   const { spec, record, authorFull: author } = r, dir = path.join(record.out, 'preflight'), W = spec.sheet.widthMm; fs.mkdirSync(dir, { recursive: true });
-  const cwd = r.sessionDir, sessionHome = fs.mkdtempSync(path.join(os.tmpdir(), `unpaint-session-home-${author.key}-`)); let done = { ended: 'not started', error: null }, kept = null, seen = null, file = null, picture = null, routes = null, network = null;
+  const cwd = r.sessionDir, sessionHome = fs.mkdtempSync(path.join(os.tmpdir(), `unpaint-iso-${author.key}-`)); let done = { ended: 'not started', error: null }, kept = null, seen = null, file = null, picture = null, routes = null, network = null;
   try {
     const pics = await runPictures(record), packet = await preparePacket({ dir, root: ROOT, run: { ...record, masks: record.masks.receipt ? { ...record.masks, formsPng: await formsImage(record.masks.mask) } : null }, drawingPng: pics.drawing, briefFile: BRIEF_FILE });
     const { auto } = await preparedPlan(r);
