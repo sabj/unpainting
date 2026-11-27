@@ -1341,7 +1341,16 @@ export class GpuLink {
   }
   pause() { this.paused = true; this.cleanZeroBase = false; this.gpuDirtyRect = null; }
   resume() { this.paused = false; }
-  close() { this.closed = true; try { this.worker.postMessage({ op: 'close', wait: false }); } catch { /* already gone */ } this.worker.terminate(); }
+  close() {
+    if (this.closed) return;
+    this.closed = true;
+    try {
+      Atomics.store(this.ctrl, 0, 0);
+      this.worker.postMessage({ op: 'close' });
+      Atomics.wait(this.ctrl, 0, 0, 5000);
+    } catch { /* already gone */ }
+    this.worker.terminate();
+  }
 }
 
 /**

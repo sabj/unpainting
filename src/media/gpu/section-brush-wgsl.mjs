@@ -1623,13 +1623,14 @@ fn section_run_small(@builtin(local_invocation_index) li: u32) {
   if (li == 0u) { w_nP = brushPigmentCount(); w_nWG = SW.nst; }
   let nst = workgroupUniformLoad(&w_nWG);
   let nP = workgroupUniformLoad(&w_nP);
+  var cells: array<vec4<u32>, ${Math.ceil(SMALL_CELLS / 256)}>;
+  var deltaP: array<f32, 16>;
   loop {
     let flag = workgroupUniformLoad(&w_flag);
     let cur = workgroupUniformLoad(&w_step);
     if (cur >= nst) { break; }
     if (li == 0u) { w_nCells = select(0u, SW.nCells, (flag & 8u) != 0u); }
     let nCells = workgroupUniformLoad(&w_nCells);
-    var cells: array<vec4<u32>, ${Math.ceil(SMALL_CELLS / 256)}>;
     var demand = vec4<f32>(0.0);
     ${evalConstants}
     for (var base = 0u; base < nCells; base += 256u) {
@@ -1647,7 +1648,7 @@ fn section_run_small(@builtin(local_invocation_index) li: u32) {
     workgroupBarrier();
     var sumOut = 0.0;
     var sumTake = 0.0;
-    var deltaP: array<f32, 16>;
+    for (var ka = 0u; ka < nP; ka++) { deltaP[ka] = 0.0; }
     let pWetting = SW.wetting != 0u;
     for (var base = 0u; base < nCells; base += 256u) {
       if (li == 0u) { atomicStore(&fTrade, 0u); }
