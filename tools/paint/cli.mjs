@@ -649,8 +649,9 @@ async function sessionRun(r) {
       }
       // a session that named the painter, the repository or another session in a command went round its looks: it is not painted
       if (outside.length && !fin.failure) fin = { failure: `the look limit was not held: ${outside.length} of its commands name the painter or a place outside its folder (author/S.commands.txt); nothing of this session is painted`, submitted: fin.submitted };
-      // a try that read a picture with code is disqualified: recorded, kept, and nothing of it is painted
+      // an unheld sandbox picture read disqualifies; when the OS sandbox held (zero bytes leaked), flag for review and paint normally
       if (guarded.cheat.disqualified) { say(r, `DISQUALIFIED: ${guarded.cheat.reason}`); if (!fin.failure) fin = { failure: `disqualified: ${guarded.cheat.reason} (${EYES_ONLY_WORDS}); nothing of this session is painted`, submitted: fin.submitted }; }
+      else if (guarded.cheat.flagged) { say(r, `EYES-ONLY FLAG: ${guarded.cheat.reason}`); }
       say(r, `session ${session.ended === 'done' ? 'ended' : `ended (${session.ended})`}: ${session.wallMinutes} min on the clock (${session.ownMinutes} its own), ${kept.looks.length} looks for ${kept.lookUnits.spent} of ${looksMost} rendering units, ${kept.steps.taken} of ${stepsMost} steps, ${kept.plans.length} plans, ${session.toolCallsTotal} tool calls, ${kept.reverts.count} returns to an earlier choice, ${kept.warningsGiven} warnings given; handed over: ${fin.submitted ? `${fin.submitted.what}${fin.submitted.note ? ` (${fin.submitted.note})` : ''}` : 'nothing'}${outside.length ? `; ${outside.length} COMMANDS NAME PLACES OUTSIDE ITS FOLDER (S.commands.txt)` : ''}${pictures.length ? `; it made ${pictures.length} pictures of its own` : ''}`);
     } catch (e) { if (!e.standIn) throw e; } finally { if (routes) await routes.done(); fs.rmSync(cwd, { recursive: true, force: true }); fs.rmSync(sessionHome, { recursive: true, force: true }); }
   }

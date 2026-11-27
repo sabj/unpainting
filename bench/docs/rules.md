@@ -54,9 +54,9 @@ The model works in a sandbox, in a fresh folder outside the repository. It has a
 - A script may read the named parts, the drawing's lines, the traced shapes, Auto's plan, the numbers and plan from each look, `sheet.png` (its own dried sheet alone) and its own files.
 - A tool whose sandbox cannot keep the pictures safe is not started. `npm run paint -- SUBJECT preflight --author KEY` checks a tool first.
 
-## Disqualification
+## Disqualification & Eyes-Only Guard
 
-A try is disqualified only if its code reads the picture's pixels. That means a read the sandbox refused, or a script that names a picture, found in the transcript after the session (`tools/paint/eyes-only.mjs`). The try is recorded and kept, and nothing of it is painted.
+When the OS sandbox holds the input pictures (`held: true`), every code attempt to read a picture's bytes is refused by the kernel (`EPERM`) so zero pixels leak: blocked attempts or scripts naming a picture are recorded in `guard` and flagged for review (`cheat.flagged = true`), while the session is still painted and scored normally (`tools/paint/eyes-only.mjs`). A try is hard-disqualified (recorded, kept, and nothing of it painted) only when code reads or names a picture in an unheld environment where target pixels could actually be read.
 
 Cheating means hill climbing toward the original. That is changing strokes to reduce image error, fitting them pixel by pixel, or keeping a stroke only when it improves the match. Looking at the original, as a painter glances at a reference, is the task.
 

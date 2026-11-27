@@ -47,7 +47,10 @@ test('under the session\'s profile a program is refused every picture and reads 
     // what the refusal reads like, for the record
     let said = ''; try { execFileSync('sandbox-exec', ['-p', profile, process.execPath, '-e', 'require("fs").readFileSync("inputs/source.png")'], { cwd, stdio: 'pipe' }); } catch (e) { said = String(e.stderr); }
     const found = pictureReadsByCode({ steps: [{ kind: 'shell', text: 'node trace.js', output: said.slice(0, 2000), denied: said.split('\n').filter(l => /not permitted/.test(l)) }], pictures });
-    assert.equal(found.blocked.length, 1, said); assert.equal(guardRecord(found, { held: true }).cheat.disqualified, true);
+    assert.equal(found.blocked.length, 1, said);
+    assert.equal(guardRecord(found, { held: true }).cheat.flagged, true);
+    assert.equal(guardRecord(found, { held: true }).cheat.disqualified, false, 'held sandbox blocked the read so zero pixels leaked: flagged, not hard-DQ');
+    assert.equal(guardRecord(found, { held: false }).cheat.disqualified, true, 'unheld environment still hard-DQs');
   } finally { fs.rmSync(cwd, { recursive: true, force: true }); fs.rmSync(`${cwd}-2`, { recursive: true, force: true }); }
 });
 
@@ -67,25 +70,31 @@ test('the rule names the viewer by its program; with none, no process reads a pi
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });
 
-test('a refused read or a script that names a picture disqualifies the try, in level 1\'s words; showing and looking do not', () => {
+test('held sandbox flags code-read attempts without hard-DQ; unheld environment still disqualifies; showing and looking never flag', () => {
   const pictures = ['inputs/source.png', 'inputs/study-2.png', 'previous/final-beside-subject.jpg'];
   const clean = pictureReadsByCode({ pictures, scripts: [{ name: 'forms.py', text: 'import cv2\nids = cv2.imread("inputs/forms-ids.png", 0)\nmine = cv2.imread("looks/2/sheet.png")\n' }, { name: 'notes.md', text: 'inputs/source.png: a cat' }],
     steps: [{ kind: 'shell', text: './unpaint show inputs/source.png', output: 'SHOWN: `inputs/source.png` is in your folder' }, { kind: 'shell', text: 'ls -la inputs/ && python3 forms.py', output: 'source.png\nforms.json' }, { kind: 'read', text: 'inputs/source.png' }, { kind: 'read', text: 'looks/1/beside.png' },
       { kind: 'shell', text: 'cat /etc/hosts.private', output: 'cat: /etc/hosts.private: Permission denied', denied: ['cat: /etc/hosts.private: Permission denied'] }] });
   assert.deepEqual(clean, { blocked: [], scripts: [], commands: [] });
-  assert.deepEqual(guardRecord(clean, { held: true }).cheat, { disqualified: false, readTargetPixels: false, reason: null });
+  assert.deepEqual(guardRecord(clean, { held: true }).cheat, { disqualified: false, flagged: false, attemptedReadByCode: false, readTargetPixels: false, reason: null });
   const blocked = pictureReadsByCode({ pictures, steps: [{ kind: 'shell', text: 'python3 t.py', output: 'Traceback', denied: ['PermissionError: [Errno 1] Operation not permitted: \'inputs/study-2.png\''] }, { kind: 'shell', text: 'cp looks/1/beside.png b.bin', output: 'cp: looks/1/beside.png: Operation not permitted' }] });
   assert.equal(blocked.blocked.length, 2);
-  const b = guardRecord(blocked, { held: true }); assert.deepEqual(b.cheat, { disqualified: true, readTargetPixels: true, reason: '2 blocked picture read(s) by code' }); assert.equal(b.guard.blockedImageReads, 2); assert.match(b.guard.how, /^refused by the session's sandbox/);
+  const bHeld = guardRecord(blocked, { held: true });
+  assert.deepEqual(bHeld.cheat, { disqualified: false, flagged: true, attemptedReadByCode: true, readTargetPixels: false, reason: '2 blocked picture read(s) by code (sandbox held; session painted and flagged for review)' });
+  assert.equal(bHeld.guard.blockedImageReads, 2); assert.match(bHeld.guard.how, /^refused by the session's sandbox/);
+  const bUnheld = guardRecord(blocked, { held: false });
+  assert.equal(bUnheld.cheat.disqualified, true); assert.equal(bUnheld.cheat.readTargetPixels, true);
   const named = pictureReadsByCode({ pictures, scripts: [{ name: 'trace.py', text: 'from PIL import Image\ntry:\n  im = Image.open("inputs/source.png")\nexcept Exception: pass\n' }],
     steps: [{ kind: 'shell', text: 'python3 - <<EOF\nimport cv2\ncv2.imread("previous/final-beside-subject.jpg")\nEOF', output: '' }, { kind: 'shell', text: 'file inputs/study-2.png 2>/dev/null', output: '' }] });
   assert.deepEqual(named.scripts.map(s => [s.name, s.names]), [['a program in a shell command', 'previous/final-beside-subject.jpg'], ['trace.py', 'inputs/source.png']]);
   assert.equal(named.commands.length, 1, 'another command that names a picture is recorded');
-  const n = guardRecord(named, { held: true }); assert.equal(n.cheat.disqualified, true); assert.equal(n.cheat.reason, 'scripts refer to the picture files: previous/final-beside-subject.jpg, inputs/source.png');
+  const nHeld = guardRecord(named, { held: true }); assert.equal(nHeld.cheat.disqualified, false); assert.equal(nHeld.cheat.flagged, true);
+  assert.match(nHeld.cheat.reason, /^scripts refer to the picture files: previous\/final-beside-subject\.jpg, inputs\/source\.png/);
+  const nUnheld = guardRecord(named, { held: false }); assert.equal(nUnheld.cheat.disqualified, true);
   assert.equal(guardRecord({ blocked: [], scripts: [], commands: named.commands }, { held: false }).cheat.disqualified, false, 'a command that only names a picture is recorded, not a disqualification');
 });
 
-test('comments and required seen.md notes mentioning picture names do not trigger false-positive disqualifications', () => {
+test('comments and required seen.md notes mentioning picture names do not trigger false-positive flags or disqualifications', () => {
   const pictures = ['inputs/source.png', 'auto-result/auto-painting.png'];
   const clean = pictureReadsByCode({
     pictures,
@@ -101,12 +110,15 @@ test('comments and required seen.md notes mentioning picture names do not trigge
     ],
   });
   assert.deepEqual(clean, { blocked: [], scripts: [], commands: [] });
+  assert.equal(guardRecord(clean, { held: true }).cheat.flagged, false);
   assert.equal(guardRecord(clean, { held: true }).cheat.disqualified, false);
-  // Real code read inside a script that also writes seen.md still disqualifies
+  // Real code read inside a script that also writes seen.md still flags under held sandbox and disqualifies if unheld
   const stillCheat = pictureReadsByCode({
     pictures,
     steps: [{ kind: 'shell', text: "python3 - <<'PY'\nopen('seen.md','w').write('auto-result/auto-painting.png: ok')\nfrom PIL import Image\nImage.open('inputs/source.png')\nPY", output: '' }],
   });
   assert.equal(stillCheat.scripts.length, 1);
-  assert.equal(guardRecord(stillCheat, { held: true }).cheat.disqualified, true);
+  assert.equal(guardRecord(stillCheat, { held: true }).cheat.flagged, true);
+  assert.equal(guardRecord(stillCheat, { held: true }).cheat.disqualified, false);
+  assert.equal(guardRecord(stillCheat, { held: false }).cheat.disqualified, true);
 });

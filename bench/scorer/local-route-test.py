@@ -164,5 +164,54 @@ class RouteSelection(unittest.TestCase):
         self.assertIn('error', pg.ask_local('m2', sheet, 'style', post=lambda m, msgs: ('nothing', {})))
 
 
+class OpenAILocalRoute(unittest.TestCase):
+    def test_auto_detects_openai_protocol_for_rapid_mlx_and_v1_urls(self):
+        self.assertEqual(lr.settings({'JUDGE_LOCAL_URL': 'http://127.0.0.1:7659'})['api'], 'openai')
+        self.assertEqual(lr.settings({'JUDGE_LOCAL_URL': 'http://localhost:9999/v1'})['api'], 'openai')
+        self.assertEqual(lr.settings({'JUDGE_LOCAL_URL': 'http://localhost:11434'})['api'], 'ollama')
+        self.assertEqual(lr.settings({'JUDGE_LOCAL_URL': 'http://localhost:11434', 'JUDGE_LOCAL_API': 'openai'})['api'], 'openai')
+
+    def test_openai_post_and_models_discovery(self):
+        cfg = lr.settings({'JUDGE_LOCAL_URL': 'http://127.0.0.1:7659', 'JUDGE_LOCAL_PANEL': 'gemma-4-31b-8bit,qwen3.8-27b-4bit'})
+        seen = []
+
+        def fake_open(req, timeout=None):
+            seen.append((req.full_url, json.loads(req.data) if req.data else None))
+            if req.full_url.endswith('/v1/models'):
+                return io.BytesIO(json.dumps({'data': [{'id': 'gemma-4-31b-8bit'}, {'id': 'qwen3.8-27b-4bit'}]}).encode())
+            return io.BytesIO(json.dumps({
+                'choices': [{'message': {'content': '{"overall":7}'}, 'finish_reason': 'stop'}],
+                'usage': {'prompt_tokens': 200, 'completion_tokens': 12, 'completion_tokens_details': {'reasoning_tokens': 4}},
+            }).encode())
+
+        digs = lr.digests(cfg, opener=fake_open)
+        self.assertEqual(digs, {'gemma-4-31b-8bit': 'openai:gemma-4-31b-8bit', 'qwen3.8-27b-4bit': 'openai:qwen3.8-27b-4bit'})
+        raw, usage = lr.post(cfg, 'gemma-4-31b-8bit', MSG, max_tokens=512, opener=fake_open, think='medium')
+        self.assertEqual(raw, '{"overall":7}')
+        self.assertEqual((usage['provider'], usage['prompt_tokens'], usage['reasoning_tokens']), ('local-openai', 200, 4))
+        self.assertEqual(seen[-1][0], 'http://127.0.0.1:7659/v1/chat/completions')
+        self.assertEqual(seen[-1][1]['reasoning'], {'effort': 'medium'})
+        self.assertEqual(seen[-1][1]['messages'], MSG)
+
+    def test_compare_local_cloud_metrics(self):
+        import compare_local_cloud as clc
+        loc = {'judge': {'label': 'mlx3-local-3x', 'panel': ['google/gemma-4-31b-it']},
+               'paintings': [
+                   {'id': 'p1', 'author': 'opus-m', 'combined': 70.0, 'share': 75.0, 'human': {'percent': 80.0, 'judges': {'google/gemma-4-31b-it': 4.0}}, 'quality': {'judges': {'google/gemma-4-31b-it': 7.5}}, 'likeness': {'score': 4.5, 'judges': {'google/gemma-4-31b-it': 4.5}}},
+                   {'id': 'p2', 'author': 'sol-m', 'combined': 60.0, 'share': 65.0, 'human': {'percent': 70.0, 'judges': {'google/gemma-4-31b-it': 3.5}}, 'quality': {'judges': {'google/gemma-4-31b-it': 6.5}}, 'likeness': {'score': 4.0, 'judges': {'google/gemma-4-31b-it': 4.0}}},
+               ]}
+        cld = {'judge': {'label': 'open3v2-openrouter-3x', 'panel': ['google/gemma-4-31b-it']},
+               'paintings': [
+                   {'id': 'p1', 'author': 'opus-m', 'combined': 72.0, 'share': 76.0, 'human': {'percent': 82.0, 'judges': {'google/gemma-4-31b-it': 4.1}}, 'quality': {'judges': {'google/gemma-4-31b-it': 7.6}}, 'likeness': {'score': 4.5, 'judges': {'google/gemma-4-31b-it': 4.5}}},
+                   {'id': 'p2', 'author': 'sol-m', 'combined': 58.0, 'share': 62.0, 'human': {'percent': 68.0, 'judges': {'google/gemma-4-31b-it': 3.4}}, 'quality': {'judges': {'google/gemma-4-31b-it': 6.2}}, 'likeness': {'score': 4.0, 'judges': {'google/gemma-4-31b-it': 4.0}}},
+               ]}
+        rep = clc.compare_results(loc, cld)
+        self.assertEqual(rep['sharedPaintings'], 2)
+        self.assertEqual(rep['metrics']['combined']['pearsonR'], 1.0)
+        self.assertEqual(rep['leaderboardSpearmanRho'], 1.0)
+        self.assertIn('google/gemma-4-31b-it (quality)', rep['perJudgeOverlap'])
+        self.assertIn('# Local vs. Cloud Judge Comparison', clc.to_markdown(rep))
+
+
 if __name__ == '__main__':
     unittest.main()

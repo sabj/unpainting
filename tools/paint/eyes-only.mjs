@@ -188,14 +188,28 @@ export function pictureReadsByCode({ steps = [], scripts = [], pictures = [] }) 
 }
 
 /**
- * The record of a session's guard and what it means for the try, in the words of level 1's (bench/scripts/v3.mjs):
+ * The record of a session's guard and what it means for the try:
  * {guard: {blockedImageReads, scriptsNamingPictures, commandsNamingPictures, ...the lists}, cheat: {disqualified,
- * readTargetPixels, reason}}. A refused read or a script that names a picture disqualifies; nothing else does.
+ * flagged, attemptedReadByCode, readTargetPixels, reason}}.
+ * When the session's OS sandbox held the pictures (`held: true`), every code read was refused with EPERM so zero
+ * picture bytes leaked: attempts are recorded and flagged for review rather than hard-disqualifying and discarding
+ * the painting. When no sandbox held the pictures (`held: false`), a refused read or script naming a picture still
+ * disqualifies the try.
  */
 export function guardRecord(found, { held }) {
-  const dq = found.blocked.length > 0 || found.scripts.length > 0;
+  const attempted = found.blocked.length > 0 || found.scripts.length > 0;
+  const dq = !held && attempted;
+  const detail = found.blocked.length
+    ? `${found.blocked.length} blocked picture read(s) by code`
+    : `scripts refer to the picture files: ${[...new Set(found.scripts.map(s => s.names))].join(', ')}`;
   return {
     guard: { how: held ? 'refused by the session\'s sandbox to every program but the model command\'s own, and detected from its transcript' : 'detected from its transcript only: this command\'s sandbox does not hold the pictures', blockedImageReads: found.blocked.length, scriptsNamingPictures: found.scripts.length, commandsNamingPictures: found.commands.length, blocked: found.blocked.slice(0, 40), scripts: found.scripts.slice(0, 40), commands: found.commands.slice(0, 40) },
-    cheat: { disqualified: dq, readTargetPixels: dq, reason: dq ? (found.blocked.length ? `${found.blocked.length} blocked picture read(s) by code` : `scripts refer to the picture files: ${[...new Set(found.scripts.map(s => s.names))].join(', ')}`) : null },
+    cheat: {
+      disqualified: dq,
+      flagged: attempted,
+      attemptedReadByCode: attempted,
+      readTargetPixels: dq,
+      reason: attempted ? (held ? `${detail} (sandbox held; session painted and flagged for review)` : detail) : null,
+    },
   };
 }
