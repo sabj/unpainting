@@ -52,7 +52,7 @@ const DEFERRED_ARCHIVE_BUDGET_BYTES = 128 * 1024 * 1024;
 // Maximum staging allocation for a speculative section-brush read.
 const PREFETCH_BYTES = 64 * 1024 * 1024;
 // the worker ops that only read the sheet: every other op counts as a change (GpuLink.version)
-const READ_OPS = new Set(['down', 'downRects', 'pigmentDown', 'paperDown', 'paperGate', 'sums', 'topDown', 'topSums', 'topDownRect', 'counters', 'idle', 'prof', 'dryStats', 'snap', 'framePort', 'brushState', 'lowerDown', 'lowerBatch', 'opticalInit', 'opticalFrame', 'drainDrys','demandCheckState']);
+const READ_OPS = new Set(['down', 'downRects', 'pigmentDown', 'paperDown', 'paperGate', 'sums', 'topDown', 'topSums', 'topDownRect', 'counters', 'idle', 'prof', 'dryStats', 'snap', 'framePort', 'brushState', 'lowerDown', 'lowerBatch', 'opticalInit', 'opticalFrame', 'opticalPort', 'opticalSnap', 'drainDrys','demandCheckState']);
 const OPT_KEYS = ['flow', 'flowIters', 'diffuse', 'evap', 'edgeEvap', 'edgeWidth', 'absorb', 'film', 'capRate', 'capEps', 'capDelta', 'settle', 'lift', 'looseLift', 'scour', 'liftDepth', 'rewetLift', 'wetEps', 'spill', 'spillHeight', 'dampEase', 'pinning', 'pinFibre', 'encloseEase', 'slideCap', 'holeFill', 'holeSpan', 'fibreFlow', 'carryDepth', 'flowDepth', 'gran', 'granFill', 'slide', 'slideFill', 'repose', 'hold', 'sizing', 'wickFilter', 'dt', 'capSigma', 'paperDry', 'marangoni', 'slope', 'filmDiffuse', 'filmDepth', 'mmPerCell', 'edgeFlowDepth', 'edgeMm', 'reachMm', 'holdDepth', 'coSettle', 'fillRef', 'level', 'levelFloor', 'invade', 'push', 'puddle', 'meniscus', 'meniscusMm', 'tiltX', 'tiltY'];
 
 export class GpuLink {
@@ -1217,8 +1217,8 @@ export class GpuLink {
     this.stats.opticalInvalidations=(this.stats.opticalInvalidations??0)+1;
   }
   initOptical(sheet, micro) {
-    this.flushDrys(sheet);
     if(this.opticalReady)return;
+    this.flushDrys(sheet);
     this.syncLower(sheet);
     this.call({op:'opticalInit', micro, count:sheet.layers.length, resistFrom:sheet.resist?sheet.resistFrom??sheet.layers.length:null, lower:sheet.layers.slice(1,-1)});
     this.opticalReady=true;

@@ -59,7 +59,7 @@ export function markKey(mark) {
   return `mark|r${step(mark.radiusMm, 0.25).toFixed(2)}|l${(1.33 ** Math.round(Math.log(Math.max(0.2, mark.lengthMm)) / Math.log(1.33))).toFixed(1)}|p${step(mark.pressure, 0.2).toFixed(1)}|d${swatchDepth(mark.depth).toFixed(1)}${mark.damp ? '|damp' : ''}`;
 }
 /** How deep a passage's marks overlap, as its swatch is laid: apart (1) under 1.25, else to the nearest half, at most 4. */
-const swatchDepth = depth => (!(depth >= 1.25) ? 1 : Math.min(4, Math.round(depth * 2) / 2));
+export const swatchDepth = depth => (!(depth >= 1.25) ? 1 : Math.min(4, Math.round(depth * 2) / 2));
 
 /** The planned footprint of a path on a grid: each point's round, r (0.25 + 0.75 p), joined along the stroke (script-washes.mjs footprint). */
 function footprintCells(path, w, h) {

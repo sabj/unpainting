@@ -1,3 +1,4 @@
+import {scriptStrokePaths} from '../../src/paint/methods/script-stroke-paths.mjs';
 // Passage brushes, touch-ups, stops at passage boundaries, and the paint loop.
 // Stage 6 of 7 of tools/paint-plate.mjs. The stages run in order and share one object, ctx: see the entry file.
 import {invalidatePaperCertificate} from '../../src/media/paper-certificate.mjs';
@@ -359,11 +360,11 @@ for (let L = L_START; L < ctx.layers.length; L++) {
   const CELLS_PER_MM = W2 / num('sheetmm', DEFAULT_SHEET_MM);
   // The plan gives each stroke the half-width it is to lay. The brush that lays that half-width on this sheet is a little
   // wider (the engine's own edgeHalfWidth, which the lanes of every wash are spaced by), so it is sized through that.
-  const brushFor = half => { let r = half + 1; for (let it = 0; it < 6; it++) r += half - edgeHalfWidth(r, { pressure: 1, splay: WASH_FLAT_SPLAY }); return Math.max(SC, r); };
   // A lane is swept with a flat; every other stroke of a wash is a round's (its footprint a disc, as the plan counts it).
   // a wash plan's strokes are a list of laid strokes (layered-washes.mjs), each charged at its own share of the mix (a
   // graded wash: water added at each recharge); a light-to-dark plan's are a count and lane widths for its stroke plan
-  const vectorPaths = Array.isArray(sh._valuePlan?.strokes) ? sh._valuePlan.strokes.map(st => { const round = st.kind !== 'lane' && !st.flat, r = round || st.flat ? Math.max(SC, st.radiusMm * CELLS_PER_MM) : brushFor(st.radiusMm * CELLS_PER_MM); const path = st.points.map(q => ({ x: q[0] * CELLS_PER_MM, y: q[1] * CELLS_PER_MM, r: q[4] != null ? Math.max(0.5, r * q[4]) : r, p: q[2] ?? 1, round, ...(q[3] > 0 ? { v: q[3] } : {}), ...(st.angle != null ? { blade: st.held === 'fixed' ? st.angle - 90 : st.angle } : {}) })); if (st.charge) PATH_FACTOR.set(path, st.charge); if (st.held === 'fixed' || st.water != null) PATH_HAND.set(path, { fixed: st.held === 'fixed', water: st.water ?? 1 }); return path; }) : null;
+  const vectorPaths = Array.isArray(sh._valuePlan?.strokes) ? scriptStrokePaths(sh._valuePlan.strokes,{scale:SC,cellsPerMm:CELLS_PER_MM,splay:WASH_FLAT_SPLAY}) : null;
+  vectorPaths?.forEach((path,i)=>{const st=sh._valuePlan.strokes[i];if(st.charge)PATH_FACTOR.set(path,st.charge);if(st.held==='fixed'||st.water!=null)PATH_HAND.set(path,{fixed:st.held==='fixed',water:st.water??1});});
   const shapedPaths = vectorPaths ? vectorPaths : sh._valuePlan?.shaped ? (sh._strokePlan ? strokePlanPaths(sh) : attachPlaneRamp(rawShapedPaths())) : null;
   let detail = !sh._valuePlan && through > num('detailfrom', 2);
   // A graded wash runs down its gradient and is not walked, so each few cells can be charged for where they are (--gradedwash).

@@ -1,3 +1,9 @@
+import {createOpticalUnder} from '../painter/optical-under.mjs';
+import {planSwatchJobs,swatchJob} from '../painter/planned-swatches.mjs';
+import {createOpticalFramer} from '../../src/media/gpu/optical-framer.mjs';
+import {createCalibrationPool} from '../painter/calibration-pool.mjs';
+import {createSwatchCalibration} from '../painter/calibration-swatches.mjs';
+import {mmSpacingDefault} from '../../src/paint/methods/look-scale.mjs';
 // Brush and pen strokes, the value plan, the sheet of paper, looks, marks and scrap calibration.
 // Stage 3 of 7 of tools/paint-plate.mjs. The stages run in order and share one object, ctx: see the entry file.
 import {createNativeOperationRecorder} from './native-operation-recorder.mjs';
@@ -11,7 +17,7 @@ import {isTinyTouch, tinyTouchRecord, tinyTouchLine} from '../../src/paint/metho
 import {drawFineMaterial, drawOnFineSheet, fineGestures} from '../../src/paint/methods/fine-material.mjs';
 import {createDeliveryCal} from '../../src/paint/methods/delivery-cal.mjs';
 import {drawMaterial, sourceDrawingCaps} from '../../src/paint/methods/material-profiles.mjs';
-import {valueTechnique, estimatePaper, targetValueMap} from '../../src/paint/methods/value-shared.mjs';
+import {estimatePaper, targetValueMap} from '../../src/paint/methods/value-shared.mjs';
 import {planStudyWashes} from '../../src/paint/methods/study-washes.mjs';
 import {studyShapesDoc} from '../../src/paint/methods/study-shapes-out.mjs';
 import {planScriptWashes} from '../../src/paint/methods/script-washes.mjs';
@@ -21,23 +27,21 @@ import {splitPlanEdit,planEditStep} from '../painter/plan-edit-step.mjs';
 import {readPlanFile,writePlanFile,planHash} from '../../src/paint/methods/plan-file.mjs';
 import {shrinkPlan} from '../../src/paint/methods/plan-shrink.mjs';
 import {studyThingMasks} from '../painter/thing-masks.mjs';
-import {washStrokeHold, LANE_OVERLAP, FLAT_OVERLAP} from '../../src/paint/methods/wash-strokes.mjs';
-import {smallestBrushMm} from '../../src/paint/methods/light-reserves.mjs';
-import {roleBrushMm,roleBrushPointMm,washKitMm} from '../../src/paint/methods/brush-footprint.mjs';
+import {washStrokeHold} from '../../src/paint/methods/wash-strokes.mjs';
+import {roleBrushMm,washKitMm} from '../../src/paint/methods/brush-footprint.mjs';
 import {writeValuePreview} from '../painter/value-plan-preview.mjs';
 import {writePlanValueCheck} from '../painter/plan-value-check.mjs';
 import {subjectField, orderBySubject, OVERLAP} from '../../src/paint/methods/subject-order.mjs';
 import {DEFAULT_SHEET_MM} from '../../src/media/sheet-size.mjs';
 import {recordGraphiteBatch} from '../painter/record-graphite.mjs';
-import {SWATCH, swatchMask, swatchLanes, scrapDelivery, chargeFactor} from '../../src/paint/methods/scrap-swatch.mjs';
-import {painterBrushOptions, isSection} from './painter-brush.mjs';
-import {createInstrumentCal, instrumentKey, chargedFromOwnSwatch} from '../../src/paint/methods/instrument-cal.mjs';
-import {representativeMarks, markKey, markLayout, markDelivery, isMarkPassage} from '../../src/paint/methods/mark-swatch.mjs';
-import {isDampPassage, underOf, dampScrap, dampCharge, liftShare, DAMP_CHANNEL} from '../../src/paint/methods/damp-swatch.mjs';
+import {chargeFactor} from '../../src/paint/methods/scrap-swatch.mjs';
+import {createInstrumentCal, chargedFromOwnSwatch} from '../../src/paint/methods/instrument-cal.mjs';
+import {representativeMarks, markKey, isMarkPassage} from '../../src/paint/methods/mark-swatch.mjs';
+import {isDampPassage, underOf, dampCharge} from '../../src/paint/methods/damp-swatch.mjs';
 import {nativeDryOptions} from '../painter/native-paint-mode.mjs';
 import {measurePaperBatch, measureBrush} from '../../src/paint/methods/wetdry.mjs';
 import {productionWaterLoad} from '../painter/production-water-load.mjs';
-import {cachedStep, cachedStepSync, codeHash} from '../../src/paint/run-cache.mjs';
+import {cachedStep, cachedStepSync, codeHash, inputHash} from '../../src/paint/run-cache.mjs';
 import fs from 'node:fs';
 import zlib from 'node:zlib';
 import path from 'node:path';
@@ -55,9 +59,7 @@ import {renderSheet} from '../../src/media/render-cache.mjs';
 import {createFramer} from '../../src/media/gpu/framer.mjs';
 import {dip as dipBrush, thirsty} from '../../src/media/brush.mjs';
 import {createTechniqueCal} from '../../src/paint/methods/technique-cal.mjs';
-import {washPaths, brushedWashPaths, sweepCover, footprintSpread, containPaths} from '../../src/media/wash.mjs';
 import {pencilDraw as physicalPencilDraw} from '../../src/paint/methods/pencil-line.mjs';
-import {distanceToZero} from '../../src/raster.js';
 import {components, removeSmall, open as openMask} from '../../src/raster.js';
 import {execution} from '../../src/eval/composite.mjs';
 import {planDensityOver} from '../../src/eval/plan-optics.mjs';
@@ -88,12 +90,12 @@ export function readActiveStroke(sheet) {
 }
 
 export async function sheetAndBrushes(ctx) {
-const { WASH_FLAT_SPLAY, ENTRY_FILE, JSONL, opt, num, optTrack, NATIVE_PAINT_MODE, SPEED_PAPER, 
-  SPEED_CONTACT, SPEED_VALUE_CACHE, SPEED_UNIFORM_PAPER, measurePaper, VALUE_CONTACT_WORK, SPEED_GPU_OPTICS, 
-  SPEED_PROFILE, root, out, RUN_CACHE, VALUE_CONFIG, VALUE_COUNTS, 
-  WASH_SESSION, phaseMark, w, h, n, FINAL_W, createBrush, physicalStroke: untracedStroke, candidateContact, TONE_MODE, 
-  SHEET_TONE, CALIBRATED_PLAN, PAPER_RULE, paperRGB, WASH_SPLAT_SETTINGS, CODE_HASH, PIGS, SMALL, 
-  setClip, COLOUR_TRACE, OUTLINE, STAGE_PLAN, REQUESTED_DRAW_MEDIUM, INK_WIDTH_FLOOR_MM, INK_DAMP, 
+const { WASH_FLAT_SPLAY, ENTRY_FILE, JSONL, opt, num, optTrack, NATIVE_PAINT_MODE, SPEED_PAPER,
+  SPEED_CONTACT, SPEED_VALUE_CACHE, SPEED_UNIFORM_PAPER, measurePaper, VALUE_CONTACT_WORK, SPEED_GPU_OPTICS,
+  SPEED_PROFILE, SPEED_COVERAGE, root, out, RUN_CACHE, VALUE_CONFIG, VALUE_COUNTS,
+  WASH_SESSION, phaseMark, w, h, n, FINAL_W, createBrush, physicalStroke: untracedStroke, candidateContact, TONE_MODE,
+  SHEET_TONE, CALIBRATED_PLAN, PAPER_RULE, paperRGB, WASH_SPLAT_SETTINGS, CODE_HASH, PIGS, SMALL,
+  setClip, COLOUR_TRACE, OUTLINE, STAGE_PLAN, REQUESTED_DRAW_MEDIUM, INK_WIDTH_FLOOR_MM, INK_DAMP,
   STYLE_INK_DEFAULT, INK_PROFILE, GRAPHITE_PROFILE, INK, GRAPHITE, SHEET_PIGS, GRAPHITE_AT, AUX_GPU } = ctx;
 Object.assign(ctx, { colourMass });
 // WET_TRACE=<file.jsonl>: a read-only record of the sheet's water under each stroke at landing and around each dry (wet-trace.mjs)
@@ -471,22 +473,8 @@ const finishRGB = rgb => {
 };
 // With the sheet on the GPU a render is kept with the link's change count (GpuLink.version) and the dried layers' version:
 // a frame and the plan-against-sheet mark taken at the same moment render once. The CPU sheet renders every time.
-ctx.RENDER_MEMO = null; ctx.RENDER_REUSED = 0; let OPTICAL_UNDER_MEMO = null;
-const getOpticalUnder = (baseBuf, micro = null) => {
-  const hasLower0 = ctx.sheet.layers.length > 1;
-  if (hasLower0) ctx.sheet._gpu.syncLower(ctx.sheet, 1);
-  const layer0 = hasLower0 ? ctx.sheet.layers[0] : null;
-  const layer0Ver = layer0?._cacheVersion ?? 0;
-  if (OPTICAL_UNDER_MEMO && OPTICAL_UNDER_MEMO.baseBuf === baseBuf && OPTICAL_UNDER_MEMO.micro === micro && OPTICAL_UNDER_MEMO.hasLower0 === hasLower0 && OPTICAL_UNDER_MEMO.layer0 === layer0 && OPTICAL_UNDER_MEMO.layer0Ver === layer0Ver) {
-    return OPTICAL_UNDER_MEMO.under;
-  }
-  const under = new Float64Array(N2 * 3);
-  if (hasLower0) renderCells([layer0], SHEET_PIGS.map(p => p.K), SHEET_PIGS.map(p => p.S), baseBuf, 0, N2, 1, null, null, null, under, micro);
-  else for (let i = 0; i < under.length; i++) under[i] = baseBuf[i] / 255;
-  under._immutable = true;
-  OPTICAL_UNDER_MEMO = { baseBuf, micro, hasLower0, layer0, layer0Ver, under };
-  return under;
-};
+ctx.RENDER_MEMO = null; ctx.RENDER_REUSED = 0;
+const getOpticalUnder=createOpticalUnder(()=>ctx.sheet,SHEET_PIGS,N2);
 const renderRaw = () => {
   const link = ctx.sheet._gpu;
   if (!link || readActiveStroke(ctx.sheet)) return renderSheet(ctx.sheet, SHEET_PIGS, base, N2, 1);
@@ -680,10 +668,16 @@ ctx.lastPainted = null;
 ctx.FRAMER = null; let FRAMER_HANDED = false; let MARK_PENDING = new Map();
 const PENDING_IO = [];
 const framer = () => {
-  if (NATIVE_PAINT_MODE.mode==='fast' || ctx.FRAMER === false || !ctx.sheet._gpu || ctx.TWO_GRID || INKRES || LOOK || ctx.GOUACHE || opt('asyncframes', '1') === '0') return null;
+  if(ctx.FRAMER===false||!ctx.sheet._gpu||ctx.TWO_GRID||ctx.GOUACHE||opt('asyncframes','1')==='0')return null;
+  const optical=(NATIVE_PAINT_MODE.mode==='fast'||SPEED_GPU_OPTICS)&&ctx.sheet._gpu.resident&&process.env.GPU_COMPOSITE==='1'&&!LOOK&&!WETRENDER&&num('pencilerase',0)===0&&!ctx.RECORDING.everyOperation;
+  if(!optical&&(NATIVE_PAINT_MODE.mode==='fast'||INKRES||LOOK))return null;
+  if(optical&&!ctx.FRAMER&&ctx.STAGE?.stage!=='paint')return null;
   if (!ctx.FRAMER) {
     if (FRAMER_HANDED) return null; // started once and stopped (a dried layer was rewritten): the painter's render from here on
-    ctx.FRAMER = createFramer({ sheet: ctx.sheet, pigments: SHEET_PIGS, base, paperRGB, n: N2, w, h, W2, SC, out, quality: 88, outW: OUT_W, outH: OUT_H, wet: WETRENDER ? { cap: num('wetcap', 0.6), dark: num('wetdark', 0.14) } : null });
+    if(optical){
+      const prepare=()=>{ctx.LOOK1??={base:LOOK_RELIEF>0||LOOK_GRAIN>0?lookBase(paper.height,W2,H2,LOOK_MM):base,micro:LOOK_MICRO>0?lookMicro(paper.height,W2,H2,LOOK_MC):null};const link=ctx.sheet._gpu;link.initOptical(ctx.sheet,ctx.LOOK1.micro);return getOpticalUnder(ctx.LOOK1.base,ctx.LOOK1.micro);};
+      prepare();ctx.FRAMER=createOpticalFramer({sheet:ctx.sheet,prepare,ink:INKRES,out,outW:OUT_W,outH:OUT_H,n:N2,w,h,W2,SC,paperRGB,onFrame:(rgb,event)=>ctx.NATIVE_FILM_CAPTURE?.(rgb,event)});
+    }else ctx.FRAMER = createFramer({ sheet: ctx.sheet, pigments: SHEET_PIGS, base, paperRGB, n: N2, w, h, W2, SC, out, quality: 88, outW: OUT_W, outH: OUT_H, wet: WETRENDER ? { cap: num('wetcap', 0.6), dark: num('wetdark', 0.14) } : null });
     FRAMER_HANDED = true;
   }
   return ctx.FRAMER.active ? ctx.FRAMER : null;
@@ -740,115 +734,19 @@ const swatchBrush = () => {
   const [kind, mm] = [...by].sort((a, b) => b[1] - a[1])[0][0].split(' ');
   return { radius: Math.max(SC, Number(mm) * cpm), flat: kind === 'flat' };
 };
-const section = isSection(painterBrushOptions({}));
-// Each technique laid on scrap (src/paint/methods/scrap-swatch.mjs), plain and, under --gradedwash, recharged every few
-// cells along its sweep as a graded wash is. `drySwatch` dries the scrap. `damp`: each technique is laid over a wash that
-// has just lost its shine (damp-swatch.mjs), as a painting script's passage laid beside damp is, and read apart from it.
-const scrapSwatches = (techniques, drySwatch, { damp = false } = {}) => {
-  const { want } = SWATCH;
-  // A graded wash is recharged every few cells along its sweep (--gradedwash), so each technique is also laid on scrap
-  // recharged that way, and what it lays is kept both inside the swatch and over the whole scrap (see GRADED_CAL).
-  // Under --physical the sheet dips a section brush once a load (paint.mjs splitLoads) and never recharges it along a
-  // sweep, so its swatch is not chunked either: chunked every few cells of a fine sheet, each chunk was a 2 mm stroke
-  // that landed on its tip and laid a tenth of the charge, and charged washes ten times over.
-  const CHUNK = opt('gradedwash', '1') !== '0' && !(section && PB) ? Math.max(2, Math.round(GCHUNK)) : 0;
-  // --calpipe 1: calibrate with the sheet's own lanes, containment and pressure, not a plain sweep at default pressure.
-  // The section brush is always calibrated as the sheet lays a wash (swatchLanes): its tuft levels with the film it
-  // finds, so what a wash holds depends on how its sweeps overlap, and one wide sweep over the scrap read 0.6 of what
-  // the plan's overlapping rounds lay. Its lanes are the plan's own brush at the plan's overlap, and the swatch is
-  // charged for that overlap as a passage is (paint.mjs, sh._cover).
-  // `lap`: how far the swatch's lanes lap, as a share of the brush's width; the plan's own lap unless a wash states its own
-  const layout = (lap = null) => {
-    const mask = swatchMask(), { width: SW, height: SH } = SWATCH;
-    if (section) {
-      // The swatch is at least sixteen brush widths across: on a fine sheet fifty cells were 13 mm, two lanes of a 7 mm
-      // round that never got past landing on its tip. Its scrap's cells grow to fit (the brush lays the same paint a
-      // millimetre at any cell size).
-      // (a look's scrap is the final sheet's: no finer than the final's cells, look-scale.mjs)
-      const sheetMm = PAPER_OPTS.mmPerCell ?? 0, brush = swatchBrush(), mm = sheetMm > 0 ? Math.max(sheetMm * w / FINAL_W, 32 * brush.radius * sheetMm / (SWATCH.x1 - SWATCH.x0)) : 0;
-      const radius = mm > 0 ? brush.radius * sheetMm / mm : brush.radius, flat = brush.flat;
-      const paths = swatchLanes(radius, { overlap: lap ?? (flat ? FLAT_OVERLAP : LANE_OVERLAP) }), cover = sweepCover(paths, mask, SW, SH);
-      const under = opt('undercover', '1') !== '0' ? 1 / Math.max(num('underfloor', 0.4), Math.min(1, cover)) : 1;
-      return { mask, paths, bedPaths: washPaths(mask, SW, SH, { pad: 1.5, minRadius: 1, minLength: 3 }), flat, under: under / Math.max(1, cover) / Math.max(1, footprintSpread(paths, mask, SW, SH)),
-        paperOptions: mm > 0 ? { ...PAPER_OPTS, seed: 5, mmPerCell: mm, ...(PAPER_OPTS.coldPress ? { coldPress: { ...PAPER_OPTS.coldPress, mmPerCell: mm } } : {}) } : null };
-    }
-    let paths = washPaths(mask, SW, SH, { pad: 1.5, minRadius: 1, minLength: 3 });
-    if (opt('calpipe', '0') !== '0') {
-      // the sheet's own brush, capped so a fifty-cell swatch is still laid in lanes as a passage that size would be
-      const lanes = brushedWashPaths(mask, SW, SH, { pad: 1.5, minRadius: 1, minLength: 3, maxRadius: Math.min(BRUSH, 16), seed: 17, overlap: num('overlap', 0.15) });
-      paths = containPaths(lanes, distanceToZero(mask, SW, SH), SW, SH, { minRadius: 0.8, minLength: 2, slack: num('slack', 0.5) }).map(pts => {
-        const total = pts.reduce((a, q, i) => a + (i ? Math.hypot(q.x - pts[i - 1].x, q.y - pts[i - 1].y) : 0), 0) || 1;
-        let run = 0;
-        return pts.map((q, i) => { if (i) run += Math.hypot(q.x - pts[i - 1].x, q.y - pts[i - 1].y); const u = run / total;
-          return { ...q, p: Math.max(0.18, Math.min(1, (0.72 + 0.28 * Math.sin(Math.PI * u)) * Math.min(Math.min(1, u / num('land', 0.06)), Math.min(1, (1 - u) / num('lift', 0.10))))) }; });
-      });
-    }
-    // and charged for its footprint exactly as a passage on the sheet is, so that shortfall is not counted twice
-    const under = opt('calpipe', '0') !== '0' && opt('undercover', '1') !== '0' ? 1 / Math.max(num('underfloor', 0.4), Math.min(1, sweepCover(paths, mask, SW, SH))) : 1;
-    return { mask, paths, under, flat: true };
-  };
-  // (a wash that states the lap of its lanes, T.lap, is tried in lanes lapped so: only the section brush's swatch is laid in lanes)
-  const plainSquare = layout(), lapped = new Map(), squareOf = T => { if (!section || !Number.isFinite(T?.lap)) return plainSquare; if (!lapped.has(T.lap)) lapped.set(T.lap, layout(T.lap)); return lapped.get(T.lap); };
-  const square = plainSquare;
-  const paintOpts = (r, T) => ({ flat: square.flat, radius: r, bristles: Math.max(12, Math.ceil(r * 2)), capacity: 100, belly: 12, feed: 0.4, give: 0.9, free: num('washfree', 0.4), film: 0.25, splay: WASH_FLAT_SPLAY, stiffness: 8, wetMix: MIX(T), bridge: washBridge(T, T.bridge), bridgeSoft: T.bridgeSoft, seed: 11 });
-  // ... and its bed is wetted as the sheet wets one (tools/painter/wet-bed-prep.mjs): a clean brush made like the swatch's
-  // painting brush, its own load metered or not, a thirsty pickup and the wait, not one sweep of a full generic brush
-  // read over the cells the swatch's brush touches, as the sheet reads its bed over the stroke's contact; on value and
-  // area runs alike, so an area pass laid into wet is charged from a swatch laid into a bed as its own is
-  const contactOf = (scrap, pts, r, T) => { const b = createBrush(paintOpts(r, T)); dipBrush(b, { water: WET(T), conc: [0] }); const c = candidateContact(b, scrap, pts, { upright: UPRIGHT, clip: null, neighborRadius: 0, includeTouched: false }); return c.cells.filter(i => c.primaryMask[i]); };
-  const prepareBed = ctx.VALUE_PLAN ? (scrap, pts, r, T, _lane, cells = contactOf(scrap, pts, r, T)) => prepareWetBed({ settings: paintOpts(r, T), bristles: Math.max(12, Math.ceil(r * 2)), seed: 911, pigments: scrap.K, target: scrap, points: pts, prepOpts: { upright: UPRIGHT, lift: false },
-    observe: () => measurePaper(scrap, cells, SPEED_PAPER, { uniform: false }), gate: () => measurePaper(scrap, cells, SPEED_PAPER, { stats: 'gate' }), advance: () => step(scrap, { ...O, dt: 2 }), createBrush, dip, thirsty, stroke }) : null;
-  const settle = ctx.VALUE_PLAN ? (scrap, cells) => { const observe = () => measurePaper(scrap, cells, SPEED_PAPER, { uniform: false }); layIntoWetBed({ paper: observe(), observe, step: o => step(scrap, o), O, info: { scrap: 'wet on wet swatch', cells: cells.length } }); } : null;
-  // The scrap is the sheet's own paper (its millimetres a cell and its tooth), with another seed: the section brush's
-  // load and transfer are in millimetres, so a scrap with no physical scale ran it at the reference 0.26 mm a cell and
-  // calibrated a 64-cell picture's 2.3 mm cells as if they were a tenth the size (forms carried 162% of the plan).
-  const envOf = (square = plainSquare) => { const { under, flat: _flat, paperOptions, ...lanes } = square; return { ...lanes, pigment: PIGS[0], physics: O, paperOptions: paperOptions ?? { ...PAPER_OPTS, seed: 5 }, charge: want * num('strength', 2.2) * under, upright: UPRIGHT, water: WET, dip, stroke, step, dry: drySwatch, settle,
-    waterBrush: r => createBrush({ flat: square.flat, radius: r, bristles: Math.max(12, Math.ceil(r * 2)), capacity: 100, belly: 12, feed: 0.4, give: 0.9, free: 0.4, film: 0.25, seed: 5 }),
-    paintBrush: (r, T) => createBrush(paintOpts(r, T)), prepareBed }; };
-  return techniques.map(T => {
-    const env = envOf(squareOf(T));
-    if (damp) {
-      const scrap = dampScrap({ pigment: env.pigment, paperOptions: env.paperOptions, wait: dampWait,
-        lay: under => scrapDelivery(DAMP_WASH(), { ...env, charge: env.charge * CAL['wet on wet'], scrap: under, channel: DAMP_CHANNEL.under, finish: false }) });
-      // the wash is the bed: the passage's own technique wets none of its own
-      const before = thicknessTotals(scrap)[DAMP_CHANNEL.under], plain = scrapDelivery({ ...T, intoWet: false }, { ...env, scrap, channel: DAMP_CHANNEL.own });
-      return { technique: T, plain: { ...plain, lift: liftShare(before, thicknessTotals(scrap)[DAMP_CHANNEL.under]) }, graded: null };
-    }
-    return { technique: T, plain: scrapDelivery(T, env), graded: CHUNK ? scrapDelivery({ ...T, name: `${T.name} graded`, chunk: CHUNK }, env) : null };
-  });
-};
-// The wash a damp swatch is laid over: the stock wet-into-wet wash; and the wait until its shine has gone, as the sheet
-// waits on a damp neighbour (tools/painter/beside-damp.mjs).
-const DAMP_WASH = () => STOCK_TECHNIQUES.find(T => T.name === 'wet on wet');
-const dampWait = (scrap, cells) => waitBesideDamp({ observe: () => measurePaper(scrap, cells, SPEED_PAPER, { uniform: false }), step: o => step(scrap, o), O });
-// One mark on scrap (src/paint/methods/mark-swatch.mjs), with the brushes, dip, stroke, bed and drying the lane swatches use.
-// A mark of a passage laid beside damp (mark.damp) is tried over a damp wash, laid first in lanes of a round an eighth
-// of the swatch wide.
-const scrapMark = (T, mark) => {
-  const sheetMm = PAPER_OPTS.mmPerCell ?? 0, L = markLayout(mark, sheetMm * w / FINAL_W);
-  const opts = (r, T) => ({ flat: false, radius: r, bristles: Math.max(12, Math.ceil(r * 2)), capacity: 100, belly: 12, feed: 0.4, give: 0.9, free: num('washfree', 0.4), film: 0.25, splay: WASH_FLAT_SPLAY, stiffness: 8, wetMix: MIX(T), bridge: washBridge(T, T.bridge), bridgeSoft: T.bridgeSoft, seed: 11 });
-  const contactOf = (scrap, pts, r, T) => { const b = createBrush(opts(r, T)); dipBrush(b, { water: WET(T), conc: [0] }); const c = candidateContact(b, scrap, pts, { upright: UPRIGHT, clip: null, neighborRadius: 0, includeTouched: false }); return c.cells.filter(i => c.primaryMask[i]); };
-  // a mark laid into wet goes into a bed wider than itself (the wet passage it is laid in), wetted along the mark's path
-  // with a round at least twice its width pressed flat: a bed only as wide as a thin mark is mostly edge and never reads as wet
-  const prepareBed = (scrap, pts0, r0, T) => { const r = Math.max(2 * r0, 6), pts = pts0.map(q => ({ ...q, r, p: 1 })), cells = contactOf(scrap, pts, r, T);
-    return prepareWetBed({ settings: opts(r, T), bristles: Math.max(12, Math.ceil(r * 2)), seed: 911, pigments: scrap.K, target: scrap, points: pts, prepOpts: { upright: UPRIGHT, lift: false },
-    observe: () => measurePaper(scrap, cells, SPEED_PAPER, { uniform: false }), gate: () => measurePaper(scrap, cells, SPEED_PAPER, { stats: 'gate' }), advance: () => step(scrap, { ...O, dt: 2 }), createBrush, dip, thirsty, stroke }); };
-  const settle = (scrap, cells) => { const observe = () => measurePaper(scrap, cells, SPEED_PAPER, { uniform: false }); layIntoWetBed({ paper: observe(), observe, step: o => step(scrap, o), O, info: { scrap: 'wet on wet mark swatch', cells: cells.length } }); };
-  const env = { pigment: PIGS[0], physics: O, paperOptions: { ...PAPER_OPTS, seed: 5, mmPerCell: L.mm, ...(PAPER_OPTS.coldPress ? { coldPress: { ...PAPER_OPTS.coldPress, mmPerCell: L.mm } } : {}) },
-    upright: UPRIGHT, water: WET, dip, stroke, step, settle, prepareBed,
-    dry: (scrap, max, o, options) => physicalDry(scrap, max, o, nativeDryOptions(NATIVE_PAINT_MODE.mode, options)), paintBrush: (r, T) => createBrush(opts(r, T)) };
-  const washLanes = () => swatchLanes((SWATCH.x1 - SWATCH.x0) / 16), washMask = () => swatchMask();
-  const scrap = mark.damp ? dampScrap({ pigment: env.pigment, paperOptions: env.paperOptions, wait: dampWait,
-    lay: under => { const mask = washMask(), paths = washLanes(); scrapDelivery(DAMP_WASH(), { ...env, mask, paths, charge: SWATCH.want * num('strength', 2.2) * CAL['wet on wet'] / Math.max(1, sweepCover(paths, mask, SWATCH.width, SWATCH.height)), scrap: under, channel: DAMP_CHANNEL.under, finish: false }); } }) : null;
-  if (!scrap) return markDelivery(T, { ...env, mask: L.mask, paths: L.paths, charge: SWATCH.want * num('strength', 2.2) / L.cover });
-  // the wash is the bed: the mark wets none of its own; what its brush took up of the wash is reckoned over the wash under its footprint
-  const before = thicknessTotals(scrap)[DAMP_CHANNEL.under], r = markDelivery({ ...T, intoWet: false }, { ...env, mask: L.mask, paths: L.paths, charge: SWATCH.want * num('strength', 2.2) / L.cover, scrap, channel: DAMP_CHANNEL.own });
-  return { ...r, lift: liftShare(before, thicknessTotals(scrap)[DAMP_CHANNEL.under], L.mask.reduce((a, v) => a + v, 0) / ((SWATCH.x1 - SWATCH.x0) * (SWATCH.y1 - SWATCH.y0))) };
-};
+const SWATCH_CONFIG = {PIGS:[PIGS[0]],O,PAPER_OPTS,GCHUNK,BRUSH,FINAL_W,UPRIGHT,WASH_FLAT_SPLAY,SPEED_PAPER,NATIVE_PAINT_MODE:{mode:NATIVE_PAINT_MODE.mode},PB:Boolean(PB),w,valuePlan:Boolean(ctx.VALUE_PLAN),uniform:SPEED_UNIFORM_PAPER,coverage:SPEED_COVERAGE,WASH_SPLAT_SETTINGS,brush:swatchBrush(),channels:(INK||GRAPHITE)?SHEET_PIGS.length:0,spacing:num('mmspacing',mmSpacingDefault(FINAL_W)?1:0)>0,STOCK_TECHNIQUES,
+ options:{gradedwash:opt('gradedwash','1'),calpipe:opt('calpipe','0'),undercover:opt('undercover','1'),underfloor:num('underfloor',.4),overlap:num('overlap',.15),slack:num('slack',.5),land:num('land',.06),lift:num('lift',.10),washfree:num('washfree',.4),strength:num('strength',2.2),waterscale:num('waterscale',1),drymix:num('drymix',1),loadedcontact:num('loadedcontact',0)}};
+const SWATCH_CACHE={dir:RUN_CACHE.dir,enabled:RUN_CACHE.enabled,code:codeHash(root,[],{dependencies:['tools/painter/calibration-swatches.mjs']})};
+let swatches;
+const scrapSwatches=(...args)=>swatches.scrapSwatches(...args),scrapMark=(...args)=>swatches.scrapMark(...args);
 const gradedReading = g => (g ? { all: g.all, escape: g.escape, edge: g.edge } : null);
-const CAL_RESULT = await cachedStep({...RUN_CACHE,name:'calibration',enabled:RUN_CACHE.enabled,code:CODE_HASH,track:optTrack,inputs:{pigment:PIGS[0],O,PAPER_OPTS,GCHUNK,BRUSH,finalWidth:FINAL_W,swatchBrush:swatchBrush(),UPRIGHT,LOADED_CONTACT,WASH_SPLAT_SETTINGS,settles:Boolean(ctx.VALUE_PLAN),physical:PB?{cfg:PB.cfg,mmPerCell:PB.mmPerCell}:null}},async () => {
+const CAL_RESULT = await cachedStep({...RUN_CACHE,name:'calibration',code:SWATCH_CACHE.code,track:optTrack,inputs:SWATCH_CONFIG},async () => {
   const out = {};
-  for (const { technique: T, plain, graded } of scrapSwatches(STOCK_TECHNIQUES, dry)) {
+  const pool=createCalibrationPool(SWATCH_CONFIG,SWATCH_CACHE);let readings;
+  try{readings=await Promise.all(STOCK_TECHNIQUES.map(T=>pool.run({kind:'wash',T})));}finally{await pool.close();}
+  for (const result of readings) {
+    if(result.error)throw new Error(result.error.message);
+    const {technique:T,plain,graded}=result.value;
     out[T.name] = chargeFactor(plain.delivered);
     console.log(`  ${T.name.padEnd(11)} delivers ${plain.delivered.toFixed(2)} of its charge, so it is charged ${out[T.name].toFixed(2)}x`);
     if (!graded) continue;
@@ -860,6 +758,7 @@ const CAL_RESULT = await cachedStep({...RUN_CACHE,name:'calibration',enabled:RUN
 });
 const CAL = CAL_RESULT.value.CAL;
 GRADED_CAL = CAL_RESULT.value.GRADED_CAL;
+SWATCH_CONFIG.CAL=CAL;swatches=createSwatchCalibration(SWATCH_CONFIG);
 // A passage whose brush load or pass count is not its stock technique's is charged from a swatch laid with its own load
 // and passes (src/paint/methods/instrument-cal.mjs). A value plan's shadow glaze is one pass of a 0.45-water brush; the
 // stock glazed swatch is two passes at 0.58 and lays 2.5 times as much. A passage
@@ -874,19 +773,22 @@ const DAMP_CHARGE_MOST = num('dampchargemost', 8);
 // of its cells already hold paint of its own wet sitting (damp-swatch.mjs isDampPassage). Default 0.5.
 const DAMP_SHARE = num('dampshare', 0.5);
 const swatchDry = (scrap, max, o, options) => physicalDry(scrap, max, o, nativeDryOptions(NATIVE_PAINT_MODE.mode, options));
+const preparedSwatches=new Map();
+ctx.SWATCH_PROFILE={planned:0,cached:0,preparedReads:0,unpreparedReads:0};
+const prepared=(job,fallback)=>{const result=preparedSwatches.get(inputHash(swatchJob(job)));if(!result){ctx.SWATCH_PROFILE.unpreparedReads++;const t=performance.now();try{return fallback();}finally{SPEED_PROFILE?.add('painting:unprepared-swatch',performance.now()-t);}}if(result.error)throw new Error(result.error.message);ctx.SWATCH_PROFILE.preparedReads++;return result.value;};
 const INSTRUMENT_CAL = createInstrumentCal({
   stock: Object.fromEntries(STOCK_TECHNIQUES.map(T => [T.name, { technique: T, cal: CAL[T.name], graded: GRADED_CAL[`${T.name} graded`] ?? null }])),
   // the scrap dries as the stock swatches do, without touching the painting's own wet-contact records
-  measure: T => { const [{ plain, graded }] = scrapSwatches([T], (scrap, max, o, options) => physicalDry(scrap, max, o, nativeDryOptions(NATIVE_PAINT_MODE.mode, options))); return { cal: chargeFactor(plain.delivered), graded: gradedReading(graded) }; },
+  measure: T => { const {plain,graded}=prepared({kind:'wash',T},()=>scrapSwatches([T],swatchDry)[0]); return { cal: chargeFactor(plain.delivered), graded: gradedReading(graded) }; },
   // a mark's swatch: the mark itself on the sheet's own paper, its brush a round of its width, charged as a passage of
   // separate marks is, and read for all the paint it lays (mark-swatch.mjs readMark, mass), so the sheet holds the
   // passage's planned paint. A mark of a passage laid into wet paint (mark.damp) is tried over a damp wash; its reading
   // carries what its brush took up of the wash, and instrumentOf reckons the passage's own factor from both.
-  measureMark: (T, mark) => { const r = scrapMark(T, mark); return { cal: chargeFactor(r.mass), mass: r.mass, lift: r.lift ?? 0, delivered: r.delivered, whole: r.whole, coverage: r.coverage, covered: r.covered }; },
+  measureMark: (T, mark) => { const r=prepared({kind:'mark',T,mark},()=>scrapMark(T,mark)); return { cal: chargeFactor(r.mass), mass: r.mass, lift: r.lift ?? 0, delivered: r.delivered, whole: r.whole, coverage: r.coverage, covered: r.covered }; },
   markKey,
   // a script's wash laid into wet paint: its lanes over a damp wash; what it laid of its own paint (all of it: in a wet
   // wash it runs past the swatch's square) and what it took up of the wash
-  measureDamp: T => { const [{ plain }] = scrapSwatches([T], swatchDry, { damp: true }), dry = INSTRUMENT_CAL.of(T).cal; return { cal: dampCharge(plain.all, { lift: plain.lift, under: 1, dry, most: DAMP_CHARGE_MOST }).cal, delivered: plain.all, lift: plain.lift, dry }; },
+  measureDamp: T => { const {plain}=prepared({kind:'damp',T},()=>scrapSwatches([T],swatchDry,{damp:true})[0]), dry = INSTRUMENT_CAL.of(T).cal; return { cal: dampCharge(plain.all, { lift: plain.lift, under: 1, dry, most: DAMP_CHARGE_MOST }).cal, delivered: plain.all, lift: plain.lift, dry }; },
   log: line => console.log(line),
 });
 const ownSwatch = T => chargedFromOwnSwatch(T, { instrumentOn: true, authored: false });
@@ -912,21 +814,20 @@ const instrumentOf = (T, sh = null) => {
   if (ownSwatch(T) && damp) { const r = INSTRUMENT_CAL.ofDamp(T); return { ...r, ...dampCharge(r.delivered, { lift: r.lift, under, dry: r.dry, most: DAMP_CHARGE_MOST }), under, damp }; }
   return ownSwatch(T) ? INSTRUMENT_CAL.of(T) : INSTRUMENT_CAL.byName(T.name);
 };
-// every instrument the value plan names is tried on scrap before the first wash
 if (ctx.VALUE_PLAN) {
-  const planned = [...new Map(ctx.layers.flatMap(l => (l.shapes ?? []).filter(sh => sh._valuePlan).map(sh => [sh, valueTechnique(sh._valuePlan)])).filter(([, T]) => ownSwatch(T)).map(([, T]) => [instrumentKey(T), T])).values()];
-  const saved = await cachedStep({...RUN_CACHE,name:'instrument-calibration',code:CODE_HASH,track:optTrack,inputs:{pigment:PIGS[0],O,PAPER_OPTS,GCHUNK,BRUSH,finalWidth:FINAL_W,swatchBrush:swatchBrush(),UPRIGHT,LOADED_CONTACT,WASH_SPLAT_SETTINGS,physical:PB?{cfg:PB.cfg,mmPerCell:PB.mmPerCell}:null,stock:CAL_RESULT.value,instruments:planned.map(instrumentKey)}},async () => {
-    for (const T of planned) INSTRUMENT_CAL.of(T);
-    return INSTRUMENT_CAL.entries();
-  });
-  if (saved.cached) INSTRUMENT_CAL.load(saved.value);
+ const {jobs,planned}=planSwatchJobs(ctx.layers,{SC,W2,H2,w,sheetMm:num('sheetmm',DEFAULT_SHEET_MM),cover:opt('cover','1')!=='0',coverPower:num('coverpow',1),markCount:MARK_SWATCHES,dampShare:DAMP_SHARE,splay:WASH_FLAT_SPLAY});
+ ctx.SWATCH_PROFILE.planned=jobs.size;
+ const started=performance.now(),pool=createCalibrationPool(SWATCH_CONFIG,SWATCH_CACHE);
+ try{await Promise.all([...jobs].map(async([key,job])=>{const result=await pool.run(job);if(result.cached)ctx.SWATCH_PROFILE.cached++;preparedSwatches.set(key,result);}));}finally{await pool.close();}
+ SPEED_PROFILE?.add('setup:passage-swatches',performance.now()-started);
+ for(const T of planned.values())INSTRUMENT_CAL.of(T);
 }
 
 Object.assign(ctx, { dry, dip, dipLoad, productionDip, stroke, pencilDraw, SC, H2, N2, GFLOOR, GCHUNK, CP_MM, paper, PROBE,
-  ABLATE, INKRES, PEN_STATE_GATE, PEN_STATE_AUDIT, TARGET_DRAW_EDGE, sourceInkDrawing, drawingCapsFor, penDraw, 
-  OUT_W, OUT_H, O, GPU_INFO, base, SHADE, TONE_STAGE, render, LOOK_RES, view, renderFine, 
-  colourTrace, traceBox, traceCells, BRUSH, UPRIGHT, highlights, expected, DELIVERY, DCAL, TECH_CAL, TCAL, 
-  sheetDensity, marks, PENDING_IO, framer, drainFrames, mark, WET, MIX, 
+  ABLATE, INKRES, PEN_STATE_GATE, PEN_STATE_AUDIT, TARGET_DRAW_EDGE, sourceInkDrawing, drawingCapsFor, penDraw,
+  OUT_W, OUT_H, O, GPU_INFO, base, SHADE, TONE_STAGE, render, LOOK_RES, view, renderFine,
+  colourTrace, traceBox, traceCells, BRUSH, UPRIGHT, highlights, expected, DELIVERY, DCAL, TECH_CAL, TCAL,
+  sheetDensity, marks, PENDING_IO, framer, drainFrames, mark, WET, MIX,
   washBridge, CAL, instrumentOf });
 if(opt('marks','0')!=='0'){
  ctx.NATIVE_UNOBSERVED_ROUTES=[];
@@ -939,7 +840,7 @@ if(opt('marks','0')!=='0'){
  // the marks laid so far, so a sparse record still accounts for every mark.
  ctx.NATIVE_CAPTURE=operation=>{if(ctx.NATIVE_RECORDING_FAILURE)return;try{if(Object.hasOwn(ctx.NATIVE_MARK_COUNTS,operation))ctx.NATIVE_MARK_COUNTS[operation]++;if(!ctx.RECORDING.everyOperation&&operation!=='initial')return;ctx.NATIVE_RECORDER.capture(INKRES?INKRES.composeKept(view()):view(),{operation,stage:ctx.STAGE??{stage:'paper'},marks:{...ctx.NATIVE_MARK_COUNTS}});}catch(error){recordingFailed(error);}};
  // a film frame already rendered (rgb), or rendered here when the film's frame worker drew it
- ctx.NATIVE_FILM_CAPTURE=rgb=>{if(ctx.NATIVE_RECORDING_FAILURE||!ctx.RECORDING.onFilm)return;try{ctx.NATIVE_RECORDER.capture(rgb??(INKRES?INKRES.composeKept(view()):view()),{operation:'film',stage:ctx.STAGE??{stage:'paper'},marks:{...ctx.NATIVE_MARK_COUNTS}});}catch(error){recordingFailed(error);}};
+ ctx.NATIVE_FILM_CAPTURE=(rgb,event)=>{if(ctx.NATIVE_RECORDING_FAILURE||!ctx.RECORDING.onFilm)return;try{ctx.NATIVE_RECORDER.capture(rgb??(INKRES?INKRES.composeKept(view()):view()),event??{operation:'film',stage:ctx.STAGE??{stage:'paper'},marks:{...ctx.NATIVE_MARK_COUNTS}});}catch(error){recordingFailed(error);}};
  if(INKRES)for(const name of ['wet','carry','settle']){const original=INKRES[name];INKRES[name]=(...args)=>{const value=original(...args);ctx.NATIVE_CAPTURE('ink-'+name);return value;};}
  if(!opt('resumestate',''))ctx.NATIVE_CAPTURE('initial');
 }

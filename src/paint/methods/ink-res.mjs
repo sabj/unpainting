@@ -1,3 +1,4 @@
+import {createInkComposer} from './ink-compose.mjs';
 import { census } from '../../media/census.mjs';
 import { certifyZeroPaper, certifyDryFixed, hasZeroPaperCertificate, invalidatePaperCertificate } from '../../media/paper-certificate.mjs';
 // Pipeline: inking, stage 6 (pen on the fine sheet).
@@ -326,61 +327,9 @@ export function makeInkRes({ N, W2, H2, paperOpts, pigments, main, inkAt = 0, gr
       renderVersion = materialVersion;
     }
   }
-  // The last composition and the render it came from: a frame recomposes only the fine rows and columns whose render
-  // pixels changed since (a frame after one mark changes a box of them), with the same arithmetic, so the same bytes.
-  // The composition is kept in one buffer and changed in place; the render kept beside it is brought up to date over
-  // the changed rows only. (It was copied whole three times a frame: 19 MB each at full size.)
-  let lastLo = null, lastOut = null, lastVersion = -1;
-  function composeImpl(lo) {
-    ensureInkRatio();
-    const rowLen = WH * 3, loRow = W2 * 3, src = Buffer.from(lo.buffer, lo.byteOffset, lo.byteLength);
-    let from = 0, to = H2 - 1, xa = 0, xb = WH - 1;
-    const kept = !!lastOut && lastVersion === renderVersion && lastLo.length === src.length;
-    if (kept) {
-      const same = y => src.compare(lastLo, y * loRow, (y + 1) * loRow, y * loRow, (y + 1) * loRow) === 0;
-      while (from < H2 && same(from)) from++;
-      if (from === H2) return lastOut;
-      while (to > from && same(to)) to--;
-      // the first and last render pixel that changed in any of those rows, and the fine columns that read them: a fine
-      // column reads its two render pixels (x0Tab, x1Tab, which only grow with x)
-      let c0 = loRow, c1 = -1;
-      for (let y = from; y <= to; y++) {
-        if (y !== from && y !== to && same(y)) continue;
-        const o = y * loRow;
-        let a = 0; while (a < c0 && src[o + a] === lastLo[o + a]) a++; if (a < c0) c0 = a;
-        let b = loRow - 1; while (b > c1 && src[o + b] === lastLo[o + b]) b--; if (b > c1) c1 = b;
-      }
-      const p0 = ((c0 / 3) | 0) * 3, p1 = ((c1 / 3) | 0) * 3;
-      while (xa < WH - 1 && x1Tab[xa] < p0) xa++;
-      while (xb > xa && x0Tab[xb] > p1) xb--;
-    } else {
-      if (!lastOut || lastOut.length !== nH * 3) lastOut = Buffer.allocUnsafe(nH * 3);
-      if (!lastLo || lastLo.length !== src.length) lastLo = Buffer.allocUnsafe(src.length);
-    }
-    const out = lastOut, i0 = xa * 3, i1 = (xb + 1) * 3;
-    let r0 = hBuf0, r1 = hBuf1, cy0 = -1, cy1 = -1;
-    for (let y = 0; y < HH; y++) {
-      const ya = y0Tab[y], yc = y1Tab[y], ty = tyTab[y], ty0 = 1 - ty, row = y * rowLen;
-      if ((ya / loRow < from && yc / loRow < from) || (ya / loRow > to && yc / loRow > to)) continue;
-      if (ya !== cy0) {
-        if (ya === cy1) { const t = r0; r0 = r1; r1 = t; cy1 = cy0; cy0 = ya; }
-        else { interpRow(lo, ya, r0, xa, xb); cy0 = ya; }
-      }
-      let rb = r0;
-      if (yc !== ya) {
-        if (yc !== cy1) { interpRow(lo, yc, r1, xa, xb); cy1 = yc; }
-        rb = r1;
-      }
-      for (let i = i0; i < i1; i++) {
-        const bLo = r0[i] * ty0 + rb[i] * ty;
-        const v = Math.round(bLo * invInkL[row + i]);
-        out[row + i] = v < 0 ? 0 : v > 255 ? 255 : v;
-      }
-    }
-    if (kept) src.copy(lastLo, from * loRow, from * loRow, (to + 1) * loRow); else src.copy(lastLo);
-    lastVersion = renderVersion;
-    return out;
-  }
+  let frameComposer=null,frameRatioVersion=-1,frameRatio=null;
+  function frameComposition(){ensureInkRatio();if(frameRatioVersion!==renderVersion){frameRatio={N,W2,H2,width:WH,height:HH,ratio:invInkL,version:renderVersion};frameRatioVersion=renderVersion;}return frameRatio;}
+  function composeImpl(lo){const state=frameComposition();frameComposer??=createInkComposer(state);if(frameComposer.version!==state.version){frameComposer.setRatio(state.ratio);frameComposer.version=state.version;}return frameComposer.compose(lo);}
 
   /** The pen over a paint render already at the fine grid (WH x HH RGB, such as the sub-cell grain render, which
    *  carries the coarse ink as the sheet holds it): the coarse ink is swapped for the pen's own, pixel by pixel. */
@@ -435,7 +384,7 @@ export function makeInkRes({ N, W2, H2, paperOpts, pigments, main, inkAt = 0, gr
     carriedLo.forEach(a=>a.fill(0));carriedHi.forEach(a=>a.fill(WH-1));
     changed();totalVersion.fill(-1);renderVersion=-1;
   }
-  return { N, width: WH, height: HH, draw, settle, compose, composeKept, composeFine, nativeInk, carry, wet, stats, fine, remapInk, changed, exportState, importState, channel, channels: chans, erased };
+  return { N, width: WH, height: HH, draw, settle, frameComposition, compose, composeKept, composeFine, nativeInk, carry, wet, stats, fine, remapInk, changed, exportState, importState, channel, channels: chans, erased };
 }
 
 

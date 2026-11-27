@@ -19,7 +19,8 @@ export function frameName(index, format = 'jpg') {
 
 /** The sharp pipeline `image` with the encoder its file name asks for. `quality` is the JPEG's. */
 export function encodeFrame(image, name, quality = 88) {
-  if (name.endsWith('.webp')) return image.webp({ lossless: true });
+  // Lossless quality controls compression search, not pixel accuracy.
+  if (name.endsWith('.webp')) return image.webp({ lossless: true, effort: 0, quality: 1 });
   if (name.endsWith('.png')) return image.png();
   return image.jpeg({ quality });
 }

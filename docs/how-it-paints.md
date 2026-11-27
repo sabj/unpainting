@@ -83,6 +83,8 @@ A pencil drawing does not move when it gets wet. A pen drawing is ink from a dip
 
 The painter saves a frame of the sheet at set points as it works, such as the end of each pass and when the paper has dried. With `--video 1` it keeps all of them and makes an MP4 (`tools/speed/frame-policy.mjs`). `frames.json` says which stage each frame belongs to. A frame never loses paint unless paint was taken off on purpose (`src/paint/film-painted.mjs`).
 
+With a resident GPU and ordinary paper optics, fast-mode frames use two readback buffers to send RGB snapshots to a background worker (`src/media/gpu/optical-framer.mjs`). The worker composes separate-resolution ink using its capture-time material state and writes lossless WebP with the fastest compression search. Native recording uses lossless PNG at compression level one. The painter keeps at most six handed frames pending. Captures retain their original stage and mark counts, and leave queued drying enabled. Full operation recording, wet darkening and special paper optics retain their existing observation path.
+
 ### What it does not do yet
 
 - Lifting paint back off dried paper is weak. New water lifts only a little. A blotting step exists in `src/media/sheet.mjs`, but no painting step uses it.
@@ -138,7 +140,7 @@ Before painting, `src/crop/segment-prep.mjs` runs `tools/seg/segments.py` on the
 | Softened edge | `src/paint/techniques/soften-lift.mjs` |
 | Shaped marks | `src/paint/techniques/shaped-marks.mjs` |
 
-Before a passage, the painter tests the loaded brush on a scrap of the same paper. That sets how much paint the brush carries (`src/paint/methods/scrap-swatch.mjs`).
+The painter tests each planned instrument on scrap of the same paper. It prepares lane, mark and damp-wash swatches before painting, using up to eight CPU workers, and caches their exact readings by material inputs and simulator code (`tools/painter/calibration-swatches.mjs`, `tools/painter/calibration-pool.mjs`). Readings are applied in passage order, including the existing first-mark rule for rounded calibration keys. The swatches never read the painting or the target.
 
 ## 5. Brush and strokes
 

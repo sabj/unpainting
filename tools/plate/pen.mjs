@@ -88,7 +88,7 @@ const shoot = async () => {
   }
   const name = frameName(ctx.frame, FRAME_FORMAT);
   const F = framer();
-  if (F) { F.name(F.capture(), name); ctx.NATIVE_FILM_CAPTURE?.(); }
+  if (F) { await F.ready?.();F.name(F.capture(),name,F.optical&&ctx.RECORDING.onFilm&&ctx.NATIVE_FILM_CAPTURE?{operation:'film',stage:{...ctx.STAGE},marks:{...ctx.NATIVE_MARK_COUNTS}}:undefined);if(!F.optical)ctx.NATIVE_FILM_CAPTURE?.(); }
   else { const rgb = INKRES ? INKRES.compose(view()) : view(); await writeFrame(rgb, name); ctx.NATIVE_FILM_CAPTURE?.(rgb); }
   FRAMES.push({ src: name, ...ctx.STAGE });
   ctx.frame++;

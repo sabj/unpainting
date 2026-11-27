@@ -9,6 +9,7 @@ const SOURCE = `
 @group(0) @binding(2) var<storage, read> paper: array<vec4<f32>>;
 @group(0) @binding(3) var<storage, read> cells: array<u32>;
 @group(0) @binding(4) var<storage, read_write> result: array<f32>;
+@group(0) @binding(5) var<uniform> count: vec4<u32>;
 var<workgroup> water: array<f32, 256>;
 var<workgroup> ratio: array<f32, 256>;
 var<workgroup> winner: array<u32, 256>;
@@ -20,7 +21,7 @@ fn subnormal(v: f32) -> bool { let bits=bitcast<u32>(v)&0x7fffffffu;return bits!
 fn nonfinite(v: f32) -> bool { return (bitcast<u32>(v) & 0x7f800000u) == 0x7f800000u; }
 fn reduceBody(id: vec3<u32>, lane: u32, group: vec3<u32>, numGroups: u32, writeW: bool) {
   water[lane]=0.0;ratio[lane]=0.0;winner[lane]=cells[group.x*256u];moist[lane]=0u;total[lane]=0.0;uncertain[lane]=0u;invalid[lane]=0u;
-  if(id.x<arrayLength(&cells)){
+  if(id.x<count.x){
     let i=cells[id.x];let w=W[i];let s=S[i]/max(1e-8,paper[i].x);
     if(writeW){result[numGroups*8u+id.x]=w;}
     water[lane]=max(0.0,w);ratio[lane]=max(0.0,s);winner[lane]=i;total[lane]=w;
@@ -53,6 +54,8 @@ fn reduce_full(@builtin(global_invocation_id) id: vec3<u32>, @builtin(local_invo
 export class PaperGate {
   constructor(device) {
     this.device=device;
+    this.count=device.createBuffer({size:16,usage:GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST});
+    this.binds=[];
     const module=device.createShaderModule({code:SOURCE});
     this.pipeline=device.createComputePipeline({label:'paper-gate',layout:'auto',compute:{module,entryPoint:'reduce'}});
     this.fullPipeline=device.createComputePipeline({label:'paper-gate-full',layout:'auto',compute:{module,entryPoint:'reduce_full'}});
@@ -67,13 +70,18 @@ export class PaperGate {
     const output=this.buffer('output',bytes,GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_SRC);
     const rb=this.buffer('rb',bytes,GPUBufferUsage.MAP_READ|GPUBufferUsage.COPY_DST);
     d.queue.writeBuffer(cells,0,indices);
+    d.queue.writeBuffer(this.count,0,new Uint32Array([indices.length,0,0,0]));
     const pipeline=full?this.fullPipeline:this.pipeline;
-    const buffers=[sheet.b.W,sheet.b.S,sheet.b.PAPER,cells,output];
-    const bind=d.createBindGroup({layout:pipeline.getBindGroupLayout(0),entries:buffers.map((buffer,binding)=>({binding,resource:{buffer,...(binding===3?{size:indices.byteLength}:{})}}))});
+    const buffers=[sheet.b.W,sheet.b.S,sheet.b.PAPER,cells,output,this.count],key=full?1:0;
+    let cached=this.binds[key];
+    if(!cached||buffers.some((buffer,i)=>buffer!==cached.buffers[i])){
+      cached={buffers,bind:d.createBindGroup({layout:pipeline.getBindGroupLayout(0),entries:buffers.map((buffer,binding)=>({binding,resource:{buffer}}))})};this.binds[key]=cached;
+    }
+    const bind=cached.bind;
     const encoder=d.createCommandEncoder(),pass=encoder.beginComputePass();
     pass.setPipeline(pipeline);pass.setBindGroup(0,bind);pass.dispatchWorkgroups(groups);pass.end();encoder.copyBufferToBuffer(output,0,rb,0,bytes);d.queue.submit([encoder.finish()]);
     await rb.mapAsync(GPUMapMode.READ,0,bytes);
     try{return new Float32Array(rb.getMappedRange(0,bytes).slice(0));}finally{rb.unmap();}
   }
-  destroy(){for(const key of ['cells','output','rb'])this[key]?.destroy();}
+  destroy(){for(const key of ['cells','output','rb','count'])this[key]?.destroy();}
 }

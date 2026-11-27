@@ -44,20 +44,22 @@ fn rt(k:vec2<f32>,s:vec2<f32>,x:vec2<f32>)->vec4<f32>{
 }
 @compute @workgroup_size(64)
 fn reset(@builtin(global_invocation_id) g:vec3<u32>,@builtin(num_workgroups) groups:vec3<u32>){let i=g.x+g.y*groups.x*64u;if(i>=o.n*3u){return;}matrix[4u*i]=ds(1.);matrix[4u*i+1u]=ds(0.);matrix[4u*i+2u]=ds(0.);matrix[4u*i+3u]=ds(1.);}
+fn matrixAt(q:u32)->vec2<f32>{if(o.reserved!=0u){return base[q];}return matrix[q];}
+fn copyCell(i:u32){if(o.reserved!=0u){for(var q=i*12u;q<(i+1u)*12u;q++){matrix[q]=base[q];}}}
 @compute @workgroup_size(256)
 fn compose(@builtin(global_invocation_id) g:vec3<u32>,@builtin(num_workgroups) groups:vec3<u32>){
  let index=g.x+g.y*groups.x*256u;
  var i=index;
  if(o.sparse!=0u){let q=index/256u;if(q>=tiles[5u*o.ntiles+1u]){return;}let tile=tiles[3u*o.ntiles+1u+q];let tw=(o.w+15u)/16u;let x=(tile%tw)*16u+(index%16u);let y=(tile/tw)*16u+(index%256u)/16u;if(x>=o.w||y>=o.n/o.w){return;}i=y*o.w+x;}
- if(i>=o.n){return;}var x0=ds(0.);for(var k=0u;k<o.k;k++){x0=add(x0,ds(layer[k*o.n+i]));}if(x0.x<=1e-7){return;}
+ if(i>=o.n){return;}var x0=ds(0.);for(var k=0u;k<o.k;k++){x0=add(x0,ds(layer[k*o.n+i]));}if(x0.x<=1e-7){copyCell(i);return;}
  var x=ds(0.);var values:array<vec2<f32>,16>;
  for(var k=0u;k<o.k;k++){var v=ds(layer[k*o.n+i]);if(o.micro!=0u){v=mul(v,add(ds(1.),mul(pigment[k*7u+6u],ds(texture[i]))));}values[k]=v;x=add(x,v);}
- if(x.x<=1e-9){return;}
+ if(x.x<=1e-9){copyCell(i);return;}
  for(var k=0u;k<o.k;k++){values[k]=divd(values[k],x);}
  for(var c=0u;c<3u;c++){
   var kc=ds(0.);var sc=ds(0.);for(var k=0u;k<o.k;k++){kc=add(kc,mul(values[k],pigment[k*7u+c]));sc=add(sc,mul(values[k],pigment[k*7u+3u+c]));}
   let opt=rt(kc,sc,x);let r=opt.xy;let t=opt.zw;let a=sub(mul(t,t),mul(r,r));let q=(i*3u+c)*4u;
-  let ma=matrix[q];let mb=matrix[q+1u];let mc=matrix[q+2u];let md=matrix[q+3u];
+  let ma=matrixAt(q);let mb=matrixAt(q+1u);let mc=matrixAt(q+2u);let md=matrixAt(q+3u);
   let aa=add(mul(a,ma),mul(r,mc));let bb=add(mul(a,mb),mul(r,md));let cc=sub(mc,mul(r,ma));let dd=sub(md,mul(r,mb));
   // Normalize to avoid underflow in an opaque stack; the represented mapping is unchanged.
   matrix[q]=divd(aa,dd);matrix[q+1u]=divd(bb,dd);matrix[q+2u]=divd(cc,dd);matrix[q+3u]=ds(1.);

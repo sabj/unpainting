@@ -20,6 +20,7 @@ const ring = new Float32Array(workerData.ring), done = new Int32Array(workerData
 const ctrl = new Int32Array(workerData.ctrl), rectData = new Float32Array(workerData.rect), layerData = new Float32Array(workerData.layer), err = new Uint8Array(workerData.err);
 function ack() { Atomics.store(ctrl, 0, 1); Atomics.notify(ctrl, 0); }
 function fail(msg, status = 0) {
+  try{opticalPort?.postMessage({error:String(msg)});}catch{}
   const b = new TextEncoder().encode(String(msg).slice(0, err.length - 1));
   err.fill(0); err.set(b); ctrl[2] = 1;
   Atomics.store(ctrl, 3, status || 2);
@@ -60,6 +61,7 @@ function driedMask(r){if(!asyncDry)return;workerWetMask=0;if(r.pushed)workerTopM
 
 // the frame worker's port (framer.mjs), and the order frames and finished layers are handed to it in: the order they were
 // taken in the queue, whatever order their read-backs land in
+let opticalPort=null,opticalChain=Promise.resolve();
 let framePort = null, frameChain = Promise.resolve();
 const toFrames = (p, build) => { frameChain = frameChain.then(() => p).then(v => { const { msg, transfer } = build(v); framePort.postMessage(msg, transfer); }).catch(e => { console.error('gpu worker frame error', e); fail(e.stack ?? e.message); }); };
 
@@ -139,13 +141,20 @@ async function handleOp(m) {
       return;
     }
     case 'opticalInit': {
-      gpu.flushStrokes(); gpu.optical?.destroy(); gpu.optical = null;
+      gpu.flushStrokes(); await gpu.optical?.drain(); gpu.optical?.destroy(); gpu.optical = null;
       gpu.optical = await GpuOpticalComposite.create(gpu.device, gpu.n, gpu.pigments, m.micro, gpu.w);
       const cut = gpu.resistMask && m.resistFrom != null ? Math.min(m.lower.length, Math.max(0, m.resistFrom - 1)) : m.lower.length;
       for (let i = 0; i < cut; i++) gpu.optical.append(m.lower[i]);
       if (gpu.resistMask) gpu.optical.beginMask(gpu.resistMask, m.resistFrom > 1 && m.resistFrom === m.count ? gpu.b.TOP : null);
       for (let i = cut; i < m.lower.length; i++) gpu.optical.append(m.lower[i]);
       gpu.opticalCount = m.count; break;
+    }
+    case 'opticalPort': opticalPort=m.port;return;
+    case 'opticalSnap': {
+      gpu.flushStrokes();const wet=gpu.optical.sumWet(gpu.b.G,gpu.b.D,gpu.b.P);
+      const {ready}=await gpu.optical.capture(m.base,gpu.hasTop?[gpu.b.TOP,wet]:[wet],true);
+      opticalChain=opticalChain.then(()=>ready).then(rgb=>opticalPort.postMessage({id:m.id,rgb},[rgb.buffer])).catch(error=>fail(error.stack??error.message));
+      return;
     }
     case 'opticalFrame': {
       gpu.flushStrokes();const wet=gpu.optical.sumWet(gpu.b.G,gpu.b.D,gpu.b.P);

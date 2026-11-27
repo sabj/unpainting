@@ -46,7 +46,7 @@ if(!isMainThread&&workerData?.nativeRecorder){
  function room(n){const s=fs.statfsSync(directory);if(used+overheadBytes+n>byteCap)throw Error('Native recording byte cap exceeded');if(s.bavail*s.bsize-n<diskFloor)throw Error('Native recording disk floor reached');}
  function write(name,b){room(b.length);fs.writeFileSync(path.join(directory,name),b);used+=b.length;}
  function save(){const b=Buffer.from(JSON.stringify({...manifest,payloadAndEventBytes:used},null,2));room(b.length);fs.writeFileSync(path.join(directory,'operations.json'),b);overheadBytes=b.length;}
- const png=(b,w,h)=>sharp(b,{raw:{width:w,height:h,channels:3}}).png({compressionLevel:6}).toBuffer();
+ const png=(b,w,h)=>sharp(b,{raw:{width:w,height:h,channels:3}}).png({compressionLevel:1}).toBuffer();
  async function capture(event,final=false,rgb=Buffer.from(pixels),at=Date.now()){
   const key=!previous||final;let rect=null,payload=null,encoding='replace';
   if(key){rect={x:0,y:0,width,height};payload=await png(rgb,width,height);}

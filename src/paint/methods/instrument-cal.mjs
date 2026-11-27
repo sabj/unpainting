@@ -12,6 +12,8 @@
 // what a swatch's delivery depends on in a technique
 const FIELDS = ['water', 'wetMix', 'bridge', 'bridgeSoft', 'passes'];
 
+export const swatchTechnique = T => Object.fromEntries(['name',...FIELDS,'intoWet','lap'].filter(key=>Object.hasOwn(T,key)).map(key=>[key,T[key]]));
+
 /** The instrument a technique is laid with, as a key: its name, brush load, wet mixing, tooth reach, wet bed and passes. */
 export function instrumentKey(T) {
   if (!T || typeof T.name !== 'string' || !T.name) throw new TypeError('instrument calibration: a technique needs a name');
