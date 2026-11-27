@@ -1,6 +1,12 @@
 # Judging
 
-Measurements and judges score a finished painting and the frames saved on the way. Nothing they say is fed back to the painter ([honesty](honesty.md)). The benchmark's judges are in [scoring](../bench/docs/scoring.md).
+In the clean 0.5.1 benchmark, three judges see the original beside the finished painting. The original is the 9/10 reference for watercolour craft. The judges also see ten stills from the film to score how human the process looks. Human-ness below 65% reduces the craft score. Likeness has its own column. Final scores are pending. [Scoring formula and judges](../bench/docs/scoring.md).
+
+![Sargent’s White Ships, with Auto’s 0.5 painting sliding across the original](img/wipe-white-ships.webp)
+
+## Checks on a painting
+
+These tools measure the painting after it dries. Their readings stay out of the model’s session. [Honesty](honesty.md).
 
 - `node tools/judge/judge-plate.mjs --image TARGET --painted PAINTING.jpg`: measures one painting with the code in `src/eval/`. It checks tone levels and how much paper is left bare (`values.mjs`), how well tones and lines match by region (`fidelity.mjs`) and colour difference (`colour.mjs`).
 - `node tools/judge/stage-check.mjs RUN_DIR`: checks whether the saved frames follow the order a painter would use (`src/eval/stages.mjs`). It flags three things. One is big shapes that are under half their final darkness a third of the way in. Another is speckle in the first half. The last is more than 70% of the final tone already down a quarter of the way in.

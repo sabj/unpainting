@@ -64,7 +64,7 @@ Made with an image generator:
 | Yale, Sterling Library | Carol M. Highsmith, Yale University, New Haven, Connecticut, September 2011. George F. Landegger Collection of Connecticut Photographs in Carol M. Highsmith's America, Library of Congress, Prints and Photographs Division, [LC-DIG-highsm-19252](https://www.loc.gov/item/2012630667/). "No known restrictions on publication." Found by matching our picture to the catalogue | Modified with an image generator (Nano Banana, Google, or the image generator in Codex, OpenAI; which one was not recorded for this picture) | Source photograph: no known restrictions |
 | Kasha portrait wash | Photograph by Sam Jackson | Modified with an image generator (Nano Banana, Google, or the image generator in Codex, OpenAI; which one was not recorded for this picture) | © Sam Jackson, noncommercial use |
 | The first Mittens, cat and portrait (0.2.1 benchmark) | Photograph by Sam Jackson | Modified with an image generator (Nano Banana, Google, or the image generator in Codex, OpenAI; which one was not recorded for this picture) | © Sam Jackson, noncommercial use ([NOTICE](../NOTICE) section 1) |
-| Yale Trumbull (0.2.1 benchmark) | Not Sam Jackson's: [posted](https://www.instagram.com/p/CESNBxYg0g8/) by the Trumbull College Instagram account (@trumbullcollegeyale), 24 August 2020, credited there to Google; photographer unknown | 5 October 2026. Modified with an image generator (Nano Banana, Google, or the image generator in Codex, OpenAI; which one was not recorded for this picture) | The source photograph was not licensed properly, so the picture is kept out of the 0.4 benchmark ([NOTICE](../NOTICE) section 1a) |
+| Yale Trumbull (0.2.1 benchmark) | Not Sam Jackson's: [posted](https://www.instagram.com/p/CESNBxYg0g8/) by the Trumbull College Instagram account (@trumbullcollegeyale), 24 August 2020, credited there to Google; photographer unknown | 5 October 2026. Modified with an image generator (Nano Banana, Google, or the image generator in Codex, OpenAI; which one was not recorded for this picture) | The source photograph was not licensed properly, so the picture is kept out of the 0.4 and 0.5 benchmarks ([NOTICE](../NOTICE) section 1a) |
 
 ## Private set
 
@@ -72,4 +72,4 @@ Beach and Overlook: photographs by Sam Jackson, modified with an image generator
 
 ## Earlier benchmarks
 
-Rounds V1 to V5 painted Hills, France, Ships, Mittens and Trumbull ([sizes](v2/crops.json)). Ships is Sargent's *White Ships*, in 0.4 at full size. Trumbull and the first Mittens are optional; Hills and France are in no 0.4 set.
+Rounds V1 to V5 painted Hills, France, Ships, Mittens and Trumbull ([sizes](v2/crops.json)). Ships is Sargent's *White Ships*, now a core picture at full size. Trumbull and the first Mittens are optional. Hills and France are outside the current sets.

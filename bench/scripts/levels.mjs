@@ -6,9 +6,7 @@
 //     failed (true when the run failed, the painter refused the script or there is no painting), commit, judgeVersion,
 //     judgeProfile, autoCommit (optional, on a model record: the Auto commit it was given or compared with),
 //     progression, cheatRisk, likeness (side readings, shown beside and never part of a score) }
-// Every level is ONE fresh, independent session (the definition, 24 Nov 2026: L1 picture + format + tips; L2 +
-// prepared studies, drawing, named forms, traced shapes; L3 + Auto's plan and finished painting; L4 L3's inputs in an
-// open session with tools). Where a level holds several tries (a test run), the LAST counts, never the best.
+// When records include several tries, the last counts.
 import { mean, bootstrapMean } from './lib.mjs';
 
 /** The levels in order. `was` is the old round the level grew out of, for display only. */
@@ -194,7 +192,7 @@ export function subjectTable(summary) {
   const out = [line(head), line(head.map((_, i) => (i === 0 || i >= head.length - 2 ? '---' : '---:'))), ...rows.map(line)];
   out.push('');
   for (const [l, st] of Object.entries(summary.steps ?? {})) if (st.subjects) out.push(`${l} minus ${st.from}, the ${st.subjects} pictures both ran: ${signed(st.adjusted)} of headroom${st.interval ? ` (${signed(st.interval[0])} to ${signed(st.interval[1])})` : ''}.`);
-  out.push(LEVEL_NOTE, '', 'A failed run, or a scheduled picture with no painting, counts as the bottom of the scale; none is left out of a mean.',
+  out.push('Each level is one fresh, independent session.', '', 'A failed run, or a scheduled picture with no painting, counts as the bottom of the scale; none is left out of a mean.',
     `Auto: commit ${summary.auto.commit}, judge ${summary.auto.judge}. Progression and cheat-risk are shown beside the score and are not part of it.`);
   return out.join('\n');
 }

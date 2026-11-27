@@ -1,15 +1,10 @@
-// 0.4's summary: every model's levels against Auto, from what `npm run bench:score04` wrote.
-//   npm run bench:summary04 -- DIR/results.json [--set core|extended] [--out FILE.md]
-// Reads the scored paintings (results.json: Auto, level 1 and levels 2 to 4 in one file, failed runs among them) and
-// sums them by model and level (levels.mjs). --set names the schedule (bench/run-sets.json): which pictures run at
-// which level, so a scheduled picture with no painting, or whose run failed, is counted as a failure and never
-// dropped; without it, every picture Auto painted is expected at every level a model entered. The figure summed is
-// the combined figure (0 to 100); human-ness, quality and likeness stay in SCORES.md beside it. Nothing is judged here.
+// npm run bench:summary04 -- DIR/results.json [--set core|extended] [--out FILE.md]
 import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { summarize, subjectTable, headerFor, LEVEL_NOTE } from './levels.mjs';
+import { summarize, subjectTable, LEVEL_NOTE } from './levels.mjs';
 import { loadRunSets, picturesAt } from '../../tools/paint/run-sets.mjs';
+import { LEVELS as paintingLevels } from '../../tools/paint/levels.mjs';
 
 const SCALE = Object.freeze({ id: 'combined100', min: 0, max: 100 });
 const MODEL_LEVELS = ['L1', 'L2', 'L3', 'L4'];
@@ -20,12 +15,7 @@ export function scheduleOf(setName, runSets = loadRunSets()) {
   return Object.fromEntries(['Auto', ...MODEL_LEVELS].map(l => [l, picturesAt(setName, l, runSets).map(p => p.id)]));
 }
 
-/**
- * results.json's paintings as the flat records levels.mjs sums: one a painting, with its level, model, subject, the
- * combined figure as its score, and `failed` for a run that left no painting. A painting that was judged but has no
- * combined figure (a judge short of its readings) is left without a score, so the summary refuses it by name rather
- * than count it as a failure or as zero.
- */
+// Missing judge readings stay null. A scheduled run that failed counts as zero.
 export function recordsOf(results) {
   const judge = { judgeVersion: results.judge?.label ?? null, judgeProfile: results.snapshotScheme?.name ?? null };
   return (results.paintings ?? []).map(p => {
@@ -39,13 +29,11 @@ export function recordsOf(results) {
 /** Every model's summary, and what was scheduled and never painted. {models: [summary], schedule, failed: [..]} */
 export function summarizeResults(results, { schedule = null } = {}) {
   const records = recordsOf(results);
-  // Auto of a scheduled picture that is not among the results: named, since nothing can be measured against it
   if (schedule) {
     const have = new Set(records.filter(r => r.level === 'Auto').map(r => r.subject));
     const gone = schedule.Auto.filter(s => !have.has(s));
     if (gone.length) throw new Error(`summary04: Auto is scheduled and not among the results for ${gone.join(', ')}. Every scheduled picture needs its Auto painting scored in the same results (a failed Auto run is listed there as failed)`);
   }
-  // Auto paints only the scheduled pictures; a picture outside the schedule is not averaged in
   const inSchedule = r => !schedule || (schedule[r.level] ?? []).includes(r.subject);
   const outside = records.filter(r => !inSchedule(r));
   const autos = records.filter(r => r.level === 'Auto' && inSchedule(r));
@@ -61,8 +49,15 @@ const signed = v => (v == null ? 'n/a' : `${v > 0 ? '+' : ''}${num(v)}`);
 /** SUMMARY.md: the headline table of every model, then each model's pictures. */
 export function summaryMarkdown(results, sum, { setName = null } = {}) {
   const j = results.judge ?? {};
-  const L = ['# 0.4 summary', '',
-    `From results written ${results.written ?? '(no date)'} by \`npm run bench:score04\`. Judges: **${j.label ?? 'not named'}** (panel ${j.panelName ?? 'not named'}, reasoning ${j.reasoning ?? 'not recorded'}); human-ness scheme ${results.snapshotScheme?.name ?? 'not named'}. The figure summed is the combined figure, 0 to 100 (${results.weights?.humanness ?? '?'} parts human-ness to ${results.weights?.quality ?? '?'} part quality; likeness is not in it).`,
+  const profile = results.profile ?? '0.4';
+  const formula = results.combinedMode === 'gated'
+    ? `Q × min(1, H / ${results.gateFloor})`
+    : `${results.weights?.humanness ?? '?'} parts human-ness to ${results.weights?.quality ?? '?'} part quality`;
+  const levels = profile === '0.5.1'
+    ? MODEL_LEVELS.map(level => `- **${level}** ${paintingLevels[level].what}`).join('\n')
+    : LEVEL_NOTE;
+  const L = [`# ${profile} summary`, '',
+    `Judges: **${j.label ?? 'not named'}** (panel ${j.panelName ?? 'not named'}, reasoning ${j.reasoning ?? 'not recorded'}); human-ness scheme ${results.snapshotScheme?.name ?? 'not named'}. Combined score (0 to 100): ${formula}.`,
     setName ? `Schedule: the run set \`${setName}\` (bench/run-sets.json). A scheduled picture with no painting, or whose run failed, counts as 0.` : 'No schedule was named: every picture Auto painted is expected at every level a model entered, and one with no painting counts as 0.', ''];
   L.push('## Every model', '', `| Model | ${MODEL_LEVELS.map(l => `${l}: adjusted for Auto (interval) | raw mean | pictures, failed`).join(' | ')} |`, `|---|${MODEL_LEVELS.map(() => '---:|---:|---:|').join('')}`);
   for (const s of sum.models) {
@@ -70,7 +65,7 @@ export function summaryMarkdown(results, sum, { setName = null } = {}) {
     L.push(`| ${s.model} | ${MODEL_LEVELS.flatMap(cell).join(' | ')} |`);
   }
   L.push('', 'Adjusted for Auto: (painting - Auto) / max(100 - Auto, 20), averaged over the pictures scheduled at the level; 0 is level with Auto. The interval is a bootstrap over pictures.', '',
-    `What each level is: ${MODEL_LEVELS.map(l => `${l}, ${headerFor(l).toLowerCase()}`).join('; ')}. ${LEVEL_NOTE}`, '');
+    levels, '');
   L.push('## Failed runs', '', ...(sum.failed.length ? [`${sum.failed.length} scheduled run${sum.failed.length === 1 ? '' : 's'} failed. Each counts as 0 above; none is dropped.`, '', ...sum.failed.map(f => `- ${f.model} ${f.level}, ${f.subject}: ${f.why}`)] : ['- None among the results. (A scheduled picture with no entry at all is shown as "no painting" in its model\'s table.)']), '');
   if (sum.flagged.length) L.push('## Likeness at the bottom of the scale', '', 'These paintings may not be paintings of their pictures at all; their scores above stand as judged and are for a person to look at.', '', ...sum.flagged.map(f => `- ${f}`), '');
   if (sum.outside.length) L.push('## Outside the schedule, not summed', '', ...sum.outside.map(f => `- ${f}`), '');

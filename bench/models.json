@@ -25,7 +25,7 @@
   { "key": "hydrogen-m", "name": "Gemini 4 Hydrogen (medium)", "id": "gemini-4-hydrogen-medium", "effort": "medium", "runner": "agy" },
   { "key": "carbon-m", "name": "Gemini 4 Carbon (medium)", "id": "gemini-4-carbon-medium", "effort": "medium", "runner": "agy" },
   { "key": "sonnet-m", "name": "Claude Sonnet 5.5 (medium)", "id": "claude-sonnet-5-5", "effort": "medium", "runner": "claude" },
-  { "key": "astra-m", "name": "Codex Astra (medium)", "id": "gpt-6-astra", "effort": "medium", "runner": "codex" },
+  { "key": "astra-m", "name": "Codex Astra (medium)", "id": "gpt-6.2-astra", "effort": "medium", "runner": "codex" },
   { "key": "sol-m", "name": "Codex Sol (medium)", "id": "gpt-6.1-sol", "effort": "medium", "runner": "codex" },
   { "key": "terra-m", "name": "Codex Terra (medium)", "id": "gpt-6.1-terra", "effort": "medium", "runner": "codex" },
   { "key": "fable-m", "name": "Claude Fable 5.2 (medium)", "id": "claude-fable-5-2", "effort": "medium", "runner": "claude" },

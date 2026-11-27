@@ -1,19 +1,4 @@
-// The levels of a model session, as named settings of one session (never a fork of the code).
-// Option A ladder (0.5.1): every level is ONE fresh, independent session; no level is handed another level's output,
-// so every level and picture can run at once. At every level: the same look budget, the anti-cheat guard (code may not
-// read the original's pixels), no judge feedback, and the model hands in its own script.
-//   L1  the picture, the script format and the painting tips; nothing prepared; blank paper. Fixed rounds.
-//   L2  + three unnumbered colour studies for visual value/colour reference; no prepared drawing, named forms, or traced
-//       shapes; blank paper. Fixed rounds.
-//   L3  + opt-in prepared drawing (OFF/blank paper unless selected), named forms, traced shapes, and Auto's plan & painting. Fixed rounds.
-//   L4  L3's inputs (with opt-in prepared drawing) in an open sandboxed session with tools (--work session).
-// Kept only to replay the runs of 23-24 Nov made under the earlier ladder, never part of the benchmark:
-//   L4-retry  the old level 4: the traced shapes and the model's own earlier painting and script (--previous); nothing of Auto.
-// Planner settings alone, or the code's plan as a choice, are refused at every level (OWN_SCRIPT_ONLY): Auto's plan
-// at L3 and L4 is something to read, never a choice to hand in. Looks are priced by size and share (look-cost.mjs).
-// Pure: nothing is read or written here.
-
-/** The clock of every benchmark level, L1 to L4, in minutes (docs rules.md; bench/scripts/levels.mjs passes it): every brief states it. */
+// L4-retry exists only to replay sessions from before the 0.5.1 ladder.
 export const LEVEL_MINUTES = 60;
 
 /** Retries at a level when the command line names no number (the old retry level only). */
@@ -58,18 +43,7 @@ export function handedAt(level, { tryNumber = 1, retries = DEFAULT_RETRIES, prev
     ...(level.noInputs ? { noInputs: true } : {}) };
 }
 
-/**
- * Shared Option A prepared-drawing policy for both fixed rounds (L1-L3) and open sessions (L4).
- * Given a parsed `choice` (from readChoice, with `choice.tools?.linesEdit` already loaded when `lines` is set) and the
- * level's `preparedDrawing` (`false`, `'opt-in'`, or `true`), returns the normalized choice actually laid:
- *   - false (L1, L2): always forces `medium: 'none'` (blank paper; author's `own` lines still drawn).
- *   - 'opt-in' (L3, L4):
- *       * explicit `medium` ('pencil' | 'pen' | 'none') is respected verbatim;
- *       * omitted `medium` + `linesEdit.rules` with any non-drop rule (`r.do && r.do !== 'drop'`) sets `startDropped: true`
- *         so ONLY the explicitly selected prepared lines are drawn (not the whole default drawing);
- *       * omitted `medium` + (no rules or drop-only rules) forces `medium: 'none'` (blank paper; `own` lines still drawn).
- *   - true (L4-retry / legacy): returns `choice` unchanged.
- */
+// Selecting prepared lines without a medium draws just those lines. Freehand lines are independent.
 export function applyPreparedDrawingPolicy(choice, preparedDrawing = true) {
   if (preparedDrawing === true || !choice) return choice;
   const tools = choice.tools ? { ...choice.tools } : {};

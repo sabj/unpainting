@@ -36,20 +36,22 @@ test('handed pictures: a line each in seen.md; what a command\'s log can show of
   assert.deepEqual(logReads('codex', ['sips -g pixelWidth previous/final-beside-subject.jpg'], files), { [files[0]]: null, [files[1]]: null }, 'codex\'s log cannot show a picture being read: null, never a guess');
 });
 
-test('the levels of 24 Nov: each one fresh session, handed no other level\'s result; L2 the studies and traced shapes, no Auto; L3 and L4 Auto\'s plan and painting; no critique at any level', () => {
+test('each level starts fresh with its 0.5.1 inputs', () => {
   assert.deepEqual(Object.keys(LEVELS), ['L1', 'L2', 'L3', 'L4', 'L4-retry']); assert.deepEqual(BENCHMARK_LEVELS, ['L1', 'L2', 'L3', 'L4']); assert.throws(() => levelOf('L9'), /one of L1, L2, L3, L4, L4-retry/); assert.equal(DEFAULT_RETRIES, 1);
-  const none = { previous: false, plan: false };
-  assert.deepEqual(handedAt(levelOf('L1'), {}), { ...none, autoPlan: false, auto: false, shapes: false, noInputs: true }, 'L1: the picture, the format and the tips');
-  assert.deepEqual(handedAt(levelOf('L2'), {}), { ...none, autoPlan: false, auto: false, shapes: true }, 'L2: the studies and the traced shapes; no Auto plan, no Auto painting');
-  assert.deepEqual(handedAt(levelOf('L3'), {}), { ...none, autoPlan: true, auto: true, shapes: true }, 'L3: L2 and Auto\'s plan and finished painting');
+  const blank = {
+    previous: false, plan: false, autoPlan: false, auto: false, shapes: false,
+    studiesOnly: false, preparedDrawing: false, namedForms: false,
+  };
+  const prepared = { ...blank, autoPlan: true, auto: true, shapes: true, preparedDrawing: 'opt-in', namedForms: true };
+  assert.deepEqual(handedAt(levelOf('L1'), {}), { ...blank, noInputs: true });
+  assert.deepEqual(handedAt(levelOf('L2'), {}), { ...blank, studiesOnly: true });
+  assert.deepEqual(handedAt(levelOf('L3'), {}), prepared);
   assert.deepEqual(handedAt(levelOf('L4'), { work: 'session' }), handedAt(levelOf('L3'), { work: 'rounds' }), 'L4: L3\'s inputs exactly');
   assert.deepEqual(BENCHMARK_LEVELS.map(l => LEVELS[l].work), ['rounds', 'rounds', 'rounds', 'session'], 'L1 to L3 fixed rounds, L4 an open session with tools');
   assert.throws(() => handedAt(levelOf('L4'), { work: 'rounds' }), /L4 is an open session with tools \(--work session\)/); assert.throws(() => handedAt(levelOf('L3'), { work: 'session' }), /L3 is fixed rounds/);
   assert.ok(Object.values(LEVELS).every(l => l.codePlan === false), 'no level hands over the code\'s plan as a choice');
-  // no previous-level input anywhere in the benchmark: --previous and --try are refused at every benchmark level
   for (const l of BENCHMARK_LEVELS) { assert.equal(LEVELS[l].previousTry, false, `${l} takes no earlier result`); assert.throws(() => handedAt(levelOf(l), { previous: 'run' }), /one fresh session, handed no other level's result/); assert.throws(() => handedAt(levelOf(l), { tryNumber: 2 }), /one fresh session/); }
-  // the old level 4 ("L4 after L2"), kept only to replay old runs: its own earlier result and the traced shapes, nothing of Auto
-  assert.equal(LEVELS['L4-retry'].replayOnly, true); assert.deepEqual(handedAt(levelOf('L4-retry'), { previous: 'l2-run' }), { ...none, previous: true, autoPlan: false, auto: false, shapes: true });
+  assert.equal(LEVELS['L4-retry'].replayOnly, true); assert.deepEqual(handedAt(levelOf('L4-retry'), { previous: 'l2-run' }), { ...blank, previous: true, shapes: true, namedForms: true, preparedDrawing: true });
   assert.throws(() => handedAt(levelOf('L4-retry'), {}), /replays an old retry: .*--previous/); assert.throws(() => handedAt(levelOf('L4-retry'), { tryNumber: 2, previous: 'run' }), /try 2: this benchmark gives 1 retry/);
   assert.ok(Object.values(LEVELS).every(l => !/critique|score|verdict/i.test(JSON.stringify(Object.keys(l)))));
 });

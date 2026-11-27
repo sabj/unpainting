@@ -1,6 +1,14 @@
 # Changelog
 
-Tags carry the detail: `git show v0.3.2`, `git log v0.3.0..v0.3.2`.
+## 0.5.1
+
+L2 gets the source and three colour studies. The prepared drawing moves to L3 and starts off there and at L4. L4 has its own home directory and 60 minutes of model time. Authored scripts leave their own whites. Brief 5 shows how to use a broad mop, work into a wet wash and sketch freehand.
+
+The `open3v2` judges grade craft side by side against Auto (`versus-auto`, alternating A/B) and human-ness from ten progress frames. A human-ness score below 65% discounts the craft score. The clean benchmark is running.
+
+## 0.5.0
+
+The WebGPU painter runs on Metal and Vulkan. Wet paint flows around the fibres of cold-press paper, blooms into damp washes and leaves grains in the hollows as it dries. A turning brush can now clear its own starting line without clipping the next pass (`endLine`).
 
 ## 0.4.0 (2026-11-24)
 

@@ -1,10 +1,14 @@
 # Painting script
 
-A painting script is the plan a model writes for a whole painting. It lists passages in the order a painter would lay them. A passage is one wash or group of marks. Each has a region, a paint, a brush and a kind of mark. The painter lays the script as written, in place of the plan Auto works out from the studies. The brief a model gets, which describes every mark, is `tools/paint/AUTHOR-BRIEF.md`.
+A script lists the washes and marks in the order the painter will lay them. Positions and brush widths are in millimetres. The model gets [brief 5](../tools/paint/BRIEF.md) with the format, marks and painting tips.
+
+For a big sky, the brief suggests a broad brush, about 24–38 mm across. Its examples use a 38 mm mop or a 25.4 mm flat. Set `paper: "wet"` to wet the sheet first. A second colour can go into the still-wet wash with `into` and `wait: "none"`. For white paper, paint around the spot or reserve it in `lights`. Authored scripts get no automatic mask from the source pixels.
 
 ```sh
 npm run paint -- SUBJECT paint --author script:SCRIPT.json --lines standard
 ```
+
+For a standalone script, `--lines standard` asks for the subject’s registered drawing. Pass `--lines FILE.json` to supply your own line choices.
 
 Code: `src/paint/methods/script-washes.mjs` (the plan) and `script-marks.mjs` (the marks). `tools/painter/script-overlay.mjs` draws a script's passages over the picture before painting.
 
@@ -16,7 +20,7 @@ Code: `src/paint/methods/script-washes.mjs` (the plan) and `script-marks.mjs` (t
   "subject": "h36", "author": "who wrote it",
   "sheet": { "widthMm": 280, "heightMm": 186.7 },
   "palette": ["ochre", "rawsienna", "ultramarine"],
-  "brushes": { "mop": { "shape": "round", "widthMm": 22 }, "r8": { "shape": "round", "widthMm": 6 } },
+  "brushes": { "mop": { "shape": "round", "widthMm": 38 }, "r8": { "shape": "round", "widthMm": 6 } },
   "approach": "how it will be painted, for people",
   "lights": [ { "what": "lit sill", "region": [[40, 34], [70, 34], [70, 37.5], [40, 37.5]] } ],
   "passages": [
@@ -53,7 +57,7 @@ A passage:
 | `kind` | `wash`: an area filled with overlapping strokes (lanes). By default the lanes follow the shape's own flow; a number in `handling.direction` lays them straight at that angle, and `"form"` asks for the shape's flow explicitly. The lanes take the wash's `path`, `pressure` and `mark`, so a wash can curve and swell. Its outline is irregular, not the exact polygon. `strokes`: a few separate strokes. `touches`: short marks scattered as a hand would. `lines`: a line drawn along each of `paths`. `erase`: pencil rubbed out |
 | `region`, `regions` | polygons that place the strokes. They guide the hand and never cut off a stroke |
 | `paths` | polylines, for `lines` |
-| `strokes` | strokes written one at a time: `{points: [[x, y, pressure], ...]}`, with three to eight points and a pressure from 0 to 1. An optional fourth number is the hand's speed in mm/s. A stroke may name its own `brush` |
+| `strokes` | strokes written one at a time: `{points: [[x, y, pressure], ...]}`, with at least two points and a pressure from 0 to 1. An optional fourth number is the hand's speed in mm/s. A stroke may name its own `brush` |
 | `count`, `character` | for a group of strokes or touches: how many there are, and `size` (even, varied), `spread` (scattered, clustered, along a line), `denser` (top, bottom, left, right, edges, middle) |
 | `paint` | `pigments` in parts, and its strength as either `swatch` (the mix as one wash on white paper) or `dilution` (very pale, pale, medium, strong, rich or dark) |
 | `brush` | a name from `brushes` |
@@ -69,14 +73,20 @@ A passage:
 
 An `erase` passage takes no paint or brush: `widthMm` (0.5 to 10, default 3) and either `strokes` or a `region` that is rubbed in lanes. It needs dry paper.
 
-From level 2, a passage may name the shapes traced from the studies by number, with `shapes`, `reserve` and `{along: n}` (`tools/painter/script-resolve.mjs`).
+At L3 and L4, a passage may name the shapes traced from the studies by number, with `shapes`, `reserve` and `{along: n}` (`tools/painter/script-resolve.mjs`).
 
 ## What it cannot say
 
 - A passage with one soft side and one hard side, or water over an area larger than the paint.
-- A light that is glazed over later, or a bare patch kept for one passage only.
+- Painting over a top-level `lights` polygon later. A passage can use `reserve` to go around a traced shape just for that passage.
 - Returning to a wash while it is wet. Only the passage just before can still be wet.
 
 ## Beside the script
 
-The model's choice names its script and may also set the drawing: `{"kind": "script", "script": "script.json", "medium": "pen", "ink": "waterproof", "lines": "my-lines.json"}`. `medium` is `pencil`, `pen` or `none`; `ink` is `waterproof` or `soluble`; `lines` says when each prepared line is drawn (before the washes, with a stage, after them or not at all) and can add lines of its own.
+The model's choice names its script and may also set the drawing: `{"kind": "script", "script": "script.json", "medium": "pen", "ink": "waterproof", "lines": "my-lines.json"}`. `medium` is `pencil`, `pen` or `none`; `ink` is `waterproof` or `soluble`; `lines` says when each prepared line is drawn (before the washes, with a stage, after them or not at all) and can add freehand lines at any level. At L1 and L2 only the model’s own lines are available. At L3 and L4 the prepared drawing starts off. Choose a medium or select the prepared lines you want.
+
+For a freehand pencil mark, put this in `lines.own` inside the drawing choice:
+
+```json
+[{ "points": [[60, 40], [72, 54], [80, 56]], "medium": "pencil", "widthMm": 0.35, "dark": 0.35, "when": "before" }]
+```

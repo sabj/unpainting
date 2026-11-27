@@ -1,27 +1,11 @@
-"""The judge panel and route for 0.4's scoring (score04.py).
-
-ONE named panel is the default on every route: JUDGE_PANEL=open3, three open-weight models (GLM-5.3-Flash, Qwen3.8-27B,
-Gemma-4-31B) read with one reasoning setting (REASONING: low) wherever they are served. Any other panel is asked for
-by name (PANELS). The route is JUDGE_ROUTE, local by default:
-
-  local       Ollama (local_route.py): one model in memory at a time, unloaded after its readings
-  openrouter  hosted, zero-data-retention providers only; needs OPENROUTER_API_KEY
-  together    hosted on Together; needs TOGETHER_API_KEY (it serves the j1 panel only)
-
-A panel a route cannot serve is refused before any work, by name: never a different or a smaller panel. The panel's
-name, its models as each route names them, and the reasoning setting are written into every results file
-(record()). The key of a hosted route is sent as a header and is never written into a result, a log or an error.
-"""
+"""Judge panels, route-specific model names and reasoning settings for the benchmark."""
 import json, os, random, time, urllib.error, urllib.request
 
 import local_route
 
 ROUTES = ("local", "together", "openrouter")
 READINGS_LABEL = "3x"
-# One reasoning setting for every judge on every route: low. It is the least setting under which all three models of
-# the panel answer: with reasoning off, GLM-5.3-Flash's hosted provider refuses the call outright (HTTP 400 on every
-# reading, 23 Nov 2026: a whole batch came back without a score). OpenRouter: reasoning effort "low", with room for
-# the thinking beside the answer; local: Ollama's think "low". SENT is what each setting sends on each route.
+# Legacy panels default to low. open3v2 supplies its own setting in PANELS.
 REASONING = "low"
 SENT = {"off": {"effort": "none", "think": False}, "low": {"effort": "low", "think": "low"}, "medium": {"effort": "medium", "think": "medium"}}
 # What a judge is asked before a batch is read (probe): one short answer, no picture.

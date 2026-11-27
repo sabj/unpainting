@@ -1,7 +1,4 @@
 #!/usr/bin/env node
-// One CLI to spin up painting jobs, prepare Auto, manage cloud GPU pods, launch benchmarks, check status, and score.
-// Wraps tools/paint/cli.mjs, tools/paint/run-benchmark.mjs, tools/cloud/render-pool-pods.py, and bench/scripts/score04.mjs.
-// Benchmark runs and pod launches are dry-run / read-only unless explicitly asked to start.
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync, spawn } from 'node:child_process';
@@ -29,16 +26,16 @@ Commands:
   pods <status|dry-run|start|stop>    Inspect, dry-check, start, or stop the cloud GPU pod renter
                                       Options (start): --cap N (default 10), --hours H (default 8),
                                                        --limit-min M (default 240), --end-min M (default 0)
-  score <run-dir> [options]           Refresh manifest.json, score finished paintings, and build the summary table
+  score <run-dir> [options]           Refresh manifest.json and score finished paintings
                                       Options: --manifest-only, --no-summary, plus any bench/scripts/score04.mjs flags
   status [run-dir]                    Show render pool state (Mac mini, cloud pods, waiting jobs) and run progress
 
 Examples:
   npm run unpaint -- prepare core --pool local --jobs 3 --dry-run
-  npm run unpaint -- benchmark --out work/bench-04 --set core --models neon-m,carbon-m,argon-m,opus-m,sonnet-m,wonderfull-m,sol-m,terra-m
+  npm run unpaint -- benchmark --out work/bench-05 --set core
   npm run unpaint -- pods status
-  npm run unpaint -- status work/bench-04
-  npm run unpaint -- score work/bench-04 --manifest-only
+  npm run unpaint -- status work/bench-05
+  JUDGE_ROUTE=openrouter npm run unpaint -- score work/bench-05 --profile 0.5.1 --out work/bench-05/scores
 `;
 
 const alive = pid => {
@@ -214,7 +211,7 @@ function cmdBenchmark(argv) {
 
 function cmdScore(argv) {
   const runDir = argv[0];
-  if (!runDir || runDir.startsWith('--')) throw new Error('score: give the benchmark run folder (e.g. npm run unpaint -- score work/bench-04)');
+  if (!runDir || runDir.startsWith('--')) throw new Error('score: give the benchmark run folder (e.g. npm run unpaint -- score work/bench-05)');
   const rest = argv.slice(1);
   const manifestOnly = rest.includes('--manifest-only');
   const noSummary = rest.includes('--no-summary');

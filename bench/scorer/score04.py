@@ -1,42 +1,8 @@
 #!/usr/bin/env python3
-"""0.4's scoring: every painting and its original, read by one judge panel, into results.json and SCORES.md.
+"""Score painting sessions and write results.json, SCORES.md and individual readings.
 
-  npm run bench:score04 -- RUN_FOLDER... | MANIFEST.json --out DIR [--snapshots progress10|film13] [--fresh] [--repeat N] [--concurrency N]
-
-For each painting (s04_runs.py says what a run folder must hold):
-  1 HUMAN-NESS, the main reading, from the film under the human-ness rubric (bench/docs/human-ness-rubric.md; its
-    sha256 is written into the results). --snapshots names what the judges are shown (s04_readings.SCHEMES):
-    progress10, the default: the opening paper (not scored), the drawing frame (the last before the first wash; scored
-    and reported, not in the mean; absent when nothing was drawn first), ten stills of the painting in progress from
-    the first wash to just before the finish, whose mean is human-ness, and the finished sheet (scored and reported,
-    not in the mean). The ten are placed by measured progress (the share of the finished picture on the sheet), not
-    by frame number, so recording density and strokes that leave no mark cannot move them. film13: the first scheme
-    (twelve by frame number through the whole film, then the finished sheet), so an old film can be scored the old
-    way. THE TWO ARE NOT COMPARABLE: results.json and SCORES.md name the scheme. The same pictures go to every judge
-    route, local or hosted. Also the thirds, the tally of tells and the whole-sequence yes or no. No film, or a film
-    that does not say where its first wash is: refused before any judge is called.
-  2 QUALITY: the painting alone and its ORIGINAL alone, 0 to 10, read the same way; the painting's share of the
-    original's. The judge of a painting's quality never sees its original.
-  3 COMBINED: two parts human-ness to one part quality (s04_table.WEIGHTS, written into the results).
-  3b LIKENESS, in its own column and NOT in the combined figure: the original and the finished painting shown together,
-    how well the painting is a painting of that picture, 1 to 5 with a reason. At the bottom of the scale it is flagged.
-  4 beside, never blended: the painter's cheat-risk record and progression, classic.py against the original, and the
-    same figures adjusted for the subject's Auto painting among the inputs.
-  5 the judges are ONE named panel on every route (s04_judge.py: JUDGE_PANEL, open3 by default, reasoning low); the
-    route is JUDGE_ROUTE: local by default, openrouter or together with their key. Panel, route and settings are
-    written into results.json; a judge that reasoned although the setting is off is named under "Faults first".
-  6 usage beside the score: each run's usage.json.
-Three readings a judge. On the local route every picture for one judge before the next judge is loaded, one reading
-at a time; the model is unloaded after its readings, and the run waits while the server holds another job's model.
-On a hosted route every judge reads at once, up to --concurrency N readings in flight for each (default 8; a busy
-server's 429 or 5xx is retried with backoff). results.json and SCORES.md are rewritten (whole, never half-written) as
-each painting completes, marked "inProgress" until the last. Readings are kept in
-DIR/readings/ and reused only when everything that could change a reply is the same (cache_key: panel, route,
-endpoint, the judge as named and as served, its digest, the options sent, the rubric, the prompt, the pictures and
-their sizes, the repeat). --fresh reads everything again. --repeat N scores the same paintings a further time, kept
-apart (readings/.../rN, results-repeat-N.json, SCORES-repeat-N.md), for a noise measurement: two repeats never share
-a reading. Exit 0 complete, 1 written but a reading is short of a judge (named under "Faults first"), 2 refused
-(nothing judged).
+Pass --profile 0.5.1 for open3v2, reference-anchored craft and gated combined scores.
+The legacy profile uses blind quality and a weighted mean. See bench/docs/scoring.md.
 """
 import argparse, json, os, sys, threading, time
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -227,7 +193,7 @@ def cheat_summary(c):
 
 
 def main(argv=None, judge=s04_judge, env=None, say=print):
-    ap = argparse.ArgumentParser(prog="bench:score04", description="0.4's scoring: human-ness, quality, combined; likeness in its own column; anti-cheat, algorithmic, Auto adjustment and usage beside.")
+    ap = argparse.ArgumentParser(prog="bench:score04", description="Score painting sessions. Use --profile 0.5.1 for reference-anchored craft and gated combined scores.")
     ap.add_argument("inputs", nargs="+", help="run folders, or a manifest .json listing them")
     ap.add_argument("--out", required=True, help="folder for results.json, SCORES.md and the kept readings")
     ap.add_argument("--snapshots", default=R.DEFAULT_SCHEME, choices=sorted(R.SCHEMES) + sorted(R.GONE), metavar="{" + ",".join(sorted(R.SCHEMES)) + "}", help="what the judges are shown: progress10 (default: opening, drawing frame, ten stills in progress placed by measured progress, the finished sheet beside) or film13 (the first scheme: opening, twelve by frame number, the finished sheet). Scores under one are not comparable with the other")
@@ -369,7 +335,6 @@ def results(a, cfg, jrec, rubric, rubric_sha, paintings, failed, originals, got)
         rows.append({**{k: e.get(k) for k in ("id", "label", "subject", "auto", "author", "level", "commit", "folder", "painting", "target", "style", "usage")}, "original": None, "classic": None,
                      "failed": e["failed"], "opening": None, "drawingFrame": None, "firstWash": None, "snapshots": [], "human": dict(none_h),
                      "quality": {"score": None, "judges": {}, "criteria": None, "spread": None, "faults": []}, "likeness": {"score": None, "judges": {}, "why": None, "flagged": None, "faults": []}, "cheat": None})
-    # the panel's one reasoning setting is off: a judge whose route reports reasoning tokens all the same is named
     if jrec.get("reasoning") == "off":
         for m in cfg["panel"]:
             n = sum(1 for by in list(got.values()) for r in by.get(m, []) if r and r.get("reasoningTokens"))

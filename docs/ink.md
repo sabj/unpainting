@@ -2,7 +2,9 @@
 
 Pen and wash pairs an ink drawing with washes over or under it. Each run saves the drawing and the washes as separate images (`ink.jpg`, `wash.jpg`) beside the painting.
 
-![Two rows, Guardi's A Colonnade, Partly Ruined, with Figures and Tiepolo's Bacchus and Ariadne. Each row: the target, the painting's estimated ink, the pen drawing, the washes, and the finished painting](img/ink.webp)
+![Guardi and Tiepolo. Each row shows the original, Auto’s opening pen drawing, first dried washes, wash layer and finished painting](img/ink.webp)
+
+Auto 0.5 painting Guardi’s *A Colonnade* and Tiepolo’s *Bacchus and Ariadne*. Both runs use pen. The fourth column shows the washes on their own. [Picture credits](../bench/PICTURES.md#museum-works).
 
 ## Ink or pencil
 
@@ -12,7 +14,7 @@ For a pencil drawing, Auto draws only the first light lines (`src/paint/methods/
 
 ## Drawing files
 
-The only line source is a drawing file (`--drawingfile STEM`), made as in [tools/seg](../tools/seg/README.md). Without it the painter logs `!!! NO LINE` and draws nothing. The pen or pencil draws the file's lines as they are. The painter reads only how dark the target's lines are, to set how much ink the pen carries (`src/paint/methods/ink-lines-file.mjs`):
+For Auto, the line source is a drawing file (`--drawingfile STEM`), made as in [tools/seg](../tools/seg/README.md). Without it the painter logs `!!! NO LINE` and draws nothing. The pen or pencil draws the file's lines as they are. The painter reads only how dark the target's lines are, to set how much ink the pen carries (`src/paint/methods/ink-lines-file.mjs`):
 
 - `--inkdarkmatch c`: adjusts the ink on a scrap of paper until test strokes are `c` times as dark as the target's firm lines.
 - `--inkdarkcap c`: limits the ink so a test line on scrap is at most `c` times as dark as the target's.

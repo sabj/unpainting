@@ -1,5 +1,5 @@
 {
- "_about": "The benchmark's pictures and how deep each is run (owner, 23 Nov: \"core is 1 photo per group\"; \"extended is all 15\"). Read by the runners: `npm run paint -- core|extended ...` (Auto and levels 2 to 4) and `node bench/scripts/run.mjs --round V3 --crops core|extended` (level 1), through tools/paint/run-sets.mjs; `node tools/paint/run-sets.mjs core` lists every painting a set asks for and starts nothing. id: the subject's id in the registry (SUBJECTS.json): always a registration made under the one-area sheet rule (tools/paint/sheet-rule.mjs), which carries the suffix -qs (tools/paint/reregister.mjs makes it from the earlier registration, which stays under its own id for earlier results); `node tools/paint/run-sets.mjs check` says which are registered and prepared, and a run of a benchmark picture not under the rule is refused. group: the kind of picture; the core has one of each. levelOne: the picture's level 1 target in bench/v3/crops.json (made by bench/scripts/add-level-one-target.mjs on the standard sheet), or null while none is made; a target without its rendering unit is refused by the level 1 runner.",
+ "_about": "The owner’s sets: \"core is 1 photo per group\"; \"extended is all 15\". Each -qs registration uses the quarter-sheet area. levelOne identifies a target in the older freehand kit. node tools/paint/run-sets.mjs core lists the schedule.",
  "depths": {
   "full": { "levels": ["Auto", "L1", "L2", "L3", "L4"], "what": "the whole ladder: levels 1 to 4, and Auto, which every score is measured against" },
   "auto-l2": { "levels": ["Auto", "L2"], "what": "Auto and level 2 only" }
@@ -9,11 +9,11 @@
   "extended": { "what": "all fifteen: the core five on the whole ladder, the other ten at Auto and level 2", "pictures": "all", "depth": { "core": "full", "others": "auto-l2" } }
  },
  "roster": {
-  "what": "the ten models of the 0.4 benchmark (the owner, 23 Nov: \"muse top end, gemini the family, codex the family, anthropic the family\", without Hydrogen, Luna and Haiku), each at medium effort. A key names the model's entry in tools/paint/authors.json (levels 2 to 4) and in bench/models.json (level 1); `node tools/paint/run-sets.mjs check` says whether each has both, the same in both",
+  "what": "Ten painters at medium effort, retained from the 0.4 roster (the owner, 23 Nov: \"muse top end, gemini the family, codex the family, anthropic the family\"). The keys are in tools/paint/authors.json.",
   "models": ["wonderfull-m", "neon-m", "carbon-m", "argon-m", "astra-m", "sol-m", "terra-m", "fable-m", "opus-m", "sonnet-m"]
  },
  "rounds": {
-  "_about": "The benchmark is run as FIXED ROUNDS (tools/paint/rounds.mjs; `npm run paint -- ... --work rounds`): no shell, no tools, the look budget of the open session. roster: the models, each with its family and its author key (tools/paint/authors.json). screening: the first stage. Every model of the roster paints the screening pictures at level 2; `node tools/paint/screening.mjs rank RESULTS.json` ranks them by their mean combined figure and names who goes on: `keep` of them (null: the top half, rounded up), and never fewer than one of each family. Those go on to the remaining core pictures and the other levels. `node tools/paint/screening.mjs plan` prints the stage's command and starts nothing.",
+  "_about": "Screen at L2 on the two pictures below. Rank by mean combined score and keep at least one painter from each family. The remaining core pictures and levels follow.",
   "roster": [
    { "key": "wonderfull-m", "name": "Muse Wonder Full", "family": "muse" },
    { "key": "neon-m", "name": "Gemini 4 Neon", "family": "gemini" },

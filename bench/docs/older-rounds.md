@@ -1,6 +1,6 @@
 # Older rounds (V1 to V5)
 
-Five rounds ran on releases 0.1.0 and 0.1.1 (painter V096, sim 100). They are kept as a record, and their scores never share a table with 0.4.
+Five rounds ran on releases 0.1.0 and 0.1.1 (painter V096, sim 100). Their scores and paintings stay on the V1–V5 leaderboard.
 
 V1 gave a toolkit and the targets. V2 added technique guides. V3 added the model's own earlier tries. In V4 the model wrote a plan that the painter laid. V5 added earlier tries ([table](../README.md#older-rounds)). V1 to V3 allowed 2,500 strokes. V4 and V5 allowed 85 minutes of model time and three looks. The targets were Hills, France, Ships, Mittens and Trumbull, each a whole image ([crops.json](../v2/crops.json); credits in [NOTICE](../../NOTICE)).
 

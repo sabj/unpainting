@@ -14,7 +14,7 @@ A run does not overwrite an earlier run's folder: name a new `--out`. Finished e
 
 ## Your own image
 
-A painting needs the picture, a line drawing file and one or more studies. A study is a simplified version of the picture in flat colours.
+For Auto, make one or more colour studies and, if you want lines, a drawing. A study simplifies the picture into flat shapes.
 
 1. Ask an image model for a clean line drawing of the picture, black on white, at its proportions. Trace and order it ([tools/seg](../tools/seg/README.md); needs Python with numpy and OpenCV):
 
@@ -37,17 +37,17 @@ Before release or benchmark comparisons, run `npm run doctor -- --strict` ([comp
 
 - `--drawingfile STEM`: the lines, drawn as they are. Without it no line is drawn. `--inkrecipe wash` draws them in pen; the default is pencil ([ink](ink.md)).
 - `--washplan STUDY.png[:MIN[:glaze]],...`: the studies, coarse to fine. `MIN` is the smallest shape in mm² that study lays; each later study adds only what is darker.
-- `--width` is the sheet's width in cells, the small squares the simulator tracks. It cannot be more than the picture's width in pixels. `--sheetmm` is the sheet's width in millimetres. The default sheet is a 6 × 4 inch postcard.
+- `--width` is the sheet's width in cells, the small squares the simulator tracks. By default the sheet cannot exceed the source width in pixels. An intentional enlargement needs an explicit `--sourcescale` limit. `--sheetmm` is the sheet's width in millimetres. The default sheet is a 6 × 4 inch postcard.
 
-`--out` gets `painting.png`, the video (`painting.mp4`, the frames `f0000.jpg` onward, and `frames.json`), `ink.jpg`, `wash.jpg` and the guard's records ([honesty](honesty.md)). Every run also records the versions and commit it used ([src/painter-version.mjs](../src/painter-version.mjs)).
+`--out` gets `painting.png`, the video (`painting.mp4` and the numbered frames listed in `frames.json`), `ink.jpg`, `wash.jpg` and the guard's records ([honesty](honesty.md)). Every run also records the versions and commit it used ([src/painter-version.mjs](../src/painter-version.mjs)).
 
 ## The benchmark's pictures
 
 `npm run unpaint -- paint` (the same as `npm run paint`) paints one of the benchmark's pictures on a quarter-size sheet, on the GPU. The pictures are listed in `SUBJECTS.json`, in a folder of inputs that is not in the repository. [bench/inputs-manifest.json](../bench/inputs-manifest.json) lists every file in it with its checksum.
 
 ```sh
-export UNPAINT_SUBJECTS=<inputs folder>/SUBJECTS.json
-node tools/prepare/manifest.mjs verify bench/inputs-manifest.json --root <inputs folder>
+export UNPAINT_SUBJECTS="/path/to/inputs/SUBJECTS.json"
+node tools/prepare/manifest.mjs verify bench/inputs-manifest.json --root "$(dirname "$UNPAINT_SUBJECTS")"
 npm run doctor                               # clean checkout, Python environments, SAM checkpoint, 20 GB free
 node tools/paint/run-sets.mjs check core     # are all the pictures and their inputs there?
 
@@ -55,7 +55,7 @@ npm run unpaint -- paint mittens-closeup-qs plan                             # A
 npm run unpaint -- paint mittens-closeup-qs paint --out work/mittens-auto    # Auto's painting
 ```
 
-A run folder holds `run.json`, `plate/` (the painting and its video), `usage.json` and `sheet.jpg`. Run `npm run paint` with no arguments to see every option. A full-size painting takes about 13 minutes on a Mac mini.
+A run folder holds `run.json`, `plate/` (the painting and its video), `usage.json` and `sheet.jpg`. Run `npm run paint` with no arguments to see every option. At commit `e0276330`, Auto’s 15 GPU run cards range from 2m 13s for Turner to 7m 33s for Guardi. Check `plate/run-card.json` for elapsed seconds and `plate/backend.json` for the adapter and fallback flag.
 
 ## A model as the painter
 
@@ -71,12 +71,12 @@ npm run unpaint -- paint $S preflight --author $M             # before L4: can i
 npm run unpaint -- paint $S paint --author $M --level L4 --wallminutes 60 --out work/$M-L4
 ```
 
-- L1 to L3 are a fixed back-and-forth conversation with no shell. `--author dry-rounds` is a script that calls no model, for testing.
-- L4 is an open session in a sandboxed folder, with a shell and tools. It needs macOS, for `sandbox-exec`.
+- L1 to L3 are fixed conversations. L1 starts with the source, L2 adds the three studies, and L3 adds the optional drawing, named forms, traced shapes and Auto’s work. `--author dry-rounds` is a script that calls no model, for testing.
+- L4 uses L3’s inputs in an isolated home with a shell and `./unpaint`. It needs macOS for `sandbox-exec`. Waiting for a GPU look does not spend the model’s 60 author minutes.
 - Add `--dry-run` to print what would run. The full-size final is painted after the model hands in.
-- `--author script:FILE.json` paints a kept script without calling a model (add `--lines standard` to use the picture's own drawing); `--from DIR` paints what an earlier run's sessions handed in.
+- `--author script:FILE.json` paints a kept script without calling a model. For a file outside its session folder, pass `--lines standard` for the registered drawing or `--lines FILE.json` for your line choices. `--from DIR` replays an earlier hand-in.
 
-Scoring and the whole benchmark at once: [bench/README.md](../bench/README.md#run-it).
+To list sessions, run `npm run unpaint -- benchmark --out work/bench-05 --set core`. For scoring, pass `--profile 0.5.1`. [Full benchmark commands](../bench/README.md#run-it).
 
 ## Your own picture and your own model
 
@@ -86,8 +86,8 @@ A model: add `{"key", "name", "id", "effort", "cli"}` to `tools/paint/authors.js
 
 ## More than one machine
 
-`UNPAINT_RENDER=pool` sends test and final paintings to a pool of machines. The pool can be this Mac, a Mac mini over ssh or rented RunPod GPUs. Manage the rented GPUs with `npm run unpaint -- pods status|dry-run|start|stop`, which needs `RUNPOD_API_KEY`. `npm run unpaint -- status` shows the pool.
+`UNPAINT_RENDER=pool` sends test and final paintings to a pool of machines. The local M5 Max MacBook Pro and the Mac mini use Metal. The pool can also use rented NVIDIA GPUs through Vulkan. Manage the rented GPUs with `npm run unpaint -- pods status|dry-run|start|stop`, which needs `RUNPOD_API_KEY`. `npm run unpaint -- status` shows the pool.
 
-On Linux, WebGPU needs an NVIDIA Vulkan driver. Run with `DAWN_FLAGS=backend=vulkan --gpu on`. Then check that `backend.json` names a real GPU, not `llvmpipe`.
+On Linux, WebGPU needs an NVIDIA Vulkan driver. Set `DAWN_FLAGS=backend=vulkan` in the environment and pass `--gpu on` to the painter. Then check that `backend.json` names a real GPU, not `llvmpipe`.
 
 [Paint Lab](../demos/lab/README.md) runs the paper, brushes and pen in the browser: `python3 -m http.server 8000 --directory demos`.

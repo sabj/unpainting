@@ -21,27 +21,23 @@ export const USAGE = `usage: npm run paint -- <subject[,subject...]> plan|paint|
   --author a[,b...]     who writes the wash plan: auto (the code planner, the control), a model key of
                         tools/paint/authors.json or bench/models.json, or script:FILE.json (a kept script).
                         Several authors make a grid, subjects down and authors across. Default auto.
-  --work rounds         fixed rounds in place of a working session (rounds.mjs): no shell and no tools; the model
-                        answers the brief with its script, is shown its own sheet after each look and answers
-                        with edits, then the full-size final. The benchmark's way (bench/run-sets.json, rounds).
-  --work session|reply  how a model author works. session (default): a working session with a shell in its own
-                        folder; it hands over its own script, at every level (planner settings or the code's
-                        plan are refused). Its work is measured (usage.json), not capped.
-                        reply: one read-only reply holding a whole script (the earlier route).
-  --level L1|L2|L3|L4   what a session is handed (default L2); every level is one fresh session, handed no other
-                        level's result. L1 (rounds): the picture, the script format, the painting tips. L2
-                        (rounds): + the drawing, the named forms and the studies' traced shapes; nothing of Auto.
-                        L3 (rounds): + Auto's plan and Auto's finished painting. L4 (--work session): L3's inputs
-                        in an open session with tools. L4-retry: the old level 4 (traced shapes and its own
-                        earlier result, --previous), to replay the runs of 23-24 Nov only
+  --work rounds         Fixed conversation for L1 to L3. The model writes a script, sees its own dried sheet after
+                        each look, and can edit the script before hand-in.
+  --work session|reply  session (default) opens a shell for L4. reply takes one read-only answer.
+  --level L1|L2|L3|L4   Each level starts fresh. The default level is L2.
+                        L1: source picture, script format and painting tips.
+                        L2: adds three colour studies. L1 and L2 start on blank paper and allow freehand lines.
+                        L3: adds an opt-in drawing, named forms, traced shapes, and Auto's plan and painting.
+                        L4: L3's inputs in an isolated shell with ./unpaint tools.
+                        L4-retry replays the November 23–24 runs with --previous.
   --retries N           retries at the replay level L4-retry (default 1), and --try N which of them this is (default 1)
   --previous <dir>      the run folder of the result this retry starts from (its finished full-size painting)
   --looks U             the benchmark's budget for looks in one try, in units (default 3). A look has a fixed price:
                         0.3 for the whole sheet at half size, 1.0 at full size, its share when stopped at a stage
                         or cut to a region, never under 0.05. How it paints (sweeps, water, dryings) and machine
                         seconds are recorded, never charged
-  --wallminutes N       the safety stop, not a budget: minutes on the wall clock after which a session is cut off and
-                        marked so (default 360). Waiting for a look, a queue or the provider is never charged
+  --wallminutes N       Session clock (benchmark: 60 minutes). At L4 it counts the author's time, excluding
+                        pending painter requests. A separate elapsed-time limit applies.
   --graceminutes N      minutes a session has to hand in after the safety stop (default 10)
   --steps N             the benchmark's budget of the model's own steps: its tool calls (default 1000). When the
                         rendering units or the steps are used the session is asked to hand in what it has and the

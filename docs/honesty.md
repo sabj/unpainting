@@ -1,10 +1,8 @@
 # Honesty
 
-Planning may read the target. Painting may not. A guard blocks reads of the target's pixels while the painter paints. It is on by default.
+Auto can read the target while it plans. Once painting starts, the guard seals the pixels and maps. In the default mode Auto can still ask for a whole shape’s average. In strict no-look mode (`--notargetlooks 1`) the plan fixes the paint before the first stroke.
 
-- While painting, the painter may only compare whole shapes with the target. It never reads the target's pixels. It never sets a stroke's paint from the error at a single cell. It never nudges strokes to shrink the pixel error, which is called hill climbing.
-- Brush colours are mixed from the 16 paints in `src/crop/box.mjs`.
-- The guard's records are kept beside the painting.
+An authored script gets no automatic masking fluid from the source’s white pixels. The model has to paint around the whites it sees or mark them in `lights`. Its code cannot sample the target or keep strokes based on whether they reduce pixel error.
 
 | `--targetguard` | Reads of the target's pixels while painting |
 |---|---|
@@ -13,7 +11,7 @@ Planning may read the target. Painting may not. A guard blocks reads of the targ
 | `warn` | recorded, not blocked; for diagnosis |
 | `off` | no guard |
 
-When painting starts, the painter seals the target and every map made from it (`tools/guard/no-target.mjs`, `tools/guard/seal-maps.mjs`). A read of a single cell is recorded and stops the run.
+In a blocking mode the guard records an attempted read of a single cell and stops the run. [Target guard](../tools/guard/no-target.mjs) and [map guard](../tools/guard/seal-maps.mjs).
 
 The guard writes two files. `target-guard.json` holds the mode, the looks at shapes, the refusals, the blocked reads and a verdict of `painted`, `copied` or `unguarded`. `cheat-risk.json` holds the [cheat risk](../bench/docs/rules.md#cheat-risk).
 

@@ -124,12 +124,12 @@ test('the check as a command stops plainly when there is no subject list', () =>
   assert.equal(r.status, 2); assert.match(r.stderr, /run-sets check: no subject list at/);
 });
 
-test('the roster is the ten models of 0.4, each with one entry for level 1 and one for levels 2 to 4, the same in both, at medium effort', () => {
+test('the ten 0.5 painters have matching registry entries at medium effort', () => {
   const sets = loadRunSets(), rows = rosterEntries(sets);
   assert.deepEqual(sets.roster, ['wonderfull-m', 'neon-m', 'carbon-m', 'argon-m', 'astra-m', 'sol-m', 'terra-m', 'fable-m', 'opus-m', 'sonnet-m']);
   assert.deepEqual(rows.filter(r => !r.ok), []);
   assert.deepEqual(rows.map(r => [r.cli, r.id, r.effort]), [['muse', 'muse-wonder-full-1.0', 'medium'], ['agy', 'gemini-4-neon-medium', 'medium'], ['agy', 'gemini-4-carbon-medium', 'medium'], ['agy', 'gemini-4-argon-medium', 'medium'],
-    ['codex', 'gpt-6-astra', 'medium'], ['codex', 'gpt-6.1-sol', 'medium'], ['codex', 'gpt-6.1-terra', 'medium'], ['claude', 'claude-fable-5-2', 'medium'], ['claude', 'claude-opus-5-5', 'medium'], ['claude', 'claude-sonnet-5-5', 'medium']]);
+    ['codex', 'gpt-6.2-astra', 'medium'], ['codex', 'gpt-6.1-sol', 'medium'], ['codex', 'gpt-6.1-terra', 'medium'], ['claude', 'claude-fable-5-2', 'medium'], ['claude', 'claude-opus-5-5', 'medium'], ['claude', 'claude-sonnet-5-5', 'medium']]);
   assert.ok(!sets.roster.some(k => /hydrogen|luna|haiku/.test(k)), 'Hydrogen, Luna and Haiku are not in the roster');
 });
 

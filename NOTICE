@@ -30,7 +30,7 @@ credits: THIRD_PARTY_NOTICES.md.
    docs/img/benchmark-overview.webp
      The Hills, France and Mittens tiles and target thumbnails.
    docs/img/auto-vs-model-*.webp
-     Mittens painted by Auto and by a model, with diagrams of their
+     Mittens painted by Auto, Opus and Sol, with diagrams of their
      washes, strokes, paints and brushes.
    bench/v3/targets/mittens-closeup.png
    bench/v3/targets/mittens-closeup-full.png
@@ -65,6 +65,7 @@ credits: THIRD_PARTY_NOTICES.md.
 
    Public domain.
 
+   docs/img/build-white-ships.webp and docs/img/wipe-white-ships.webp, original panels
    examples/targets/white-ships.jpg
      John Singer Sargent, White Ships, 1908, Brooklyn Museum (09.846), public
      domain, via Wikimedia Commons. The Commons reproduction is marked
@@ -98,8 +99,7 @@ credits: THIRD_PARTY_NOTICES.md.
      Francesco Guardi, A Colonnade, Partly Ruined, with Figures, ca. 1780-90,
      The Metropolitan Museum of Art (459623), and Giovanni Battista Tiepolo,
      Bacchus and Ariadne, ca. 1740, The Metropolitan Museum of Art (459236),
-     Robert Lehman Collection, 1975. Public domain (Open Access). Cropped and
-     scaled down. The other panels are painter output (section 3).
+     Robert Lehman Collection, 1975. Public domain (Open Access). Scaled down. The other panels are painter output (section 3).
      https://www.metmuseum.org/art/collection/search/459623
      https://www.metmuseum.org/art/collection/search/459236
 

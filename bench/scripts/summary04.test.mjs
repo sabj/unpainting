@@ -1,6 +1,3 @@
-// 0.4's summary (summary04.mjs) over a results document as bench:score04 writes it: every level of every model
-// against Auto, on the schedule of a run set, with failed and missing runs counted. (bench/scorer/score04-test.py
-// runs the two together from real run folders of every level.)
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -56,6 +53,15 @@ test('every level of every model against Auto; a failed run and a scheduled pict
   assert.match(md, /- neon-m L4, a: nothing handed in/); assert.match(md, /## Likeness at the bottom of the scale/);
   assert.match(md, /Each level is one fresh, independent session/);
   assert.match(md, /\| c \| 90 \| not run \| 0 \(no painting\) \| not run \| not run \|/);
+});
+
+test('a 0.5.1 summary prints the gated score and the studies-only L2', () => {
+  const results = { ...RESULTS(PAINTINGS), profile: '0.5.1', combinedMode: 'gated', gateFloor: 65 };
+  const md = summaryMarkdown(results, summarizeResults(results));
+  assert.match(md, /^# 0\.5\.1 summary/);
+  assert.match(md, /Q × min\(1, H \/ 65\)/);
+  assert.match(md, /\*\*L2\*\*.*three unnumbered colour studies/);
+  assert.doesNotMatch(md, /2 parts human-ness|L2: \+ prepared studies, drawing/);
 });
 
 test('what cannot be summed is refused by name', () => {

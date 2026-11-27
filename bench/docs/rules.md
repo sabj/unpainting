@@ -4,14 +4,14 @@ The model paints the picture as a person with a brush and pen would, through the
 
 ## Levels
 
-Auto is the code's own planner working alone. Every score is measured against it. Every level is one fresh session, and it is never given another level's result. Each level adds one thing (`tools/paint/levels.mjs`).
+Auto is the code planner working alone. Its painting is the baseline for each picture. Every model session starts fresh.
 
-| Level | What the model is given | How it works |
+| Level | What the model gets | How it works |
 |---|---|---|
-| L1 | The picture, the [script format](../../docs/painting-script.md) and painting tips. Nothing is prepared, so any line drawn is its own | Fixed conversation |
-| L2 | L1 and the prepared inputs. These are the line drawing, three simplified colour versions of the picture (the studies), the named parts with their boxes, and the shapes traced from the studies, as a numbered picture and a list. The shapes may be wrong, and the model need not use them. Nothing from Auto | Fixed rounds |
-| L3 | L2, plus Auto's plan as numbers to read, plus Auto's finished painting to improve on | Fixed rounds |
-| L4 | The same as L3 | An open session with a shell and tools |
+| L1 | The source, the [script format](../../docs/painting-script.md) and painting tips | Fixed rounds |
+| L2 | L1 plus three colour studies to look at. Neither level has a prepared drawing, named forms or traced shapes | Fixed rounds |
+| L3 | L2 plus a prepared drawing, named forms, traced shapes, and Auto’s plan and finished painting. The drawing starts off | Fixed rounds |
+| L4 | The same inputs and drawing choice as L3 | An isolated shell with tools |
 
 Comparing L4 with L3 shows the effect of tools alone. The five core pictures run every level. The other ten run Auto and L2.
 
@@ -22,11 +22,11 @@ Comparing L4 with L3 shows the effect of tools alone. The five core pictures run
 - The paper is a quarter sheet in area, in the picture's proportions. The simulator, the paint box, the brushes, the judges and the scoring never change.
 - A choice that only risks a worse painting gets a warning and is not refused.
 
-The model chooses the whole script. That includes the drawing medium (pencil, pen or none), the pen's ink (waterproof or soluble), any lines of its own, up to 14 paints, and whether to erase. From L2 it also chooses which prepared lines are drawn and when. They can go down before the washes, with a stage, after the washes, or not at all.
+The model chooses up to 14 paints and any freehand pen or pencil lines (`lines.own`). Pen ink can be waterproof or soluble. At L3 and L4 it may also choose which prepared lines to draw before, during or after the washes.
 
 ## Budget
 
-Each try has 3.0 units for test paintings and 60 minutes on the clock (`--wallminutes 60`, as the benchmark launcher runs it).
+Each try gets 3.0 units for test paintings and 60 minutes on the clock (`--wallminutes 60`). At L4, GPU waits are recorded separately from the 60 minutes of author time (`ownMinutes`). At three hours of elapsed time the harness asks for the script, even if author time remains.
 
 - A test painting, also called a look, is the script painted for real at half size and dried. The whole sheet costs 0.3. A full-size painting would cost 1.0. A look that stops after a stage, or covers only a region, costs its share, and never less than 0.05.
 - The full-size final painting is made after the model hands in, and costs nothing.
@@ -46,13 +46,15 @@ This is a back-and-forth conversation with no shell, tools or files (`tools/pain
 
 ## The open session (L4)
 
-The model works in a sandbox, in a fresh folder outside the repository. It has a shell, a fixed set of Python tools (numpy, pillow, scipy, scikit-image and opencv) and the painter's commands: `./unpaint plan` (checks the script, free), `look`, `show` and `status`. Every model gets the same tools and budget.
+The model works in a sandbox, in a fresh folder outside the repository, with a home directory of its own. It has a shell, a fixed set of Python tools (numpy, pillow, scipy, scikit-image and opencv) and the painter's commands: `./unpaint plan` (checks the script, free), `look`, `show` and `status`. Every model gets the same tools and budget.
 
-- It cannot read the repository, the picture list or other sessions. The network lets through only its own provider's hosts.
+- The sandbox keeps the repository, the picture list and other sessions out of reach. The network lets through only its own provider's hosts.
 - Pictures are for looking at. They are the original, the three studies, Auto's painting, and each look's `beside.png` and `stages.png`. Only the model tool's own image viewer can read them. The sandbox refuses a script, `cat`, copy, link or move.
 - The input pictures are put away when the model plans or looks. `./unpaint show` brings the original back for 0.05 of a unit. A study is free.
 - A script may read the named parts, the drawing's lines, the traced shapes, Auto's plan, the numbers and plan from each look, `sheet.png` (its own dried sheet alone) and its own files.
-- A tool whose sandbox cannot keep the pictures safe is not started. `npm run paint -- SUBJECT preflight --author KEY` checks a tool first.
+- The harness checks the sandbox before starting the session. `npm run paint -- SUBJECT preflight --author KEY` checks a tool first.
+
+When reading a session saved at `6dce5b91`, its folder README still describes the older drawing and clock defaults. The L4 harness at that commit starts on blank paper and records the author’s time and the painter wait separately.
 
 ## Disqualification & Eyes-Only Guard
 
