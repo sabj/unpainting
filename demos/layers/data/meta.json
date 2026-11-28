@@ -1,7 +1,7 @@
 {
-  "title": "Bacchus and Ariadne · Tiepolo",
-  "w": 556,
-  "h": 707,
+  "title": "Yale Rosewalk",
+  "w": 960,
+  "h": 640,
   "stageGrouping": "Three contiguous groups of recorded brush passages between drawing and finishing; original saved frames only.",
   "frames": [
     "data/f0000.webp",
@@ -18,87 +18,85 @@
     "data/f0011.webp",
     "data/f0012.webp",
     "data/f0013.webp",
-    "data/f0014.webp",
-    "data/f0015.webp"
+    "data/f0014.webp"
   ],
   "labels": "data/subjects.png",
   "subjects": [
-    "reclining figure",
-    "drapery",
-    "reclining figure hair",
-    "reclining figure face",
-    "staff with leaves",
-    "child upper right",
-    "child hair",
-    "child face",
-    "putto with wreath",
-    "dish",
-    "satyr",
-    "satyr hair",
-    "satyr face",
-    "satyr hand",
-    "urn"
+    "main stone wall",
+    "arched gateway",
+    "iron gate",
+    "open gate leaf",
+    "upper central window group",
+    "upper left window",
+    "left small windows",
+    "right tall window",
+    "wall niche",
+    "left tree",
+    "right tree foliage",
+    "left garden bed",
+    "right garden bed",
+    "paved path",
+    "tree shadow on wall",
+    "path shadow",
+    "left stone wall",
+    "right stone wall",
+    "wall lamp left",
+    "wall lamp right",
+    "distant building",
+    "distant foliage",
+    "right bay wall"
   ],
   "stages": [
     {
-      "key": "frisket-1",
-      "group": "frisket",
-      "label": "Reserve lights",
-      "frames": [
-        1,
-        1
-      ]
-    },
-    {
-      "key": "drawing-2",
+      "key": "drawing-1",
       "group": "drawing",
       "label": "Ink drawing",
       "frames": [
-        2,
-        3
+        1,
+        2
       ],
       "ink": true
     },
     {
-      "key": "paint-0-4",
+      "key": "paint-0-3",
       "group": "paint-0",
       "label": "First washes",
       "frames": [
-        4,
-        7
+        3,
+        6
       ]
     },
     {
-      "key": "paint-1-8",
+      "key": "paint-1-7",
       "group": "paint-1",
       "label": "Building color",
       "frames": [
-        8,
-        10
+        7,
+        9
       ]
     },
     {
-      "key": "paint-2-11",
+      "key": "paint-2-10",
       "group": "paint-2",
       "label": "Final washes",
       "frames": [
-        11,
-        14
+        10,
+        13
       ]
     },
     {
-      "key": "finished-15",
+      "key": "finished-14",
       "group": "finished",
       "label": "Finished sheet",
       "frames": [
-        15,
-        15
+        14,
+        14
       ]
     }
   ],
   "source": {
-    "code": "179f2cb7f7b42d6a7436187e498e599e24656165",
-    "dirty": true,
+    "code": "e027633009f5306f8acacdebf60f43984aa1f54d",
+    "dirty": false,
     "brush": "section",
     "backend": {
       "backend": "gpu",
@@ -107,113 +105,107 @@
       "device": null
     },
     "dimensions": {
-      "sourceWidth": 1600,
-      "sourceHeight": 2035,
-      "paintWidth": 556,
-      "paintHeight": 707,
-      "enlargement": 0.35,
-      "sheetWidth": 556,
-      "sourceScale": 0.3475,
+      "sourceWidth": 1536,
+      "sourceHeight": 1024,
+      "paintWidth": 1536,
+      "paintHeight": 1024,
+      "enlargement": 1,
+      "sheetWidth": 1536,
+      "sourceScale": 1,
       "sourceScaleAllowed": 1
     },
-    "targetSHA256": "9af6854e13dc6e99010f8cb35d38fd5f3e1b6c59ebd3a890a804bd378efd5355",
-    "maskSHA256": "1d4ede4732986bd1fd57b867b7921903898aea5d190a7c3def1544ade7948ec2",
+    "targetSHA256": "2744c78e1f5e9e7b153fe6dd34faae28a697a06c1767c7b2d680c6cdd288be50",
+    "maskSHA256": "b7e34adf15e36b4a7f4aecb0468c5933974509d55c40a8e768017b318e0b7138",
     "frames": [
       {
         "savedFrame": 0,
         "stage": "paper",
         "value": 0,
-        "sha256": "017f65de3b12f725b26caf799d59dc2b88d8177bd91931478688f932522a3bed"
+        "sha256": "8c65811532d21aef0b8e4cf86fb9fc0922631b65b609a3e13338b404085d84a6"
       },
       {
         "savedFrame": 1,
-        "stage": "frisket",
-        "value": null,
-        "sha256": "017f65de3b12f725b26caf799d59dc2b88d8177bd91931478688f932522a3bed"
-      },
-      {
-        "savedFrame": 2,
         "stage": "drawing",
         "value": null,
-        "sha256": "bf417413da0132f8b20989bb19b05adc3520c3178656961811e0259863ed7724"
+        "sha256": "77c34ef2901cd8c97091ccb79c2d25f3eea23a0192becd56bcb3ac27176e2100"
       },
       {
-        "savedFrame": 6,
+        "savedFrame": 10,
         "stage": "drawing",
         "value": null,
-        "sha256": "57eb31211939f2b55e82a11ca2284c9cf03e44717c941d32ead42f6df7056848"
+        "sha256": "0c5930552db9f0e771e046327028e8824bd0b8a029645d61dfc12f3461682f21"
       },
       {
-        "savedFrame": 7,
+        "savedFrame": 11,
         "stage": "paint",
         "value": 1,
-        "sha256": "127c5363209fa4c8889d01b7551d11df504046d99643a521be50bca6d64128c1"
+        "sha256": "6b95e5d83db58465b9e16a7815891440915b4ff92413accc318ba2fc42e55b03"
       },
       {
-        "savedFrame": 16,
+        "savedFrame": 21,
         "stage": "paint",
         "value": 1,
-        "sha256": "3663b575d7dfe9272aef52875a2adfca53645f133a918da6b6c140bdf7dc2875"
+        "sha256": "d14f7b0e66091c00c43dcdc536562dd0071252edbab31a9c30223ec75b398e03"
       },
       {
-        "savedFrame": 41,
+        "savedFrame": 54,
         "stage": "paint",
         "value": 1,
-        "sha256": "a21a111dce974f08673bc4041078ae46a59389b5bc930e502897e473794a75a9"
+        "sha256": "5ec1ee95baeec1fe053271e584ec1bfabed2fba6acbd2f2202db49c4fe8687ec"
       },
       {
-        "savedFrame": 68,
-        "stage": "paint",
-        "value": 1,
-        "sha256": "8bad185686ed18fe4df4137ac4bd598ac188c251968c0aec304788ad04993eb0"
-      },
-      {
-        "savedFrame": 69,
-        "stage": "paint",
-        "value": 1,
-        "sha256": "bbaef977270fe3db911a60eb5ea725945f812d4ea4f787ca5203995adf277fa3"
-      },
-      {
-        "savedFrame": 83,
+        "savedFrame": 84,
         "stage": "paint",
         "value": 3,
-        "sha256": "d7c7b51428553e03268d04bf9a0377dc68ff52b42707f90006819e0f695e1352"
+        "sha256": "9b2532c532cc17576229f67e724298103bf3f5488d8af3ddc59a38f411251ce1"
       },
       {
-        "savedFrame": 118,
+        "savedFrame": 85,
         "stage": "paint",
         "value": 3,
-        "sha256": "e75fa1e1281e19a472bf6c5f80164af1a4a9afc2948adab3bc4d07fbd26f26cd"
+        "sha256": "a0e1453974b5dfeb779abfcb33970a0db6e62e9252bbcdeece262772d11fd8c2"
       },
       {
-        "savedFrame": 119,
-        "stage": "paint",
-        "value": 3,
-        "sha256": "6196fb79b9808c1ede0e1944b58a22b8beae3d00922e0edcd954fd2729d1c5a5"
-      },
-      {
-        "savedFrame": 125,
+        "savedFrame": 109,
         "stage": "paint",
         "value": 1,
-        "sha256": "6b5ea52ef106d69b69acff6d713da9c2b6498d7dcf0baffcf6dcfb9b92f9af18"
+        "sha256": "a858d2b6c149a8059876b97cf6a5533d59839a28a00f9e4cc9b8e0592f16272e"
       },
       {
-        "savedFrame": 150,
+        "savedFrame": 139,
         "stage": "paint",
         "value": 3,
-        "sha256": "655d827c511f58686210135e2a05b70a21ddbfd3a7a68ec3cb86501d286323f7"
+        "sha256": "4eff8d654b4d5d3f38beeca348e597340c610abc20157f2888e4057bca8349e5"
       },
       {
-        "savedFrame": 166,
+        "savedFrame": 140,
+        "stage": "paint",
+        "value": 3,
+        "sha256": "ec9579a41fcb70ed56da0356de4714207fdab3ceddec485ce1f33181312d6d99"
+      },
+      {
+        "savedFrame": 163,
+        "stage": "paint",
+        "value": 3,
+        "sha256": "6e9c0d7e8238a244354c09c6c666dee13fe5bd71799aa445035624f5abd4e42a"
+      },
+      {
+        "savedFrame": 196,
+        "stage": "paint",
+        "value": 3,
+        "sha256": "8b2fd119d4c9dbee164cef0f4ed81fb994eed4147275f90e65263987c8515ca8"
+      },
+      {
+        "savedFrame": 217,
         "stage": "paint",
         "value": 5,
-        "sha256": "f0ebe7a630d26d6c39f2f3c8464eee580d8d47342c23fb9d5833bba3ec4fbe82"
+        "sha256": "acb9538448b9f3ef0f858c503918affcdaccd3d9b661cfc77db377d9a196aaf8"
       },
       {
-        "savedFrame": 167,
+        "savedFrame": 218,
         "stage": "finished",
         "value": null,
-        "sha256": "c1b5fdaa8338da5cea3d4abe840b89f1b620a9604641dd1cd300803014103c8b"
+        "sha256": "acb9538448b9f3ef0f858c503918affcdaccd3d9b661cfc77db377d9a196aaf8"
       }
     ]
   }

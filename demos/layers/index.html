@@ -127,7 +127,7 @@ nav{padding:12px 24px;font:14px system-ui}nav a{color:inherit}#stackInner{will-c
 <nav aria-label="Demos"><a href="../">All demos</a> · <a href="https://github.com/sabj/unpainting">GitHub</a></nav>
 <header>
   <h1>Layers</h1>
-  <p>Bacchus and Ariadne · Tiepolo. Saved painting stages and named forms.</p>
+  <p id="subtitle">Yale Rosewalk · ink and watercolour. Saved painting stages and named forms.</p>
 </header>
 <main>
   <aside>
@@ -166,7 +166,7 @@ nav{padding:12px 24px;font:14px system-ui}nav a{color:inherit}#stackInner{will-c
 <script>
 let STAGES=[], W=1,H=1,N=1,MAX_FRAME=0;
 const FAM_NAMES = {};
-const FAM_COL = ['#999999','#8fb3d9','#d9a441','#a0522d','#3b3b46','#5f7a3a','#9a9a8a','#b58fb5','#b39175','#6f8484','#b592a4','#aab68a','#947969','#b3ab7f','#947d9f','#69847a','#9e725b'];
+const FAM_COL = ['#999999','#8fb3d9','#d9a441','#a0522d','#3b3b46','#5f7a3a','#9a9a8a','#b58fb5','#b39175','#6f8484','#b592a4','#aab68a','#947969','#b3ab7f','#947d9f','#69847a','#9e725b','#7b9ab8','#c98c58','#6e8b5c','#a87c86','#8b8378','#c4a66b','#5d748a','#8a6f5e'];
 let upto=0,playing=null,meta,sel={stages:new Set(),fams:new Set()};
 let truthFrames=[];
 let bank=null,bankKey=null,requestedKey=null,rasterWorker;
@@ -179,6 +179,8 @@ function prepareBank(){
 async function init(){
  window.tilt=document.getElementById('tilt');window.turn=document.getElementById('turn');window.gap=document.getElementById('gap');window.inkw=document.getElementById('inkw');
  meta=await(await fetch('data/meta.json')).json();({w:W,h:H}=meta);N=W*H;STAGES=meta.stages;MAX_FRAME=meta.frames.length-1;upto=MAX_FRAME;
+ const sub=document.getElementById('subtitle');if(sub&&meta.title)sub.textContent=`${meta.title}. Saved painting stages and ${meta.subjects.length} named forms.`;
+ const si=document.getElementById('stackInner');if(si&&W&&H){const bw=innerWidth<=820?330:760;si.style.width=bw+'px';si.style.height=Math.round(bw*H/W)+'px';}
  meta.families=meta.subjects;sel.stages=new Set(STAGES.map(s=>s.key));meta.families.forEach((_,i)=>sel.fams.add(i+1));
  for(const id of ['tSlider','scrub']){document.getElementById(id).max=MAX_FRAME;document.getElementById(id).value=MAX_FRAME;}
  rasterWorker=new Worker('raster-worker.mjs',{type:'module'});

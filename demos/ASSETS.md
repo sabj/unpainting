@@ -21,7 +21,7 @@ node tools/lab/build-layers-example.mjs RUN NAMED_SAM_RECEIPT TITLE
 
 The checkpoint builder accepts example IDs to avoid rebuilding unrelated paintings. It saves actual sheet fields and depleted tool states at 10%, 25%, 50%, 75%, 90%, and 100% of the complete tape.
 
-Layers uses the Tiepolo run's lossless saved frames and its fixed SAM map of 15 named forms. Its wash layers are three contiguous groups of recorded brush passages; no intermediate painting frames are synthesized. `layers/data/meta.json` retains each original saved frame number and hash. The raster worker prepares subject selections and timeline positions away from the UI thread; the page retains its canvas nodes while scrubbing.
+Layers uses the 0.5 Yale Rosewalk (`h36-qs`) WebGPU section-brush painting's saved frames (scaled to 960 × 640 for web) and its fixed SAM map of 23 named forms. Its wash layers are three contiguous groups of recorded brush passages; no intermediate painting frames are synthesized. `layers/data/meta.json` retains each original saved frame number and hash. The raster worker prepares subject selections and timeline positions away from the UI thread; the page retains its canvas nodes while scrubbing.
 
 `thumbs/lab*.webp` come from the new Prout run. `thumbs/layers*.webp` are captures of the replacement dataset. `thumbs/fungi.webp` is a newly completed native painting from Spore Studies.
 
