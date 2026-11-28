@@ -38,7 +38,7 @@ Every judge gives three readings; a judge's figure is the median of its three (p
 needs all three. The panel's figure is the mean of the judges'. A judge short of three valid readings leaves the
 figure empty and is named: never a smaller panel.
 """
-import hashlib, json, math, os, re, statistics
+import hashlib, json, math, os, re, statistics, threading
 
 READINGS = 3
 LETTERS = "abcdefghij"
@@ -234,6 +234,57 @@ def progress(d, frames, side=PROGRESS_SIDE):
         top = max(top, min(1.0, 1.0 - float(np.abs(load(fr["src"], size)[0] - last).sum()) / whole))
         out.append(top)
     return out + [1.0]
+
+
+class ProgressCache:
+    """Thread-safe disk cache for progress() vectors keyed by film path, frame count, side and frames.json stat.
+
+    Avoids re-decoding hundreds of WebP frames on incremental score04.py re-runs while auto-invalidating
+    whenever a film is re-painted. Call save() once the output directory exists.
+    """
+    def __init__(self, path):
+        self.path = path
+        self._lock = threading.Lock()
+        self._dirty = False
+        try:
+            with open(path) as fh:
+                raw = json.load(fh)
+            self._data = raw if isinstance(raw, dict) else {}
+        except Exception:
+            self._data = {}
+
+    @staticmethod
+    def _key(d, frames, side):
+        fj = os.path.join(d, "frames.json")
+        try:
+            st = os.stat(fj)
+            sig = f"{st.st_mtime_ns}:{st.st_size}"
+        except OSError:
+            sig = "0:0"
+        return f"{os.path.realpath(d)}|{len(frames)}|{side}|{sig}"
+
+    def measure(self, d, frames, side=PROGRESS_SIDE):
+        k = self._key(d, frames, side)
+        with self._lock:
+            hit = self._data.get(k)
+        if isinstance(hit, list) and len(hit) == len(frames):
+            return list(hit)
+        val = progress(d, frames, side=side)
+        with self._lock:
+            self._data[k] = val
+            self._dirty = True
+        return val
+
+    def save(self):
+        with self._lock:
+            if not self._dirty:
+                return
+            payload = json.dumps(self._data)
+            self._dirty = False
+        tmp = f"{self.path}.{os.getpid()}.{threading.get_ident()}.tmp"
+        with open(tmp, "w") as fh:
+            fh.write(payload)
+        os.replace(tmp, self.path)
 
 
 def stills(prog, w, count):

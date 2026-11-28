@@ -223,9 +223,10 @@ def main(argv=None, judge=s04_judge, env=None, say=print):
         # a run that failed is kept and counted (never judged, never dropped); the paintings are judged
         paintings, failed = [e for e in everything if not e.get("failed")], [e for e in everything if e.get("failed")]
         bad = []
+        pcache = R.ProgressCache(os.path.join(a.out, ".progress-cache.json"))
         def _prep_frames(e):
             try:
-                return e, R.frames_for(e["painting"], a.snapshots), None
+                return e, R.frames_for(e["painting"], a.snapshots, measure=pcache.measure), None
             except R.Refusal as x:
                 return e, None, f"{e['id']}: {x}"
         if len(paintings) > 1:
@@ -250,6 +251,7 @@ def main(argv=None, judge=s04_judge, env=None, say=print):
     import score_painting as SP  # classic.py's measurements and the scorer's picture preparation
     from common import load_rgb
     os.makedirs(a.out, exist_ok=True)
+    pcache.save()
     # each painting is measured against the original it was painted from. One file a subject is the rule; level 1's
     # target is its own file of the same picture (the sheet's size), so it is read as an original of its own, named.
     originals, shas = {}, {}

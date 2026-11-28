@@ -983,6 +983,25 @@ class Parallel(unittest.TestCase):
         self.assertEqual((len(bad), slept), (1, []), "a refusal is not retried")
         self.assertEqual(J.backoff(10, rand=lambda: 0), 60.0)
 
+    def test_progress_cache_reuses_and_invalidates_on_change(self):
+        real_progress = R.progress
+        calls = []
+        def spy(d, frames, side=R.PROGRESS_SIDE):
+            calls.append(d)
+            return real_progress(d, frames, side=side)
+        with mock.patch.object(R, "progress", side_effect=spy):
+            self.assertEqual(self.run_(HostedJudge(), "pcache"), 0)
+            first_calls = len(calls)
+            self.assertEqual(first_calls, 3, "each painting's progress measured once on first run")
+            self.assertTrue(Path(self.tmp.name, "pcache", ".progress-cache.json").is_file())
+            self.assertEqual(self.run_(HostedJudge(), "pcache"), 0)
+            self.assertEqual(len(calls), first_calls, "second run reuses cached progress with zero frame decoding")
+            # Touch one film's frames.json so its stat signature changes and forces a re-measure
+            fj = Path(self.tmp.name, "model-run", "plate", "frames.json")
+            fj.write_text(fj.read_text() + " ")
+            self.assertEqual(self.run_(HostedJudge(), "pcache"), 0)
+            self.assertEqual(len(calls), first_calls + 1, "modified film invalidates only its own cache entry")
+
 
 if __name__ == "__main__":
     unittest.main()
