@@ -1,7 +1,7 @@
 # Unpainting Repository Guide
 
 ## Core Rules
-- Trunk and candidates: `main` is the released trunk; 0.4 is not merged to it yet. Branch from `integration/0.4`. A release candidate is a branch `claude/04-rcN`, tagged `v0.4.0-rc.N` when frozen.
+- Trunk and candidates: `main` is the released trunk; `0.5` is the active release branch. Release candidates are tagged `v0.5.x-rc.N` when frozen.
 - Merge back only once tests and `npx knip` pass. Nothing is pushed, tagged or merged to the trunk without the owner's yes.
 - No silent fallbacks: missing Python environments, SAM checkpoints, line files, or GPU errors must fail the run loudly.
 - Run `npm run doctor` before benchmark or canary runs to verify clean git state, line and segmentation Python environments, SAM checkpoint, and the 20 GiB free disk floor.
