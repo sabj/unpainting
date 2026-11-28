@@ -4,7 +4,7 @@
 
 L2 gets the source and three colour studies. The prepared drawing moves to L3 and starts off there and at L4. L4 has its own home directory and 60 minutes of model time. Authored scripts leave their own whites. Brief 5 shows how to use a broad mop, work into a wet wash and sketch freehand.
 
-The `open3v2` judges grade craft side by side against Auto (`versus-auto`, alternating A/B) and human-ness from ten progress frames. A human-ness score below 65% discounts the craft score. The clean benchmark is running.
+The local-first `open2` panel (Qwen 3.8 27B and Gemma 4 31B, running identically on local Apple Silicon MLX at `$0` and on OpenRouter) grades craft side by side against Auto (`versus-auto`, alternating A/B) and human-ness from ten progress frames. A human-ness score below 65% discounts the craft score. Adds `L4b` open-book mode, per-film progress vector caching, and complete Core 5 (`L1–L4`), Extended 10 (`L2`), and effort-tier results in `bench/README.md`.
 
 ## 0.5.0
 

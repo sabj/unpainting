@@ -2,9 +2,45 @@
 
 AI models paint a picture with the simulator's brush and pen. Judges score how human the making looks and how good the painting is. Auto, the code planner alone, paints every picture too, and each model is measured against it.
 
-The clean 0.5.1 benchmark is running. Final scores are pending.
+The clean 0.5.1 benchmark is scored on the local-first `open2` panel (**Qwen 3.8 27B + Gemma 4 31B** — the exact same two open-weight judges run locally on Apple Silicon MLX at `$0` or via OpenRouter). Core 5 (`180` sessions across `L1–L4`), Extended 10 `L2` (`70` sessions), and Effort tiers (`40` sessions) are complete.
 
-All ten painters use medium effort. [Model IDs](../tools/paint/authors.json).
+### Core 5 results (`open2`, Combined `Q × min(1, H / 65)`)
+
+Auto 0.5 baseline on Core 5: **`60.1%`** (`Q = 62.7%`, `H = 76.6%`).
+
+| Model | L1 | L2 | L3 | L4 | Peak |
+|---|---:|---:|---:|---:|:---:|
+| **Codex Astra 6.2 · med** | 45.6% | 50.5% | **61.8%** | 57.5% | L3 |
+| **Gemini 4 Argon · med** | 39.7% | 42.8% | **54.3%** | 42.5% | L3 |
+| **Gemini 4 Carbon · med** | 42.9% | 47.8% | **53.0%** | 48.3% | L3 |
+| **Sonnet 5.5 · med** | 47.5% | 44.9% | **50.5%** | 31.8% | L3 |
+| **Gemini 4 Neon · med** | 45.8% | 46.7% | **49.4%** | 48.3% | L3 |
+| **Codex Terra 6.1 · med** | 40.0% | 42.5% | **45.5%** | 38.3% | L3 |
+| **Codex Sol 6.1 · med** | 45.7% | **55.5%** | 41.7% | 41.7% | L2 |
+| **Opus 5.5 · med** | 32.8% | 33.9% | **43.7%** | 41.3% | L3 |
+| **Muse Wonder Full · med** | 28.2% | 34.7% | **42.7%** | 35.9% | L3 |
+
+### Extended 10 `L2` (`open2`, `n = 10` pictures each)
+
+Auto 0.5 baseline on Extended 10: **`58.5%`** (`Q = 63.9%`, `H = 70.6%`).
+
+| Model | Combined | Craft `Q` | Human-ness `H` |
+|---|---:|---:|---:|
+| **Codex Astra 6.2 · med** | **54.7%** | 56.0% | 77.5% |
+| **Gemini 4 Carbon · med** | 50.9% | 51.9% | 84.0% |
+| **Codex Sol 6.1 · med** | 49.0% | 50.0% | 79.3% |
+| **Gemini 4 Argon · med** | 44.7% | 45.2% | 74.8% |
+| **Gemini 4 Neon · med** | 44.7% | 46.0% | 74.9% |
+| **Codex Terra 6.1 · med** | 41.3% | 44.5% | 72.7% |
+| **Muse Wonder Full · med** | 31.6% | 34.0% | 66.4% |
+
+### Key findings
+
+- **Autonomy peaks at L3 (`8/9` models; Sol peaks at L2; `0/9` peak at L4).** At L4, shell + Python loops more than double passage count (`34 → 76` avg), dropping human-ness `H` (`82.8% → 77.0%`) and tripping the `< 65%` gate even when raw craft `Q` edges up (Astra `Q` rises `+1.3 pp` at L4, but its `H` falls on Prout).
+- **Effort inverted-U (Core 5 `L2`):** Codex Astra peaks at `high` (`low 46.9% → med 50.5% → high 57.7% → xhigh 53.9%`); Codex Sol peaks at `med` (`low 47.7% → med 55.5% → high 51.4% → xhigh 48.6%`).
+- **Open-book `L4b` control:** Giving Astra, Sol, and Carbon direct Python/OpenCV target-pixel access cuts pixel error `ΔE` by `19–53%` and doubles SSIM, yet wins `0/5` against Auto (`Q = 2.6–4.9` vs Auto `7.0`) — pixel optimization cannot fake watercolour craft.
+
+All models in the main tables use medium effort. [Model IDs](../tools/paint/authors.json).
 
 - Opus 5.5, Sonnet 5.5, Fable 5.2
 - Codex Astra 6.2, Codex Sol 6.1, Codex Terra 6.1
@@ -40,7 +76,7 @@ Each level starts a fresh session. Auto supplies the baseline.
 
 The model hands in its own script. For each picture, the session has 60 minutes on the clock and 3.0 units for test paintings. At L4 the clock excludes GPU waits. Judges see the results only after the model finishes. [Rules](docs/rules.md).
 
-The `open3v2` panel grades craft against the original and human-ness from ten stills of the painting in progress. The combined score is `Q × min(1, H / 65)`. [Scoring](docs/scoring.md).
+The `open2` panel (Qwen 3.8 27B and Gemma 4 31B, running identically on local Apple Silicon MLX or OpenRouter) grades craft side by side against Auto (`versus-auto`, alternating A/B) and human-ness from ten stills of the painting in progress. The combined score is `Q × min(1, H / 65)`. [Scoring](docs/scoring.md).
 
 ## Run it
 
