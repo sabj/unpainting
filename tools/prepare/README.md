@@ -22,7 +22,7 @@ What a picture needs before Auto or a model can paint it, and the scripts that m
 | `UNPAINT_PREP_PYTHON` | Python with numpy, pillow, scipy, scikit-image and opencv (default `.venv-seg`) |
 | `UNPAINT_STUDY_PYTHON`, `UNPAINT_STUDY_LORA` | Python with `mflux`, and the Lightning 8-step LoRA file |
 | `PAINTER_SAM_CHECKPOINT` | `sam_vit_b_01ec64.pth` |
-| `UNPAINT_LABEL_MODEL`, `UNPAINT_LABEL_URL` | the label model on Ollama (default `qwen3.8:27b-mlx` at `http://127.0.0.1:11434`) |
+| `UNPAINT_LABEL_MODEL`, `UNPAINT_LABEL_URL` | local vision model server for thing labels (default `http://127.0.0.1:11434`, configurable for any local model server) |
 
 The image model is Qwen-Image-Edit 2511, 8-bit MLX (`mlx-community/qwen-image-edit-2511-8bit`, run by `mflux`) with the Lightning 8-step LoRA: 8 steps, guidance 1, seeds 42, 7 and 11. It needs 36 GB on disk and 54 GB of memory. The prompts are in `prompts/`. The same seed on another machine gives the same kind of study, not the same pixels.
 
@@ -33,11 +33,8 @@ The studies are made by an open image model, Qwen-Image-Edit 2511. The default s
 | Option | What it costs | Tested |
 |---|---|---|
 | Use the studies of a shipped picture | Nothing. You can only paint the pictures that ship | Yes |
-| Run the same step on a rented cloud GPU, with `qwen_queue_cloud.py` (also `qwen_study_cloud.py`, `qwen_pencil_cloud.py` and `qwen_inkprep_cloud.py`) | You pay for the GPU. It runs the full-size model, so the studies look the same kind but not the same pixels | Yes |
-| Make the model smaller by quantizing it. `mflux-generate-qwen-edit --quantize 4` (or `-q 4`) stores it at 4 bits instead of 8 | Uses less memory. Expect softer, less exact studies. `study_model.py` does not pass this option yet, and no ready-made 4-bit copy of this model has been checked | No |
+| Make the model smaller by quantizing it. `mflux-generate-qwen-edit --quantize 4` (or `-q 4`) stores it at 4 bits instead of 8 | Uses less memory. Expect softer, less exact studies (`study_model.py` does not pass this option yet) | No |
 | Make the working size smaller. The fourth field of a job in `study_model.py` is a scale. Under 1 makes the picture smaller before the model sees it | Uses less memory. Fine lines in the pencil lay-in are lost first | No |
-
-4-bit result on a Mac mini: to be filled in (quality and memory).
 
 ## A new picture
 

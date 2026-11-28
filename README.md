@@ -33,43 +33,44 @@ Try the [quick start](#try-it), paint by hand in [Paint Lab](https://sabj.github
 
 ## How it works
 
-Auto, the built-in painter, works from a line drawing and simplified colour studies. An image model makes the studies, from broad shapes to fine detail. Code traces the drawing and orders the lines. Auto draws them, then builds up thin washes from light to dark. A model can also write its own script and start on blank paper.
+1. **Generate line drawings & colour studies** — An open image model (Qwen-Image-Edit) decomposes the target into a clean line drawing and three flat colour block-in studies, and SAM cuts out named forms ([ink & studies](docs/ink.md)).
+2. **Automate a painting process (`Auto`)** — Code traces the drawing into ordered pen or pencil contours on cold-press paper, then sweeps overlapping wet-in-wet and dry-brush washes light-to-dark on WebGPU while a guard seals the target's pixels ([how it paints](docs/how-it-paints.md), [the guard](docs/honesty.md)).
+3. **Hand the same brushes to models (`L1–L4`)** — Frontier LLMs get some or all of those inputs plus painting tips, author their own scripts from bare paper, and inspect half-size test looks as they work ([what the model gets](docs/what-the-model-gets.md)).
+4. **Judge the outputs (`open2`)** — Two open-weight vision judges (**Qwen 3.8 27B + Gemma 4 31B**, `$0` local MLX or OpenRouter) grade craft `Q` blind against Auto, score 10 replay frames for human-ness `H`, and track API cost ([scoring](bench/docs/scoring.md)).
 
-<p align="center"><a href="docs/how-it-paints.md"><img src="docs/img/pipeline-summary.webp" width="900" alt="Unpainting 0.5.1 summary flow on Yale Rosewalk: 01 Plan (block-in studies and SAM forms), 02 Ink and Paper (cold-press paper and ordered contours), 03 Paint on WebGPU (wet-in-wet, drying, glazes), and 04 open2 judging"></a></p>
-
-Deep dives: [how it paints](docs/how-it-paints.md) · [ink & studies](docs/ink.md) · [target guard](docs/honesty.md) · [judging & scoring](bench/docs/scoring.md).
+<p align="center"><a href="docs/how-it-paints.md"><img src="docs/img/pipeline-summary.webp" width="900" alt="Unpainting 0.5.1 four-step flow: 01 Studies and Drawing, 02 Automated Painting on WebGPU, 03 Hand to Models (L1–L4), and 04 Blind Judging (open2)"></a></p>
 
 <p align="center"><img src="docs/img/cheat-white-ships.webp" width="912" alt="Sargent's White Ships four times: the target; cheat #1, a hill-climber that keeps random dabs only when they match the photo better; cheat #2, strokes replayed with paint sampled from the photo's pixels; and Fair Mode (0.5), building up stroke by stroke with zero target pixel reads."></p>
 
 ## Try it
 
-Start with a picture already in watercolor or ink-and-wash style. A photo gives poor results. Requires [Node.js](https://nodejs.org/en/download) 25 or later.
+Start with a picture already in watercolor or ink-and-wash style. A photo gives poor results.
+
+| Task | What you need |
+|---|---|
+| **Bundled examples** (`quick-start`, `example:*`) | [Node.js 25+](https://nodejs.org/en/download) + `npm ci` (WebGPU on Apple Silicon / NVIDIA, or `--gpu auto` for CPU) |
+| **MP4 replay videos** | `ffmpeg` (optional — pass `--video 0` to skip) |
+| **Own pictures, tracing, SAM & scoring** | Python 3 + `pip install -r` [`requirements.txt`](requirements.txt) (+ `sam_vit_b_01ec64.pth` for SAM) |
+| **Model benchmark runs** | Model CLIs signed in (`claude`, `codex`, `agy`, `muse`) + `OPENROUTER_API_KEY` (or local Apple Silicon MLX for `$0` scoring) |
 
 ```sh
 git clone https://github.com/sabj/unpainting.git
 cd unpainting
 npm ci
-npm run quick-start
-```
-
-Open `work/plan-graded-wash/result.png`: a blue wash fading from dark to light, in about five seconds. Then the bundled public-domain examples:
-
-```sh
-npm run example:animal      # Tiepolo, Punchinello Riding a Camel: a drawing and one simplified picture
-npm run example:portrait    # Sargent, A Tramp: one simplified picture, no drawing
+npm run quick-start          # 5-second graded wash → work/plan-graded-wash/result.png
+npm run example:animal       # Tiepolo, Punchinello Riding a Camel (bundled drawing + study)
+npm run example:portrait     # Sargent, A Tramp (bundled study, no drawing)
 ```
 
 <p align="center"><img src="docs/img/build-white-ships.webp" width="560" alt="Sargent's White Ships beside Auto’s 0.5 painting building from blank paper through pencil and washes, then rewinding"></p>
 
-[Getting started](docs/running.md) covers your own image, the benchmark's pictures and model painters. `ffmpeg` is needed for MP4 videos (`--video 0` skips them). Python 3 is needed for tracing a drawing, finding regions and scoring.
-
-`npm run unpaint` is one command for painting, benchmark runs, cloud GPUs and scoring ([benchmark](bench/README.md#run-it)):
+All CLI runners for painting, multi-machine/pod render pools, model sessions, and scoring live in [`tools/`](tools/README.md) (`npm run unpaint`, `tools/paint/`, `tools/cloud/`, `bench/scorer/`) and read credentials solely from environment variables (`OPENROUTER_API_KEY`, `RUNPOD_API_KEY`). See [getting started](docs/running.md) and [benchmark setup](bench/README.md#run-it):
 
 ```sh
 npm run unpaint -- --help
-npm run unpaint -- paint mittens-closeup-qs plan              # plan or paint a prepared benchmark picture
-npm run unpaint -- benchmark --out work/bench-05 --set core   # lists every session; --start runs them
-npm run unpaint -- status work/bench-05                       # progress of the runs
+npm run unpaint -- paint mittens-closeup-qs plan                     # plan or paint a prepared picture
+npm run unpaint -- benchmark --out work/bench-05 --set core --pool local   # preview commands; add --start to run
+npm run unpaint -- status work/bench-05                              # progress of runs
 ```
 
 ## Benchmark

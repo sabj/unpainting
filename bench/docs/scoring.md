@@ -44,6 +44,16 @@ The output folder holds `results.json`, `SCORES.md`, `.progress-cache.json` (whi
 
 On Apple Silicon running `rapid-mlx`, the same `open2` panel (`qwen3.8-27b-4bit` with `--no-spec-decode` + `gemma-4-31b-8bit`, `think=False`) runs fully offline at `$0` API cost using the same `versus-auto` craft prompt and per-snapshot `1..5` human-ness scoring. Always pass `--no-spec-decode` when serving `qwen3.8-27b-4bit` with vision inputs to avoid multimodal speculative-decode hangs.
 
+**Local MLX vs. cloud OpenRouter validation (Core 5 `L2`, 50 paintings):** overall 9-model ranking agrees tightly (**`r = 0.955`**, Spearman **`ρ = 0.917`**; identical top 3: Sol, Astra, Carbon), and craft `Q` tracks closely (`r = 0.827`, `MAE = 4.2 pp`). Quantized local weights grade 10-frame human-ness `H` more harshly (`−13.7 pp` mean bias, `r = 0.325`), so published 0.5.1 leaderboard numbers use full-precision `open2` 3× repeats (which correlate at **`r = 0.957`**, `ρ = 0.917` across 17 model-effort variants with the 3-judge cloud panel `GLM-5.3-Flash + Kimi-K3.1-Pro + Gemma 4 31B`).
+
+## Craft vs. human-ness & cross-version leap
+
+![Craft quality Q versus human-ness H across L3 and L4 on Core 5, showing the 65% human-ness gate](../../docs/img/bench-qh-quadrant.svg)
+
+![Generational engine leap from 0.2.1 V5 to 0.5.1 on White Ships, Mittens, and Yale Trumbull under fixed open3v2 judges](../../docs/img/bench-v021-leap.svg)
+
+Explore formula sensitivity, judge splits, and 95% bootstrap intervals in the **[Interactive Benchmark Explorer](https://sabj.github.io/unpainting/demos/bench/)**.
+
 ## Difficulty-adjusted scoring & why pixel error fails
 
 Subjects vary by ~20 points in average difficulty (Cézanne `55.1%` vs. Yale Rosewalk `36.4%` across the 7-model `L2` panel). Rankings always compare models on the exact same picture set (`All 15 · L2` or `Core 5 · L1–L4`); highlight galleries subtract each picture’s field mean (`Adjusted Δ = score − subject mean`) so standout work on hard scenes isn’t buried behind easy subjects.

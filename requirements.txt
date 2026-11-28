@@ -1,0 +1,29 @@
+# Python dependencies for Unpainting 0.5.1
+#
+# Note: Bundled painting examples (`npm run quick-start`, `example:animal`,
+# `example:portrait`) need Node.js 25+ ONLY — no Python required.
+#
+# Install this file in a virtualenv (e.g. `.venv-seg`) when:
+#   - tracing your own line drawings (`tools/seg/trace-drawing.py`)
+#   - cutting named forms with SAM (`tools/seg/sam_regions.py`, `npm run doctor`)
+#   - scoring benchmark runs (`bench/scorer/score04.py`)
+
+# Core image processing, vector line tracing, and benchmark scoring
+numpy
+scipy
+scikit-image
+Pillow
+opencv-python-headless
+
+# Named-form segmentation (SAM — also needs sam_vit_b_01ec64.pth via PAINTER_SAM_CHECKPOINT)
+torch
+torchvision
+segment-anything
+
+# Optional: ONNX lineart helpers (`tools/seg/lines.py`, `tools/seg/sketch-lines.py`)
+# onnxruntime
+# controlnet-aux
+
+# Optional: Local Apple Silicon study generation (`tools/prepare/studies.sh`, Qwen-Image-Edit 2511)
+# mflux
+# mlx

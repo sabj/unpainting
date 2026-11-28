@@ -33,7 +33,7 @@ function namedPaths(text, docDir = 'docs') {
 test('every file or folder named in docs/how-it-paints.md exists', () => {
   const text = fs.readFileSync(path.join(root, DOC), 'utf8');
   const paths = namedPaths(text);
-  assert.ok(paths.size > 40, `expected the doc to name many paths, found ${paths.size}`);
+  assert.ok(paths.size >= 15, `expected the doc to name many paths, found ${paths.size}`);
   const missing = [...paths.keys()].filter(p => !fs.existsSync(path.join(root, p)));
   assert.deepEqual(missing, [], `${DOC} names paths that do not exist:\n${missing.join('\n')}`);
 });

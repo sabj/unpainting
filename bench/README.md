@@ -2,10 +2,12 @@
 
 AI models paint a picture with the simulator's brush and pen. Judges score how human the making looks and how good the painting is. Auto, the code planner alone, paints every picture too, and each model is measured against it.
 
-The clean 0.5.1 benchmark is scored on the local-first `open2` panel (**Qwen 3.8 27B + Gemma 4 31B** — the exact same two open-weight judges run locally on Apple Silicon MLX at `$0` or via OpenRouter). Core 5 (`180` sessions across `L1–L4`), Extended 10 `L2` (`70` sessions), and Effort tiers (`40` sessions) are complete.
+The clean 0.5.1 benchmark is scored on the local-first `open2` panel (**Qwen 3.8 27B + Gemma 4 31B** — the exact same two open-weight judges run locally on Apple Silicon MLX at `$0` or via OpenRouter). Core 5 (`180` sessions across `L1–L4`), Extended 10 `L2` (`70` sessions), and Effort tiers (`40` sessions) are complete. Explore every rubric, difficulty adjustment, and judge slice interactively in the **[Live Benchmark Explorer](https://sabj.github.io/unpainting/demos/bench/)**.
 
 <p align="center"><img src="../docs/img/bench-chart.svg" width="900" alt="0.5.1 overall benchmark ranking"></p>
+<p align="center"><img src="../docs/img/bench-trajectories.svg" width="900" alt="0.5.1 autonomy (L1 to L4) and reasoning effort (low to xhigh) trajectories"></p>
 <p align="center"><img src="../docs/img/bench-pareto.svg" width="900" alt="0.5.1 cost vs quality Pareto frontier"></p>
+<p align="center"><img src="../docs/img/bench-heatmap.svg" width="900" alt="0.5.1 model by 15-picture heatmap at L2"></p>
 <p align="center"><img src="../docs/img/judging-rubric.svg" width="900" alt="How 0.5.1 open2 judging works"></p>
 <p align="center"><img src="../docs/img/difficulty-scoring.svg" width="900" alt="Subject difficulty spread and L4b open-book pixel-error control"></p>
 
@@ -31,17 +33,19 @@ Auto 0.5 baseline on Core 5: **`60.1%`** (`Q = 62.7%`, `H = 76.6%`).
 |---|---:|---:|---:|---:|:---:|
 | **Codex Astra 6.2 · med** | 45.6% | 50.5% | **61.8%** | 57.5% | L3 |
 | **Gemini 4 Argon · med** | 39.7% | 42.8% | **54.3%** | 42.5% | L3 |
-| **Gemini 4 Carbon · med** | 42.9% | 47.8% | **53.0%** | 48.3% | L3 |
+| **Gemini 4 Carbon · med** | 42.9% | 47.8% | **53.0%*** | 48.3% | L3* |
 | **Sonnet 5.5 · med** | 47.5% | 44.9% | **50.5%** | 31.8% | L3 |
 | **Gemini 4 Neon · med** | 45.8% | 46.7% | **49.4%** | 48.3% | L3 |
-| **Codex Terra 6.1 · med** | 40.0% | 42.5% | **45.5%** | 38.3% | L3 |
-| **Codex Sol 6.1 · med** | 45.7% | **55.5%** | 41.7% | 41.7% | L2 |
+| **Codex Terra 6.1 · med** | 41.2% | 42.5% | **45.5%** | 38.3% | L3 |
+| **Codex Sol 6.1 · med** | 45.7% | **55.5%** | 44.2% | 41.7% | L2 |
 | **Opus 5.5 · med** | 32.8% | 33.9% | **43.7%** | 41.3% | L3 |
 | **Muse Wonder Full · med** | 28.2% | 34.7% | **42.7%** | 35.9% | L3 |
 
+*\*Carbon L3 completed-only mean covers 4/5 Core pictures (Prout L3 pending); counting the missing run as 0 gives `42.4%`.*
+
 ### Extended 10 `L2` (`open2`, `n = 10` pictures each)
 
-Auto 0.5 baseline on Extended 10: **`58.5%`** (`Q = 63.9%`, `H = 70.6%`).
+Auto 0.5 baseline on Extended 10: **`58.7%`** (`Q = 64.2%`, `H = 70.6%`).
 
 | Model | Combined | Craft `Q` | Human-ness `H` |
 |---|---:|---:|---:|
@@ -55,13 +59,13 @@ Auto 0.5 baseline on Extended 10: **`58.5%`** (`Q = 63.9%`, `H = 70.6%`).
 
 ### Key findings
 
-- **Autonomy peaks at L3 (`8/9` models; Sol peaks at L2; `0/9` peak at L4).** At L4, shell + Python loops more than double passage count (`34 → 76` avg), dropping human-ness `H` (`82.8% → 77.0%`) and tripping the `< 65%` gate even when raw craft `Q` edges up (Astra `Q` rises `+1.3 pp` at L4, but its `H` falls on Prout).
+- **Autonomy peaks at L3 (`8/9` completed-only; Sol peaks at L2; `0/9` peak at L4).** At L4, shell + Python loops more than double passage count (`33.9 → 73.5` avg), nudging pooled human-ness `H` down (`72.7% → 70.3%`, with `16/45` runs tripping the `< 65%` gate vs `12/44` at L3) even when raw craft `Q` rises on individual runs (Astra `Q` edges up `+1.3 pp` at L4, but its `H` drops on Prout).
 - **Effort inverted-U (Core 5 `L2`):** Codex Astra peaks at `high` (`low 46.9% → med 50.5% → high 57.7% → xhigh 53.9%`); Codex Sol peaks at `med` (`low 47.7% → med 55.5% → high 51.4% → xhigh 48.6%`).
-- **Open-book `L4b` control:** Giving Astra, Sol, and Carbon direct Python/OpenCV target-pixel access cuts pixel error `ΔE` by `19–53%` and doubles SSIM, yet wins `0/5` against Auto (`Q = 2.6–4.9` vs Auto `7.0`) — pixel optimization cannot fake watercolour craft.
+- **Open-book `L4b` control (3-judge panel `GLM-5.3-Flash + Kimi-K3.1-Pro + Gemma 4 31B`, `0–10` scale):** Giving Astra, Sol, and Carbon direct Python/OpenCV target-pixel access cuts pixel error `ΔE` by `19–53%` and raises SSIM by `+2–62%`, yet goes `0/5` against Auto (`Q = 2.6–4.9` vs Auto `6.7` on White Ships / `7.0` on Mittens) — pixel optimization cannot fake watercolour craft.
 
 All models in the main tables use medium effort. [Model IDs](../tools/paint/authors.json).
 
-- Opus 5.5, Sonnet 5.5, Fable 5.2
+- Opus 5.5, Sonnet 5.5
 - Codex Astra 6.2, Codex Sol 6.1, Codex Terra 6.1
 - Gemini 4 Neon, Gemini 4 Argon, Gemini 4 Carbon
 - Muse Wonder Full

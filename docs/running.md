@@ -1,6 +1,6 @@
 # Getting started
 
-Needs [Node.js 25+](https://nodejs.org/en/download) and `npm ci`. `ffmpeg` is optional for MP4 videos (pass `--video 0` to skip). WebGPU runs automatically on Apple Silicon (Metal) or NVIDIA (Vulkan); add `--gpu auto` to allow CPU fallback.
+Needs [Node.js 25+](https://nodejs.org/en/download) and `npm ci`. `ffmpeg` is optional for MP4 videos (pass `--video 0` to skip). WebGPU runs automatically on Apple Silicon (Metal) or NVIDIA (Vulkan); add `--gpu auto` to allow CPU fallback. For drawing tracing, SAM segmentation, or benchmark scoring, install Python dependencies with `pip install -r` [`requirements.txt`](../requirements.txt).
 
 ## 1. Run the bundled examples
 
