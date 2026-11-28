@@ -1002,6 +1002,16 @@ class Parallel(unittest.TestCase):
             self.assertEqual(self.run_(HostedJudge(), "pcache"), 0)
             self.assertEqual(len(calls), first_calls + 1, "modified film invalidates only its own cache entry")
 
+    def test_open2_panel_matches_on_local_mlx_and_openrouter(self):
+        cloud = J.settings({"JUDGE_ROUTE": "openrouter", "OPENROUTER_API_KEY": "k", "JUDGE_PANEL": "open2"})
+        local = J.settings({"JUDGE_ROUTE": "local", "JUDGE_PANEL": "open2"})
+        self.assertEqual(cloud["panel"], ["Qwen/Qwen3.8-27B", "google/gemma-4-31b-it"])
+        self.assertEqual(local["panel"], ["Qwen/Qwen3.8-27B", "google/gemma-4-31b-it"])
+        self.assertEqual(cloud["reasoning"], "medium")
+        self.assertEqual(local["reasoning"], "medium")
+        self.assertEqual(cloud["names"], {"Qwen/Qwen3.8-27B": "qwen/qwen3.8-27b", "google/gemma-4-31b-it": "google/gemma-4-31b-it"})
+        self.assertEqual(local["names"], {"Qwen/Qwen3.8-27B": "qwen3.8-27b-4bit", "google/gemma-4-31b-it": "gemma-4-31b-8bit"})
+
 
 if __name__ == "__main__":
     unittest.main()

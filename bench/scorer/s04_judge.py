@@ -20,7 +20,12 @@ PANELS = {
               "openrouter": {"zai-org/GLM-5.3-Flash": "z-ai/glm-5.3-flash", "Qwen/Qwen3.8-27B": "qwen/qwen3.8-27b", "google/gemma-4-31b-it": "google/gemma-4-31b-it"},
               # GLM-5.3-Flash has no local tag here: name the one the server holds in JUDGE_LOCAL_TAGS
               "local": {"Qwen/Qwen3.8-27B": "qwen3.8:27b-mlx", "google/gemma-4-31b-it": "gemma4:31b-mlx"}},
-    "open3v2": {"what": "the 0.5.1 panel: GLM-5.3-Flash, Kimi-K3.1-Pro and Gemma-4-31B at medium reasoning, zero data retention or local MLX",
+    "open2": {"what": "the local-first 0.5.1 panel: Qwen3.8-27B and Gemma-4-31B at medium reasoning (runs identically on local Apple Silicon MLX at $0 or OpenRouter; r=0.967, rho=0.950 vs open3v2)",
+              "reasoning": "medium",
+              "models": ("Qwen/Qwen3.8-27B", "google/gemma-4-31b-it"),
+              "openrouter": {"Qwen/Qwen3.8-27B": "qwen/qwen3.8-27b", "google/gemma-4-31b-it": "google/gemma-4-31b-it"},
+              "local": {"Qwen/Qwen3.8-27B": "qwen3.8-27b-4bit", "google/gemma-4-31b-it": "gemma-4-31b-8bit"}},
+    "open3v2": {"what": "the archival 3-judge 0.5.1 panel: GLM-5.3-Flash, Kimi-K3.1-Pro and Gemma-4-31B at medium reasoning, zero data retention or local MLX",
                 "reasoning": "medium",
                 "models": ("zai-org/GLM-5.3-Flash", "moonshotai/Kimi-K3.1-Pro", "google/gemma-4-31b-it"),
                 "openrouter": {"zai-org/GLM-5.3-Flash": "z-ai/glm-5.3-flash", "moonshotai/Kimi-K3.1-Pro": "moonshotai/kimi-k3.1-pro", "google/gemma-4-31b-it": "google/gemma-4-31b-it"},

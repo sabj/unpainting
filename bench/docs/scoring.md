@@ -21,7 +21,7 @@ The scorer picks frames by how much of the finished picture is visible. If a sin
 
 ## Judges
 
-The `open3v2` panel is GLM-5.3-Flash, Kimi-K3.1-Pro and Gemma-4-31B-it. All three are open-weight vision models and use medium reasoning. Each judge gives three readings. The scorer takes each judge’s median, then averages across the panel. The painter’s name and level are hidden.
+The default `0.5.1` panel (`open2`) is **Qwen 3.8 27B** and **Gemma 4 31B** — the exact same two open-weight vision models run identically on **local Apple Silicon MLX (`$0` API cost)** and on **OpenRouter** (`JUDGE_ROUTE=local` or `JUDGE_ROUTE=openrouter`), matching the archival 3-judge cloud panel (`open3v2`: GLM-5.3-Flash + Kimi-K3.1-Pro + Gemma-4-31B) at **`r = 0.967, ρ = 0.950`** on the 9-model Core 5 L2 leaderboard and `ΔAuto r = 0.906, ρ = 0.924` at painting level. Pass `JUDGE_PANEL=open3v2` to reproduce the archival cloud runs. Each judge gives three readings; the scorer takes each judge’s median, then averages across the panel. The painter’s name and level are hidden.
 
 ## Run the scorer
 

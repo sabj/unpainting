@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Score painting sessions and write results.json, SCORES.md and individual readings.
 
-Pass --profile 0.5.1 for open3v2, reference-anchored craft and gated combined scores.
+Pass --profile 0.5.1 for open2 (Qwen3.8-27B + Gemma-4-31B, identical on local MLX and OpenRouter), versus-auto craft and gated combined scores.
 The legacy profile uses blind quality and a weighted mean. See bench/docs/scoring.md.
 """
 import argparse, json, os, sys, threading, time
@@ -200,15 +200,15 @@ def main(argv=None, judge=s04_judge, env=None, say=print):
     ap.add_argument("--fresh", action="store_true", help="read every picture again: no kept reading is reused (the new readings replace the kept ones)")
     ap.add_argument("--repeat", type=int, default=1, metavar="N", help="score the same paintings a further time, kept apart from repeat 1 (results-repeat-N.json, SCORES-repeat-N.md): for measuring the judges' noise")
     ap.add_argument("--concurrency", type=int, default=CONCURRENCY, metavar="N", help=f"hosted route: readings in flight at once for each judge, every judge at once (default {CONCURRENCY}). The local route holds one model at a time and reads one reading after another")
-    ap.add_argument("--profile", default=None, choices=("0.5.1", "0.4"), help="named scoring profile: 0.5.1 sets panel open3v2 (reasoning medium), anchored quality, gated combined; 0.4 sets open3, blind, weighted")
-    ap.add_argument("--quality-mode", default=None, choices=R.QUALITY_MODES, help="quality judging mode: blind (0.4 single image vs original share) or anchored (0.5.1 reference=9.0 harsh craft scale, Q = 10 x overall)")
+    ap.add_argument("--profile", default=None, choices=("0.5.1", "0.4"), help="named scoring profile: 0.5.1 sets panel open2 (Qwen3.8-27B + Gemma-4-31B, identical on local MLX and OpenRouter; pass JUDGE_PANEL=open3v2 for archival 3-judge cloud panel), versus-auto quality, gated combined; 0.4 sets open3, blind, weighted")
+    ap.add_argument("--quality-mode", default=None, choices=R.QUALITY_MODES, help="quality judging mode: blind (0.4 single image vs original share), anchored (reference=9.0 harsh craft scale), or versus-auto (0.5.1 side-by-side vs Auto)")
     ap.add_argument("--combined-mode", default=None, choices=T.COMBINED_MODES, help="combined formula: weighted (0.4 2:1 H:Q) or gated (0.5.1 Q * min(1, H / 65))")
     a = ap.parse_args(argv)
     if a.profile == "0.5.1":
         a.quality_mode = a.quality_mode or "versus-auto"
         a.combined_mode = a.combined_mode or "gated"
         env = {**(os.environ if env is None else env)}
-        env.setdefault("JUDGE_PANEL", "open3v2")
+        env.setdefault("JUDGE_PANEL", "open2")
     else:
         a.quality_mode = a.quality_mode or "blind"
         a.combined_mode = a.combined_mode or "weighted"
