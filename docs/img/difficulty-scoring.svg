@@ -1,0 +1,170 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 564" width="960" height="564" role="img" aria-label="Difficulty-adjusted scoring across 15 subjects and why pixel error fails on L4b">
+  <rect width="960" height="564" rx="6" fill="#f6f2ea" stroke="#d6cebf"/>
+  <text x="28" y="34" font-family="Georgia, serif" font-size="19" font-weight="600" fill="#2b2a27">Why Difficulty Adjustment Matters — and Why Pixel Error Fails</text>
+  <text x="28" y="54" font-family="-apple-system, Helvetica, Arial, sans-serif" font-size="12.5" fill="#6d6559">Real 0.5.1 open2 scores across all 15 pictures: easy subjects score ~20 pts higher than hard ones; optimizing ΔE destroys craft.</text>
+
+  <!-- Left panel: 15-subject difficulty spread -->
+  <g transform="translate(28, 70)">
+    <rect width="450" height="412" rx="4" fill="#fbf8f2" stroke="#d6cebf"/>
+    <rect width="450" height="4" fill="#99543a"/>
+    <text x="16" y="26" font-family="ui-monospace, monospace" font-size="11.5" font-weight="700" fill="#99543a">SUBJECT DIFFICULTY SPREAD (ALL 15 · L2 MEAN)</text>
+    <text x="16" y="44" font-family="-apple-system, sans-serif" font-size="11.3" fill="#6d6559">Bars: 7-model L2 mean · Black dot: Auto 0.5 · Dashed: 15-pic mean (45.4%)</text>
+
+    <!-- Grid lines -->
+    <line x1="116" y1="62" x2="116" y2="398" stroke="#d6cebf"/>
+    <line x1="215" y1="62" x2="215" y2="398" stroke="#ece6da"/>
+    <line x1="314" y1="62" x2="314" y2="398" stroke="#ece6da"/>
+    <line x1="266" y1="60" x2="266" y2="398" stroke="#99543a" stroke-width="1.3" stroke-dasharray="4,3"/>
+    <text x="116" y="75" font-family="ui-monospace, monospace" font-size="9.5" fill="#8a8174">0%</text>
+    <text x="215" y="75" text-anchor="middle" font-family="ui-monospace, monospace" font-size="9.5" fill="#8a8174">30%</text>
+    <text x="314" y="75" text-anchor="middle" font-family="ui-monospace, monospace" font-size="9.5" fill="#8a8174">60%</text>
+    <text x="266" y="58" text-anchor="middle" font-family="ui-monospace, monospace" font-size="9.5" font-weight="700" fill="#99543a">mean 45.4%</text>
+
+    <g transform="translate(0, -4)">
+      <g transform="translate(0, 84)">
+    <text x="108" y="12.5" text-anchor="end" font-family="-apple-system, Helvetica, Arial, sans-serif" font-size="11.5" fill="#2b2a27">Cézanne</text>
+    <rect x="116" y="2" width="182" height="13" rx="2" fill="#6f8759" opacity="0.86"/>
+    <circle cx="289" cy="8.5" r="3.5" fill="#2b2a27" stroke="#fbf8f2" stroke-width="1.2"/>
+    <text x="305" y="12.5" font-family="ui-monospace, monospace" font-size="10.2" fill="#584f42">55.1%</text>
+  </g>
+<g transform="translate(0, 105)">
+    <text x="108" y="12.5" text-anchor="end" font-family="-apple-system, Helvetica, Arial, sans-serif" font-size="11.5" fill="#2b2a27">Ender Valley</text>
+    <rect x="116" y="2" width="165" height="13" rx="2" fill="#6f8759" opacity="0.86"/>
+    <circle cx="324" cy="8.5" r="3.5" fill="#2b2a27" stroke="#fbf8f2" stroke-width="1.2"/>
+    <text x="331" y="12.5" font-family="ui-monospace, monospace" font-size="10.2" fill="#584f42">49.9%</text>
+  </g>
+<g transform="translate(0, 126)">
+    <text x="108" y="12.5" text-anchor="end" font-family="-apple-system, Helvetica, Arial, sans-serif" font-size="11.5" fill="#2b2a27">Turner Fort</text>
+    <rect x="116" y="2" width="164" height="13" rx="2" fill="#6f8759" opacity="0.86"/>
+    <circle cx="266" cy="8.5" r="3.5" fill="#2b2a27" stroke="#fbf8f2" stroke-width="1.2"/>
+    <text x="287" y="12.5" font-family="ui-monospace, monospace" font-size="10.2" fill="#584f42">49.8%</text>
+  </g>
+<g transform="translate(0, 147)">
+    <text x="108" y="12.5" text-anchor="end" font-family="-apple-system, Helvetica, Arial, sans-serif" font-size="11.5" fill="#2b2a27">White Ships</text>
+    <rect x="116" y="2" width="164" height="13" rx="2" fill="#6f8759" opacity="0.86"/>
+    <circle cx="359" cy="8.5" r="3.5" fill="#2b2a27" stroke="#fbf8f2" stroke-width="1.2"/>
+    <text x="366" y="12.5" font-family="ui-monospace, monospace" font-size="10.2" fill="#584f42">49.8%</text>
+  </g>
+<g transform="translate(0, 168)">
+    <text x="108" y="12.5" text-anchor="end" font-family="-apple-system, Helvetica, Arial, sans-serif" font-size="11.5" fill="#2b2a27">Tiepolo</text>
+    <rect x="116" y="2" width="163" height="13" rx="2" fill="#7b8c98" opacity="0.86"/>
+    <circle cx="314" cy="8.5" r="3.5" fill="#2b2a27" stroke="#fbf8f2" stroke-width="1.2"/>
+    <text x="321" y="12.5" font-family="ui-monospace, monospace" font-size="10.2" fill="#584f42">49.3%</text>
+  </g>
+<g transform="translate(0, 189)">
+    <text x="108" y="12.5" text-anchor="end" font-family="-apple-system, Helvetica, Arial, sans-serif" font-size="11.5" fill="#2b2a27">Sargent Tyrol</text>
+    <rect x="116" y="2" width="159" height="13" rx="2" fill="#7b8c98" opacity="0.86"/>
+    <circle cx="221" cy="8.5" r="3.5" fill="#2b2a27" stroke="#fbf8f2" stroke-width="1.2"/>
+    <text x="282" y="12.5" font-family="ui-monospace, monospace" font-size="10.2" fill="#584f42">48.1%</text>
+  </g>
+<g transform="translate(0, 210)">
+    <text x="108" y="12.5" text-anchor="end" font-family="-apple-system, Helvetica, Arial, sans-serif" font-size="11.5" fill="#2b2a27">Morisot Bench</text>
+    <rect x="116" y="2" width="154" height="13" rx="2" fill="#7b8c98" opacity="0.86"/>
+    <circle cx="316" cy="8.5" r="3.5" fill="#2b2a27" stroke="#fbf8f2" stroke-width="1.2"/>
+    <text x="323" y="12.5" font-family="ui-monospace, monospace" font-size="10.2" fill="#584f42">46.7%</text>
+  </g>
+<g transform="translate(0, 231)">
+    <text x="108" y="12.5" text-anchor="end" font-family="-apple-system, Helvetica, Arial, sans-serif" font-size="11.5" fill="#2b2a27">Manet Fan</text>
+    <rect x="116" y="2" width="152" height="13" rx="2" fill="#7b8c98" opacity="0.86"/>
+    <circle cx="285" cy="8.5" r="3.5" fill="#2b2a27" stroke="#fbf8f2" stroke-width="1.2"/>
+    <text x="292" y="12.5" font-family="ui-monospace, monospace" font-size="10.2" fill="#584f42">46.2%</text>
+  </g>
+<g transform="translate(0, 252)">
+    <text x="108" y="12.5" text-anchor="end" font-family="-apple-system, Helvetica, Arial, sans-serif" font-size="11.5" fill="#2b2a27">Bonington</text>
+    <rect x="116" y="2" width="150" height="13" rx="2" fill="#7b8c98" opacity="0.86"/>
+    <circle cx="328" cy="8.5" r="3.5" fill="#2b2a27" stroke="#fbf8f2" stroke-width="1.2"/>
+    <text x="335" y="12.5" font-family="ui-monospace, monospace" font-size="10.2" fill="#584f42">45.6%</text>
+  </g>
+<g transform="translate(0, 273)">
+    <text x="108" y="12.5" text-anchor="end" font-family="-apple-system, Helvetica, Arial, sans-serif" font-size="11.5" fill="#2b2a27">Homer Fan</text>
+    <rect x="116" y="2" width="146" height="13" rx="2" fill="#7b8c98" opacity="0.86"/>
+    <circle cx="208" cy="8.5" r="3.5" fill="#2b2a27" stroke="#fbf8f2" stroke-width="1.2"/>
+    <text x="269" y="12.5" font-family="ui-monospace, monospace" font-size="10.2" fill="#584f42">44.4%</text>
+  </g>
+<g transform="translate(0, 294)">
+    <text x="108" y="12.5" text-anchor="end" font-family="-apple-system, Helvetica, Arial, sans-serif" font-size="11.5" fill="#2b2a27">Mittens</text>
+    <rect x="116" y="2" width="144" height="13" rx="2" fill="#7b8c98" opacity="0.86"/>
+    <circle cx="346" cy="8.5" r="3.5" fill="#2b2a27" stroke="#fbf8f2" stroke-width="1.2"/>
+    <text x="353" y="12.5" font-family="ui-monospace, monospace" font-size="10.2" fill="#584f42">43.6%</text>
+  </g>
+<g transform="translate(0, 315)">
+    <text x="108" y="12.5" text-anchor="end" font-family="-apple-system, Helvetica, Arial, sans-serif" font-size="11.5" fill="#2b2a27">Guardi</text>
+    <rect x="116" y="2" width="132" height="13" rx="2" fill="#99543a" opacity="0.86"/>
+    <circle cx="350" cy="8.5" r="3.5" fill="#2b2a27" stroke="#fbf8f2" stroke-width="1.2"/>
+    <text x="357" y="12.5" font-family="ui-monospace, monospace" font-size="10.2" fill="#584f42">40.1%</text>
+  </g>
+<g transform="translate(0, 336)">
+    <text x="108" y="12.5" text-anchor="end" font-family="-apple-system, Helvetica, Arial, sans-serif" font-size="11.5" fill="#2b2a27">Prout</text>
+    <rect x="116" y="2" width="131" height="13" rx="2" fill="#99543a" opacity="0.86"/>
+    <circle cx="316" cy="8.5" r="3.5" fill="#2b2a27" stroke="#fbf8f2" stroke-width="1.2"/>
+    <text x="323" y="12.5" font-family="ui-monospace, monospace" font-size="10.2" fill="#584f42">39.6%</text>
+  </g>
+<g transform="translate(0, 357)">
+    <text x="108" y="12.5" text-anchor="end" font-family="-apple-system, Helvetica, Arial, sans-serif" font-size="11.5" fill="#2b2a27">Kasha</text>
+    <rect x="116" y="2" width="122" height="13" rx="2" fill="#99543a" opacity="0.86"/>
+    <circle cx="369" cy="8.5" r="3.5" fill="#2b2a27" stroke="#fbf8f2" stroke-width="1.2"/>
+    <text x="376" y="12.5" font-family="ui-monospace, monospace" font-size="10.2" fill="#584f42">37.0%</text>
+  </g>
+<g transform="translate(0, 378)">
+    <text x="108" y="12.5" text-anchor="end" font-family="-apple-system, Helvetica, Arial, sans-serif" font-size="11.5" fill="#2b2a27">Yale Rosewalk</text>
+    <rect x="116" y="2" width="120" height="13" rx="2" fill="#99543a" opacity="0.86"/>
+    <circle cx="377" cy="8.5" r="3.5" fill="#2b2a27" stroke="#fbf8f2" stroke-width="1.2"/>
+    <text x="384" y="12.5" font-family="ui-monospace, monospace" font-size="10.2" fill="#584f42">36.4%</text>
+  </g>
+    </g>
+  </g>
+
+  <!-- Right top panel: Difficulty-adjusted formula & worked example -->
+  <g transform="translate(494, 70)">
+    <rect width="438" height="216" rx="4" fill="#fbf8f2" stroke="#d6cebf"/>
+    <rect width="438" height="4" fill="#6896a4"/>
+    <text x="16" y="26" font-family="ui-monospace, monospace" font-size="11.5" font-weight="700" fill="#4f7c8a">DIFFICULTY-ADJUSTED SCORE (Δ ABOVE FIELD)</text>
+    <text x="16" y="49" font-family="Georgia, serif" font-size="14.5" font-weight="600" fill="#2b2a27">Adjusted Δ = Model Score − Subject Mean</text>
+    <text x="16" y="70" font-family="-apple-system, sans-serif" font-size="12" fill="#584f42">Raw scores pick whichever picture happened to be easiest (Cézanne,</text>
+    <text x="16" y="86" font-family="-apple-system, sans-serif" font-size="12" fill="#584f42">White Ships). Subtracting the all-run subject mean spotlights real skill:</text>
+
+    <!-- Worked examples -->
+    <rect x="16" y="100" width="406" height="100" rx="4" fill="#f6f2ea" stroke="#d6cebf"/>
+    <text x="26" y="120" font-family="ui-monospace, monospace" font-size="10.5" font-weight="700" fill="#6d6559">STANDOUT DIFFICULTY-ADJUSTED WINS (ALL 15 · OPEN2)</text>
+    <text x="26" y="142" font-family="-apple-system, sans-serif" font-size="11.8" fill="#2b2a27"><tspan font-weight="600">Astra 6.2 L4 · Manet Fan</tspan> — 68.5% on a 43.5% subject</text>
+    <text x="410" y="142" text-anchor="end" font-family="ui-monospace, monospace" font-size="12" font-weight="700" fill="#52693e">+25.0</text>
+    <text x="26" y="164" font-family="-apple-system, sans-serif" font-size="11.8" fill="#2b2a27"><tspan font-weight="600">Argon L3 · Mittens</tspan> — 70.0% on a 46.5% subject</text>
+    <text x="410" y="164" text-anchor="end" font-family="ui-monospace, monospace" font-size="12" font-weight="700" fill="#52693e">+23.5</text>
+    <text x="26" y="186" font-family="-apple-system, sans-serif" font-size="11.8" fill="#2b2a27"><tspan font-weight="600">Terra L3 · Guardi</tspan> — 54.0% on a 33.7% subject</text>
+    <text x="410" y="186" text-anchor="end" font-family="ui-monospace, monospace" font-size="12" font-weight="700" fill="#52693e">+20.3</text>
+  </g>
+
+  <!-- Right bottom panel: L4b Open-Book Control Proof -->
+  <g transform="translate(494, 302)">
+    <rect width="438" height="180" rx="4" fill="#fbf8f2" stroke="#d6cebf"/>
+    <rect width="438" height="4" fill="#99543a"/>
+    <text x="16" y="26" font-family="ui-monospace, monospace" font-size="11.5" font-weight="700" fill="#99543a">WHY PIXEL METRICS FAIL · L4b OPEN-BOOK CONTROL</text>
+    <text x="16" y="48" font-family="-apple-system, sans-serif" font-size="12" fill="#584f42">White Ships: giving Astra full Python/OpenCV pixel access cuts</text>
+    <text x="16" y="64" font-family="-apple-system, sans-serif" font-size="12" fill="#584f42">colour error ΔE in half — yet judges reject the muddy result.</text>
+
+    <!-- Comparison bars -->
+    <g transform="translate(16, 84)">
+      <text x="0" y="13" font-family="-apple-system, sans-serif" font-size="11.5" font-weight="600" fill="#2b2a27">Auto 0.5 (honest)</text>
+      <rect x="136" y="2" width="124" height="13" rx="2" fill="#c9c0b0"/>
+      <text x="268" y="13" font-family="ui-monospace, monospace" font-size="10.2" fill="#584f42">ΔE 19.9</text>
+      <text x="406" y="13" text-anchor="end" font-family="ui-monospace, monospace" font-size="11" font-weight="700" fill="#52693e">Q 7.0/10</text>
+
+      <text x="0" y="41" font-family="-apple-system, sans-serif" font-size="11.5" font-weight="600" fill="#2b2a27">Astra L4 (honest)</text>
+      <rect x="136" y="30" width="109" height="13" rx="2" fill="#6896a4"/>
+      <text x="253" y="41" font-family="ui-monospace, monospace" font-size="10.2" fill="#584f42">ΔE 17.5</text>
+      <text x="406" y="41" text-anchor="end" font-family="ui-monospace, monospace" font-size="11" font-weight="700" fill="#4f7c8a">Q 6.6/10</text>
+
+      <text x="0" y="69" font-family="-apple-system, sans-serif" font-size="11.5" font-weight="600" fill="#99543a">Astra L4b (pixel fit)</text>
+      <rect x="136" y="58" width="58" height="13" rx="2" fill="#99543a"/>
+      <text x="202" y="69" font-family="ui-monospace, monospace" font-size="10.2" fill="#99543a">ΔE 9.4 (−53%)</text>
+      <text x="406" y="69" text-anchor="end" font-family="ui-monospace, monospace" font-size="11" font-weight="700" fill="#99543a">Q 4.9 · 0/5</text>
+    </g>
+  </g>
+
+  <!-- Footer takeaway -->
+  <g transform="translate(28, 496)">
+    <rect width="904" height="50" rx="4" fill="#efe9de" stroke="#d6cebf"/>
+    <text x="20" y="22" font-family="Georgia, serif" font-size="13.5" font-weight="600" fill="#2b2a27">Takeaway: compare models on the same 15-picture panel, adjust for subject difficulty when picking highlights,</text>
+    <text x="20" y="40" font-family="-apple-system, sans-serif" font-size="12" fill="#584f42">and never use ΔE or SSIM to rank watercolour craft — closed-loop pixel fitting wins 0 / 5 against honest washes.</text>
+  </g>
+</svg>

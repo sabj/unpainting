@@ -43,7 +43,8 @@ input[type=range] { width:100%; accent-color:var(--accent); }
 #stackInner .plane { position:absolute; inset:0; transform-style:preserve-3d; transition:transform .25s ease, opacity .2s ease; }
 #stackInner canvas { width:100%; height:100%; display:block; border-radius:3px; backface-visibility:visible; }
 #stackInner .plane.paper canvas { box-shadow:0 2px 14px rgba(43,42,39,.15); }
-#stackInner .tag { position:absolute; left:100%; top:0; margin-left:14px; white-space:nowrap; font:italic 15px Georgia, serif; }
+#stackInner .tag { position:absolute; left:100%; top:0; margin-left:16px; white-space:nowrap; font:italic 22px/1.2 Georgia, serif; color:var(--ink); background:rgba(246,242,234,.85); padding:2px 8px; border-radius:4px; }
+#famsList { max-height:220px; overflow:auto; margin-top:4px; padding-right:2px; }
 #stackInner .plane.dim, #spread figure.dim { opacity:.12; }
 #stackInner .plane.hot canvas, #spread figure.hot { outline:2px solid var(--accent); }
 .note { color:var(--muted); font-size:12px; }
@@ -127,21 +128,21 @@ nav{padding:12px 24px;font:14px system-ui}nav a{color:inherit}#stackInner{will-c
 <nav aria-label="Demos"><a href="../">All demos</a> · <a href="https://github.com/sabj/unpainting">GitHub</a></nav>
 <header>
   <h1>Layers</h1>
-  <p id="subtitle">Yale Rosewalk · ink and watercolour. Saved painting stages and named forms.</p>
+  <p id="subtitle">Yale Rosewalk · ink and watercolour. Saved painting stages and 21 named forms.</p>
 </header>
 <main>
   <aside>
     <div class="kicker">Show</div>
-    <fieldset id="fams"><legend>Subjects</legend><div class="row"><button data-all="fams">All</button><button data-none="fams">None</button><label style="margin-left:auto"><input type="checkbox" id="outline"> outlines</label></div></fieldset>
+    <fieldset id="fams"><legend>Subjects</legend><div class="row"><button data-all="fams">All</button><button data-none="fams">None</button><label style="margin-left:auto"><input type="checkbox" id="outline"> outlines</label></div><div id="famsList"></div></fieldset>
     <fieldset id="stages"><legend>Stages (layers)</legend><div class="row"><button data-all="stages">All</button><button data-none="stages">None</button></div></fieldset>
     <div class="kicker">View settings</div>
     <fieldset id="stackCtl"><legend>Layers in 3D</legend>
       <div class="slider"><span>Tilt</span><input id="tilt" type="range" min="-180" max="180" value="55"><span></span></div>
       <div class="slider"><span>Turn</span><input id="turn" type="range" min="-180" max="180" value="-28"><span></span></div>
       <div class="slider"><span>Spin</span><input id="spin" type="range" min="-180" max="180" value="0"><span></span></div>
-      <div class="slider"><span>Spacing</span><input id="gap" type="range" min="0" max="160" value="70"><span></span></div>
-      <div class="slider"><span>Fan out</span><input id="fan" type="range" min="0" max="200" value="90"><span></span></div>
-      <div class="slider"><span>Zoom</span><input id="zoom" type="range" min="20" max="200" value="70"><span></span></div>
+      <div class="slider"><span>Spacing</span><input id="gap" type="range" min="0" max="160" value="90"><span></span></div>
+      <div class="slider"><span>Fan out</span><input id="fan" type="range" min="0" max="200" value="110"><span></span></div>
+      <div class="slider"><span>Zoom</span><input id="zoom" type="range" min="20" max="200" value="62"><span></span></div>
       <div class="slider"><span>Ink weight</span><input id="inkw" type="range" min="1" max="6" step="0.5" value="2.5"><span></span></div>
       <input type="radio" name="by" value="stage" checked hidden>      <label><input type="checkbox" id="showPaper" checked> finished sheet in front</label>
       <label><input type="checkbox" id="tags" checked> labels</label>
@@ -154,13 +155,13 @@ nav{padding:12px 24px;font:14px system-ui}nav a{color:inherit}#stackInner{will-c
   <section>
     <div class="tabs"><span class="tl">View</span><button data-view="build">Painting</button><button data-view="stack" data-mode="3d" class="on">Layers in 3D</button><button data-view="stack" data-mode="2d">Layers side by side</button><button data-view="truth">Real frames</button><span class="sep"></span><button id="fullBtn">Full page</button></div>
     <div id="timeline"><span class="tl">When</span><div id="transport"><button id="tFirst" aria-label="Start" title="Start"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4v16 M19 5l-9 7 9 7z"/></svg></button><button id="tBack" aria-label="Step back" title="Step back"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 5l-9 7 9 7z"/></svg></button><button id="playBtn" aria-label="Play" title="Play"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5l10 7-10 7z"/></svg></button><button id="tFwd" aria-label="Step forward" title="Step forward"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5l9 7-9 7z"/></svg></button><button id="tLast" aria-label="End" title="End"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 4v16 M5 5l9 7-9 7z"/></svg></button></div>
-      <div id="playLbl"><span id="stageName">Finished</span><span id="frameName">frame 36 of 36</span></div>
-      <div id="tTrack"><div id="tBands" aria-hidden="true"></div><input id="tSlider" aria-label="Painting frame" type="range" min="0" max="36" value="36"><div id="tTicks"></div><div id="tTooltip" role="tooltip" hidden></div></div></div>
+      <div id="playLbl"><span id="stageName">Finished</span><span id="frameName">frame 13 of 13</span></div>
+      <div id="tTrack"><div id="tBands" aria-hidden="true"></div><input id="tSlider" aria-label="Painting frame" type="range" min="0" max="13" value="13"><div id="tTicks"></div><div id="tTooltip" role="tooltip" hidden></div></div></div>
         <div id="subjList"><div class="kicker">Show</div><b>Subjects</b><div class="note">Tick to show. ▶ plays one subject through every layer.</div><div id="subjs"></div><div class="row"><button id="playAll">▶ Play selected</button><button id="allSubj">All</button></div></div>
 
     <div id="vBuild" class="stage-wrap" hidden><canvas class="sheet" id="cv"></canvas></div>
     <div id="vStack"><div id="stack"><div id="stackInner"></div></div><div id="spread"></div></div>
-    <div id="vTruth" hidden><canvas class="sheet" id="tv"></canvas><input id="scrub" type="range" min="0" max="36" value="36"><div class="note" id="tlabel"></div></div>
+    <div id="vTruth" hidden><canvas class="sheet" id="tv"></canvas><input id="scrub" type="range" min="0" max="13" value="13"><div class="note" id="tlabel"></div></div>
   </section>
 </main>
 <script>
@@ -172,18 +173,19 @@ let truthFrames=[];
 let bank=null,bankKey=null,requestedKey=null,rasterWorker;
 const bankIdentity=()=>JSON.stringify([[...sel.fams].sort(),[...sel.stages].sort(),+inkw.value,document.getElementById('outline').checked]);
 function prepareBank(){
- const key=bankIdentity();if(key===bankKey)return true;if(key===requestedKey)return false;
+ const key=bankIdentity();if(key===bankKey){requestedKey=null;document.body.dataset.rasterizing='false';return true;}if(key===requestedKey)return false;
  requestedKey=key;document.body.dataset.rasterizing='true';
  rasterWorker.postMessage({key,fams:[...sel.fams],stages:[...sel.stages],gain:+inkw.value,outline:document.getElementById('outline').checked,colors:FAM_COL});return false;
 }
 async function init(){
  window.tilt=document.getElementById('tilt');window.turn=document.getElementById('turn');window.gap=document.getElementById('gap');window.inkw=document.getElementById('inkw');
- meta=await(await fetch('data/meta.json')).json();({w:W,h:H}=meta);N=W*H;STAGES=meta.stages;MAX_FRAME=meta.frames.length-1;upto=MAX_FRAME;
+ const ver='?v=051-rosewalk-2';
+ meta=await(await fetch('data/meta.json'+ver)).json();({w:W,h:H}=meta);N=W*H;STAGES=meta.stages;MAX_FRAME=meta.frames.length-1;upto=MAX_FRAME;
  const sub=document.getElementById('subtitle');if(sub&&meta.title)sub.textContent=`${meta.title}. Saved painting stages and ${meta.subjects.length} named forms.`;
  const si=document.getElementById('stackInner');if(si&&W&&H){const bw=innerWidth<=820?330:760;si.style.width=bw+'px';si.style.height=Math.round(bw*H/W)+'px';}
  meta.families=meta.subjects;sel.stages=new Set(STAGES.map(s=>s.key));meta.families.forEach((_,i)=>sel.fams.add(i+1));
  for(const id of ['tSlider','scrub']){document.getElementById(id).max=MAX_FRAME;document.getElementById(id).value=MAX_FRAME;}
- rasterWorker=new Worker('raster-worker.mjs',{type:'module'});
+ rasterWorker=new Worker('raster-worker.mjs'+ver,{type:'module'});
  const loaded=new Promise((resolve,reject)=>{rasterWorker.onmessage=({data:d})=>{
   if(d.kind==='error'){reject(Error(d.message));return;}
   if(d.kind==='loaded'){prepareBank();return;}
@@ -192,15 +194,16 @@ async function init(){
    if(bank)for(const b of [...bank.composites,...Object.values(bank.layers)])b.close();bank=d;bankKey=d.key;requestedKey=null;document.body.dataset.rasterizing='false';redraw();resolve();
   }
  };rasterWorker.onerror=e=>reject(Error(e.message));});
- rasterWorker.postMessage({kind:'init',meta:{...meta,frames:meta.frames.map(f=>new URL(f,location.href).href),labels:new URL(meta.labels,location.href).href}});
- truthFrames=await Promise.all(meta.frames.map(async f=>createImageBitmap(await(await fetch(f)).blob())));buildControls();await loaded;
+ const bust=f=>new URL(f+ver,location.href).href;
+ rasterWorker.postMessage({kind:'init',meta:{...meta,frames:meta.frames.map(bust),labels:bust(meta.labels)}});
+ truthFrames=await Promise.all(meta.frames.map(async f=>createImageBitmap(await(await fetch(f+ver)).blob())));buildControls();await loaded;
 }
 function copyBitmap(canvas,source){if(!source||canvas._source===source)return;canvas._source=source;if(canvas.width!==W)canvas.width=W;if(canvas.height!==H)canvas.height=H;const c=canvas.getContext('2d');c.clearRect(0,0,W,H);c.drawImage(source,0,0);}
 function stageBitmap(s){return bank.layers[upto<s.frames[0]?'blank':`${s.key}:${Math.min(upto,s.frames[1])}`]??bank.layers.blank;}
 function buildControls() {
   const st = document.getElementById('stages');
   STAGES.forEach(s => { const l = document.createElement('label'); l.innerHTML = `<input type="checkbox" data-st="${s.key}" checked> ${s.label} <small>frames ${s.frames[0]}${s.frames[1]!==s.frames[0]?'–'+s.frames[1]:''}</small>`; st.appendChild(l); });
-  const fm = document.getElementById('fams');
+  const fm = document.getElementById('famsList');
   meta.families.map((n, i) => [i+1, n]).forEach(([v, n]) => { const row = document.createElement('div'); row.className = 'subject-row'; row.innerHTML = `<label><input type="checkbox" data-fam="${v}" checked> <span class="sw" style="background:${FAM_COL[v]}"></span> ${n}</label><button class="subject-play" aria-label="Play ${n}" title="Play ${n}">${playIcon(false)}</button>`; row.querySelector('button').onclick = () => playSubject(v); fm.appendChild(row); });
   document.querySelectorAll('[data-st]').forEach(c => c.onchange = () => { c.checked ? sel.stages.add(c.dataset.st) : sel.stages.delete(c.dataset.st); redraw(); });
   document.querySelectorAll('[data-fam]').forEach(c => c.onchange = () => { const v = +c.dataset.fam; c.checked ? sel.fams.add(v) : sel.fams.delete(v); buildSubjList(); redraw(); });
@@ -305,7 +308,7 @@ function wireMouse() {
   st.addEventListener('contextmenu', e => e.preventDefault());
   st.addEventListener('pointerup', end); st.addEventListener('pointercancel', end);
   st.addEventListener('wheel', e => { e.preventDefault(); if (e.shiftKey) { setVal('gap', +gap.value - (e.deltaY || e.deltaX) * 0.15); setVal('fan', +document.getElementById('fan').value - (e.deltaY || e.deltaX) * 0.15); } else setVal('zoom', +document.getElementById('zoom').value - e.deltaY * 0.08); updateStack(); }, { passive: false });
-  st.addEventListener('dblclick', () => { setVal('tilt', 55); setVal('turn', -28); setVal('spin', 0); setVal('gap', innerWidth <= 820 ? 30 : 70); setVal('fan', innerWidth <= 820 ? 20 : 90); setVal('zoom', Math.max(20, Math.min(70, Math.round(st.clientHeight / (innerWidth <= 820 ? 6.5 : 16)), Math.round(st.clientWidth / (innerWidth <= 820 ? 6.5 : 18))))); pan = { x: 0, y: 0 }; updateStack(); });
+  st.addEventListener('dblclick', () => { setVal('tilt', 55); setVal('turn', -28); setVal('spin', 0); setVal('gap', innerWidth <= 820 ? 34 : 90); setVal('fan', innerWidth <= 820 ? 24 : 110); setVal('zoom', Math.max(30, Math.min(72, Math.round(st.clientHeight / (innerWidth <= 820 ? 6.5 : 11)), Math.round(st.clientWidth / (innerWidth <= 820 ? 6.5 : 15))))); pan = { x: 0, y: 0 }; updateStack(); });
   document.getElementById('copyView').onclick = () => { const v = { tilt: +tilt.value, turn: +turn.value, spin: +document.getElementById('spin').value, gap: +gap.value, fan: +document.getElementById('fan').value, zoom: +document.getElementById('zoom').value, inkw: +inkw.value, pan, by: document.querySelector('input[name=by]:checked').value, stages: [...sel.stages], subjects: [...sel.fams] }; navigator.clipboard?.writeText(JSON.stringify(v)); document.getElementById('copyView').textContent = 'Copied'; setTimeout(() => document.getElementById('copyView').textContent = 'Copy view settings', 1200); };
 }
 function curView() { return document.querySelector('[data-view].on')?.dataset.view; }
@@ -387,9 +390,9 @@ init().then(() => { wireMouse(); buildSubjList(); buildTicks(); document.getElem
   document.getElementById('tSlider').oninput = e => queueGoTo(+e.target.value);
   addEventListener('keydown', e => { if (e.target.tagName === 'INPUT' && e.target.type !== 'range') return; if (e.key === ' ') { e.preventDefault(); play(); } if (e.key === 'ArrowRight') { e.preventDefault(); goTo(upto + 1); } if (e.key === 'ArrowLeft') { e.preventDefault(); goTo(upto - 1); } });
   const initialStack = document.getElementById('stack');
-  if (innerWidth <= 820) { setVal('gap', 30); setVal('fan', 20); }
-  const zoomDivisor = innerWidth <= 820 ? 6.5 : 16;
-  setVal('zoom', Math.max(20, Math.min(70, Math.round(initialStack.clientHeight / zoomDivisor), Math.round(initialStack.clientWidth / (innerWidth <= 820 ? 6.5 : 18)))));
+  if (innerWidth <= 820) { setVal('gap', 34); setVal('fan', 24); }
+  const zoomDivisor = innerWidth <= 820 ? 6.5 : 11;
+  setVal('zoom', Math.max(30, Math.min(72, Math.round(initialStack.clientHeight / zoomDivisor), Math.round(initialStack.clientWidth / (innerWidth <= 820 ? 6.5 : 15)))));
   redraw();
   document.getElementById('playAll').onclick = () => { if (playing) play(); play(); };
   document.getElementById('allSubj').onclick = () => { meta.families.forEach((_, k) => setFam(k + 1, true)); buildSubjList(); redraw(); };

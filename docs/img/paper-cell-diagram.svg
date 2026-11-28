@@ -1,0 +1,86 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 920 420" width="920" height="420" role="img" aria-label="Cross-section of a cold-press paper cell and brush tuft in Unpainting 0.5">
+  <defs>
+    <pattern id="pores" width="16" height="16" patternUnits="userSpaceOnUse" patternTransform="rotate(35)">
+      <rect width="16" height="16" fill="#ede1cc"/>
+      <line x1="0" y1="0" x2="0" y2="16" stroke="#dfcda9" stroke-width="6"/>
+    </pattern>
+    <marker id="arr" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 1 2 L 8 5 L 1 8 z" fill="#99543a"/>
+    </marker>
+    <marker id="arrB" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 1 2 L 8 5 L 1 8 z" fill="#4f7c8a"/>
+    </marker>
+  </defs>
+  <rect width="920" height="420" rx="6" fill="#f6f2ea" stroke="#d6cebf"/>
+  <text x="28" y="34" font-family="Georgia, serif" font-size="19" font-weight="600" fill="#2b2a27">Inside one sheet cell: brush, water, pigment, and cold-press paper</text>
+  <text x="28" y="54" font-family="-apple-system, Helvetica, Arial, sans-serif" font-size="12.5" fill="#6d6559">Every cell tracks surface water (W), suspended pigment (G), settled deposit (D), pore water (s), and absorbed stain (P).</text>
+
+  <!-- Left cross-section frame -->
+  <g transform="translate(28, 72)">
+    <!-- Air zone -->
+    <rect x="0" y="0" width="520" height="62" fill="#fbf9f3" stroke="#d6cebf"/>
+    <text x="14" y="24" font-family="Georgia, serif" font-size="13.5" font-weight="600" fill="#2b2a27">Air &amp; Bristle Tuft</text>
+    <text x="14" y="42" font-family="-apple-system, Helvetica, Arial, sans-serif" font-size="11.5" fill="#6d6559">Faster evaporation at wash rim pulls pigment outward (edge darkening)</text>
+    <!-- Evaporation arrows -->
+    <line x1="415" y1="54" x2="415" y2="18" stroke="#4f7c8a" stroke-width="1.6" stroke-dasharray="3,2" marker-end="url(#arrB)"/>
+    <line x1="450" y1="54" x2="450" y2="12" stroke="#4f7c8a" stroke-width="2" stroke-dasharray="3,2" marker-end="url(#arrB)"/>
+    <line x1="485" y1="54" x2="485" y2="18" stroke="#4f7c8a" stroke-width="1.6" stroke-dasharray="3,2" marker-end="url(#arrB)"/>
+    <text x="450" y="58" text-anchor="middle" font-family="ui-monospace, monospace" font-size="10" fill="#4f7c8a">evap ↑</text>
+
+    <!-- Surface water film W + G -->
+    <rect x="0" y="62" width="520" height="66" fill="#dcebf0" stroke="#6896a4" stroke-width="1.5"/>
+    <text x="14" y="85" font-family="Georgia, serif" font-size="13.5" font-weight="600" fill="#203b44">Surface film · W + G</text>
+    <text x="14" y="103" font-family="-apple-system, Helvetica, Arial, sans-serif" font-size="11.5" fill="#2f525d">Free water (W) carries suspended pigment (G) laterally across the sheet</text>
+    <text x="14" y="119" font-family="-apple-system, Helvetica, Arial, sans-serif" font-size="11.5" fill="#2f525d">→ wet-in-wet mixing, blooms / backruns, and edge flow</text>
+    <!-- Lateral flow arrows & floating pigment dots -->
+    <line x1="408" y1="88" x2="496" y2="88" stroke="#4f7c8a" stroke-width="2" marker-end="url(#arrB)"/>
+    <circle cx="425" cy="98" r="3.5" fill="#99543a"/>
+    <circle cx="445" cy="105" r="2.8" fill="#526f8f"/>
+    <circle cx="470" cy="96" r="3.5" fill="#99543a"/>
+    <circle cx="492" cy="106" r="4" fill="#7a3e28"/>
+
+    <!-- Cold-press wavy relief + deposit D -->
+    <path d="M 0 128 Q 40 116 80 128 T 160 128 T 240 128 T 320 128 T 400 128 T 480 128 L 520 128 L 520 186 L 0 186 Z" fill="#cfa79b" stroke="#99543a" stroke-width="1.3"/>
+    <text x="14" y="152" font-family="Georgia, serif" font-size="13.5" font-weight="600" fill="#2d1f1b">Paper surface &amp; deposit · D</text>
+    <text x="14" y="170" font-family="-apple-system, Helvetica, Arial, sans-serif" font-size="11.5" fill="#3e2c26">Heavy grains settle into paper valleys (granulation); dry brush hits only crests</text>
+    <!-- Settling granules -->
+    <circle cx="440" cy="136" r="2.5" fill="#4b352e"/>
+    <circle cx="447" cy="139" r="2.2" fill="#4b352e"/>
+    <circle cx="454" cy="136" r="2.5" fill="#4b352e"/>
+
+    <!-- Paper pores s + P -->
+    <rect x="0" y="186" width="520" height="72" fill="url(#pores)" stroke="#c2b296"/>
+    <text x="14" y="210" font-family="Georgia, serif" font-size="13.5" font-weight="600" fill="#2b2a27">Paper pores · s + P</text>
+    <text x="14" y="228" font-family="-apple-system, Helvetica, Arial, sans-serif" font-size="11.5" fill="#584f42">Capillary water (s) wicks through fibre throats; staining pigment (P) locks in</text>
+    <text x="14" y="245" font-family="-apple-system, Helvetica, Arial, sans-serif" font-size="11.5" fill="#584f42">Sizing resists wicking on dry paper so strokes hold crisp boundaries</text>
+
+    <!-- Fixed dried glaze layers -->
+    <rect x="0" y="258" width="520" height="60" fill="#e8dcc6" stroke="#b9a585"/>
+    <text x="14" y="281" font-family="Georgia, serif" font-size="13.5" font-weight="600" fill="#2b2a27">Fixed dry layers (Kubelka–Munk glazes)</text>
+    <text x="14" y="299" font-family="-apple-system, Helvetica, Arial, sans-serif" font-size="11.5" fill="#584f42">Each dried wash fixes as a translucent optical layer; next wash glazes over it</text>
+  </g>
+
+  <!-- Right callout cards: 3 paper wetness states -->
+  <g transform="translate(572, 72)">
+    <rect x="0" y="0" width="320" height="96" rx="4" fill="#fbf8f2" stroke="#d6cebf"/>
+    <rect x="0" y="0" width="5" height="96" rx="2" fill="#99543a"/>
+    <text x="16" y="24" font-family="Georgia, serif" font-size="14.5" font-weight="600" fill="#2b2a27">1. Wet on dry paper</text>
+    <text x="16" y="44" font-family="-apple-system, Helvetica, Arial, sans-serif" font-size="12" fill="#584f42">Sized dry fibres hold the bead in place.</text>
+    <text x="16" y="61" font-family="-apple-system, Helvetica, Arial, sans-serif" font-size="12" fill="#584f42">Dries with a crisp edge (<tspan font-family="ui-monospace, monospace" fill="#99543a">edges: found</tspan>).</text>
+    <text x="16" y="79" font-family="-apple-system, Helvetica, Arial, sans-serif" font-size="12" fill="#584f42">Low water load catches crests → dry brush.</text>
+
+    <rect x="0" y="111" width="320" height="96" rx="4" fill="#fbf8f2" stroke="#d6cebf"/>
+    <rect x="0" y="111" width="5" height="96" rx="2" fill="#6896a4"/>
+    <text x="16" y="135" font-family="Georgia, serif" font-size="14.5" font-weight="600" fill="#2b2a27">2. Wet into wet</text>
+    <text x="16" y="155" font-family="-apple-system, Helvetica, Arial, sans-serif" font-size="12" fill="#584f42">Clean water pre-wets the zone (or <tspan font-family="ui-monospace, monospace" fill="#99543a">into</tspan>).</text>
+    <text x="16" y="172" font-family="-apple-system, Helvetica, Arial, sans-serif" font-size="12" fill="#584f42">Pigment diffuses freely into soft gradients</text>
+    <text x="16" y="189" font-family="-apple-system, Helvetica, Arial, sans-serif" font-size="12" fill="#584f42">and blends on the paper, not in the dish.</text>
+
+    <rect x="0" y="222" width="320" height="96" rx="4" fill="#fbf8f2" stroke="#d6cebf"/>
+    <rect x="0" y="222" width="5" height="96" rx="2" fill="#6f8759"/>
+    <text x="16" y="246" font-family="Georgia, serif" font-size="14.5" font-weight="600" fill="#2b2a27">3. Damp edge &amp; drying wait</text>
+    <text x="16" y="266" font-family="-apple-system, Helvetica, Arial, sans-serif" font-size="12" fill="#584f42">Clean damp brush softens rims (<tspan font-family="ui-monospace, monospace" fill="#99543a">lost</tspan>).</text>
+    <text x="16" y="283" font-family="-apple-system, Helvetica, Arial, sans-serif" font-size="12" fill="#584f42">No fake timer: GPU measures real water</text>
+    <text x="16" y="300" font-family="-apple-system, Helvetica, Arial, sans-serif" font-size="12" fill="#584f42">in W and s until dry enough to glaze.</text>
+  </g>
+</svg>

@@ -17,8 +17,7 @@
     "data/f0010.webp",
     "data/f0011.webp",
     "data/f0012.webp",
-    "data/f0013.webp",
-    "data/f0014.webp"
+    "data/f0013.webp"
   ],
   "labels": "data/subjects.png",
   "subjects": [
@@ -36,8 +35,6 @@
     "left garden bed",
     "right garden bed",
     "paved path",
-    "tree shadow on wall",
-    "path shadow",
     "left stone wall",
     "right stone wall",
     "wall lamp left",
@@ -69,7 +66,7 @@
     {
       "key": "paint-1-7",
       "group": "paint-1",
-      "label": "Building color",
+      "label": "Windows & shadow",
       "frames": [
         7,
         9
@@ -78,19 +75,10 @@
     {
       "key": "paint-2-10",
       "group": "paint-2",
-      "label": "Final washes",
+      "label": "Foliage & final washes",
       "frames": [
         10,
         13
-      ]
-    },
-    {
-      "key": "finished-14",
-      "group": "finished",
-      "label": "Finished sheet",
-      "frames": [
-        14,
-        14
       ]
     }
   ],
@@ -199,12 +187,6 @@
         "savedFrame": 217,
         "stage": "paint",
         "value": 5,
-        "sha256": "acb9538448b9f3ef0f858c503918affcdaccd3d9b661cfc77db377d9a196aaf8"
-      },
-      {
-        "savedFrame": 218,
-        "stage": "finished",
-        "value": null,
         "sha256": "acb9538448b9f3ef0f858c503918affcdaccd3d9b661cfc77db377d9a196aaf8"
       }
     ]
