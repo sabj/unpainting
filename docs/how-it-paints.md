@@ -6,7 +6,14 @@ Auto plans its washes from flat colour studies and a traced drawing; a model sta
 
 ## The 0.5.1 pipeline
 
-![Unpainting 0.5.1 pipeline from block-in studies and SAM forms through WebGPU brushwork to open2 judging](img/pipeline-map.png)
+![Unpainting 0.5.1 summary flow from block-in studies and SAM forms through WebGPU brushwork to open2 judging](img/pipeline-summary.webp)
+
+<details>
+<summary>Full 4-stage pipeline diagram</summary>
+
+![Full 4-stage Unpainting 0.5.1 pipeline diagram](img/pipeline-map.png)
+
+</details>
 
 ## Paper, water, and brush physics
 

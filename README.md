@@ -35,9 +35,9 @@ Try the [quick start](#try-it), paint by hand in [Paint Lab](https://sabj.github
 
 Auto, the built-in painter, works from a line drawing and simplified colour studies. An image model makes the studies, from broad shapes to fine detail. Code traces the drawing and orders the lines. Auto draws them, then builds up thin washes from light to dark. A model can also write its own script and start on blank paper.
 
-<p align="center"><a href="docs/how-it-paints.md"><img src="docs/img/pipeline-map.png" alt="The 0.5 painting pipeline on Yale Rosewalk: block-in studies and SAM named forms, cold-press paper and ordered ink lay-in, WebGPU wet-in-wet painting stages, and side-by-side open2 judging"></a></p>
+<p align="center"><a href="docs/how-it-paints.md"><img src="docs/img/pipeline-summary.webp" width="900" alt="Unpainting 0.5.1 summary flow on Yale Rosewalk: 01 Plan (block-in studies and SAM forms), 02 Ink and Paper (cold-press paper and ordered contours), 03 Paint on WebGPU (wet-in-wet, drying, glazes), and 04 open2 judging"></a></p>
 
-While a painting runs, a guard stops the code from reading the target's pixels: [how it paints](docs/how-it-paints.md), [the guard](docs/honesty.md).
+Deep dives: [how it paints](docs/how-it-paints.md) · [ink & studies](docs/ink.md) · [target guard](docs/honesty.md) · [judging & scoring](bench/docs/scoring.md).
 
 <p align="center"><img src="docs/img/cheat-white-ships.webp" width="912" alt="Sargent's White Ships four times: the target; cheat #1, a hill-climber that keeps random dabs only when they match the photo better; cheat #2, strokes replayed with paint sampled from the photo's pixels; and Fair Mode (0.5), building up stroke by stroke with zero target pixel reads."></p>
 
