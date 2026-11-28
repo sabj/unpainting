@@ -35,13 +35,11 @@ Try the [quick start](#try-it), paint by hand in [Paint Lab](https://sabj.github
 
 Auto, the built-in painter, works from a line drawing and simplified colour studies. An image model makes the studies, from broad shapes to fine detail. Code traces the drawing and orders the lines. Auto draws them, then builds up thin washes from light to dark. A model can also write its own script and start on blank paper.
 
-<p align="center"><a href="docs/how-it-paints.md"><img src="docs/img/pipeline-map.png" alt="The painting pipeline: plan, prepare the sheet, paint, review. Cards 1, 3 and 4 show the Part 1 beach study; card 2 shows a White Ships run with a pencil drawing"></a></p>
+<p align="center"><a href="docs/how-it-paints.md"><img src="docs/img/pipeline-map.png" alt="The 0.5 painting pipeline on Yale Rosewalk: block-in studies and SAM named forms, cold-press paper and ordered ink lay-in, WebGPU wet-in-wet painting stages, and side-by-side open2 judging"></a></p>
 
 While a painting runs, a guard stops the code from reading the target's pixels: [how it paints](docs/how-it-paints.md), [the guard](docs/honesty.md).
 
-<p align="center"><img src="docs/img/cheat-white-ships.webp" width="912" alt="Sargent's White Ships four times: the target; cheat #1, a hill-climber that keeps random dabs only when they match the photo better; cheat #2, the painter's own strokes replayed with their paint taken from the photo's pixels, with an inset heat map of where it read the photo; and the painter's run building up stroke by stroke."></p>
-
-The four-panel White Ships clip is the original guard demonstration.
+<p align="center"><img src="docs/img/cheat-white-ships.webp" width="912" alt="Sargent's White Ships four times: the target; cheat #1, a hill-climber that keeps random dabs only when they match the photo better; cheat #2, strokes replayed with paint sampled from the photo's pixels; and Fair Mode (0.5), building up stroke by stroke with zero target pixel reads."></p>
 
 ## Try it
 
@@ -74,36 +72,26 @@ npm run unpaint -- benchmark --out work/bench-05 --set core   # lists every sess
 npm run unpaint -- status work/bench-05                       # progress of the runs
 ```
 
-## How long it takes
-
-Auto took about 2–7½ minutes per picture on Apple Silicon GPUs. On an M5 Max MacBook Pro, Auto painted Turner’s fort in 2m 13s, Yale Rosewalk in 4m 14s and Mittens in 7m 06s. Those are painting times from the `e0276330` run cards. Preparing the studies and waiting for a model to write a script take extra time.
-
-The bundled examples are ready to paint. To add your own, an open image model (Qwen-Image-Edit, run locally) first makes a few studies of it: a pencil lay-in and three simplified colour versions. The painter and the models plan from those. See [preparing a picture](tools/prepare/README.md).
-
 ## Benchmark
 
-[unpaint-bench](bench/README.md) gives models the simulator's brush and pen. Auto paints each picture too. The clean 0.5.1 benchmark is running.
+[unpaint-bench](bench/README.md) hands AI models the simulator's brush and pen across **15 pictures** (5 Core at `L1–L4`, 10 Extended at `L2`; [credits](bench/PICTURES.md)). Models can look at the target, never read its pixels, and are graded by two open-weight vision judges (`open2`: **Qwen 3.8 27B + Gemma 4 31B**, identical locally on Apple Silicon MLX or via OpenRouter) on craft vs Auto 0.5 and human-ness across ten progress frames (`Q × min(1, H / 65)`).
 
-There are fifteen pictures, twelve from museums and three made with an image generator. The five core pictures get all four levels. The other ten get Auto and L2. [Picture credits](bench/PICTURES.md).
+| Level | Inputs given to the model | Mode |
+|---|---|---|
+| **L1** | Source picture + script format | Fixed rounds |
+| **L2** | L1 + three colour block-in studies | Fixed rounds |
+| **L3** | L2 + opt-in drawing, named forms, traced shapes, Auto plan | Fixed rounds |
+| **L4** | Same inputs as L3 | Isolated shell (`python3` + `./unpaint`) |
 
-- **L1** starts with the picture, the script format and painting tips. The sheet is blank.
-- **L2** adds three colour studies. The model can sketch its own lines or go straight to paint.
-- **L3** adds a prepared drawing, named forms, traced shapes, and Auto’s plan and finished painting. The drawing stays off until the model asks for it.
-- **L4** gives the same material in an isolated shell with Python and `./unpaint`. The model’s 60-minute clock pauses while it waits for the GPU.
+<p align="center"><a href="docs/what-the-model-gets.md"><img src="docs/img/auto-vs-model-inputs.webp" width="900" alt="The four pictures a model sees at L2 (Mittens and three colour studies), followed by its finished painting"></a></p>
 
-Each level starts fresh with a 60-minute budget. The model hands in its own script and has 3.0 units to spend on test paintings. It can look at the picture. Its code cannot read the pixels, and it gets no scores along the way.
+<p align="center"><a href="bench/README.md"><img src="docs/img/bench-chart.svg" width="920" alt="Unpainting 0.5.1 overall benchmark ranking: All 15 pictures at L2 and Core 5 across autonomy levels L1 to L4"></a></p>
 
-Three open-weight judges (`open3v2`) grade the finished watercolour beside the original, which sets the craft standard at 9/10. They judge how human the process looks from ten stills. Below 65% human-ness, the craft score takes a proportional cut. At 65% and up, craft alone sets the score.
+<p align="center"><a href="bench/README.md"><img src="docs/img/bench-pareto.svg" width="920" alt="Unpainting 0.5.1 cost versus quality Pareto frontier on Core 5 (model API cost per painting, log scale)"></a></p>
 
-<p align="center"><a href="docs/what-the-model-gets.md"><img src="docs/img/auto-vs-model-inputs.webp" width="900" alt="The four pictures Opus saw at L2 (Mittens and three colour studies), followed by its finished painting"></a></p>
+<p align="center"><a href="bench/README.md"><img src="docs/img/benchmark-overview.webp" width="1200" alt="Two rows of 0.5.1 paintings. Top: each model's best Core 5 painting, sorted by open2 score. Bottom: Sargent's White Ships target, Auto 0.5 baseline, and each model's best 0.5.1 run."></a></p>
 
-[What the model gets](docs/what-the-model-gets.md), [script format](docs/painting-script.md), [rules](bench/docs/rules.md), [scoring](bench/docs/scoring.md), [changelog](CHANGELOG.md).
-
-Rounds V1 to V5 are kept as a record: [leaderboard](bench/results/leaderboard.md), [gallery](bench/results/gallery.md), [findings](bench/results/FINDINGS.md). Tag `v0.3.2` replays V4 and V5.
-
-<p align="center"><a href="bench/results/leaderboard.md"><img src="docs/img/bench-chart.svg" width="800" alt="Mean score per model and round as a percentage of each target's own score, with 95% intervals"></a></p>
-
-<p align="center"><a href="bench/results/gallery.md"><img src="docs/img/benchmark-overview.webp" width="1200" alt="Two rows of paintings. Top: each model's best painting from any round, sorted by score, with the five targets at left. Bottom: each model's best Ships painting from V1 to V3, with the Ships target at left."></a></p>
+Full tables, findings, and setup: [unpaint-bench](bench/README.md) · [what the model gets](docs/what-the-model-gets.md) · [rules](bench/docs/rules.md) · [scoring](bench/docs/scoring.md) · [changelog](CHANGELOG.md). Older V1–V5 rounds: [leaderboard](bench/results/leaderboard.md), [gallery](bench/results/gallery.md) (tag `v0.3.2`).
 
 ## References and license
 

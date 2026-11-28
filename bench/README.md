@@ -4,6 +4,23 @@ AI models paint a picture with the simulator's brush and pen. Judges score how h
 
 The clean 0.5.1 benchmark is scored on the local-first `open2` panel (**Qwen 3.8 27B + Gemma 4 31B** — the exact same two open-weight judges run locally on Apple Silicon MLX at `$0` or via OpenRouter). Core 5 (`180` sessions across `L1–L4`), Extended 10 `L2` (`70` sessions), and Effort tiers (`40` sessions) are complete.
 
+<p align="center"><img src="../docs/img/bench-chart.svg" width="900" alt="0.5.1 overall benchmark ranking"></p>
+<p align="center"><img src="../docs/img/bench-pareto.svg" width="900" alt="0.5.1 cost vs quality Pareto frontier"></p>
+
+### All 15 pictures · `L2` (`open2`, Core 5 + Extended 10 including Yale Rosewalk)
+
+Auto 0.5 baseline across all 15 pictures: **`59.2%`** (`Q = 63.7%`, `H = 72.6%`).
+
+| Model | Pictures | Combined | Craft `Q` | Human-ness `H` | Mean API Cost |
+|---|---:|---:|---:|---:|---:|
+| **Codex Astra 6.2 · med** | 15/15 | **53.3%** | 54.9% | 74.3% | $1.26 |
+| **Codex Sol 6.1 · med** | 15/15 | **51.2%** | 52.0% | 76.9% | $0.40 |
+| **Gemini 4 Carbon · med** | 15/15 | **49.9%** | 51.1% | 82.1% | $2.06 |
+| **Gemini 4 Neon · med** | 15/15 | **45.4%** | 46.5% | 76.8% | $1.62 |
+| **Gemini 4 Argon · med** | 15/15 | **44.1%** | 44.7% | 74.3% | $1.08 |
+| **Codex Terra 6.1 · med** | 15/15 | **41.7%** | 44.2% | 72.8% | $0.09 |
+| **Muse Wonder Full · med** | 15/15 | **32.6%** | 34.2% | 70.6% | $0.89 |
+
 ### Core 5 results (`open2`, Combined `Q × min(1, H / 65)`)
 
 Auto 0.5 baseline on Core 5: **`60.1%`** (`Q = 62.7%`, `H = 76.6%`).
