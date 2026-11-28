@@ -6,6 +6,8 @@ The clean 0.5.1 benchmark is scored on the local-first `open2` panel (**Qwen 3.8
 
 <p align="center"><img src="../docs/img/bench-chart.svg" width="900" alt="0.5.1 overall benchmark ranking"></p>
 <p align="center"><img src="../docs/img/bench-pareto.svg" width="900" alt="0.5.1 cost vs quality Pareto frontier"></p>
+<p align="center"><img src="../docs/img/judging-rubric.svg" width="900" alt="How 0.5.1 open2 judging works"></p>
+<p align="center"><img src="../docs/img/difficulty-scoring.svg" width="900" alt="Subject difficulty spread and L4b open-book pixel-error control"></p>
 
 ### All 15 pictures · `L2` (`open2`, Core 5 + Extended 10 including Yale Rosewalk)
 

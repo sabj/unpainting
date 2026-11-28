@@ -1,38 +1,39 @@
-# Ink
+# Ink & Line Drawing
 
-Pen and wash pairs an ink drawing with washes over or under it. Each run saves the drawing and the washes as separate images (`ink.jpg`, `wash.jpg`) beside the painting.
+Pen and wash pairs a simulated dip-pen or graphite drawing with transparent washes. Every run saves the separated line layer (`ink.jpg`) and wash layer (`wash.jpg`) alongside the finished painting (`painting.png`).
 
-![Guardi and Tiepolo. Each row shows the original, Auto’s opening pen drawing, first dried washes, wash layer and finished painting](img/ink.webp)
+![How drawing decomposition works on Yale Rosewalk and Prout’s Laundresses: target, Qwen line extraction and traced paths, dip-pen lay-in, wash layer, and finished painting](img/ink-decomposition.webp)
 
-Auto 0.5 painting Guardi’s *A Colonnade* and Tiepolo’s *Bacchus and Ariadne*. Both runs use pen. The fourth column shows the washes on their own. [Picture credits](../bench/PICTURES.md#museum-works).
+## How the Qwen passes work
 
-## Ink or pencil
+Before painting begins, three automated prep passes turn a finished picture into ordered millimetre strokes (never reading the target again during painting):
 
-The default drawing is light pencil, which does not move under water (`--outlinemedium graphite`). Ink is drawn with `--outlinemedium ink` or `--inkrecipe wash`. `--outlinemedium auto` draws ink when at least 0.5% of the source is pen line, and pencil otherwise (`src/paint/methods/medium-decision.mjs`). In the benchmark the model chooses pencil, pen or no drawing.
+1. **Medium classification (`tools/seg/classify-medium.py`):** Measures how much of the picture is pen line vs. dry pencil vs. pure wash, routing it to `ink`, `pencil`, `mixed`, or `none`. Pure watercolours never get black pen outlines.
+2. **Qwen-Image-Edit 2511 extraction (`tools/prepare/studies.sh`):** Runs the 8-step Lightning model across three seeds (`42, 7, 11`) with two dedicated prompts in `tools/prepare/prompts/`:
+   - **`e6` (ink):** Redraws visible architectural and contour structure in black line on white paper — explicitly forbidding shading, hatching, sky, or cast shadows.
+   - **`l1` (pencil lay-in):** Produces a sparse, light watercolourist’s graphite underdrawing — main form outlines and essential facial/structural landmarks only.
+   - `choose_layin.py` picks the cleanest seed automatically.
+3. **Vector tracing, tagging & ordering (`trace-drawing.py`, `tag-medium.py`, `order-strokes.mjs`):** Skeletonises the extracted drawing into smooth millimetre polylines, tags regions ink vs. pencil on mixed works, and orders strokes **one SAM object at a time** so the pen finishes a window, arch, or figure before moving on.
 
-For a pencil drawing, Auto draws only the first light lines (`src/paint/methods/drawing-default.mjs`). These are the outlines, the lines that place the main shapes, the inner contours, the quarter of lines that matter most and the lines round facial features. None is darker than the first light lines. Hatching and texture marked `drop` are left for the washes. A pen drawing lays all lines.
+![Guardi and Tiepolo: original, Auto’s opening pen drawing, first dried washes, isolated wash layer, and finished painting](img/ink.webp)
 
-## Drawing files
+## Dip pen & pencil physics
 
-For Auto, the line source is a drawing file (`--drawingfile STEM`), made as in [tools/seg](../tools/seg/README.md). Without it the painter logs `!!! NO LINE` and draws nothing. The pen or pencil draws the file's lines as they are. The painter reads only how dark the target's lines are, to set how much ink the pen carries (`src/paint/methods/ink-lines-file.mjs`):
+`src/media/pen.mjs` simulates a physical dip pen (after Kim et al.; see [reading list](reading-list.md)):
 
-- `--inkdarkmatch c`: adjusts the ink on a scrap of paper until test strokes are `c` times as dark as the target's firm lines.
-- `--inkdarkcap c`: limits the ink so a test line on scrap is at most `c` times as dark as the target's.
-- `--inkwidthfloor f`: no line is thinner than `f` pixels of the target.
+- **Pressure & speed:** More pressure spreads the nib; slower strokes deposit wider, darker ink; fast strokes thin out.
+- **Ink exhaustion:** A fresh dip lays a rich bead, then thins and skips over cold-press paper crests until the pen re-dips.
+- **Wet vs. dry paper:** Waterproof `black` ink stays locked under later washes; soluble `sepia` pulls into clean water; damp paper feathers the line along paper fibres.
+- **Pencil (`graphite`):** Stays fixed under water and goes down in phases just ahead of the washes that need it.
 
-## The dip pen
+![Dip-pen lines at varying speeds, soluble ink pulled with clean water, and ink drawn over a dried wash](img/technique-inking.webp)
 
-`src/media/pen.mjs` models a dip pen after Kim et al., "[Hydrodynamics of Writing with Ink](https://doi.org/10.1103/PhysRevLett.107.264501)" (*Physical Review Letters*, 2011).
+## Common options
 
-- Contact: more pressure spreads the nib and widens the line. A fresh dip carries a drop that widens the first marks.
-- Speed: slow strokes leave more ink for each millimetre. Fast strokes thin out.
-- Running out: as the ink runs low, the line thins and skips over raised fibres. Then the pen is dipped again.
-- Paper: dry paper gives a crisp edge. Damp paper pulls ink along its fibres, so the line feathers.
-
-Ink colour is separate from the wash paints. It is `sepia` (the default, which dissolves in water) or `black` (waterproof). `--inkfast auto|1|0` sets whether the opening ink dries and sets before the washes.
-
-## Pen-and-wash recipe
-
-`--inkrecipe wash` sets the flags for pen-and-wash pictures (`src/paint/methods/ink-recipe.mjs` lists every value). Flags on the command line override it. It draws in ink before the washes and again after them (`--drawing both --stages prepink,finishink`). It matches the ink's darkness to the target's lines. It also paints on a finer sheet. `npm run example:animal` paints one.
-
-`--drawing` sets when lines run: `first` (default), `both` (the opening drawing, then closing accents over the dry washes, taken from `--drawinglast STEM` or the `finishink` stage), `last` or `none`. `--drawingonly 1` lays the drawing alone.
+| Option | What it controls |
+|---|---|
+| `--outlinemedium auto\|ink\|graphite` | Auto picks ink when ≥0.5% of the source is pen line, else faint pencil |
+| `--inkrecipe wash` | Pen-and-wash preset: opening ink (`prepink`), matched ink darkness, closing accents (`finishink`) |
+| `--drawing first\|both\|last\|none` | When lines are drawn relative to the washes (`--drawingonly 1` skips washes) |
+| `--inkfast auto\|1\|0` | Whether opening ink dries and sets before the first wash |
+| `--inkdarkmatch c` / `--inkdarkcap c` | Calibrates pen ink darkness on scrap paper against the target’s firm lines |

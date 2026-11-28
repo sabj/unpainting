@@ -75,11 +75,7 @@ An `erase` passage takes no paint or brush: `widthMm` (0.5 to 10, default 3) and
 
 At L3 and L4, a passage may name the shapes traced from the studies by number, with `shapes`, `reserve` and `{along: n}` (`tools/painter/script-resolve.mjs`).
 
-## What it cannot say
-
-- A passage with one soft side and one hard side, or water over an area larger than the paint.
-- Painting over a top-level `lights` polygon later. A passage can use `reserve` to go around a traced shape just for that passage.
-- Returning to a wash while it is wet. Only the passage just before can still be wet.
+Current script limits: each passage uses one edge style (`lost` or `found`) and wets only its own region; top-level `lights` stay reserved for the whole run (use per-passage `reserve` for temporary masks); and `into` only works into the immediately preceding passage.
 
 ## Beside the script
 

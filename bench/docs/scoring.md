@@ -1,6 +1,8 @@
 # Scoring
 
-The clean 0.5.1 benchmark is running. The scoring rules are set. Final scores are pending.
+Every 0.5.1 benchmark run is scored on the local-first **`open2`** panel (**Qwen 3.8 27B** + **Gemma 4 31B**, running identically on local Apple Silicon MLX at `$0` or on OpenRouter).
+
+![How 0.5.1 judges a painting: blind Versus-Auto craft scoring, 10-frame Human-ness gate, and anti-cheat enforcement](../../docs/img/judging-rubric.svg)
 
 ## What counts
 
@@ -41,6 +43,12 @@ The output folder holds `results.json`, `SCORES.md`, `.progress-cache.json` (whi
 ### Local Apple Silicon MLX judging ($0 API cost)
 
 On Apple Silicon running `rapid-mlx`, the same `open2` panel (`qwen3.8-27b-4bit` with `--no-spec-decode` + `gemma-4-31b-8bit`, `think=False`) runs fully offline at `$0` API cost using the same `versus-auto` craft prompt and per-snapshot `1..5` human-ness scoring. Always pass `--no-spec-decode` when serving `qwen3.8-27b-4bit` with vision inputs to avoid multimodal speculative-decode hangs.
+
+## Difficulty-adjusted scoring & why pixel error fails
+
+Subjects vary by ~20 points in average difficulty (Cézanne `55.1%` vs. Yale Rosewalk `36.4%` across the 7-model `L2` panel). Rankings always compare models on the exact same picture set (`All 15 · L2` or `Core 5 · L1–L4`); highlight galleries subtract each picture’s field mean (`Adjusted Δ = score − subject mean`) so standout work on hard scenes isn’t buried behind easy subjects.
+
+![Real 0.5.1 subject difficulty spread across all 15 pictures, difficulty-adjusted Δ wins, and the L4b open-book pixel-error control](../../docs/img/difficulty-scoring.svg)
 
 ## The summary
 
