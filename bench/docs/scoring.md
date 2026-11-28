@@ -6,7 +6,7 @@ The clean 0.5.1 benchmark is running. The scoring rules are set. Final scores ar
 
 | Score | What the judges see | How it counts |
 |---|---|---|
-| Craft quality (Q) | The original and the finished painting | The original sets the standard at 9.0/10. Judges grade the washes, light and dark, and colour, then give an overall craft mark out of 10. Q = 10 × overall. |
+| Craft quality (Q) | The original, the candidate, and Auto 0.5 | Side-by-side `versus-auto` comparison beside the original (with A/B order alternated across readings). Judges score both paintings 0–10 and pick a winner; Q = 10 × candidate score, with `diffVsAuto` and `winPct` reported alongside. |
 | Human-ness (H) | The painting film, without the original | Each of ten progress frames gets 1 to 5 for how a person would make those marks in that order. H is their mean as a percentage of 5. |
 | Combined (C) | Craft and human-ness scores | `C = Q × min(1, H / 65)`. At 65% human-ness or above, the painting keeps its craft score. Below 65%, it gets a fraction of that score. |
 | Likeness | Original and painting side by side | A separate mark from 1 to 5 for subject, composition, values and colour. A mean of 1.5 or less is flagged. |
@@ -36,7 +36,11 @@ For individual run folders, use `JUDGE_ROUTE=openrouter npm run bench:score04 --
 
 The scorer takes run folders or a manifest listing them. The launcher’s `score` command builds the manifest from finished runs and their Auto paintings. A scheduled failure stays in the table with its reason. A bad input, including a film with fewer than ten frames between the first wash and the finish, exits with code 2. An incomplete judge panel leaves the figure empty and exits with code 1.
 
-The output folder holds `results.json`, `SCORES.md` and the replies in `readings/`. Results record the panel, route, reasoning setting, frame scheme, rubric and prompts. Matching saved readings can be reused. `--fresh` reads again and `--repeat N` keeps a separate repeat.
+The output folder holds `results.json`, `SCORES.md`, `.progress-cache.json` (which caches per-film frame progress measurements and invalidates automatically if `frames.json` changes), and the replies in `readings/`. Results record the panel, route, reasoning setting, frame scheme, rubric and prompts. Matching saved readings can be reused. `--fresh` reads again and `--repeat N` keeps a separate repeat.
+
+### Local Apple Silicon MLX judging ($0 API cost)
+
+On an Apple Silicon machine running `rapid-mlx`, a 2-model local ensemble (`qwen3.8-27b-4bit` launched with `--no-spec-decode` + `gemma-4-31b-8bit`, `think=False`) correlates strongly with the hosted `open3v2` panel (`r = 0.967`, `ρ = 0.950` on the 9-model Core 5 L2 leaderboard; painting-level `ΔAuto` `r = 0.906`, `ρ = 0.924`) when using the same `versus-auto` craft prompt and per-snapshot `1..5` human-ness scoring across 5 progress frames. Always pass `--no-spec-decode` when serving `qwen3.8-27b-4bit` with vision inputs to avoid multimodal speculative-decode hangs.
 
 ## The summary
 
