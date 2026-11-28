@@ -89,7 +89,7 @@ npm run unpaint -- status work/bench-05                       # progress of the 
 
 <p align="center"><a href="bench/README.md"><img src="docs/img/bench-pareto.svg" width="920" alt="Unpainting 0.5.1 cost versus quality Pareto frontier on Core 5 (model API cost per painting, log scale)"></a></p>
 
-<p align="center"><a href="bench/README.md"><img src="docs/img/benchmark-overview.webp" width="1200" alt="Two rows of 0.5.1 paintings. Top: each model's best Core 5 painting, sorted by open2 score. Bottom: Sargent's White Ships target, Auto 0.5 baseline, and each model's best 0.5.1 run."></a></p>
+<p align="center"><a href="bench/README.md"><img src="docs/img/benchmark-overview.webp" width="1200" alt="Two rows of 0.5.1 paintings. Top: each model's best painting across all 15 pictures (Core 5 + Extended 10), ranked by difficulty-adjusted score versus picture mean. Bottom: Sargent's White Ships target, Auto 0.5 baseline, and each model's best 0.5.1 run."></a></p>
 
 Full tables, findings, and setup: [unpaint-bench](bench/README.md) · [what the model gets](docs/what-the-model-gets.md) · [rules](bench/docs/rules.md) · [scoring](bench/docs/scoring.md) · [changelog](CHANGELOG.md). Older V1–V5 rounds: [leaderboard](bench/results/leaderboard.md), [gallery](bench/results/gallery.md) (tag `v0.3.2`).
 
