@@ -1,30 +1,32 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 415" width="960" height="415" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif">
   <defs><marker id="arr" viewBox="0 0 8 8" refX="6.5" refY="4" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M1,1.5 L7,4 L1,6.5 z" fill="#8b8378"/></marker></defs>
   <rect x="0.5" y="0.5" width="959" height="414" rx="10" fill="#fbf9f5" stroke="#ded7c8"/>
-  <text x="24" y="30" font-size="16" font-weight="700" fill="#22201d">Unpainting 0.5.1 — Craft Quality (Q) vs. Human-ness (H%)</text>
+  <text x="24" y="30" font-size="16" font-weight="700" fill="#22201d">Unpainting 0.5.1 — Craft Quality (% of Original) vs. Human-ness (H%)</text>
   <text x="24" y="48" font-size="11.5" fill="#6b645a">Core 5 means · solid dot = L3 (structured), hollow dot = L4 (shell + Python) · arrows show L3 → L4 drift toward the 65% human-ness gate</text>
-  <rect x="760.6" y="76" width="155.4" height="197.3" fill="#2d9d6f" opacity="0.09"/>
+  <rect x="683.8" y="76" width="232.2" height="197.3" fill="#2d9d6f" opacity="0.09"/>
   <text x="906" y="92" font-size="10.5" font-weight="700" fill="#237d57" text-anchor="end">Above Auto Q, mean H ≥ 65%</text>
   <rect x="68" y="273.3" width="848" height="82.7" fill="#c25e32" opacity="0.06"/>
   <text x="78" y="348" font-size="10.5" font-weight="600" fill="#a84922">Below 65% human gate → Combined score penalized by H / 65</text>
   <line x1="68.0" y1="76" x2="68.0" y2="356" stroke="#ece6da"/>
-  <text x="68.0" y="373" font-size="10.5" fill="#7a7267" text-anchor="middle">30%</text>
-  <line x1="174.0" y1="76" x2="174.0" y2="356" stroke="#ece6da"/>
-  <text x="174.0" y="373" font-size="10.5" fill="#7a7267" text-anchor="middle">35%</text>
-  <line x1="280.0" y1="76" x2="280.0" y2="356" stroke="#ece6da"/>
-  <text x="280.0" y="373" font-size="10.5" fill="#7a7267" text-anchor="middle">40%</text>
-  <line x1="386.0" y1="76" x2="386.0" y2="356" stroke="#ece6da"/>
-  <text x="386.0" y="373" font-size="10.5" fill="#7a7267" text-anchor="middle">45%</text>
-  <line x1="492.0" y1="76" x2="492.0" y2="356" stroke="#ece6da"/>
-  <text x="492.0" y="373" font-size="10.5" fill="#7a7267" text-anchor="middle">50%</text>
-  <line x1="598.0" y1="76" x2="598.0" y2="356" stroke="#ece6da"/>
-  <text x="598.0" y="373" font-size="10.5" fill="#7a7267" text-anchor="middle">55%</text>
-  <line x1="704.0" y1="76" x2="704.0" y2="356" stroke="#ece6da"/>
-  <text x="704.0" y="373" font-size="10.5" fill="#7a7267" text-anchor="middle">60%</text>
-  <line x1="810.0" y1="76" x2="810.0" y2="356" stroke="#ece6da"/>
-  <text x="810.0" y="373" font-size="10.5" fill="#7a7267" text-anchor="middle">65%</text>
+  <text x="68.0" y="373" font-size="10.5" fill="#7a7267" text-anchor="middle">35%</text>
+  <line x1="162.2" y1="76" x2="162.2" y2="356" stroke="#ece6da"/>
+  <text x="162.2" y="373" font-size="10.5" fill="#7a7267" text-anchor="middle">40%</text>
+  <line x1="256.4" y1="76" x2="256.4" y2="356" stroke="#ece6da"/>
+  <text x="256.4" y="373" font-size="10.5" fill="#7a7267" text-anchor="middle">45%</text>
+  <line x1="350.7" y1="76" x2="350.7" y2="356" stroke="#ece6da"/>
+  <text x="350.7" y="373" font-size="10.5" fill="#7a7267" text-anchor="middle">50%</text>
+  <line x1="444.9" y1="76" x2="444.9" y2="356" stroke="#ece6da"/>
+  <text x="444.9" y="373" font-size="10.5" fill="#7a7267" text-anchor="middle">55%</text>
+  <line x1="539.1" y1="76" x2="539.1" y2="356" stroke="#ece6da"/>
+  <text x="539.1" y="373" font-size="10.5" fill="#7a7267" text-anchor="middle">60%</text>
+  <line x1="633.3" y1="76" x2="633.3" y2="356" stroke="#ece6da"/>
+  <text x="633.3" y="373" font-size="10.5" fill="#7a7267" text-anchor="middle">65%</text>
+  <line x1="727.6" y1="76" x2="727.6" y2="356" stroke="#ece6da"/>
+  <text x="727.6" y="373" font-size="10.5" fill="#7a7267" text-anchor="middle">70%</text>
+  <line x1="821.8" y1="76" x2="821.8" y2="356" stroke="#ece6da"/>
+  <text x="821.8" y="373" font-size="10.5" fill="#7a7267" text-anchor="middle">75%</text>
   <line x1="916.0" y1="76" x2="916.0" y2="356" stroke="#ece6da"/>
-  <text x="916.0" y="373" font-size="10.5" fill="#7a7267" text-anchor="middle">70%</text>
+  <text x="916.0" y="373" font-size="10.5" fill="#7a7267" text-anchor="middle">80%</text>
   <line x1="68" y1="336.9" x2="916" y2="336.9" stroke="#ece6da"/>
   <text x="60" y="340.4" font-size="10.5" fill="#7a7267" text-anchor="end">55%</text>
   <line x1="68" y1="273.3" x2="916" y2="273.3" stroke="#ece6da"/>
@@ -37,48 +39,48 @@
   <text x="60" y="85.9" font-size="10.5" fill="#7a7267" text-anchor="end">95%</text>
   <line x1="68" y1="273.3" x2="916" y2="273.3" stroke="#c25e32" stroke-width="1.6" stroke-dasharray="5,3"/>
   <text x="908" y="267.3" font-size="10.5" font-weight="700" fill="#c25e32" text-anchor="end">Human-ness gate (H = 65%)</text>
-  <line x1="760.6" y1="76" x2="760.6" y2="356" stroke="#c25e32" stroke-width="1.6" stroke-dasharray="4,3"/>
-  <rect x="755.1" y="194.0" width="11" height="11" transform="rotate(45 760.6 199.5)" fill="#c25e32" stroke="#fbf9f5" stroke-width="1.4"/>
-  <text x="770.6" y="203.0" font-size="11" font-weight="700" fill="#c25e32">Auto 0.5 (Q 62.7%, H 76.6%)</text>
-  <line x1="774.0" y1="175.3" x2="799.4" y2="236.4" stroke="#2d7ff9" stroke-width="1.5" opacity="0.55" stroke-dasharray="3,2" marker-end="url(#arr)"/>
-  <circle cx="799.4" cy="236.4" r="4.6" fill="#fbf9f5" stroke="#2d7ff9" stroke-width="2.0"/>
-  <circle cx="774.0" cy="175.3" r="5.6" fill="#2d7ff9" stroke="#fbf9f5" stroke-width="1.4"/>
-  <text x="784.0" y="167.3" font-size="11" font-weight="700" fill="#2d7ff9" text-anchor="start">Astra L3</text>
-  <text x="807.4" y="239.9" font-size="9.8" font-weight="600" fill="#6b645a">Astra L4</text>
-  <line x1="453.8" y1="274.5" x2="430.5" y2="311.5" stroke="#5aa7ff" stroke-width="1.5" opacity="0.55" stroke-dasharray="3,2" marker-end="url(#arr)"/>
-  <circle cx="430.5" cy="311.5" r="4.6" fill="#fbf9f5" stroke="#5aa7ff" stroke-width="2.0"/>
-  <circle cx="453.8" cy="274.5" r="5.6" fill="#5aa7ff" stroke="#fbf9f5" stroke-width="1.4"/>
-  <text x="443.8" y="266.5" font-size="11" font-weight="700" fill="#5aa7ff" text-anchor="end">Sol L3</text>
-  <line x1="555.6" y1="181.0" x2="481.4" y2="208.4" stroke="#2da44e" stroke-width="1.5" opacity="0.55" stroke-dasharray="3,2" marker-end="url(#arr)"/>
-  <circle cx="481.4" cy="208.4" r="4.6" fill="#fbf9f5" stroke="#2da44e" stroke-width="2.0"/>
-  <circle cx="555.6" cy="181.0" r="5.6" fill="#2da44e" stroke="#fbf9f5" stroke-width="1.4"/>
-  <text x="565.6" y="185.0" font-size="11" font-weight="700" fill="#2da44e" text-anchor="start">Carbon L3</text>
-  <line x1="615.0" y1="212.2" x2="403.0" y2="227.5" stroke="#1f8875" stroke-width="1.5" opacity="0.55" stroke-dasharray="3,2" marker-end="url(#arr)"/>
-  <circle cx="403.0" cy="227.5" r="4.6" fill="#fbf9f5" stroke="#1f8875" stroke-width="2.0"/>
-  <circle cx="615.0" cy="212.2" r="5.6" fill="#1f8875" stroke="#fbf9f5" stroke-width="1.4"/>
-  <text x="625.0" y="216.2" font-size="11" font-weight="700" fill="#1f8875" text-anchor="start">Argon L3</text>
-  <text x="411.0" y="231.0" font-size="9.8" font-weight="600" fill="#6b645a">Argon L4</text>
-  <line x1="487.8" y1="186.7" x2="456.0" y2="163.8" stroke="#63b86b" stroke-width="1.5" opacity="0.55" stroke-dasharray="3,2" marker-end="url(#arr)"/>
-  <circle cx="456.0" cy="163.8" r="4.6" fill="#fbf9f5" stroke="#63b86b" stroke-width="2.0"/>
-  <circle cx="487.8" cy="186.7" r="5.6" fill="#63b86b" stroke="#fbf9f5" stroke-width="1.4"/>
-  <text x="477.8" y="178.7" font-size="11" font-weight="700" fill="#63b86b" text-anchor="end">Neon L3</text>
-  <line x1="553.5" y1="235.1" x2="106.2" y2="172.7" stroke="#d4772c" stroke-width="1.5" opacity="0.55" stroke-dasharray="3,2" marker-end="url(#arr)"/>
-  <circle cx="106.2" cy="172.7" r="4.6" fill="#fbf9f5" stroke="#d4772c" stroke-width="2.0"/>
-  <circle cx="553.5" cy="235.1" r="5.6" fill="#d4772c" stroke="#fbf9f5" stroke-width="1.4"/>
-  <text x="563.5" y="239.1" font-size="11" font-weight="700" fill="#d4772c" text-anchor="start">Sonnet 5.5 L3</text>
-  <text x="114.2" y="176.2" font-size="9.8" font-weight="600" fill="#6b645a">Sonnet 5.5 L4</text>
-  <line x1="483.5" y1="280.9" x2="324.5" y2="277.1" stroke="#808993" stroke-width="1.5" opacity="0.55" stroke-dasharray="3,2" marker-end="url(#arr)"/>
-  <circle cx="324.5" cy="277.1" r="4.6" fill="#fbf9f5" stroke="#808993" stroke-width="2.0"/>
-  <circle cx="483.5" cy="280.9" r="5.6" fill="#808993" stroke="#fbf9f5" stroke-width="1.4"/>
-  <text x="493.5" y="272.9" font-size="11" font-weight="700" fill="#808993" text-anchor="start">Terra L3</text>
-  <line x1="373.3" y1="249.1" x2="405.1" y2="237.6" stroke="#b3593a" stroke-width="1.5" opacity="0.55" stroke-dasharray="3,2" marker-end="url(#arr)"/>
-  <circle cx="405.1" cy="237.6" r="4.6" fill="#fbf9f5" stroke="#b3593a" stroke-width="2.0"/>
-  <circle cx="373.3" cy="249.1" r="5.6" fill="#b3593a" stroke="#fbf9f5" stroke-width="1.4"/>
-  <text x="363.3" y="253.1" font-size="11" font-weight="700" fill="#b3593a" text-anchor="end">Opus 5.5 L3</text>
-  <line x1="366.9" y1="214.7" x2="369.0" y2="322.9" stroke="#8e62d9" stroke-width="1.5" opacity="0.55" stroke-dasharray="3,2" marker-end="url(#arr)"/>
-  <circle cx="369.0" cy="322.9" r="4.6" fill="#fbf9f5" stroke="#8e62d9" stroke-width="2.0"/>
-  <circle cx="366.9" cy="214.7" r="5.6" fill="#8e62d9" stroke="#fbf9f5" stroke-width="1.4"/>
-  <text x="356.9" y="218.7" font-size="11" font-weight="700" fill="#8e62d9" text-anchor="end">Wonder Full L3</text>
-  <text x="492.0" y="403" font-size="11.5" font-weight="600" fill="#4c453d" text-anchor="middle">Craft Quality Q (% · blind side-by-side vs Auto 0.5)</text>
+  <line x1="683.8" y1="76" x2="683.8" y2="356" stroke="#c25e32" stroke-width="1.6" stroke-dasharray="4,3"/>
+  <rect x="678.3" y="194.0" width="11" height="11" transform="rotate(45 683.8 199.5)" fill="#c25e32" stroke="#fbf9f5" stroke-width="1.4"/>
+  <text x="693.8" y="203.0" font-size="11" font-weight="700" fill="#c25e32">Auto 0.5 (Q 67.7%, H 76.6%)</text>
+  <line x1="729.3" y1="175.3" x2="722.2" y2="236.4" stroke="#2d7ff9" stroke-width="1.5" opacity="0.55" stroke-dasharray="3,2" marker-end="url(#arr)"/>
+  <circle cx="722.2" cy="236.4" r="4.6" fill="#fbf9f5" stroke="#2d7ff9" stroke-width="2.0"/>
+  <circle cx="729.3" cy="175.3" r="5.6" fill="#2d7ff9" stroke="#fbf9f5" stroke-width="1.4"/>
+  <text x="739.3" y="167.3" font-size="11" font-weight="700" fill="#2d7ff9" text-anchor="start">Astra L3</text>
+  <text x="730.2" y="239.9" font-size="9.8" font-weight="600" fill="#6b645a">Astra L4</text>
+  <line x1="392.4" y1="274.5" x2="385.6" y2="311.5" stroke="#5aa7ff" stroke-width="1.5" opacity="0.55" stroke-dasharray="3,2" marker-end="url(#arr)"/>
+  <circle cx="385.6" cy="311.5" r="4.6" fill="#fbf9f5" stroke="#5aa7ff" stroke-width="2.0"/>
+  <circle cx="392.4" cy="274.5" r="5.6" fill="#5aa7ff" stroke="#fbf9f5" stroke-width="1.4"/>
+  <text x="382.4" y="266.5" font-size="11" font-weight="700" fill="#5aa7ff" text-anchor="end">Sol L3</text>
+  <line x1="496.3" y1="181.0" x2="415.1" y2="208.4" stroke="#2da44e" stroke-width="1.5" opacity="0.55" stroke-dasharray="3,2" marker-end="url(#arr)"/>
+  <circle cx="415.1" cy="208.4" r="4.6" fill="#fbf9f5" stroke="#2da44e" stroke-width="2.0"/>
+  <circle cx="496.3" cy="181.0" r="5.6" fill="#2da44e" stroke="#fbf9f5" stroke-width="1.4"/>
+  <text x="506.3" y="185.0" font-size="11" font-weight="700" fill="#2da44e" text-anchor="start">Carbon L3</text>
+  <line x1="563.7" y1="212.2" x2="336.8" y2="227.5" stroke="#1f8875" stroke-width="1.5" opacity="0.55" stroke-dasharray="3,2" marker-end="url(#arr)"/>
+  <circle cx="336.8" cy="227.5" r="4.6" fill="#fbf9f5" stroke="#1f8875" stroke-width="2.0"/>
+  <circle cx="563.7" cy="212.2" r="5.6" fill="#1f8875" stroke="#fbf9f5" stroke-width="1.4"/>
+  <text x="573.7" y="216.2" font-size="11" font-weight="700" fill="#1f8875" text-anchor="start">Argon L3</text>
+  <text x="344.8" y="231.0" font-size="9.8" font-weight="600" fill="#6b645a">Argon L4</text>
+  <line x1="426.9" y1="186.7" x2="394.4" y2="163.8" stroke="#63b86b" stroke-width="1.5" opacity="0.55" stroke-dasharray="3,2" marker-end="url(#arr)"/>
+  <circle cx="394.4" cy="163.8" r="4.6" fill="#fbf9f5" stroke="#63b86b" stroke-width="2.0"/>
+  <circle cx="426.9" cy="186.7" r="5.6" fill="#63b86b" stroke="#fbf9f5" stroke-width="1.4"/>
+  <text x="416.9" y="199.7" font-size="11" font-weight="700" fill="#63b86b" text-anchor="end">Neon L3</text>
+  <line x1="513.2" y1="235.1" x2="64.9" y2="172.7" stroke="#d4772c" stroke-width="1.5" opacity="0.55" stroke-dasharray="3,2" marker-end="url(#arr)"/>
+  <circle cx="64.9" cy="172.7" r="4.6" fill="#fbf9f5" stroke="#d4772c" stroke-width="2.0"/>
+  <circle cx="513.2" cy="235.1" r="5.6" fill="#d4772c" stroke="#fbf9f5" stroke-width="1.4"/>
+  <text x="523.2" y="239.1" font-size="11" font-weight="700" fill="#d4772c" text-anchor="start">Sonnet 5.5 L3</text>
+  <text x="72.9" y="176.2" font-size="9.8" font-weight="600" fill="#6b645a">Sonnet 5.5 L4</text>
+  <line x1="438.1" y1="280.9" x2="273.8" y2="277.1" stroke="#808993" stroke-width="1.5" opacity="0.55" stroke-dasharray="3,2" marker-end="url(#arr)"/>
+  <circle cx="273.8" cy="277.1" r="4.6" fill="#fbf9f5" stroke="#808993" stroke-width="2.0"/>
+  <circle cx="438.1" cy="280.9" r="5.6" fill="#808993" stroke="#fbf9f5" stroke-width="1.4"/>
+  <text x="448.1" y="293.9" font-size="11" font-weight="700" fill="#808993" text-anchor="start">Terra L3</text>
+  <line x1="314.5" y1="249.1" x2="341.7" y2="237.6" stroke="#b3593a" stroke-width="1.5" opacity="0.55" stroke-dasharray="3,2" marker-end="url(#arr)"/>
+  <circle cx="341.7" cy="237.6" r="4.6" fill="#fbf9f5" stroke="#b3593a" stroke-width="2.0"/>
+  <circle cx="314.5" cy="249.1" r="5.6" fill="#b3593a" stroke="#fbf9f5" stroke-width="1.4"/>
+  <text x="304.5" y="253.1" font-size="11" font-weight="700" fill="#b3593a" text-anchor="end">Opus 5.5 L3</text>
+  <line x1="320.2" y1="214.7" x2="311.9" y2="322.9" stroke="#8e62d9" stroke-width="1.5" opacity="0.55" stroke-dasharray="3,2" marker-end="url(#arr)"/>
+  <circle cx="311.9" cy="322.9" r="4.6" fill="#fbf9f5" stroke="#8e62d9" stroke-width="2.0"/>
+  <circle cx="320.2" cy="214.7" r="5.6" fill="#8e62d9" stroke="#fbf9f5" stroke-width="1.4"/>
+  <text x="310.2" y="218.7" font-size="11" font-weight="700" fill="#8e62d9" text-anchor="end">Wonder Full L3</text>
+  <text x="492.0" y="403" font-size="11.5" font-weight="600" fill="#4c453d" text-anchor="middle">Craft Quality Q (% of original · blind-calibrated on open2)</text>
   <text x="20" y="216.0" font-size="11.5" font-weight="600" fill="#4c453d" text-anchor="middle" transform="rotate(-90 20 216.0)">Human-ness H (% · 10-frame replay)</text>
 </svg>

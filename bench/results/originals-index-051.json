@@ -1,0 +1,340 @@
+{
+  "written": "2026-11-28 01:47",
+  "panel": [
+    "Qwen/Qwen3.8-27B",
+    "google/gemma-4-31b-it"
+  ],
+  "method": "Blind 4x balanced A/B pair (Original vs Auto 0.5) on open2 craft rubric (0-10). Auto % of original = 100 * autoPair / origPair; model Q indexed to original = 100 * (autoPair / origPair) * (Q_model / autoVersusAuto). Originals have no progression/human-ness score, so indexing applies to Craft Q and the same H/65 gate applies afterward.",
+  "subjects": {
+    "mittens-closeup-qs": {
+      "origPair": 8.688,
+      "autoPair": 6.2,
+      "autoOverOrigPairPct": 71.4,
+      "origPairJudges": {
+        "Qwen/Qwen3.8-27B": 8.575,
+        "google/gemma-4-31b-it": 8.8
+      },
+      "autoPairJudges": {
+        "Qwen/Qwen3.8-27B": 6.95,
+        "google/gemma-4-31b-it": 5.45
+      },
+      "autoWinVsOrigPct": 0.0,
+      "origSingle": 8.5,
+      "origSingleJudges": {
+        "Qwen/Qwen3.8-27B": 8.0,
+        "google/gemma-4-31b-it": 9.0
+      },
+      "autoVersusAuto": 6.97,
+      "autoVAOverOrigPairPct": 80.2,
+      "autoVAOverOrigSinglePct": 82.0
+    },
+    "turner-esseillon-qs": {
+      "origPair": 7.487,
+      "autoPair": 5.8,
+      "autoOverOrigPairPct": 77.5,
+      "origPairJudges": {
+        "Qwen/Qwen3.8-27B": 6.125,
+        "google/gemma-4-31b-it": 8.85
+      },
+      "autoPairJudges": {
+        "Qwen/Qwen3.8-27B": 7.825,
+        "google/gemma-4-31b-it": 3.775
+      },
+      "autoWinVsOrigPct": 50.0,
+      "origSingle": 8.0,
+      "origSingleJudges": {
+        "Qwen/Qwen3.8-27B": 8.0,
+        "google/gemma-4-31b-it": 8.0
+      },
+      "autoVersusAuto": 5.086,
+      "autoVAOverOrigPairPct": 67.9,
+      "autoVAOverOrigSinglePct": 63.6
+    },
+    "manet-morisot-fan-crop-qs": {
+      "origPair": 8.25,
+      "autoPair": 4.45,
+      "autoOverOrigPairPct": 53.9,
+      "origPairJudges": {
+        "Qwen/Qwen3.8-27B": 7.675,
+        "google/gemma-4-31b-it": 8.825
+      },
+      "autoPairJudges": {
+        "Qwen/Qwen3.8-27B": 5.975,
+        "google/gemma-4-31b-it": 2.925
+      },
+      "autoWinVsOrigPct": 0.0,
+      "origSingle": 8.0,
+      "origSingleJudges": {
+        "Qwen/Qwen3.8-27B": 8.0,
+        "google/gemma-4-31b-it": 8.0
+      },
+      "autoVersusAuto": 5.122,
+      "autoVAOverOrigPairPct": 62.1,
+      "autoVAOverOrigSinglePct": 64.0
+    },
+    "prout-laundresses-qs": {
+      "origPair": 8.137,
+      "autoPair": 6.237,
+      "autoOverOrigPairPct": 76.6,
+      "origPairJudges": {
+        "Qwen/Qwen3.8-27B": 7.0,
+        "google/gemma-4-31b-it": 9.275
+      },
+      "autoPairJudges": {
+        "Qwen/Qwen3.8-27B": 7.625,
+        "google/gemma-4-31b-it": 4.85
+      },
+      "autoWinVsOrigPct": 37.5,
+      "origSingle": 8.5,
+      "origSingleJudges": {
+        "Qwen/Qwen3.8-27B": 8.0,
+        "google/gemma-4-31b-it": 9.0
+      },
+      "autoVersusAuto": 6.807,
+      "autoVAOverOrigPairPct": 83.7,
+      "autoVAOverOrigSinglePct": 80.1
+    },
+    "white-ships-1488-qs": {
+      "origPair": 8.225,
+      "autoPair": 4.85,
+      "autoOverOrigPairPct": 59.0,
+      "origPairJudges": {
+        "Qwen/Qwen3.8-27B": 7.775,
+        "google/gemma-4-31b-it": 8.675
+      },
+      "autoPairJudges": {
+        "Qwen/Qwen3.8-27B": 5.75,
+        "google/gemma-4-31b-it": 3.95
+      },
+      "autoWinVsOrigPct": 0.0,
+      "origSingle": 7.5,
+      "origSingleJudges": {
+        "Qwen/Qwen3.8-27B": 7.0,
+        "google/gemma-4-31b-it": 8.0
+      },
+      "autoVersusAuto": 7.35,
+      "autoVAOverOrigPairPct": 89.4,
+      "autoVAOverOrigSinglePct": 98.0
+    },
+    "tiepolo-bacchus-qs": {
+      "origPair": 8.075,
+      "autoPair": 6.287,
+      "autoOverOrigPairPct": 77.9,
+      "origPairJudges": {
+        "Qwen/Qwen3.8-27B": 8.05,
+        "google/gemma-4-31b-it": 8.1
+      },
+      "autoPairJudges": {
+        "Qwen/Qwen3.8-27B": 6.325,
+        "google/gemma-4-31b-it": 6.25
+      },
+      "autoWinVsOrigPct": 25.0,
+      "origSingle": 8.0,
+      "origSingleJudges": {
+        "Qwen/Qwen3.8-27B": 7.0,
+        "google/gemma-4-31b-it": 9.0
+      },
+      "autoVersusAuto": 6.0,
+      "autoVAOverOrigPairPct": 74.3,
+      "autoVAOverOrigSinglePct": 75.0
+    },
+    "homer-water-fan-qs": {
+      "origPair": 9.162,
+      "autoPair": 3.662,
+      "autoOverOrigPairPct": 40.0,
+      "origPairJudges": {
+        "Qwen/Qwen3.8-27B": 8.6,
+        "google/gemma-4-31b-it": 9.725
+      },
+      "autoPairJudges": {
+        "Qwen/Qwen3.8-27B": 5.425,
+        "google/gemma-4-31b-it": 1.9
+      },
+      "autoWinVsOrigPct": 0.0,
+      "origSingle": 9.0,
+      "origSingleJudges": {
+        "Qwen/Qwen3.8-27B": 8.0,
+        "google/gemma-4-31b-it": 10.0
+      },
+      "autoVersusAuto": 4.318,
+      "autoVAOverOrigPairPct": 47.1,
+      "autoVAOverOrigSinglePct": 48.0
+    },
+    "bonington-french-town-qs": {
+      "origPair": 8.875,
+      "autoPair": 4.875,
+      "autoOverOrigPairPct": 54.9,
+      "origPairJudges": {
+        "Qwen/Qwen3.8-27B": 8.625,
+        "google/gemma-4-31b-it": 9.125
+      },
+      "autoPairJudges": {
+        "Qwen/Qwen3.8-27B": 5.25,
+        "google/gemma-4-31b-it": 4.5
+      },
+      "autoWinVsOrigPct": 0.0,
+      "origSingle": 7.5,
+      "origSingleJudges": {
+        "Qwen/Qwen3.8-27B": 7.0,
+        "google/gemma-4-31b-it": 8.0
+      },
+      "autoVersusAuto": 6.423,
+      "autoVAOverOrigPairPct": 72.4,
+      "autoVAOverOrigSinglePct": 85.6
+    },
+    "guardi-qs": {
+      "origPair": 8.537,
+      "autoPair": 7.088,
+      "autoOverOrigPairPct": 83.0,
+      "origPairJudges": {
+        "Qwen/Qwen3.8-27B": 8.0,
+        "google/gemma-4-31b-it": 9.075
+      },
+      "autoPairJudges": {
+        "Qwen/Qwen3.8-27B": 7.325,
+        "google/gemma-4-31b-it": 6.85
+      },
+      "autoWinVsOrigPct": 12.5,
+      "origSingle": 9.0,
+      "origSingleJudges": {
+        "Qwen/Qwen3.8-27B": 8.0,
+        "google/gemma-4-31b-it": 10.0
+      },
+      "autoVersusAuto": 7.1,
+      "autoVAOverOrigPairPct": 83.2,
+      "autoVAOverOrigSinglePct": 78.9
+    },
+    "sargent-tyrol-qs": {
+      "origPair": 8.538,
+      "autoPair": 3.388,
+      "autoOverOrigPairPct": 39.7,
+      "origPairJudges": {
+        "Qwen/Qwen3.8-27B": 8.025,
+        "google/gemma-4-31b-it": 9.05
+      },
+      "autoPairJudges": {
+        "Qwen/Qwen3.8-27B": 4.125,
+        "google/gemma-4-31b-it": 2.65
+      },
+      "autoWinVsOrigPct": 0.0,
+      "origSingle": 8.0,
+      "origSingleJudges": {
+        "Qwen/Qwen3.8-27B": 8.0,
+        "google/gemma-4-31b-it": 8.0
+      },
+      "autoVersusAuto": 5.183,
+      "autoVAOverOrigPairPct": 60.7,
+      "autoVAOverOrigSinglePct": 64.8
+    },
+    "ender-mountain-valley-qs": {
+      "origPair": 8.375,
+      "autoPair": 4.638,
+      "autoOverOrigPairPct": 55.4,
+      "origPairJudges": {
+        "Qwen/Qwen3.8-27B": 7.65,
+        "google/gemma-4-31b-it": 9.1
+      },
+      "autoPairJudges": {
+        "Qwen/Qwen3.8-27B": 5.575,
+        "google/gemma-4-31b-it": 3.7
+      },
+      "autoWinVsOrigPct": 0.0,
+      "origSingle": 8.0,
+      "origSingleJudges": {
+        "Qwen/Qwen3.8-27B": 8.0,
+        "google/gemma-4-31b-it": 8.0
+      },
+      "autoVersusAuto": 6.317,
+      "autoVAOverOrigPairPct": 75.4,
+      "autoVAOverOrigSinglePct": 79.0
+    },
+    "morisot-avenue-du-bois-qs": {
+      "origPair": 8.8,
+      "autoPair": 4.925,
+      "autoOverOrigPairPct": 56.0,
+      "origPairJudges": {
+        "Qwen/Qwen3.8-27B": 8.175,
+        "google/gemma-4-31b-it": 9.425
+      },
+      "autoPairJudges": {
+        "Qwen/Qwen3.8-27B": 6.5,
+        "google/gemma-4-31b-it": 3.35
+      },
+      "autoWinVsOrigPct": 12.5,
+      "origSingle": 8.0,
+      "origSingleJudges": {
+        "Qwen/Qwen3.8-27B": 7.0,
+        "google/gemma-4-31b-it": 9.0
+      },
+      "autoVersusAuto": 7.039,
+      "autoVAOverOrigPairPct": 80.0,
+      "autoVAOverOrigSinglePct": 88.0
+    },
+    "cezanne-bathers-bridge-qs": {
+      "origPair": 7.9,
+      "autoPair": 5.475,
+      "autoOverOrigPairPct": 69.3,
+      "origPairJudges": {
+        "Qwen/Qwen3.8-27B": 7.7,
+        "google/gemma-4-31b-it": 8.1
+      },
+      "autoPairJudges": {
+        "Qwen/Qwen3.8-27B": 5.775,
+        "google/gemma-4-31b-it": 5.175
+      },
+      "autoWinVsOrigPct": 25.0,
+      "origSingle": 6.5,
+      "origSingleJudges": {
+        "Qwen/Qwen3.8-27B": 6.0,
+        "google/gemma-4-31b-it": 7.0
+      },
+      "autoVersusAuto": 6.188,
+      "autoVAOverOrigPairPct": 78.3,
+      "autoVAOverOrigSinglePct": 95.2
+    },
+    "kasha-portrait-qs": {
+      "origPair": 8.475,
+      "autoPair": 6.8,
+      "autoOverOrigPairPct": 80.2,
+      "origPairJudges": {
+        "Qwen/Qwen3.8-27B": 8.275,
+        "google/gemma-4-31b-it": 8.675
+      },
+      "autoPairJudges": {
+        "Qwen/Qwen3.8-27B": 6.8,
+        "google/gemma-4-31b-it": 6.8
+      },
+      "autoWinVsOrigPct": 0.0,
+      "origSingle": 8.0,
+      "origSingleJudges": {
+        "Qwen/Qwen3.8-27B": 8.0,
+        "google/gemma-4-31b-it": 8.0
+      },
+      "autoVersusAuto": 7.678,
+      "autoVAOverOrigPairPct": 90.6,
+      "autoVAOverOrigSinglePct": 96.0
+    },
+    "h36-qs": {
+      "origPair": 8.613,
+      "autoPair": 6.6,
+      "autoOverOrigPairPct": 76.6,
+      "origPairJudges": {
+        "Qwen/Qwen3.8-27B": 8.25,
+        "google/gemma-4-31b-it": 8.975
+      },
+      "autoPairJudges": {
+        "Qwen/Qwen3.8-27B": 6.7,
+        "google/gemma-4-31b-it": 6.5
+      },
+      "autoWinVsOrigPct": 12.5,
+      "origSingle": 8.5,
+      "origSingleJudges": {
+        "Qwen/Qwen3.8-27B": 8.0,
+        "google/gemma-4-31b-it": 9.0
+      },
+      "autoVersusAuto": 7.906,
+      "autoVAOverOrigPairPct": 91.8,
+      "autoVAOverOrigSinglePct": 93.0
+    }
+  }
+}

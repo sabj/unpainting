@@ -36,9 +36,9 @@ Try the [quick start](#try-it), paint by hand in [Paint Lab](https://sabj.github
 1. **Generate line drawings & colour studies** — An open image model (Qwen-Image-Edit) decomposes the target into a clean line drawing and three flat colour block-in studies, and SAM cuts out named forms ([ink & studies](docs/ink.md)).
 2. **Automate a painting process (`Auto`)** — Code traces the drawing into ordered pen or pencil contours on cold-press paper, then sweeps overlapping wet-in-wet and dry-brush washes light-to-dark on WebGPU while a guard seals the target's pixels ([how it paints](docs/how-it-paints.md), [the guard](docs/honesty.md)).
 3. **Hand the same brushes to models (`L1–L4`)** — Frontier LLMs get some or all of those inputs plus painting tips, author their own scripts from bare paper, and inspect half-size test looks as they work ([what the model gets](docs/what-the-model-gets.md)).
-4. **Judge the outputs (`open2`)** — Two open-weight vision judges (**Qwen 3.8 27B + Gemma 4 31B**, `$0` local MLX or OpenRouter) grade craft `Q` blind against Auto, score 10 replay frames for human-ness `H`, and track API cost ([scoring](bench/docs/scoring.md)).
+4. **Judge the outputs (`open2`)** — Two open-weight vision judges (**Qwen 3.8 27B + Gemma 4 31B**, `$0` local MLX or OpenRouter) grade craft `Q` blind against Auto, index `Q` to each picture's original (`% of original`, with a raw `0–100` mode alongside), and score 10 replay frames for human-ness `H`. Model API cost is reported beside the score, never inside it ([scoring](bench/docs/scoring.md)).
 
-<p align="center"><a href="docs/how-it-paints.md"><img src="docs/img/pipeline-summary.webp" width="900" alt="Unpainting 0.5.1 four-step flow: 01 Studies and Drawing, 02 Automated Painting on WebGPU, 03 Hand to Models (L1–L4), and 04 Blind Judging (open2)"></a></p>
+<p align="center"><a href="docs/how-it-paints.md"><img src="docs/img/pipeline-summary.webp" width="900" alt="Unpainting 0.5.1 four-step flow on Mittens: 01 Studies and Drawing, 02 Automated Painting on WebGPU, 03 Hand to Models (L1–L4), and 04 Blind Judging (open2)"></a></p>
 
 <p align="center"><img src="docs/img/cheat-white-ships.webp" width="912" alt="Sargent's White Ships four times: the target; cheat #1, a hill-climber that keeps random dabs only when they match the photo better; cheat #2, strokes replayed with paint sampled from the photo's pixels; and Fair Mode (0.5), building up stroke by stroke with zero target pixel reads."></p>
 
@@ -75,7 +75,7 @@ npm run unpaint -- status work/bench-05                              # progress 
 
 ## Benchmark
 
-[unpaint-bench](bench/README.md) hands AI models the simulator's brush and pen across **15 pictures** (5 Core at `L1–L4`, 10 Extended at `L2`; [credits](bench/PICTURES.md)). Models can look at the target, never read its pixels, and are graded by two open-weight vision judges (`open2`: **Qwen 3.8 27B + Gemma 4 31B**, identical locally on Apple Silicon MLX or via OpenRouter) on craft vs Auto 0.5 and human-ness across ten progress frames (`Q × min(1, H / 65)`).
+[unpaint-bench](bench/README.md) hands AI models the simulator's brush and pen across **15 pictures** (5 Core at `L1–L4`, 10 Extended at `L2`; [credits](bench/PICTURES.md)). Models can look at the target, never read its pixels, and are graded by two open-weight vision judges (`open2`: **Qwen 3.8 27B + Gemma 4 31B**, identical locally on Apple Silicon MLX or via OpenRouter) on craft indexed to each picture's original (`% of original`, plus a non-indexed raw `0–100` mode) and human-ness across ten progress frames (`Combined = Q × min(1, H / 65)`).
 
 | Level | Inputs given to the model | Mode |
 |---|---|---|

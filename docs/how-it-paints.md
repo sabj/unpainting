@@ -4,16 +4,9 @@ Auto plans its washes from flat colour studies and a traced drawing; a model sta
 
 ![Yale Rosewalk, from photograph and watercolour target to Auto’s ink and washes](img/hero-rosewalk.webp)
 
-## The 0.5.1 pipeline
+## The 0.5.1 architecture
 
-![Unpainting 0.5.1 summary flow from block-in studies and SAM forms through WebGPU brushwork to open2 judging](img/pipeline-summary.webp)
-
-<details>
-<summary>Full 4-stage pipeline diagram</summary>
-
-![Full 4-stage Unpainting 0.5.1 pipeline diagram](img/pipeline-map.png)
-
-</details>
+![Unpainting 0.5.1 architecture flow from target and studies through dual Auto 0.5 and Model L1–L4 tracks, across the Target Guard into the shared WebGPU paper engine and blind open2 judging](img/pipeline-flow.svg)
 
 ## Paper, water, and brush physics
 

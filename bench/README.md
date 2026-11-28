@@ -11,56 +11,58 @@ The clean 0.5.1 benchmark is scored on the local-first `open2` panel (**Qwen 3.8
 <p align="center"><img src="../docs/img/judging-rubric.svg" width="900" alt="How 0.5.1 open2 judging works"></p>
 <p align="center"><img src="../docs/img/difficulty-scoring.svg" width="900" alt="Subject difficulty spread and L4b open-book pixel-error control"></p>
 
-### All 15 pictures · `L2` (`open2`, Core 5 + Extended 10 including Yale Rosewalk)
+### All 15 pictures · `L2` (`open2`, `% of original`, Core 5 + Extended 10 including Yale Rosewalk)
 
-Auto 0.5 baseline across all 15 pictures: **`59.2%`** (`Q = 63.7%`, `H = 72.6%`).
+Craft `Q` is indexed to each picture's blind-judged original (`Original = 100%`, chained via 4× balanced blind `Original vs. Auto` pairs on `open2`; originals have no progression subscore, so indexing applies to Craft `Q` before the `H / 65` gate). Toggle between **`% of Original`** and **non-indexed `Raw 0–100`** in the [Live Benchmark Explorer](https://sabj.github.io/unpainting/demos/bench/) — see [Scoring](docs/scoring.md#indexing-to-the-original-and-non-indexed-raw-mode).
 
-| Model | Pictures | Combined | Craft `Q` | Human-ness `H` | Mean API Cost |
+Auto 0.5 baseline across all 15 pictures: **`60.5%`** of original (`Q = 64.8%`, `H = 72.6%`; non-indexed raw `59.2%`, `Q = 63.7%`).
+
+| Model | Pictures | Combined (`% orig`) | Craft `Q` (`% orig`) | Human-ness `H` | Mean API Cost |
 |---|---:|---:|---:|---:|---:|
-| **Codex Astra 6.2 · med** | 15/15 | **53.3%** | 54.9% | 74.3% | $1.26 |
-| **Codex Sol 6.1 · med** | 15/15 | **51.2%** | 52.0% | 76.9% | $0.40 |
-| **Gemini 4 Carbon · med** | 15/15 | **49.9%** | 51.1% | 82.1% | $2.06 |
-| **Gemini 4 Neon · med** | 15/15 | **45.4%** | 46.5% | 76.8% | $1.62 |
-| **Gemini 4 Argon · med** | 15/15 | **44.1%** | 44.7% | 74.3% | $1.08 |
-| **Codex Terra 6.1 · med** | 15/15 | **41.7%** | 44.2% | 72.8% | $0.09 |
-| **Muse Wonder Full · med** | 15/15 | **32.6%** | 34.2% | 70.6% | $0.89 |
+| **Codex Astra 6.2 · med** | 15/15 | **54.7%** | 56.6% | 74.3% | $1.26 |
+| **Codex Sol 6.1 · med** | 15/15 | **52.7%** | 53.5% | 76.9% | $0.40 |
+| **Gemini 4 Carbon · med** | 15/15 | **51.2%** | 52.8% | 82.1% | $2.06 |
+| **Gemini 4 Neon · med** | 15/15 | **46.8%** | 47.9% | 76.8% | $1.62 |
+| **Gemini 4 Argon · med** | 15/15 | **45.4%** | 46.1% | 74.3% | $1.08 |
+| **Codex Terra 6.1 · med** | 15/15 | **42.2%** | 44.9% | 72.8% | $0.09 |
+| **Muse Wonder Full · med** | 15/15 | **32.6%** | 34.3% | 70.6% | $0.89 |
 
-### Core 5 results (`open2`, Combined `Q × min(1, H / 65)`)
+### Core 5 results (`open2`, Combined `Q_orig × min(1, H / 65)`)
 
-Auto 0.5 baseline on Core 5: **`60.1%`** (`Q = 62.7%`, `H = 76.6%`).
+Auto 0.5 baseline on Core 5: **`64.4%`** of original (`Q = 67.7%`, `H = 76.6%`; non-indexed raw `60.1%`, `Q = 62.7%`).
 
 | Model | L1 | L2 | L3 | L4 | Peak |
 |---|---:|---:|---:|---:|:---:|
-| **Codex Astra 6.2 · med** | 45.6% | 50.5% | **61.8%** | 57.5% | L3 |
-| **Gemini 4 Argon · med** | 39.7% | 42.8% | **54.3%** | 42.5% | L3 |
-| **Gemini 4 Carbon · med** | 42.9% | 47.8% | **53.0%*** | 48.3% | L3* |
-| **Sonnet 5.5 · med** | 47.5% | 44.9% | **50.5%** | 31.8% | L3 |
-| **Gemini 4 Neon · med** | 45.8% | 46.7% | **49.4%** | 48.3% | L3 |
-| **Codex Terra 6.1 · med** | 41.2% | 42.5% | **45.5%** | 38.3% | L3 |
-| **Codex Sol 6.1 · med** | 45.7% | **55.5%** | 44.2% | 41.7% | L2 |
-| **Opus 5.5 · med** | 32.8% | 33.9% | **43.7%** | 41.3% | L3 |
-| **Muse Wonder Full · med** | 28.2% | 34.7% | **42.7%** | 35.9% | L3 |
+| **Codex Astra 6.2 · med** | 50.4% | 56.0% | **68.4%** | 61.9% | L3 |
+| **Codex Sol 6.1 · med** | 50.5% | **60.9%** | 48.0% | 46.3% | L2 |
+| **Gemini 4 Argon · med** | 43.5% | 48.2% | **59.6%** | 44.8% | L3 |
+| **Gemini 4 Carbon · med** | 46.6% | 53.5% | **57.7%*** | 52.1% | L3* |
+| **Sonnet 5.5 · med** | 52.9% | 49.2% | **55.9%** | 34.8% | L3 |
+| **Gemini 4 Neon · med** | 50.8% | 52.2% | **53.7%** | 52.3% | L3 |
+| **Codex Terra 6.1 · med** | 46.4% | 46.5% | **50.4%** | 41.4% | L3 |
+| **Opus 5.5 · med** | 35.7% | 36.9% | **47.5%** | 45.4% | L3 |
+| **Muse Wonder Full · med** | 32.0% | 37.7% | **46.9%** | 39.4% | L3 |
 
-*\*Carbon L3 completed-only mean covers 4/5 Core pictures (Prout L3 pending); counting the missing run as 0 gives `42.4%`.*
+*\*Carbon L3 completed-only mean covers 4/5 Core pictures (Prout L3 pending); counting the missing run as 0 gives `46.2%` (`42.4%` raw).*
 
-### Extended 10 `L2` (`open2`, `n = 10` pictures each)
+### Extended 10 `L2` (`open2`, `% of original`, `n = 10` pictures each)
 
-Auto 0.5 baseline on Extended 10: **`58.7%`** (`Q = 64.2%`, `H = 70.6%`).
+Auto 0.5 baseline on Extended 10: **`58.5%`** of original (`Q = 63.3%`, `H = 70.6%`; non-indexed raw `58.7%`, `Q = 64.2%`).
 
-| Model | Combined | Craft `Q` | Human-ness `H` |
+| Model | Combined (`% orig`) | Craft `Q` (`% orig`) | Human-ness `H` |
 |---|---:|---:|---:|
-| **Codex Astra 6.2 · med** | **54.7%** | 56.0% | 77.5% |
-| **Gemini 4 Carbon · med** | 50.9% | 51.9% | 84.0% |
-| **Codex Sol 6.1 · med** | 49.0% | 50.0% | 79.3% |
-| **Gemini 4 Argon · med** | 44.7% | 45.2% | 74.8% |
-| **Gemini 4 Neon · med** | 44.7% | 46.0% | 74.9% |
-| **Codex Terra 6.1 · med** | 41.3% | 44.5% | 72.7% |
-| **Muse Wonder Full · med** | 31.6% | 34.0% | 66.4% |
+| **Codex Astra 6.2 · med** | **54.1%** | 55.7% | 77.5% |
+| **Gemini 4 Carbon · med** | 50.1% | 51.0% | 84.0% |
+| **Codex Sol 6.1 · med** | 48.5% | 49.4% | 79.3% |
+| **Gemini 4 Neon · med** | 44.1% | 45.4% | 74.9% |
+| **Gemini 4 Argon · med** | 44.0% | 44.5% | 74.8% |
+| **Codex Terra 6.1 · med** | 40.1% | 43.4% | 72.7% |
+| **Muse Wonder Full · med** | 30.1% | 32.6% | 66.4% |
 
 ### Key findings
 
-- **Autonomy peaks at L3 (`8/9` completed-only; Sol peaks at L2; `0/9` peak at L4).** At L4, shell + Python loops more than double passage count (`33.9 → 73.5` avg), nudging pooled human-ness `H` down (`72.7% → 70.3%`, with `16/45` runs tripping the `< 65%` gate vs `12/44` at L3) even when raw craft `Q` rises on individual runs (Astra `Q` edges up `+1.3 pp` at L4, but its `H` drops on Prout).
-- **Effort inverted-U (Core 5 `L2`):** Codex Astra peaks at `high` (`low 46.9% → med 50.5% → high 57.7% → xhigh 53.9%`); Codex Sol peaks at `med` (`low 47.7% → med 55.5% → high 51.4% → xhigh 48.6%`).
+- **Autonomy peaks at L3 (`8/9` completed-only; Sol peaks at L2; `0/9` peak at L4).** At L4, shell + Python loops more than double passage count (`33.9 → 73.5` avg), nudging pooled human-ness `H` down (`72.7% → 70.3%`, with `16/45` runs tripping the `< 65%` gate vs `12/44` at L3) even when raw craft `Q` rises on individual runs (Astra `Q` edges up at L4, but its `H` drops on Prout).
+- **Effort inverted-U (Core 5 `L2`, `% of original`):** Codex Astra peaks at `high` (`low 51.5% → med 56.0% → high 63.4% → xhigh 56.4%`; raw `46.9% → 50.5% → 57.7% → 53.9%`); Codex Sol peaks at `med` (`low 51.7% → med 60.9% → high 56.6% → xhigh 52.1%`; raw `47.7% → 55.5% → 51.4% → 48.6%`).
 - **Open-book `L4b` control (3-judge panel `GLM-5.3-Flash + Kimi-K3.1-Pro + Gemma 4 31B`, `0–10` scale):** Giving Astra, Sol, and Carbon direct Python/OpenCV target-pixel access cuts pixel error `ΔE` by `19–53%` and raises SSIM by `+2–62%`, yet goes `0/5` against Auto (`Q = 2.6–4.9` vs Auto `6.7` on White Ships / `7.0` on Mittens) — pixel optimization cannot fake watercolour craft.
 
 All models in the main tables use medium effort. [Model IDs](../tools/paint/authors.json).
